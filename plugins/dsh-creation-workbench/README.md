@@ -2,7 +2,7 @@
 
 **WTT 创作工作台**（`@wtt/dsh-creation-workbench`）是面向 DeepSeek Harness（DSH）的通用创作插件：用自由画布管理素材与文件，卡片化组织文本、PPT、图片、视频与文档，AI 创作流可接入本机任意 Skill。
 
-- **旗舰工作流：课程制作**——八步曲大纲 → 分镜 → 可编辑课件 → 逐字稿/练习/讲师手册的完整闭环，并支持课件源稿的 AI 迭代编辑
+- **旗舰工作流：课程制作**——大纲 → 分镜 → 可编辑课件 → 逐字稿/练习/讲师手册的完整闭环，并支持课件源稿的 AI 迭代编辑
 - **同样适合**：营销方案、视频脚本与分镜、调研整理、任意 Skill 驱动的创作场景
 
 ## 功能总览
@@ -67,18 +67,20 @@ PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm test
 
 ## 运行前提（自备）
 
-本仓库只包含插件本体（前端、Host 业务服务与内部工作台协议）。以下能力按需自备，缺失时界面如实提示：
+本仓库只包含插件本体（前端、Host 业务服务与内部工作台协议）。课程类等复杂创作工作流由你自己的本机 Skill 驱动，插件不附带任何课程技能；Skill 缺失或不可调用时界面如实提示，不伪装可用。
 
-| 能力 | 本机 Skill | 运行与技术检查 |
-| --- | --- | --- |
-| 大纲 | `wtt-course-eight-steps-dev` | 保留八步曲课题／大纲确认 |
-| PPT | `wtt-course-pptx-generator` → `wtt-course-pptx-builder` | 依赖 `python-pptx`、`PyMuPDF`、Builder 脚本及 LibreOffice；登记时重新验证实际 PPTX 和原生可编辑性 |
-| 练习 | `wtt-course-exercise-builder` | 依赖 `reportlab`、`pypdf`；正式交付仅 PDF／CSV |
-| 逐字稿 | `wtt-course-scriptwriter` | 可独立输出 Markdown；DOCX 需 `python-docx`，PDF 需 `pypdf` |
+建议把复杂创作拆成多个步骤，每步在文本／PPT 创作框中选择对应的本机 Skill 推进。以课程制作为例：
 
-- Python 生产及文件验证使用同一 `pythonExecutable`（默认 `python3`），依赖版本见 `resources/course-python-requirements.txt`；文档导入复用同一套 Python 依赖
+1. **大纲**——导入资料与背景，用你的大纲类 Skill 生成课程大纲，确认后保存版本
+2. **分镜**——从大纲进入分镜类 Skill，逐段确认教学安排与页面设计
+3. **课件**——用课件类 Skill 生成可编辑 PPT；插件在登记时会重新验证真实 PPTX 与原生可编辑性
+4. **练习与逐字稿**——分别用练习类、逐字稿类 Skill 产出正式文件（PDF／CSV、Markdown／DOCX 等）
+
+环境依赖按需自备，缺失时如实提示：
+
+- Python 3 与文档／课件依赖（版本见 `resources/course-python-requirements.txt`；PPT 分页渲染需 LibreOffice）
 - MP4／WebM 视频预览需要本机 `ffprobe`；图片／视频生成需本机即梦 API 与账号
-- 本仓库**不包含**课程类私有 Skills、私有知识库、企业品牌模板或任何账号凭据；模型账号在 DSH 界面配置
+- 本仓库**不包含**任何课程技能、私有知识库、企业品牌模板或账号凭据；模型账号在 DSH 界面配置
 
 ## 文件组织
 
