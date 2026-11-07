@@ -19,7 +19,7 @@
   "type": "module",
   "engines": {
     "node": ">=24",
-    "dsh": "0.2.1-rc.5"
+    "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
   },
   "exports": {
     ".": "./src/index.mjs",

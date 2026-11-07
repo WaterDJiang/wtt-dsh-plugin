@@ -17,7 +17,7 @@
 
 ## 安装
 
-前提：已安装 DSH 宿主 `0.2.1-rc.5`；源码构建另需 Node ≥ 24。
+前提：DSH 宿主 `0.2.1-rc.5` 或更新（含 `0.2.2-rc.x`，见 `package.json` 的 `engines.dsh`）；源码构建另需 Node ≥ 24。
 
 ### 方式一：DSH 插件市场安装（最简单，无需命令行）
 
@@ -71,7 +71,7 @@ WTT_COURSE_WORKSPACE=/path/to/workspace dsh web
 ```sh
 npm install --prefix .runtime/node node@24.11.0 --registry=https://registry.npmjs.org
 PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm ci --registry=https://registry.npmjs.org
-PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm install --prefix .runtime/host @deepseek-ai/dsh@0.2.1-rc.5 --registry=https://registry.npmjs.org
+PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm install --prefix .runtime/host @deepseek-ai/dsh@0.2.1-rc.5 --registry=https://registry.npmjs.org   # 安装与你运行版本一致的 DSH 宿主
 PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm run build
 PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm test
 ```
@@ -120,7 +120,7 @@ PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm test
 
 ## 开源使用须知
 
-- 本插件是面向 DSH 的独立第三方项目，与 DeepSeek 无隶属关系
+- 本插件是面向 DSH 的独立第三方项目，与 DeepSeek 无隶属关系；运行依赖 DSH 宿主 `0.2.1-rc.5` 或更新（`engines.dsh: >=0.2.1-rc.5 || >=0.2.2-rc.0`）
 - 按许可证「按原样」提供，不含任何担保
 - 插件不收集、不上传任何数据；所有项目数据保存在用户本机工作目录
 - 模型账号、本机技能、Python 依赖与外部工具需自行配置，插件对缺失能力如实报错，不伪装可用
