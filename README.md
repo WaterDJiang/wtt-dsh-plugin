@@ -8,3 +8,14 @@ WTT 面向 DeepSeek Harness（DSH）的插件合集，按 monorepo 组织。每�
 
 - 运行依赖 DSH 宿主 `0.2.1-rc.5`
 - 许可证：MIT（整仓统一）
+
+## 安装
+
+各子插件的完整安装说明见其目录内 README。以创作工作台为例，npm 成品包两步安装（包内含已构建产物，无需本地构建）：
+
+```sh
+npm pack @wtt/dsh-creation-workbench
+dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
+```
+
+源码构建、启动参数与运行前提见 [`plugins/dsh-creation-workbench/README.md`](plugins/dsh-creation-workbench/README.md)。

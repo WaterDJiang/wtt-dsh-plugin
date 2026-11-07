@@ -15,7 +15,20 @@
 - **成果管理**：正式文件按「需求／版本／任务」目录组织，同卡多版本、下载绑定具体文件与 SHA-256 校验，旧版本不覆盖
 - **Skill 发现**：自动读取本机常见技能目录（`~/.codex/skills`、`~/.agents/skills`、`~/.claude/skills`），常用技能点星收藏、中文改名
 
-## 安装（DSH 宿主 0.2.1-rc.5）
+## 安装
+
+前提：已安装 DSH 宿主 `0.2.1-rc.5`；源码构建另需 Node ≥ 24。
+
+### 方式一：npm 成品包（推荐，无需本地构建）
+
+npm 包内含已构建的 `dist/` 前端与业务服务：
+
+```sh
+npm pack @wtt/dsh-creation-workbench
+dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
+```
+
+### 方式二：从源码构建
 
 ```sh
 git clone https://github.com/WaterDJiang/wtt-dsh-plugin.git
@@ -23,12 +36,20 @@ cd wtt-dsh-plugin/plugins/dsh-creation-workbench
 npm install
 npm run build
 npm pack
-dsh plugin --profile web add /绝对路径/wtt-dsh-creation-workbench-<版本>.tgz
+dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
 ```
 
-或使用 npm 包（发布后）：`npm pack @wtt/dsh-creation-workbench`，再按上述 `dsh plugin add` 安装。
+Node ≥ 24 推荐按下文「构建与检查」先安装隔离运行时，避免污染系统 Node。
 
-安装到已有 DSH 时，需使用兼容的 `0.2.1-rc.5`。从期望的工作目录运行 `dsh web`，或设置 `WTT_COURSE_WORKSPACE` 指定默认目录。
+### 安装后启动
+
+```sh
+WTT_COURSE_WORKSPACE=/path/to/workspace dsh web
+```
+
+进入 DSH 左侧「WTT 创作工作台」即可使用；之后可直接从工作目录运行 `dsh web`，工作区在前端切换并记忆。
+
+仓库还自带启动器 `./scripts/wtt-dsh --workspace /path/to/workspace`：使用项目内 Node 24 与 DSH，在隔离 profile 自动安装插件，首次安装后复用；停止用 `Ctrl+C`。
 
 ## 构建与检查
 
