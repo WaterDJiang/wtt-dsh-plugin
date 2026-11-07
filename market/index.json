@@ -1,0 +1,73 @@
+{
+  "format": 1,
+  "title": {
+    "zh": "WTT 插件市场索引",
+    "en": "WTT plugin market index"
+  },
+  "description": {
+    "zh": "WTT 面向 DeepSeek Harness（DSH）的插件合集。",
+    "en": "WTT plugins for DeepSeek Harness (DSH)."
+  },
+  "metadata": {
+    "categories": {
+      "creation": {
+        "title": {
+          "zh": "创作工具",
+          "en": "Creation"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "@wtt/dsh-creation-workbench",
+      "title": {
+        "zh": "WTT 创作工作台",
+        "en": "WTT Creation Workbench"
+      },
+      "description": {
+        "zh": "自由创作画布：素材、文本、PPT、图片、视频与任意 Skill 工作流；课程制作为旗舰工作流。",
+        "en": "Free creation canvas for materials, text, PPT, images, video and any Skill workflow; course production is the flagship workflow."
+      },
+      "author": "Wattter (WTT)",
+      "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+      "repository": {
+        "url": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+        "directory": "plugins/dsh-creation-workbench"
+      },
+      "metadata": {
+        "category": "creation",
+        "keywords": [
+          "wtt-dsh-plugin",
+          "creation-workbench",
+          "dsh",
+          "deepseek",
+          "创作画布",
+          "课件",
+          "课程制作",
+          "工作台",
+          "canvas"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.51.0",
+          "publishTimestamp": 1794066153,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+            "commit": "14b29593e15ca5217a8668758fd148e4fbe39346",
+            "path": "plugins/dsh-creation-workbench"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.5"
+          }
+        }
+      ]
+    }
+  ]
+}
