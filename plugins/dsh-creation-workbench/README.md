@@ -19,7 +19,20 @@
 
 前提：已安装 DSH 宿主 `0.2.1-rc.5`；源码构建另需 Node ≥ 24。
 
-### 方式一：npm 成品包（推荐，无需本地构建）
+### 方式一：DSH 插件市场安装（最简单，无需命令行）
+
+1. 在 DSH 插件管理页启用实验性的「自定义插件市场」
+2. 在发现页添加本项目市场索引源：
+
+```
+https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json
+```
+
+3. 搜索「创作工作台」「课件」或包名 `@wtt/dsh-creation-workbench`，一键安装
+
+版本按 git 提交固定；发布新版本后刷新索引即可看到更新。
+
+### 方式二：npm 成品包（无需本地构建）
 
 npm 包内含已构建的 `dist/` 前端与业务服务：
 
@@ -28,7 +41,7 @@ npm pack @wtt/dsh-creation-workbench
 dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
 ```
 
-### 方式二：从源码构建
+### 方式三：从源码构建
 
 ```sh
 git clone https://github.com/WaterDJiang/wtt-dsh-plugin.git
