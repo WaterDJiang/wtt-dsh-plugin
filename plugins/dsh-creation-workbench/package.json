@@ -1,0 +1,64 @@
+{
+  "name": "@wtt/dsh-creation-workbench",
+  "version": "0.51.0",
+  "description": "WTT 创作工作台：DSH 通用创作画布——自由画布管理素材、文本、PPT、图片、视频与任意 Skill 工作流；课程制作为旗舰工作流（八步曲→分镜→课件→逐字稿）。",
+  "type": "module",
+  "engines": {
+    "node": ">=24",
+    "dsh": "0.2.1-rc.5"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./client": "./dist/client.js"
+  },
+  "files": [
+    "src",
+    "dist",
+    "skills",
+    "resources/course-python-requirements.txt",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+        "@deepseek-ai/dsh-client-ui-input-trigger"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/start.mjs",
+    "check": "node scripts/doctor.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-skill-filesystem": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.5"
+  },
+  "devDependencies": {
+    "@tiptap/extension-table": "3.32.2",
+    "@tiptap/markdown": "3.32.2",
+    "@tiptap/react": "3.32.2",
+    "@tiptap/starter-kit": "3.32.2",
+    "@xyflow/react": "12.12.0",
+    "esbuild": "0.25.12",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  }
+}

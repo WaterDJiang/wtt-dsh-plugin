@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,readFileSync,writeFileSync,mkdirSync,rmSync,symlinkSync,unlinkSync,utimesSync,statSync,existsSync} from 'node:fs';
+import {tmpdir} from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';import {spawnSync} from 'node:child_process';
+import {WorkbenchService} from '../src/service.mjs';import {documentApplications} from '../src/external-documents.mjs';
+function fixture(t,extra={}){const root=mkdtempSync(path.join(tmpdir(),'cw36-')),opened=[];const config={documentStabilityMs:0,documentApplicationFolders:[],openDocumentApplication:async(file,app,folder)=>opened.push({file,app,folder}),...extra};const service=new WorkbenchService({workspaceRoot:root,...config}),req=service.store.createRequirement({background:'外部编辑独立验收',operationId:randomUUID()});t.after(()=>{service.close();rmSync(root,{recursive:true,force:true})});return {root,service,req,opened,config}}
+async function imported(f,name,bytes){await f.service.importMaterial({requirementId:f.req.id,filename:name,bytes,operationId:randomUUID()});const n=f.service.canvas.getBoard(f.req.id).nodes.find(n=>n.importedFile?.name===name);return {node:n,scope:{requirementId:f.req.id,cardId:n.outputCard.id,versionId:n.outputCard.versionId,sourceRef:n.id,hash:n.importedFile.hash}}}
+const publish=(f,d,operationId=randomUUID())=>f.service.externalDocuments.saveVersion({draftId:d.id,revision:d.revision,hash:d.hash,operationId});
+const nextScope=(f,r)=>{const d=f.service.cards.describe({requirementId:f.req.id,cardId:r.cardId,versionId:r.versionId});return {requirementId:f.req.id,cardId:r.cardId,versionId:r.versionId,sourceRef:d.version.primaryRef,hash:d.node.sourceHash}};
+function python(code,args){const p=spawnSync('python3',['-c',code,...args],{encoding:'utf8'});assert.equal(p.status,0,p.stderr);return p.stdout}
+
+test('application discovery filters actual bundles by format; unknown apps cannot launch or create copies',async t=>{
+ const f=fixture(t),apps=path.join(f.root,'apps');for(const app of ['wpsoffice.app','Microsoft Word.app','Numbers.app']){mkdirSync(path.join(apps,app,'Contents'),{recursive:true});writeFileSync(path.join(apps,app,'Contents/Info.plist'),'fixture')}
+ assert.deepEqual(documentApplications('csv',[apps]).map(a=>a.id),['default','wps','numbers']);assert.deepEqual(documentApplications('docx',[apps]).map(a=>a.id),['default','wps','word']);assert.deepEqual(documentApplications('pdf',[apps]).map(a=>a.id),['default','wps']);
+ const {scope}=await imported(f,'中文数据.csv',Buffer.from('a,b\n1,2\n'));const d=await f.service.externalDocuments.open(scope);assert.equal(d.workingFile,null);assert.equal(existsSync(path.join(f.root,'工作稿')),false);
+ await assert.rejects(f.service.externalDocuments.openApplication({draftId:d.id,application:'/tmp/evil.app'}),/未安装/);assert.equal(f.opened.length,0);assert.equal(existsSync(path.join(f.root,'工作稿')),false);
+ const launched=await f.service.externalDocuments.openApplication({draftId:d.id});assert.equal(f.opened.length,1);assert.ok(launched.workingFile.startsWith('工作稿/'));assert.equal(path.extname(f.opened[0].file),'.csv');assert.equal(f.opened[0].app.id,'default');
+});
+
+test('external CSV changes preview only until manual publish, retains original and reuses work file after V2',async t=>{
+ const f=fixture(t),original=Buffer.from('\ufeff项目,说明\r\n原文,"a,b"\r\n'),{scope,node}=await imported(f,'课堂数据.csv',original);let d=await f.service.externalDocuments.open(scope);
+ await f.service.externalDocuments.openApplication({draftId:d.id});const work=f.service.externalDocuments.work(d.id),file=path.join(f.root,work.path);assert.deepEqual(readFileSync(file),original);assert.notEqual(statSync(file).ino,statSync(path.join(f.root,node.importedFile.path)).ino);
+ writeFileSync(file,'项目,说明\n修改,"第一行\n第二行"\n');d=await f.service.externalDocuments.status({draftId:d.id});assert.equal(d.state,'changed');assert.deepEqual(d.rows,[['项目','说明'],['修改','第一行\n第二行']]);assert.equal(f.service.cards.describe({requirementId:f.req.id,cardId:scope.cardId}).card.versions.length,1);
+ const id=randomUUID(),payload={draftId:d.id,revision:d.revision,hash:d.hash,operationId:id};const v2=await f.service.externalDocuments.saveVersion(payload);assert.deepEqual(await f.service.externalDocuments.saveVersion(payload),v2);assert.equal(f.service.cards.describe({requirementId:f.req.id,cardId:v2.cardId}).version.number,2);
+ let current=await f.service.externalDocuments.open(nextScope(f,v2));assert.equal(current.workingFile,work.path);assert.equal(current.dirty,false);writeFileSync(file,'项目,说明\n继续修改,第三版\n');current=await f.service.externalDocuments.status({draftId:current.id});const v3=await publish(f,current);assert.equal(f.service.cards.describe({requirementId:f.req.id,cardId:v3.cardId}).version.number,3);
+ assert.deepEqual(await f.service.externalDocuments.saveVersion(payload),v2);assert.equal(f.service.externalDocuments.work((await f.service.documents.open(nextScope(f,v3))).id).path,work.path);assert.deepEqual(f.service.canvas.readImportedFile(node.refId).bytes,original);
+ const old=await f.service.externalDocuments.open(scope);assert.equal(old.dirty,false);await f.service.externalDocuments.openApplication({draftId:old.id});assert.notEqual(f.service.externalDocuments.work(old.id).path,work.path);
+});
+
+test('changed-again and writing files cannot publish unseen bytes; corrupt/link/missing files keep last good preview',async t=>{
+ const f=fixture(t),{scope}=await imported(f,'安全.csv',Buffer.from('a,b\n1,2\n'));let d=await f.service.externalDocuments.open(scope);await f.service.externalDocuments.openApplication({draftId:d.id});const file=path.join(f.root,f.service.externalDocuments.work(d.id).path);
+ writeFileSync(file,'a,b\n3,4\n');d=await f.service.externalDocuments.status({draftId:d.id});writeFileSync(file,'a,b\n5,6\n');await assert.rejects(publish(f,d),/又发生了变化/);d=await f.service.externalDocuments.status({draftId:d.id});assert.equal(d.rows[1][0],'5');
+ f.service.externalDocuments.stabilityMs=600;utimesSync(file,new Date(),new Date(Date.now()+60000));assert.equal((await f.service.externalDocuments.status({draftId:d.id})).state,'writing');await assert.rejects(publish(f,d),/正在保存/);f.service.externalDocuments.stabilityMs=0;utimesSync(file,new Date(0),new Date(0));
+ writeFileSync(file,Buffer.from([255,254,0]));utimesSync(file,new Date(0),new Date(0));let bad=await f.service.externalDocuments.status({draftId:d.id});assert.equal(bad.state,'invalid');assert.equal(bad.rows[1][0],'5');await assert.rejects(publish(f,bad),/尚未导入/);
+ unlinkSync(file);const outside=path.join(f.root,'链接目标.csv');writeFileSync(outside,'outside');symlinkSync(outside,file);bad=await f.service.externalDocuments.status({draftId:d.id});assert.equal(bad.state,'invalid');await assert.rejects(f.service.externalDocuments.openApplication({draftId:d.id}),/路径/);unlinkSync(file);assert.equal((await f.service.externalDocuments.status({draftId:d.id})).state,'invalid');assert.equal(f.service.cards.describe({requirementId:f.req.id,cardId:scope.cardId}).card.versions.length,1);
+});
+
+test('working copy and detected draft survive restart and a foreign project cannot read or launch them',async t=>{
+ const f=fixture(t),{scope}=await imported(f,'重启.csv',Buffer.from('a,b\n1,2\n'));let d=await f.service.externalDocuments.open(scope);await f.service.externalDocuments.openApplication({draftId:d.id});const work=f.service.externalDocuments.work(d.id);writeFileSync(path.join(f.root,work.path),'a,b\n重启恢复,2\n');
+ const second=new WorkbenchService({workspaceRoot:f.root,...f.config});t.after(()=>second.close());const restored=await second.externalDocuments.open(scope);assert.equal(restored.id,d.id);assert.equal(restored.workingFile,work.path);assert.equal(restored.rows[1][0],'重启恢复');assert.ok(restored.dirty);
+ const other=fixture(t);await assert.rejects(other.service.externalDocuments.status({draftId:d.id}),/不属于/);await assert.rejects(other.service.externalDocuments.openApplication({draftId:d.id}),/不属于/);
+});
+
+test('legacy CSV, Word and PDF drafts become exact working files without publishing',async t=>{
+ const f=fixture(t);const csv=await imported(f,'旧草稿.csv',Buffer.from('a,b\n1,2\n'));let d=await f.service.documents.open(csv.scope);await f.service.documents.saveDraft({draftId:d.id,revision:0,patch:{rows:[['旧CSV草稿','2']]}});let view=await f.service.externalDocuments.open(csv.scope);await f.service.externalDocuments.openApplication({draftId:view.id});assert.match(readFileSync(f.opened.at(-1).file,'utf8'),/旧CSV草稿/);
+ const doc=path.join(f.root,'word.docx'),pdf=path.join(f.root,'pdf.pdf');python(`from docx import Document\nimport fitz,sys\nd=Document();d.add_paragraph('原Word');d.save(sys.argv[1]);p=fitz.open();p.new_page().insert_text((72,72),'Alpha beta');p.save(sys.argv[2])`,[doc,pdf]);
+ const word=await imported(f,'Word.docx',readFileSync(doc));d=await f.service.documents.open(word.scope);await f.service.documents.saveDraft({draftId:d.id,revision:0,patch:{changes:{[d.model.objects[0].id]:'旧Word草稿'}}});view=await f.service.externalDocuments.open(word.scope);await f.service.externalDocuments.openApplication({draftId:view.id});assert.match(python(`from docx import Document\nimport sys\nprint(Document(sys.argv[1]).paragraphs[0].text)`,[f.opened.at(-1).file]),/旧Word草稿/);
+ const p=await imported(f,'PDF.pdf',readFileSync(pdf));d=await f.service.documents.open(p.scope);await f.service.documents.saveDraft({draftId:d.id,revision:0,patch:{annotations:[{id:randomUUID(),type:'note',page:1,lineId:null,note:'旧PDF批注'}]}});view=await f.service.externalDocuments.open(p.scope);await f.service.externalDocuments.openApplication({draftId:view.id});assert.match(python(`import fitz,sys\nd=fitz.open(sys.argv[1]);print(next(d[0].annots()).info['content'])`,[f.opened.at(-1).file]),/旧PDF批注/);
+ for(const input of [csv,word,p])assert.equal(f.service.cards.describe({requirementId:f.req.id,cardId:input.scope.cardId}).card.versions.length,1);
+});
+
+test('publication preserves an application save that arrives after commit and supports branching from V1',async t=>{
+ const f=fixture(t),{scope}=await imported(f,'并发.csv',Buffer.from('a,b\n1,2\n'));let d=await f.service.externalDocuments.open(scope);await f.service.externalDocuments.openApplication({draftId:d.id});const file=path.join(f.root,f.service.externalDocuments.work(d.id).path);writeFileSync(file,'a,b\n归档版,2\n');d=await f.service.externalDocuments.status({draftId:d.id});
+ const original=f.service.documents.saveVersion.bind(f.service.documents);f.service.documents.saveVersion=async input=>{const r=await original(input);writeFileSync(file,'a,b\n归档期间的新输入,2\n');return r};const v2=await publish(f,d);f.service.documents.saveVersion=original;
+ const next=await f.service.externalDocuments.open(nextScope(f,v2));assert.ok(next.dirty);assert.equal(next.rows[1][0],'归档期间的新输入');const registered=f.service.tasks.files.read(v2.artifactId);assert.match(registered.bytes.toString(),/归档版/);assert.doesNotMatch(registered.bytes.toString(),/期间的新输入/);
+ let old=await f.service.externalDocuments.open(scope);await f.service.externalDocuments.openApplication({draftId:old.id});writeFileSync(path.join(f.root,f.service.externalDocuments.work(old.id).path),'a,b\n基于旧版,2\n');old=await f.service.externalDocuments.status({draftId:old.id});const v3=await publish(f,old),desc=f.service.cards.describe({requirementId:f.req.id,cardId:v3.cardId});assert.equal(desc.version.number,3);assert.equal(desc.version.baseVersionId,scope.versionId);
+});
+
+test('revision conflicts and restarted workspaces do not overwrite another editor',async t=>{
+ const f=fixture(t),{scope}=await imported(f,'冲突.csv',Buffer.from('a,b\n1,2\n'));let d=await f.service.externalDocuments.open(scope);await f.service.externalDocuments.openApplication({draftId:d.id});const old=f.service.externalDocuments.work(d.id),file=path.join(f.root,old.path);writeFileSync(file,'a,b\n本机修改,2\n');
+ await f.service.documents.saveDraft({draftId:d.id,revision:d.revision,patch:{rows:[['另一处修改','2']]}});const conflict=await f.service.externalDocuments.status({draftId:d.id});assert.equal(conflict.state,'invalid');assert.equal(conflict.rows[0][0],'另一处修改');await f.service.externalDocuments.openApplication({draftId:d.id,restart:true});const next=f.service.externalDocuments.work(d.id);assert.notEqual(next.path,old.path);assert.match(readFileSync(file,'utf8'),/本机修改/);assert.match(readFileSync(path.join(f.root,next.path),'utf8'),/另一处修改/);
+});

@@ -1,0 +1,9 @@
+#!/bin/zsh
+set -e
+project_root="${0:A:h:h}"
+local_node="$project_root/.runtime/node/node_modules/node/bin/node"
+if [[ -x "$local_node" ]]; then
+  exec "$local_node" "$project_root/scripts/start.mjs" "$@"
+else
+  exec node --experimental-sqlite "$project_root/scripts/start.mjs" "$@"
+fi

@@ -1,0 +1,143 @@
+/* CW-18：只消费宿主主题，变量仅作用于工作台；不改宿主或媒体像素。 */
+.wtt-project-workbench {
+  color-scheme: light;
+  --wtt-ui-canvas: var(--dsw-alias-bg-base, #f7f9fc);
+  --wtt-ui-surface: var(--dsw-alias-bg-layer-1, #fff);
+  --wtt-ui-subtle: var(--dsw-alias-bg-layer-2, #f1f4f8);
+  --wtt-ui-hover: var(--dsw-alias-interactive-bg-hover-solid, #e9eef6);
+  --wtt-ui-glass: var(--dsw-alias-bg-layer-1, #fffffff5);
+  --wtt-ui-ink: var(--dsw-alias-label-primary, #263148);
+  --wtt-ui-text: var(--dsw-alias-label-secondary, #475569);
+  --wtt-ui-muted: var(--dsw-alias-label-secondary, #5e6c80);
+  --wtt-ui-line: var(--dsw-alias-border-l3, #dce2eb);
+  --wtt-ui-control-line: #7d8ca2;
+  --wtt-ui-grid: #d4d9e3;
+  --wtt-ui-edge: #8194b8;
+  --wtt-ui-shadow: #25344b18;
+  --wtt-ui-scrim: #11182766;
+  --wtt-ui-selection: #3559c71c;
+  --wtt-ui-wash: #e8edf577;
+  --wtt-ui-on-accent: #fff;
+  --wtt-ui-accent: #3559c7;
+  --wtt-ui-accent-fill: #3559c7;
+  --wtt-ui-accent-hover: #294bb6;
+  --wtt-ui-accent-line: #9aafe1;
+  --wtt-ui-accent-paper: #eef3ff;
+  --wtt-ui-warning: #8a581b;
+  --wtt-ui-warning-fill: #8a581b;
+  --wtt-ui-warning-line: #c7a778;
+  --wtt-ui-warning-paper: #fff6e7;
+  --wtt-ui-success: #246645;
+  --wtt-ui-success-fill: #246645;
+  --wtt-ui-success-line: #91b59d;
+  --wtt-ui-success-paper: #edf7f0;
+  --wtt-ui-danger: #ae3c33;
+  --wtt-ui-danger-fill: #ae3c33;
+  --wtt-ui-danger-line: #d4a09b;
+  --wtt-ui-danger-paper: #fff1ef;
+  --wtt-ui-purple: #695193;
+  --wtt-ui-purple-fill: #695193;
+  --wtt-ui-purple-line: #b4a3ce;
+  --wtt-ui-purple-paper: #f4effa;
+}
+/* 固定主题（包括宿主自定义主题的解析结果）优先于浏览器偏好。 */
+html[data-ds-theme-source="dark"] .wtt-project-workbench,
+html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench {
+  color-scheme: dark;
+  --wtt-ui-canvas: var(--dsw-alias-bg-base, #171b24);
+  --wtt-ui-surface: var(--dsw-alias-bg-layer-1, #222936);
+  --wtt-ui-subtle: var(--dsw-alias-bg-layer-2, #292f3e);
+  --wtt-ui-hover: var(--dsw-alias-interactive-bg-hover-solid, #353e50);
+  --wtt-ui-glass: var(--dsw-alias-bg-layer-1, #222936f5);
+  --wtt-ui-ink: var(--dsw-alias-label-primary, #e8edf5);
+  --wtt-ui-text: var(--dsw-alias-label-secondary, #c8d2e1);
+  --wtt-ui-muted: var(--dsw-alias-label-secondary, #a8b5c9);
+  --wtt-ui-line: var(--dsw-alias-border-l3, #414c60);
+  --wtt-ui-control-line: #77869f;
+  --wtt-ui-grid: #374257;
+  --wtt-ui-edge: #8396b7;
+  --wtt-ui-shadow: #00000055;
+  --wtt-ui-scrim: #00000099;
+  --wtt-ui-selection: #8facff26;
+  --wtt-ui-wash: #303b4a77;
+  --wtt-ui-on-accent: #fff;
+  --wtt-ui-accent: #9bb7ff;
+  --wtt-ui-accent-fill: #486ad2;
+  --wtt-ui-accent-hover: #3f60c5;
+  --wtt-ui-accent-line: #7e9bd9;
+  --wtt-ui-accent-paper: #2b3a5b;
+  --wtt-ui-warning: #f0c179;
+  --wtt-ui-warning-fill: #8a581b;
+  --wtt-ui-warning-line: #a38455;
+  --wtt-ui-warning-paper: #3d3121;
+  --wtt-ui-success: #8ddbb2;
+  --wtt-ui-success-fill: #246645;
+  --wtt-ui-success-line: #588d6d;
+  --wtt-ui-success-paper: #21382c;
+  --wtt-ui-danger: #ffa9a0;
+  --wtt-ui-danger-fill: #ae3c33;
+  --wtt-ui-danger-line: #b57870;
+  --wtt-ui-danger-paper: #412b2c;
+  --wtt-ui-purple: #cfb8f3;
+  --wtt-ui-purple-fill: #695193;
+  --wtt-ui-purple-line: #9781b8;
+  --wtt-ui-purple-paper: #372e48;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-ds-theme-source="light"]) .wtt-project-workbench {
+    color-scheme: dark;
+  --wtt-ui-canvas: var(--dsw-alias-bg-base, #171b24);
+  --wtt-ui-surface: var(--dsw-alias-bg-layer-1, #222936);
+  --wtt-ui-subtle: var(--dsw-alias-bg-layer-2, #292f3e);
+  --wtt-ui-hover: var(--dsw-alias-interactive-bg-hover-solid, #353e50);
+  --wtt-ui-glass: var(--dsw-alias-bg-layer-1, #222936f5);
+  --wtt-ui-ink: var(--dsw-alias-label-primary, #e8edf5);
+  --wtt-ui-text: var(--dsw-alias-label-secondary, #c8d2e1);
+  --wtt-ui-muted: var(--dsw-alias-label-secondary, #a8b5c9);
+  --wtt-ui-line: var(--dsw-alias-border-l3, #414c60);
+  --wtt-ui-control-line: #77869f;
+  --wtt-ui-grid: #374257;
+  --wtt-ui-edge: #8396b7;
+  --wtt-ui-shadow: #00000055;
+  --wtt-ui-scrim: #00000099;
+  --wtt-ui-selection: #8facff26;
+  --wtt-ui-wash: #303b4a77;
+  --wtt-ui-on-accent: #fff;
+  --wtt-ui-accent: #9bb7ff;
+  --wtt-ui-accent-fill: #486ad2;
+  --wtt-ui-accent-hover: #3f60c5;
+  --wtt-ui-accent-line: #7e9bd9;
+  --wtt-ui-accent-paper: #2b3a5b;
+  --wtt-ui-warning: #f0c179;
+  --wtt-ui-warning-fill: #8a581b;
+  --wtt-ui-warning-line: #a38455;
+  --wtt-ui-warning-paper: #3d3121;
+  --wtt-ui-success: #8ddbb2;
+  --wtt-ui-success-fill: #246645;
+  --wtt-ui-success-line: #588d6d;
+  --wtt-ui-success-paper: #21382c;
+  --wtt-ui-danger: #ffa9a0;
+  --wtt-ui-danger-fill: #ae3c33;
+  --wtt-ui-danger-line: #b57870;
+  --wtt-ui-danger-paper: #412b2c;
+  --wtt-ui-purple: #cfb8f3;
+  --wtt-ui-purple-fill: #695193;
+  --wtt-ui-purple-line: #9781b8;
+  --wtt-ui-purple-paper: #372e48;
+  }
+}
+.wtt-project-workbench .react-flow {
+  --xy-attribution-background-color: var(--wtt-ui-surface);
+  --xy-minimap-background-color: var(--wtt-ui-surface);
+  --xy-minimap-mask-background-color: var(--wtt-ui-scrim);
+  --xy-background-pattern-color: var(--wtt-ui-grid);
+  --xy-connectionline-stroke: var(--wtt-ui-accent);
+  --xy-edge-label-background-color: var(--wtt-ui-canvas);
+}
+.wtt-project-workbench .wtt-course-canvas .wcc-element-text { color: var(--wtt-ui-ink); }
+.wtt-project-workbench .wcc-element-text .wcc-element-content.is-empty { color: var(--wtt-ui-muted); }
+/* 手动颜色是白板内容；其工具与手柄仍跟随界面。 */
+.wtt-project-workbench .wcc-element:not(.wcc-element-text) .wcc-element-edit { color: #475569; }
+.wtt-project-workbench .wtt-ppt-page-empty { color: #5e6c80; }
+
+.wtt-project-workbench .react-flow__attribution a { color: var(--wtt-ui-muted); }

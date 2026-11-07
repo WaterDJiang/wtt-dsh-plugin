@@ -1,0 +1,37 @@
+.wtt-project-workbench .wtt-recycle-dialog {
+  box-sizing:border-box;width:min(480px,calc(100vw - 24px));min-width:0;min-height:0;max-height:calc(100dvh - 32px);
+  margin:auto;padding:0;overflow:hidden;border:1px solid var(--wtt-ui-line);border-radius:12px;
+  background:var(--wtt-ui-surface);color:var(--wtt-ui-text);font:var(--wtt-text-md)/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;box-shadow:0 16px 60px #0005;
+}
+.wtt-project-workbench .wtt-recycle-dialog[open]{display:flex;flex-direction:column}
+.wtt-project-workbench .wtt-recycle-dialog::backdrop{background:#0006}
+.wtt-project-workbench .wtt-recycle-dialog form{display:contents;margin:0;padding:0}.wtt-project-workbench .wtt-recycle-dialog footer{display:flex;flex-shrink:0;gap:10px;align-items:center;margin:0;padding:12px 16px;border-bottom:1px solid var(--wtt-ui-line)}
+.wtt-project-workbench .wtt-recycle-dialog footer{justify-content:flex-end;border-bottom:0;border-top:1px solid var(--wtt-ui-line)}
+.wtt-project-workbench .wtt-recycle-body{flex:1;min-height:0;overflow:auto;padding:14px 16px;max-height:calc(100dvh - 170px)}
+.wtt-project-workbench .wtt-delete-names{margin:0 0 12px;padding-left:18px;overflow-wrap:anywhere}
+.wtt-project-workbench .wtt-recycle-dialog fieldset{display:grid;gap:8px;min-width:0;border:0;padding:0;margin:0}
+.wtt-project-workbench .wtt-recycle-dialog fieldset label{display:grid;grid-template-columns:16px minmax(0,1fr);gap:10px;align-items:start;margin:0;padding:10px 12px;border:1px solid var(--wtt-ui-line);border-radius:8px;color:inherit;font-size:var(--wtt-text-md);cursor:pointer}
+.wtt-project-workbench .wtt-recycle-dialog fieldset label:has(input:checked){border-color:var(--wtt-ui-accent);background:var(--wtt-ui-selected,#627fda14)}
+.wtt-project-workbench .wtt-recycle-dialog input[type=radio]{box-sizing:border-box;appearance:auto;flex:none;width:16px;min-width:16px;max-width:16px;height:16px;min-height:16px;margin:2px 0 0;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;accent-color:var(--wtt-ui-accent)}
+.wtt-project-workbench .wtt-recycle-dialog fieldset label>span{min-width:0;overflow-wrap:anywhere;line-height:20px}
+.wtt-project-workbench .wtt-recycle-dialog p{font-size:var(--wtt-text-sm);color:var(--wtt-ui-muted);margin:10px 0}
+.wtt-project-workbench .wtt-recycle-dialog code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font:var(--wtt-text-sm)/1.6 ui-monospace,monospace}
+.wtt-project-workbench .wtt-delete-files{padding-left:16px;margin:8px 0}
+.wtt-project-workbench .wtt-delete-files>li{padding:6px 0}
+.wtt-project-workbench .wtt-recycle-dialog small{display:block;color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm)}
+.wtt-project-workbench .wtt-recycle-shared{border-left:2px solid #bc944e;padding-left:8px;font-size:var(--wtt-text-sm);margin-top:6px}
+.wtt-project-workbench .wtt-recycle-body article{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--wtt-ui-line)}
+.wtt-project-workbench .wtt-recycle-body article>div{flex:1;min-width:0}
+.wtt-project-workbench .wtt-recycle-body article strong{overflow-wrap:anywhere}
+.wtt-project-workbench .wtt-recycle-dialog summary{cursor:pointer;font-size:var(--wtt-text-sm)}
+.wtt-project-workbench .wtt-recycle-body article>.wtt-recycle-entry-actions{display:flex;flex:0 0 auto;gap:var(--wtt-space-1);flex-wrap:wrap;justify-content:flex-end;max-width:160px}
+.wtt-project-workbench .wtt-purge-scope{margin:0;padding:0;list-style:none}
+.wtt-project-workbench .wtt-purge-scope>li{padding:var(--wtt-space-3) 0;border-bottom:1px solid var(--wtt-ui-line);overflow-wrap:anywhere}
+.wtt-project-workbench .wtt-purge-file{display:grid;gap:var(--wtt-space-1);margin-top:var(--wtt-space-2)}
+.wtt-project-workbench .wtt-purge-file>span{font-size:var(--wtt-text-sm);color:var(--wtt-ui-muted)}
+.wtt-project-workbench .wtt-recycle-dialog .wtt-purge-warning{color:var(--wtt-ui-danger);font-size:var(--wtt-text-md);font-weight:600}
+.wtt-project-workbench .wtt-purge-confirm{display:flex;align-items:flex-start;gap:var(--wtt-space-2);font-size:var(--wtt-text-sm);cursor:pointer}
+.wtt-project-workbench .wtt-purge-confirm input[type=checkbox]{appearance:auto;flex:none;width:16px;min-width:16px;height:16px;margin:2px 0;padding:0;accent-color:var(--wtt-ui-danger-fill)}
+@media(max-width:480px){.wtt-project-workbench .wtt-recycle-dialog footer{padding:10px 12px}.wtt-project-workbench .wtt-recycle-body{padding:12px}}
+
+.wtt-project-workbench .wtt-recycle-pages{display:flex;align-items:center;justify-content:space-between;gap:var(--wtt-space-2);font-size:var(--wtt-text-sm)}

@@ -1,0 +1,74 @@
+- insert:
+    - id: wtt-creation-workbench
+      name: '@wtt/dsh-creation-workbench'
+    - id: preset-wtt-course-economy
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: wtt-course-economy
+        name: WTT 创作工作台 · 课程模式 · 节省上下文
+        description: 按阶段制作课程，保留确认与文件事实，较早收敛长历史。
+        order: 20
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: 你是 WTT 创作工作台助手。按冻结的任务阶段执行，文件和业务记录是事实源。保留技能确认门；详细报告落盘，优先返回具体结果、错误位置和文件路径。
+          - id: instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time
+            name: '@deepseek-ai/dsh-time-context'
+          - id: bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: files
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: skills
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: skill-tool
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: ask
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+                config:
+                  auto: true
+                  thresholdRatio: 0.1
+                  retainTokens: 20000
+                  maxTokens: 8192
+              - id: compact-command
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: prune
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024

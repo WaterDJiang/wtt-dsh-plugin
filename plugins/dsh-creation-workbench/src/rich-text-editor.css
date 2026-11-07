@@ -1,0 +1,19 @@
+.wtt-rich-editor{display:flex!important;flex-direction:column;flex:1;min-height:0;min-width:0;text-align:left}
+.wtt-rich-tools{display:flex;align-items:center;flex-wrap:wrap;gap:2px;padding:3px 0;flex-shrink:0;justify-content:flex-start!important;border-bottom:1px solid var(--wtt-ui-line)}
+.wtt-rich-tools button{border:0!important;background:transparent!important;color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm)!important;padding:3px 5px!important;min-height:26px!important}
+.wtt-rich-tools button:is(:hover,[aria-pressed=true]){color:var(--wtt-ui-accent);background:var(--wtt-ui-accent-paper)!important}
+.wtt-rich-tools .wtt-rich-source{margin-left:auto}
+.wtt-rich-editor>div:last-child:not(.wtt-rich-tools){flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+.wtt-rich-editor .tiptap{min-height:100%;box-sizing:border-box;padding:10px 6px;outline:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:var(--wtt-text-md);line-height:1.75;color:var(--wtt-ui-ink);user-select:text}
+.wtt-rich-editor .tiptap p{margin:0 0 .65em!important;max-height:none!important;overflow:visible!important;font-size:inherit!important;color:inherit!important}
+.wtt-rich-editor .tiptap :is(h1,h2,h3){margin:.65em 0 .4em;line-height:1.4}
+.wtt-rich-editor .tiptap h2{font-size:1.35em}
+.wtt-rich-editor .tiptap :is(ul,ol){padding-left:1.6em;margin:.4em 0}
+.wtt-rich-editor .tiptap :is(pre,blockquote){margin:8px 0;padding:8px;background:var(--wtt-ui-subtle);white-space:pre-wrap}
+.wtt-rich-editor .tiptap table{border-collapse:collapse;table-layout:fixed;width:100%}
+.wtt-rich-editor .tiptap :is(td,th){border:1px solid var(--wtt-ui-line);padding:5px;min-width:40px;vertical-align:top;position:relative}
+.wtt-rich-editor .tiptap .selectedCell:after{content:'';position:absolute;inset:0;background:#5d8beb25;pointer-events:none}
+.wtt-rich-editor .wtt-rich-raw{flex:1;min-height:80px;resize:none;white-space:pre-wrap;font:var(--wtt-text-md)/1.7 ui-monospace,monospace}
+.wtt-course-canvas .wcc-card.is-editing{min-height:280px}
+.wtt-course-canvas .wcc-card-inline-editor:has(.wtt-rich-editor){gap:3px}
+@media(max-width:600px){.wtt-rich-editor .tiptap{font-size:var(--wtt-text-lg)}}

@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { apply } from '../src/index.mjs';
+
+test('real document HTTP route saves binary Word beyond JSON cap and reads checked snapshots',async t=>{
+ const root=mkdtempSync(path.join(tmpdir(),'cw35-http-')),disposers=[];let endpoint;
+ apply({effect(fn){const d=fn();if(typeof d==='function')disposers.push(d)},connection:{fetch:{register(v){endpoint=v;return()=>{}}}},tools:{register(){return()=>{}}},skills:{register(){return()=>{}}}},{workspaceRoot:root,registryFile:path.join(root,'projects.json')});
+ t.after(()=>{for(const d of disposers.reverse())d();rmSync(root,{recursive:true,force:true})});
+ const request=(query={},options)=>endpoint.fetch(new Request(`http://localhost/api/wtt-creation-workbench?${new URLSearchParams(query)}`,options));
+ const projectId=(await(await request({projects:1})).json()).activeProjectId;
+ const call=async(action,data)=>{const r=await request({projectId},{method:'POST',body:JSON.stringify({action,data})});const v=await r.json();assert.equal(r.status,200,JSON.stringify(v));return v};
+ const p=spawnSync('python3',['-c',`from docx import Document\nfrom zipfile import ZipFile\nimport os,sys\np=sys.argv[1];d=Document();d.add_paragraph('原件');d.save(p+'/base.docx');d.add_paragraph('连续编辑草稿');d.save(p+'/rich.docx')\nwith ZipFile(p+'/rich.docx','a') as z:z.writestr('customXml/fixture.bin',os.urandom(1600000))`,root],{encoding:'utf8'});assert.equal(p.status,0,p.stderr);
+ const original=readFileSync(path.join(root,'base.docx')),candidate=readFileSync(path.join(root,'rich.docx'));assert.ok(candidate.length>1_500_000);
+ const requirement=await call('create',{background:'HTTP独立验收',operationId:randomUUID()});
+ const uploaded=await request({projectId,importMaterial:requirement.id,filename:'原件.docx',operationId:randomUUID()},{method:'POST',body:original});assert.equal(uploaded.status,200);const n=(await uploaded.json()).board.nodes.find(n=>n.importedFile);
+ const scope={requirementId:requirement.id,cardId:n.outputCard.id,versionId:n.outputCard.versionId,sourceRef:n.id,hash:n.importedFile.hash};const d=await call('document-open',scope);
+ const noProject=await request({saveWordDraft:d.id,revision:0},{method:'POST',body:candidate});assert.equal(noProject.status,400);
+ const saved=await request({projectId,saveWordDraft:d.id,revision:0},{method:'POST',body:candidate});assert.equal(saved.status,200,await saved.clone().text());const next=await saved.json();assert.ok(next.dirty);
+ const snapshot=await request({projectId,documentDraftFile:d.id,revision:next.revision});assert.equal(snapshot.status,200);assert.match(snapshot.headers.get('content-type'),/wordprocessingml/);assert.deepEqual(Buffer.from(await snapshot.arrayBuffer()),candidate);
+ assert.equal((await request({projectId,saveWordDraft:d.id,revision:0},{method:'POST',body:candidate})).status,400);
+ assert.equal((await request({projectId},{method:'POST',body:JSON.stringify({action:'add-material',data:{content:'a'.repeat(1_500_001)}})})).status,400);
+ const source=await request({projectId,materialFile:n.refId});assert.deepEqual(Buffer.from(await source.arrayBuffer()),original);
+ const shell=await request({wordEditorAsset:'html'});assert.equal(shell.status,410);assert.match(await shell.text(),/本机应用编辑/);
+ assert.equal((await request({wordEditorAsset:'../../secret'})).status,400);
+ const view=await call('document-external-open',scope);assert.equal(view.id,d.id);assert.equal(view.dirty,true);assert.equal(view.workingFile,null);assert.ok(view.applications.some(app=>app.id==='default'));
+ const download=await request({projectId,documentDownload:d.id,revision:next.revision});assert.equal(download.status,200);assert.deepEqual(Buffer.from(await download.arrayBuffer()),candidate);assert.doesNotMatch(decodeURIComponent(download.headers.get('content-disposition')),/\.docx\.docx/);
+ assert.equal((await request({projectId},{method:'POST',body:JSON.stringify({action:'document-open-application',data:{draftId:d.id,application:'/tmp/forged.app'}})})).status,400);
+ assert.equal((await request({},{method:'POST',body:JSON.stringify({action:'document-external-status',data:{draftId:d.id}})})).status,400);
+});

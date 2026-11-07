@@ -1,0 +1,34 @@
+/* 共享几何Token唯一来源；颜色只消费theme.css，专用画布/媒体控件走custom。 */
+.wtt-project-workbench{--wtt-text-xs:max(11px,calc(var(--dsh-content-font-size,14px) - 2px));--wtt-text-sm:max(12px,calc(var(--dsh-content-font-size,14px) - 1px));--wtt-text-md:var(--dsh-content-font-size,14px);--wtt-text-lg:calc(var(--dsh-content-font-size,14px) + 2px);--wtt-text-xl:calc(var(--dsh-content-font-size,14px) + 4px);font-size:var(--wtt-text-md);--wtt-control-h:32px;--wtt-control-compact-h:28px;--wtt-control-touch-h:36px;--wtt-icon-size:16px;--wtt-space-1:4px;--wtt-space-2:8px;--wtt-space-3:12px;--wtt-space-4:16px;--wtt-radius-control:6px;--wtt-radius-panel:10px;--wtt-panel-header-h:56px}
+.wtt-project-workbench :is(button,a).wtt-ui-button:not([data-ui-variant=custom]){box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:var(--wtt-space-1);flex-shrink:0;min-height:var(--wtt-control-h);padding:5px 10px;border:1px solid transparent;border-radius:var(--wtt-radius-control);background:var(--wtt-ui-subtle);color:var(--wtt-ui-ink);font:inherit;font-size:var(--wtt-text-sm);line-height:20px;text-align:center;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background-color .12s,color .12s}
+.wtt-project-workbench :is(button,a).wtt-ui-button[data-ui-variant=ghost]{background:transparent;color:var(--wtt-ui-text)}
+.wtt-project-workbench :is(button,a).wtt-ui-button[data-ui-variant=primary]{background:var(--wtt-ui-accent-fill);color:var(--wtt-ui-on-accent)}
+.wtt-project-workbench :is(button,a).wtt-ui-button[data-ui-variant=danger]{background:var(--wtt-ui-danger-fill);color:var(--wtt-ui-on-accent)}
+.wtt-project-workbench :is(button,a).wtt-ui-button:not([data-ui-variant=custom]):hover:not(:disabled){background:var(--wtt-ui-hover)}
+.wtt-project-workbench :is(button,a).wtt-ui-button[data-ui-variant=primary]:hover:not(:disabled){background:var(--wtt-ui-accent-hover)}
+.wtt-project-workbench :is(button,a).wtt-ui-button[data-ui-variant=danger]:hover:not(:disabled){filter:brightness(.92);background:var(--wtt-ui-danger-fill)}
+.wtt-project-workbench :is(button,a).wtt-ui-button:not([data-ui-variant=custom]):is([aria-pressed=true],[aria-selected=true]){background:var(--wtt-ui-accent-paper);color:var(--wtt-ui-accent)}
+.wtt-project-workbench :is(button,a).wtt-ui-button:not([data-ui-variant=custom]):focus-visible{outline:2px solid var(--wtt-ui-accent);outline-offset:2px}
+.wtt-project-workbench button.wtt-ui-button:not([data-ui-variant=custom]):disabled{opacity:.45;cursor:default}
+.wtt-project-workbench :is(button,a).wtt-ui-button[data-ui-size=compact]{min-height:var(--wtt-control-compact-h);padding:3px 8px}
+.wtt-project-workbench :is(button,a).wtt-ui-button.is-icon-only{width:var(--wtt-control-h);height:var(--wtt-control-h);min-width:var(--wtt-control-h);padding:0}
+.wtt-project-workbench .wtt-ui-button>svg{flex-shrink:0;pointer-events:none}
+.wtt-project-workbench header.wtt-ui-panel-header{position:relative;display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:var(--wtt-space-2);box-sizing:border-box;width:100%;min-width:0;height:var(--wtt-panel-header-h);min-height:var(--wtt-panel-header-h);margin:0;padding:9px var(--wtt-space-3);border:0;border-bottom:1px solid color-mix(in srgb,var(--wtt-ui-line) 60%,transparent);border-radius:0;background:var(--wtt-ui-surface);box-shadow:none;color:var(--wtt-ui-ink)}
+.wtt-project-workbench .wtt-ui-panel-heading{flex:1;min-width:0}.wtt-project-workbench .wtt-ui-panel-heading>div{display:flex;align-items:center;gap:var(--wtt-space-2);min-width:0}
+.wtt-project-workbench .wtt-ui-panel-heading h2{flex:0 1 auto;min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--wtt-text-lg);font-weight:600;line-height:1.4;color:var(--wtt-ui-ink)}
+.wtt-project-workbench .wtt-ui-panel-heading p{margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--wtt-text-sm);line-height:14px;color:var(--wtt-ui-muted)}
+.wtt-project-workbench .wtt-ui-format{flex-shrink:0;color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm);line-height:18px}
+.wtt-project-workbench .wtt-ui-panel-actions{display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;gap:var(--wtt-space-1);margin-left:auto}
+.wtt-project-workbench .wtt-ui-panel-toolbar{display:flex;flex:0 0 auto;flex-wrap:wrap;align-items:center;gap:var(--wtt-space-2);min-width:0;min-height:44px;margin:0;padding:6px var(--wtt-space-3);border-bottom:1px solid color-mix(in srgb,var(--wtt-ui-line) 50%,transparent);background:var(--wtt-ui-surface);font-size:var(--wtt-text-sm);color:var(--wtt-ui-text)}
+.wtt-project-workbench .wtt-ui-panel-toolbar>.wtt-ui-toolbar-note{flex:1;min-width:100px;margin:0;color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm);line-height:1.5}
+.wtt-project-workbench footer.wtt-ui-dialog-footer{display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;gap:var(--wtt-space-2);margin:0;padding:var(--wtt-space-3);border:0;border-top:1px solid var(--wtt-ui-line);background:var(--wtt-ui-surface)}
+.wtt-project-workbench .wtt-ui-dialog-footer>[role=status]{margin-right:auto;color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm)}
+.wtt-course-canvas[data-dock-mobile] .wtt-ui-panel-actions [data-panel-action=expand]{display:none}
+@media(max-width:600px){.wtt-project-workbench :is(button,a).wtt-ui-button:not([data-ui-variant=custom]){min-height:var(--wtt-control-touch-h)}.wtt-project-workbench :is(button,a).wtt-ui-button.is-icon-only{width:var(--wtt-control-touch-h);height:var(--wtt-control-touch-h);min-width:var(--wtt-control-touch-h)}}
+@media(prefers-reduced-motion:reduce){.wtt-project-workbench .wtt-ui-button{transition:none}}
+.wtt-course-canvas .wcc-sidebar .wcc-inspector,.wtt-course-canvas .wcc-sidebar .wcc-task-panel{padding:var(--wtt-space-3)}
+.wtt-project-workbench .wtt-empty-file-preview:has(.wtt-project-file-preview[data-expanded=true]){width:min(900px,100%)}
+.wtt-project-workbench :is(.wtt-dialog,.wcc-material-dialog,.wcc-group-dialog):has(.wtt-ui-panel-header){padding:0}
+.wtt-project-workbench :is(.wtt-dialog,.wcc-material-dialog,.wcc-group-dialog):has(.wtt-ui-panel-header)>form{display:flex;flex-direction:column;gap:0;margin:0;padding:0}
+.wtt-project-workbench .wtt-ui-dialog-body{display:grid;gap:var(--wtt-space-3);padding:var(--wtt-space-3);min-width:0}
+.wtt-project-workbench .wtt-ui-dialog-body>.wtt-field{margin:0}

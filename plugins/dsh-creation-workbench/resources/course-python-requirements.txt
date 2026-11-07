@@ -1,0 +1,11 @@
+# 本次文档／课件转换验收环境；可选联网生图依赖不包含在此。
+python-pptx==1.0.2
+PyMuPDF==1.27.2.3
+Markdown==3.10
+beautifulsoup4==4.12.2
+python-docx==1.1.0
+reportlab==4.5.0
+pypdf==6.5.0
+Pillow==11.2.1
+svglib==1.6.0
+lxml==6.1.0

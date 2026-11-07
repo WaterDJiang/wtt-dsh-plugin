@@ -1,0 +1,47 @@
+/* CW-28: the right panel occupies layout space; graph overlays stay in the graph. */
+.wtt-course-canvas.wcc-studio .wcc-workspace { display:flex;min-width:0;min-height:0; }
+.wtt-course-canvas.wcc-studio .wcc-graph { position:relative;flex:1 1 0;min-width:0;min-height:0;width:auto; }
+.wtt-course-canvas.wcc-studio .wcc-dock { position:relative;display:flex;flex:0 0 var(--wtt-dock-width);width:var(--wtt-dock-width);min-width:0;min-height:0;height:100%;flex-direction:column;border-left:1px solid var(--wtt-ui-line);background:var(--wtt-ui-surface);container-type:inline-size;z-index:25; }
+.wtt-course-canvas.wcc-studio .wcc-dock > :is(.wcc-sidebar,.wtt-ppt-editor,.wtt-svg-editor,.wtt-document-viewer,.wtt-project-file-preview) { position:relative;inset:auto;flex:1 1 0;width:100%;max-width:100%;min-width:0;min-height:0;height:auto;margin:0;border:0;border-radius:0;box-shadow:none;resize:none; }
+.wtt-course-canvas.wcc-studio .wcc-dock > .wcc-sidebar { padding:0; }
+.wtt-course-canvas .wcc-dock-separator { position:absolute;top:0;bottom:0;left:-5px;width:10px;z-index:50;cursor:col-resize;touch-action:none;outline:0; }
+.wtt-course-canvas .wcc-dock-separator::after { content:'';position:absolute;top:0;bottom:0;left:4px;width:2px;background:transparent; }
+.wtt-course-canvas .wcc-dock-separator:is(:hover,:focus-visible)::after,
+.wtt-course-canvas[data-dock-resizing] .wcc-dock-separator::after { background:var(--wtt-ui-accent); }
+.wtt-course-canvas[data-dock-resizing] { cursor:col-resize;user-select:none; }
+.wtt-course-canvas[data-dock-resizing] iframe { pointer-events:none; }
+.wtt-course-canvas .wcc-dock-mobile-header { display:none; }
+.wtt-course-canvas .wcc-dock-preference-error { margin:0;padding:8px 12px;font-size:var(--wtt-text-sm);color:var(--wtt-ui-warning);border-top:1px solid var(--wtt-ui-line); }
+.wtt-course-canvas[data-dock-mobile][data-dock-open] .wcc-graph { visibility:hidden;position:absolute;inset:0;width:100%;height:100%;pointer-events:none; }
+.wtt-course-canvas[data-dock-mobile][data-dock-open] .wcc-dock { flex:1 1 100%;width:100%;border:0; }
+.wtt-course-canvas[data-dock-mobile] .wcc-dock-mobile-header { display:flex;flex:0 0 auto;padding:8px 12px;border-bottom:1px solid var(--wtt-ui-line); }
+.wtt-course-canvas[data-dock-mobile] .wcc-dock .wtt-ppt-editor-actions :is(button[aria-label='展开编辑器'],button[aria-label='恢复编辑器宽度']) { display:none; }
+.wtt-course-canvas .wcc-dock-mobile-header button { border:0;background:transparent;color:var(--wtt-ui-text);min-height:40px;padding:4px 0;font:inherit;cursor:pointer; }
+.wtt-course-canvas .wcc-graph { container-type:inline-size; }
+.wtt-course-canvas[data-editor-fullscreen] .wcc-graph{visibility:hidden;position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.wtt-course-canvas[data-editor-fullscreen] .wcc-dock{flex:1 1 100%;width:100%;border-left:0}
+.wtt-course-canvas[data-editor-fullscreen] .wcc-workspace{position:relative}
+@container (max-width:700px) {
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock { top:76px;right:12px;left:auto;width:max-content;justify-content:flex-end; }
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-save-status,
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-divider,
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-panel-button span { display:none; }
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock { gap:1px;padding:3px; }
+}
+@container (max-width:460px) {
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock { left:auto;right:12px; }
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock button[aria-label='刷新画布'],
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock button[aria-label='撤销布局'],
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock button[aria-label='重做布局'] { display:none; }
+}
+@container (max-width:700px) {
+  .wtt-course-canvas .wcc-dock .wtt-document-viewer h2 { flex-basis:100%; }
+}
+@container (max-width:520px) {
+  .wtt-course-canvas .wcc-dock .wtt-ppt-editor-body { display:flex;flex-direction:column;overflow:hidden; }
+  .wtt-course-canvas .wcc-dock .wtt-ppt-slides { display:flex;flex:0 0 auto;gap:7px;max-height:110px;overflow:auto; }
+  .wtt-course-canvas .wcc-dock .wtt-ppt-slides>input,
+  .wtt-course-canvas .wcc-dock .wtt-ppt-slides>button { flex:0 0 100px;width:100px;margin:0; }
+  .wtt-course-canvas .wcc-dock .wtt-ppt-slides img { display:none; }
+  .wtt-course-canvas .wcc-dock .wtt-ppt-editor-workspace { flex:1 1 0;min-height:0;overflow:auto;padding:10px; }
+}

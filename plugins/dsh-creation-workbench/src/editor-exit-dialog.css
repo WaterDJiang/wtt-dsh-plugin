@@ -1,0 +1,4 @@
+.wtt-editor-exit{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--wtt-ui-line);border-radius:12px;background:var(--wtt-ui-surface);color:var(--wtt-ui-ink);box-shadow:0 12px 48px var(--wtt-ui-shadow)}
+.wtt-editor-exit::backdrop{background:var(--wtt-ui-shadow)}
+.wtt-editor-exit .wtt-ui-dialog-body p{margin:0;line-height:1.75}
+.wtt-editor-exit .wtt-ui-dialog-footer{flex-wrap:wrap}

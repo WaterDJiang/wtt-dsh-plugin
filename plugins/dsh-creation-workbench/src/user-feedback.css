@@ -1,0 +1,5 @@
+.wtt-user-error { min-width:0;overflow-wrap:anywhere; }
+.wtt-user-error>p { margin:0;font:inherit;line-height:1.65; }
+.wtt-user-error>details { margin-top:5px; }
+.wtt-user-error>details>summary { width:fit-content;cursor:pointer;font-size:var(--wtt-text-sm); }
+.wtt-user-error>details>pre { max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0;font:var(--wtt-text-sm)/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }

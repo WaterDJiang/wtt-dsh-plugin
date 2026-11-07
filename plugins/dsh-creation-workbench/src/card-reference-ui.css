@@ -1,0 +1,46 @@
+/* CW-47：画布卡的专用拖动标题，不复用预览面板的固定操作条。 */
+.wtt-course-canvas .wcc-card-grip{height:auto;min-height:56px;align-items:flex-start;padding:9px 12px;gap:8px}
+.wtt-course-canvas .wcc-card-heading{flex:1;min-width:0}
+.wtt-course-canvas .wcc-card .wcc-card-heading h3{margin:0;line-height:1.4;font-size:var(--wtt-text-lg);font-weight:600;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.wtt-course-canvas .wcc-card-metadata{display:flex;align-items:center;gap:6px;margin-top:4px;min-width:0;line-height:1.3;color:var(--wtt-ui-muted)}
+.wtt-course-canvas .wcc-card-metadata .wcc-card-kind{font-size:var(--wtt-text-xs);font-weight:400}
+.wtt-course-canvas .wcc-card-heading-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;max-width:42%;min-width:0;padding-top:2px}
+.wtt-course-canvas .wcc-card-heading-actions .wcc-card-versions{min-width:42px;max-width:86px;width:auto;flex:0 1 auto;margin:0}
+.wtt-course-canvas .wcc-card-heading-actions .wcc-grip{flex:0 0 auto;margin:0}
+.wtt-course-canvas .wcc-card-body{padding-top:10px}
+
+/* 引用入口保留文字；格式、名称与移除各有自己的视觉／交互位置。 */
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content max-content;align-items:center;gap:6px;margin:0 64px 8px 0;min-width:0;min-height:32px}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area .wcc-creation-reference-caption{grid-column:1;display:flex;align-items:center;justify-content:flex-start;gap:4px;margin:0;font-size:var(--wtt-text-xs);white-space:nowrap;color:var(--wtt-ui-muted)}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-caption small{font:inherit;font-variant-numeric:tabular-nums}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area .wcc-creation-reference-chips{grid-column:2;width:100%;max-width:none;min-width:0;min-height:32px;align-items:stretch;margin:0;gap:6px;scrollbar-width:thin}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chips:empty{display:none}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chip{height:auto;min-height:32px;max-width:100%;padding:3px 6px;gap:5px;border:1px solid var(--wtt-ui-line);border-radius:var(--wtt-radius-control);background:var(--wtt-ui-subtle)}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chip.is-unavailable{border-color:var(--wtt-ui-warning-line);background:var(--wtt-ui-warning-paper)}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chip>.wcc-reference-format{flex:0 0 auto;max-width:none;padding:2px 4px;border-radius:3px;background:var(--wtt-ui-surface);color:var(--wtt-ui-muted);font-size:var(--wtt-text-xs);line-height:1.2;font-weight:600}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chip button.wcc-reference-name{display:block;flex:1 1 auto;min-width:0;width:auto;min-height:24px;max-width:260px;padding:0 2px;border:0;background:transparent;color:var(--wtt-ui-ink);font-size:var(--wtt-text-sm);line-height:1.5;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chip>.wcc-creation-reference-lock{max-width:none;flex:0 0 auto;font-size:var(--wtt-text-xs);color:var(--wtt-ui-muted)}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chip button.wcc-reference-remove{width:22px;min-height:24px;flex:0 0 22px;padding:0}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area button.wcc-creation-add-reference{grid-column:3;position:static;display:inline-flex;align-items:center;justify-content:center;gap:3px;width:auto;min-height:32px;padding:3px 5px;border:1px solid var(--wtt-ui-line);border-radius:var(--wtt-radius-control);background:var(--wtt-ui-subtle);color:var(--wtt-ui-text);font-size:var(--wtt-text-xs);line-height:1.5;white-space:nowrap}
+.wtt-course-canvas .wcc-card-composer button.wcc-reference-preview-toggle{grid-column:4;min-height:32px;padding:3px 4px;border:0;border-radius:var(--wtt-radius-control);background:transparent;color:var(--wtt-ui-text);font-size:var(--wtt-text-xs);line-height:1.5;white-space:nowrap}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area button:is(.wcc-creation-add-reference,.wcc-reference-preview-toggle,.wcc-reference-name,.wcc-reference-remove):hover:not(:disabled){background:var(--wtt-ui-hover);color:var(--wtt-ui-ink)}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area button:focus-visible{outline:2px solid var(--wtt-ui-accent);outline-offset:1px}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area button:disabled{opacity:.45;cursor:default}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area :is(.wcc-creation-reference-picker,.wcc-creation-reference-preview,.wcc-creation-reference-pending){position:static;grid-column:1/-1;width:100%;max-width:none;min-width:0;margin:0}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-preview>div{margin-top:0}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-preview details>summary{display:flex;align-items:baseline;gap:6px;overflow-wrap:anywhere}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-preview details>summary>span{flex:0 0 auto}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-sources button{display:grid;grid-template-columns:18px minmax(0,1fr) 10px;align-items:center;gap:6px;min-height:44px;padding:8px;border:1px solid var(--wtt-ui-line);border-radius:var(--wtt-radius-control);background:var(--wtt-ui-subtle);color:var(--wtt-ui-ink);font-size:var(--wtt-text-sm);line-height:1.5}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-sources button:hover:not(:disabled){background:var(--wtt-ui-hover)}
+@media(max-width:600px){
+ .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area{grid-template-columns:minmax(0,1fr) max-content max-content;gap:6px 4px}
+ .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area button.wcc-creation-add-reference{grid-column:2;min-height:var(--wtt-control-touch-h)}
+ .wtt-course-canvas .wcc-card-composer button.wcc-reference-preview-toggle{grid-column:3;min-height:var(--wtt-control-touch-h)}
+ .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area .wcc-creation-reference-chips{grid-column:1/-1;grid-row:2;width:calc(100% + 64px);min-height:var(--wtt-control-touch-h)}
+ .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area :is(.wcc-creation-reference-picker,.wcc-creation-reference-preview,.wcc-creation-reference-pending){width:calc(100% + 64px)}
+ .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-sources{grid-template-columns:1fr}
+}
+/* CW-48：发送前显示实际制作方式，与模型摘要共用紧凑操作行。 */
+.wtt-course-canvas .wcc-card-composer .wcc-creation-footer-model{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-engine-summary{flex:0 0 auto;max-width:100%;font-size:var(--wtt-text-xs);color:var(--wtt-ui-muted);white-space:nowrap}
