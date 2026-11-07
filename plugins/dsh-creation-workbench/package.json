@@ -57,6 +57,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "prepare": "npm run build",
     "start": "node scripts/start.mjs",
     "check": "node scripts/doctor.mjs",
     "test": "node --test test/*.test.mjs"
