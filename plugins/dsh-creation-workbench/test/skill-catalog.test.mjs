@@ -1,13 +1,25 @@
-import test from 'node:test';
+import { test as nodeTest } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Context } from '../.runtime/host/node_modules/@deepseek-ai/cordis/lib/index.js';
-import { SkillRegistry } from '../.runtime/host/node_modules/@deepseek-ai/dsh-skill/lib/index.js';
 import { apply as filesystem } from '@deepseek-ai/dsh-skill-filesystem';
 import { createWorkbenchSkillCatalog } from '../src/skill-catalog.mjs';
+
+// Host framework modules come from the local DSH install; skip honestly when README setup hasn't run.
+const [cordis, hostSkill] = await Promise.all([
+  import('../.runtime/host/node_modules/@deepseek-ai/cordis/lib/index.js').catch(() => null),
+  import('../.runtime/host/node_modules/@deepseek-ai/dsh-skill/lib/index.js').catch(() => null),
+]);
+const hostModules = cordis && hostSkill ? { Context: cordis.Context, SkillRegistry: hostSkill.SkillRegistry } : null;
+const { Context, SkillRegistry } = hostModules ?? {};
+const HOST_SKIP = hostModules ? false : '需先按 README「干净检出」安装 .runtime/host（@deepseek-ai/dsh 0.2.1-rc.5）';
+const test = hostModules ? nodeTest : (...args) => {
+  const fn = args.find(arg => typeof arg === 'function');
+  const options = args.find(arg => arg && typeof arg === 'object');
+  nodeTest(args[0], { ...(options || {}), skip: HOST_SKIP }, fn);
+};
 
 function skill(root, name, content = `Fixture ${name}`, policy = '') {
   const directory = path.join(root, name); mkdirSync(directory, { recursive: true });

@@ -512,9 +512,11 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     setNotice('')
     try {
       if (modelLoading) throw new Error('模型目录正在读取，请稍后再试。')
+      const outline = await request('course-outline-skill', {})
+      if (!outline?.name) throw new Error('未找到课程大纲技能：请先安装对应本机 Skill，或在插件设置中配置 courseSkillDir 后重试。')
       const data = { requirementId: selected.id, selectedCardIds: [`requirement:${selected.id}`],
-        instruction: '/wtt-course-eight-steps-dev\n根据背景信息开发课程大纲，保留课题与大纲确认步骤。',
-        selectedSkills: ['wtt-course-eight-steps-dev'], outputType: 'outline', generation: { mode: 'new' },
+        instruction: `/${outline.name}\n根据背景信息开发课程大纲，保留课题与大纲确认步骤。`,
+        selectedSkills: [outline.name], outputType: 'outline', generation: { mode: 'new' },
         ...(modelSelection ? { modelSelection } : {}) }
       const created = await request('create-task', { ...data, operationId: operationId(courseAttempt, data) })
       if (!mounted.current) return

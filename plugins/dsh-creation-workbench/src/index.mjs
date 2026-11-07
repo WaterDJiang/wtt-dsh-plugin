@@ -283,7 +283,7 @@ export function apply(ctx, config = {}) {
         if(['document-external-open','document-external-status','document-open-application','document-reveal-file','document-external-save-version'].includes(action)&&!projectId)throw new Error('本机文档操作必须指定当前项目');
         if (action === 'open-project') return Response.json({ project: projects.open(data?.path) }, { headers });
         const service = projects.get(projectId);
-        await syncServiceSkills(service, ['create-task', 'prepare-course', 'prepare-canvas', 'export-word'].includes(action) || /^(ppt|slides|svg)-/.test(action));
+        await syncServiceSkills(service, ['create-task', 'prepare-course', 'course-outline-skill', 'prepare-canvas', 'export-word'].includes(action) || /^(ppt|slides|svg)-/.test(action));
         if (typeof action === 'string' && /^(ppt|slides|svg)-/.test(action) && !projectId) throw new Error('PPT 编辑请求必须指定当前项目');
         if (typeof action === 'string' && /^document-/.test(action) && !projectId) throw new Error('文档编辑请求必须指定当前项目');
         let result;
@@ -329,6 +329,7 @@ export function apply(ctx, config = {}) {
         else if (action === 'save-outline') result = service.store.saveOutline(data);
         else if (action === 'export-word') result = await service.exportWord(data, { signal: request.signal });
         else if (action === 'prepare-course') result = projects.prepared(service, service.prepareCourse(data));
+        else if (action === 'course-outline-skill') result = service.courseOutlineSkill();
         else if (action === 'prepare-canvas') result = projects.prepared(service, service.prepareCanvas(data));
         else if (action === 'document-open') result = await service.documents.open(data);
         else if(action==='document-external-open')result=await service.externalDocuments.open(data);

@@ -7,6 +7,9 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { WorkbenchService } from '../src/service.mjs';
 import { createPreviewSessionAcquirer } from '../src/session.mjs';
+import { slidesRuntimeAvailable } from '../src/baoyu-runtime.mjs';
+
+const SLIDES_SKIP = slidesRuntimeAvailable() ? false : '需要本机安装 dsh-claude-slides（宝玉幻灯片插件）；按 README 干净检出并安装后运行';
 
 function python(code, args) {
   const result = spawnSync('python3', ['-B', '-c', code, ...args], { encoding: 'utf8' });
@@ -45,7 +48,7 @@ async function oldTask(f) {
   return { created, file, sessionId, scope: { requirementId: f.canvas.id, cardId: created.task.outputCardId } };
 }
 
-test('旧宝玉任务的PPTX附件按真实格式打开，同卡网页入口保留，读取不改变版本或冻结输入', async t => {
+test('旧宝玉任务的PPTX附件按真实格式打开，同卡网页入口保留，读取不改变版本或冻结输入', { skip: SLIDES_SKIP }, async t => {
   const f = fixture(t), { created, file, scope } = await oldTask(f);
   const before = f.service.store.db.prepare('SELECT input_json FROM course_tasks WHERE id=?').get(created.task.id).input_json;
   const manifest = f.service.outcomes.manifest(scope);
@@ -70,7 +73,7 @@ test('旧宝玉任务的PPTX附件按真实格式打开，同卡网页入口保�
   assert.throws(() => f.service.outcomes.preview({ ...scope, sourceRef: manifest.selectedRef, hash: file.hash }), /变化|修改|缺失/);
 });
 
-test('PPTX附件在工作副本修改，明确保存后同卡首版／修订版归档，旧任务和原文件保留', async t => {
+test('PPTX附件在工作副本修改，明确保存后同卡首版／修订版归档，旧任务和原文件保留', { skip: SLIDES_SKIP }, async t => {
   const f = fixture(t), { created, file, scope } = await oldTask(f);
   const original = readFileSync(path.join(f.root, file.path));
   const frozen = f.service.tasks.get(created.task.id).input;
@@ -121,7 +124,7 @@ test('宿主文件预览独立保留会话，不查询模型、不提交、不�
   assert.equal(calls.filter(x => x === 'release').length, 3);
 });
 
-test('PPTX附件恢复原生文字／备注编辑，明确保存才成为同卡首版，旧工程和附件保留', async t => {
+test('PPTX附件恢复原生文字／备注编辑，明确保存才成为同卡首版，旧工程和附件保留', { skip: SLIDES_SKIP }, async t => {
   const f = fixture(t), { created, file, scope } = await oldTask(f);
   const original = readFileSync(path.join(f.root,file.path)), input = f.service.tasks.get(created.task.id).input;
   const selection={...scope,artifactId:file.id,hash:file.hash,outcome:true};

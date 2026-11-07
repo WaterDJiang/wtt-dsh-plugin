@@ -35,6 +35,9 @@ export function findSlidesRuntime(config = {}) {
   return { root, script: path.join(root, 'skills/claude-slides/scripts/artifact.mjs'),
     skill: path.join(root, 'skills/claude-slides/SKILL.md'), plugin: path.join(root, 'lib/index.js') };
 }
+export function slidesRuntimeAvailable(config = {}) {
+  try { findSlidesRuntime(config); return true; } catch { return false; }
+}
 
 /** Configure the installed editor at response time; never copy or patch its files. */
 export function configureEditorHtml(html, parentOrigin) {

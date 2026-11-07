@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WorkbenchService } from '../src/service.mjs';
 import { extractSkillNames, pptEngineForSelection } from '../src/skill-commands.mjs';
+import { slidesRuntimeAvailable } from '../src/baoyu-runtime.mjs';
+
+const SLIDES_SKIP = slidesRuntimeAvailable() ? false : '需要本机安装 dsh-claude-slides（宝玉幻灯片插件）；按 README 干净检出并安装后运行';
 import { createCardContext, creationTaskInput } from '../src/creation-context.mjs';
 
 const refs = names => names.map(name => ({ name, hash: 'a'.repeat(64), path: null }));
@@ -64,7 +67,7 @@ test('selecting both native Skills is deliberate and selecting incompatible make
   assert.equal(f.service.tasks.list(f.canvas.id).length, before);
 });
 
-test('default and explicitly selected baoyu makers omit the unselected course Generator', t => {
+test('default and explicitly selected baoyu makers omit the unselected course Generator', { skip: SLIDES_SKIP }, t => {
   const f = fixture(t);
   const defaults = f.create({ outputType: 'pptx', pptEngine: 'baoyu' });
   onlyCommands(defaults, ['claude-slides']);
@@ -103,8 +106,31 @@ test('prepare-canvas never infers a course Skill from the origin of its backgrou
   const f = fixture(t);
   const prepared = f.service.prepareCanvas(f.input());
   assert.deepEqual(extractSkillNames(prepared.prompt), ['wtt-creation-workbench']);
-  assert.match(f.service.prepareCourse({ requirementId: f.canvas.id }).prompt, /\/wtt-course-eight-steps-dev/,
+});
+
+test('the course action resolves the configured outline skill and fails honestly without one', t => {
+  const skillRoot = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'wtt-outline-skill-')));
+  const outlineDir = path.join(skillRoot, 'outline-skill');
+  mkdirSync(outlineDir, { recursive: true });
+  writeFileSync(path.join(outlineDir, 'SKILL.md'), '---\nname: course-outline-skill\n---\n# outline\n');
+  t.after(() => rmSync(skillRoot, { recursive: true, force: true }));
+  const f = fixture(t, { courseSkillDir: outlineDir });
+  assert.match(f.service.prepareCourse({ requirementId: f.canvas.id }).prompt, /\/course-outline-skill/,
     'the dedicated course-development action is still explicit');
+  assert.deepEqual(f.service.courseOutlineSkill(), { name: 'course-outline-skill' });
+
+  const missing = path.join(os.tmpdir(), randomUUID());
+  const bare = fixture(t, { courseSkillDir: missing });
+  assert.throws(() => bare.service.prepareCourse({ requirementId: bare.canvas.id }), /未找到课程大纲技能/);
+  assert.deepEqual(bare.service.courseOutlineSkill(), { name: null });
+
+  const unnamedRoot = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'wtt-outline-unnamed-')));
+  const unnamed = path.join(unnamedRoot, '技能目录');
+  mkdirSync(unnamed, { recursive: true });
+  writeFileSync(path.join(unnamed, 'SKILL.md'), '# 没有 frontmatter 名称\n');
+  t.after(() => rmSync(unnamedRoot, { recursive: true, force: true }));
+  const odd = fixture(t, { courseSkillDir: unnamed });
+  assert.deepEqual(odd.service.courseOutlineSkill(), { name: null });
 });
 
 test('UI and server use the same engine priority while plain custom Skills never expand it', () => {

@@ -30,7 +30,9 @@ function application(config) {
 test('project HTTP routing isolates copied UUIDs, downloads, pending exports and Agent saves', async t => {
   const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'wtt-project-api-')));
   const a = path.join(directory, 'A'), b = path.join(directory, 'B'); mkdirSync(a);
-  const config = { workspaceRoot: a, registryFile: path.join(directory, 'projects.json') };
+  const skillDir = path.join(directory, 'outline-skill'); mkdirSync(skillDir);
+  writeFileSync(path.join(skillDir, 'SKILL.md'), '---\nname: course-outline-skill\n---\n');
+  const config = { workspaceRoot: a, registryFile: path.join(directory, 'projects.json'), courseSkillDir: skillDir };
   const applications = [];
   const create = () => { const app = application(config); applications.push(app); return app; };
   t.after(() => { applications.forEach(app => app.close()); rmSync(directory, { recursive: true, force: true }); });

@@ -7,7 +7,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { WorkbenchService } from '../src/service.mjs';
 import { slideTree } from '../src/slide-projects.mjs';
-import { localEditorUrl, configureEditorHtml, editorParentOrigin, configuredEditorPolicy } from '../src/baoyu-runtime.mjs';
+import { localEditorUrl, configureEditorHtml, editorParentOrigin, configuredEditorPolicy, slidesRuntimeAvailable } from '../src/baoyu-runtime.mjs';
+
+const SLIDES_SKIP = slidesRuntimeAvailable() ? false : '需要本机安装 dsh-claude-slides（宝玉幻灯片插件）；按 README 干净检出并安装后运行';
 
 function writeEngineering(root) {
   mkdirSync(path.join(root, 'project/slides'), { recursive: true });
@@ -53,7 +55,7 @@ test('编辑 URL 和启动配置只接受当前回环来源，不能注入脚本
   assert.throws(() => editorParentOrigin(new Request('http://dsh.internal/api', { headers: { Host: '127.0.0.1:3087', Origin: 'https://evil.test' } })), /来源不一致/);
 });
 
-test('真实编辑代理保留 CSP，只有入口 HTML 获得精确脚本哈希；课件 HTML 原样读取且拒绝外部来源', async t => {
+test('真实编辑代理保留 CSP，只有入口 HTML 获得精确脚本哈希；课件 HTML 原样读取且拒绝外部来源', { skip: SLIDES_SKIP }, async t => {
   const f = await fixture(t), opened = await f.service.slides.open({ projectId: f.attached.project.id, requirementId: f.requirement.id }, 'http://127.0.0.1:3087');
   const entry = await fetch(opened.editor.url), html = await entry.text(), csp = entry.headers.get('content-security-policy');
   assert.equal(entry.status, 200); assert.match(html, /__wtt_slides_command/);
@@ -67,7 +69,7 @@ test('真实编辑代理保留 CSP，只有入口 HTML 获得精确脚本哈希�
   assert.match(configured, /sha256-existing/); assert.match(configured, /frame-src 'self'/);
 });
 
-test('新课件冻结宝玉引擎；原任务重放不换引擎，登记工程不制造正式版本', async t => {
+test('新课件冻结宝玉引擎；原任务重放不换引擎，登记工程不制造正式版本', { skip: SLIDES_SKIP }, async t => {
   const f = await fixture(t), { service, created, attached } = f;
   assert.equal(service.tasks.get(created.task.id).input.pptEngine, 'baoyu');
   assert.match(created.prepared.prompt, /course_attach_slide_project/);
@@ -82,7 +84,7 @@ test('新课件冻结宝玉引擎；原任务重放不换引擎，登记工程�
   assert.equal(service.createTask({ ...f.input, operationId: randomUUID(), pptEngine: 'native' }).task.input.pptEngine, 'native');
 });
 
-test('工程封面按项目与当前修订读取，不启动编辑器、不导出、不创建正式版本', async t => {
+test('工程封面按项目与当前修订读取，不启动编辑器、不导出、不创建正式版本', { skip: SLIDES_SKIP }, async t => {
   const f = await fixture(t), data = { projectId: f.attached.project.id, requirementId: f.requirement.id };
   const node = f.service.canvas.getBoard(f.requirement.id).nodes.find(item => item.slideProject);
   f.service.slides.runtime.open = () => { throw new Error('封面读取不应启动编辑器'); };
@@ -94,7 +96,7 @@ test('工程封面按项目与当前修订读取，不启动编辑器、不导�
   assert.throws(() => f.service.slides.cover({ ...data, requirementId: randomUUID() }), /不属于/);
 });
 
-test('工程拒绝链接；外改和旧导出不发布成功版本', async t => {
+test('工程拒绝链接；外改和旧导出不发布成功版本', { skip: SLIDES_SKIP }, async t => {
   const f = await fixture(t), data = { projectId: f.attached.project.id, requirementId: f.requirement.id };
   symlinkSync('/etc/hosts', path.join(f.root, 'project/外部链接'));
   assert.throws(() => slideTree(path.join(f.root, 'project')), /符号链接/);
@@ -109,7 +111,7 @@ test('工程拒绝链接；外改和旧导出不发布成功版本', async t => 
   assert.equal(f.service.store.db.prepare('SELECT COUNT(*) AS n FROM slide_project_versions').get().n, 0);
 });
 
-test('批注发送失败后持久保留，恢复原会话后只重送一次；跨工程回传被阻止', async t => {
+test('批注发送失败后持久保留，恢复原会话后只重送一次；跨工程回传被阻止', { skip: SLIDES_SKIP }, async t => {
   const f = await fixture(t), data = { projectId: f.attached.project.id, requirementId: f.requirement.id };
   f.service.slides.runtime.watch = () => {};
   f.service.slides.deliverComments = async () => { throw new Error('技术测试：会话暂不可用'); };
@@ -128,7 +130,7 @@ test('批注发送失败后持久保留，恢复原会话后只重送一次；�
   await assert.rejects(f.service.slides.queueComments('其他会话', { ...message, id: randomUUID() }, f.root), /绑定课程任务/);
 });
 
-test('真实格式文件绑定工程快照与同卡递增版本；重放幂等，旧版与草稿隔离', async t => {
+test('真实格式文件绑定工程快照与同卡递增版本；重放幂等，旧版与草稿隔离', { skip: SLIDES_SKIP }, async t => {
   const f = await fixture(t), { service } = f, data = { projectId: f.attached.project.id, requirementId: f.requirement.id };
   const save = async label => {
     const intent = service.slides.preparePublish({ ...data, operationId: randomUUID() }); const exported = exportedPpt(f.root, label);
