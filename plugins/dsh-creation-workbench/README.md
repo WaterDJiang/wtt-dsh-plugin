@@ -19,9 +19,9 @@
 
 前提：DSH 宿主 `0.2.1-rc.5` 或更新（含 `0.2.2-rc.x`，见 `package.json` 的 `engines.dsh`）；源码构建另需 Node ≥ 24。
 
-### 方式一：DSH 插件市场新增插件安装（最简单）
+### 方式一：DSH 内安装第三方插件（最简单）
 
-在 DSH 插件市场选择「新增插件」，粘贴以下安装串后安装：
+在 DSH 中依次进入：**插件 → 添加插件 → 安装第三方插件**，粘贴以下安装串后安装：
 
 ```
 git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench

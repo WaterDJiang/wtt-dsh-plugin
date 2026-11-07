@@ -11,7 +11,7 @@ WTT 面向 DeepSeek Harness（DSH）的插件合集，按 monorepo 组织。每�
 
 ## 安装
 
-各子插件的完整安装说明见其目录内 README。最简单的方式是在 DSH 插件市场选择「新增插件」，粘贴安装串后安装：
+各子插件的完整安装说明见其目录内 README。最简单的方式是在 DSH 中依次进入 **插件 → 添加插件 → 安装第三方插件**，粘贴安装串后安装：
 
 ```
 git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
