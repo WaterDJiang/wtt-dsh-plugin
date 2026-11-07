@@ -11,10 +11,10 @@ WTT 面向 DeepSeek Harness（DSH）的插件合集，按 monorepo 组织。每�
 
 ## 安装
 
-各子插件的完整安装说明见其目录内 README。最简单的方式是通过 DSH 插件市场：在插件管理页启用实验性的「自定义插件市场」，在发现页添加索引源后即可搜索安装：
+各子插件的完整安装说明见其目录内 README。最简单的方式是在 DSH 插件市场选择「新增插件」，粘贴安装串后安装：
 
 ```
-https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json
+git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
 ```
 
 以创作工作台为例，npm 成品包两步安装（包内含已构建产物，无需本地构建）：

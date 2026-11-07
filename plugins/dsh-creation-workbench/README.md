@@ -19,18 +19,15 @@
 
 前提：DSH 宿主 `0.2.1-rc.5` 或更新（含 `0.2.2-rc.x`，见 `package.json` 的 `engines.dsh`）；源码构建另需 Node ≥ 24。
 
-### 方式一：DSH 插件市场安装（最简单，无需命令行）
+### 方式一：DSH 插件市场新增插件安装（最简单）
 
-1. 在 DSH 插件管理页启用实验性的「自定义插件市场」
-2. 在发现页添加本项目市场索引源：
+在 DSH 插件市场选择「新增插件」，粘贴以下安装串后安装：
 
 ```
-https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json
+git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
 ```
 
-3. 搜索「创作工作台」「课件」或包名 `@wtt/dsh-creation-workbench`，一键安装
-
-版本按 git 提交固定；发布新版本后刷新索引即可看到更新。
+`#main` 跟随主分支最新版本；需要锁定版本时把 `#main` 换成 `#<提交sha>`（插件市场索引 [market/index.json](https://github.com/WaterDJiang/wtt-dsh-plugin/blob/main/market/index.json) 即按固定提交发布）。
 
 ### 方式二：npm 成品包（无需本地构建）
 
