@@ -1,6 +1,5 @@
 node_modules/
 .runtime/
-dist/
 *.tgz
 .DS_Store
 __pycache__/
