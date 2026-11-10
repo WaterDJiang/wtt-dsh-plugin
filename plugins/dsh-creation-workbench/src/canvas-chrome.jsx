@@ -1,5 +1,6 @@
 import { UiButton } from './ui/controls.jsx'
 import React, { useEffect, useRef, useState } from 'react'
+import { useStore } from '@xyflow/react'
 import './canvas-chrome.css'
 
 const ICONS = {
@@ -13,6 +14,7 @@ const ICONS = {
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
   fit: <><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6" /><rect x="8" y="8" width="8" height="8" rx="1" /></>,
+  arrange: <><rect x="3" y="4" width="7" height="6" rx="1" /><rect x="14" y="4" width="7" height="6" rx="1" /><rect x="3" y="14" width="7" height="6" rx="1" /><rect x="14" y="14" width="7" height="6" rx="1" /></>,
   focus: <><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" /><path d="M8 12h8M12 8v8" /></>,
   map: <><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z" /><path d="M9 3v16M15 5v16" /></>,
   undo: <><path d="m8 5-5 5 5 5M3 10h11a6 6 0 0 1 0 12" /></>,
@@ -79,8 +81,16 @@ const TOOLS = [
   ['rectangle', '矩形工具', 'R'], ['ellipse', '椭圆工具', 'O'],
 ]
 
+const zoomPercent = state => Math.round(state.transform[2] * 100)
+
+function ZoomValue({ onReset }) {
+  const zoom = useStore(zoomPercent)
+  return <UiButton variant="custom" type="button" className="wcc-studio-zoom-value" onClick={onReset} disabled={!onReset}
+    title="恢复至 100%" aria-label={`当前缩放 ${zoom}%，恢复至 100%`}>{zoom}%</UiButton>
+}
+
 export function CanvasChrome({
-  tool = 'select', onTool, zoom = 1, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected,
+  tool = 'select', onTool, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected, onArrange, canArrange,
   onToggleMap, showMap = false, onAddMaterial, onAddElement, onUndo, onRedo, canUndo, canRedo,
   onInspect, onAI, onTasks, onAssets, taskCount = 0, runningCount = 0, pendingCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
   hasSelection = selectedCount > 0, busy = false,
@@ -117,17 +127,18 @@ export function CanvasChrome({
       <ToolButton icon="inspect" label="内容详情" active={typeof sidebar === 'string' ? sidebar === 'inspect' : undefined} onClick={onInspect} className="wcc-studio-panel-button"><span>内容</span></ToolButton>
       <ToolButton icon="material" label="创作任务" active={sidebar === 'tasks'} onClick={onTasks} className="wcc-studio-panel-button"><span>{runningCount ? `运行 ${runningCount}` : '任务'}{pendingCount ? ` · 待办 ${pendingCount}` : ''}</span></ToolButton>
       <ToolButton icon="inspect" label="资产看板" onClick={onAssets} className="wcc-studio-panel-button"><span>资产</span></ToolButton>
-      <ToolButton icon="ai" label="AI 制课" active={typeof sidebar === 'string' ? sidebar === 'ai' : undefined} onClick={onAI} className="wcc-studio-panel-button is-ai"><span>AI 制课</span></ToolButton>
+      <ToolButton icon="ai" label="AI 创作" active={typeof sidebar === 'string' ? sidebar === 'ai' : undefined} onClick={onAI} className="wcc-studio-panel-button is-ai"><span>AI 创作</span></ToolButton>
     </div>
 
     <div className="wcc-studio-zoom-dock wcc-studio-surface" role="toolbar" aria-label="画布缩放与导航">
       <ToolButton icon="minus" label="缩小画布" onClick={onZoomOut} />
-      <UiButton variant="custom" type="button" className="wcc-studio-zoom-value" onClick={onZoom100} disabled={!onZoom100} title="恢复至 100%" aria-label={`当前缩放 ${Math.round(zoom * 100)}%，恢复至 100%`}>{Math.round(zoom * 100)}%</UiButton>
+      <ZoomValue onReset={onZoom100} />
       <ToolButton icon="plus" label="放大画布" onClick={onZoomIn} />
       <span className="wcc-studio-divider" aria-hidden="true" />
       <ToolButton icon="fit" label="查看全部卡片" onClick={onFitAll} />
       <ToolButton icon="focus" label="定位所选卡片" onClick={onFitSelected} disabled={!hasSelection} />
       <ToolButton icon="map" label="显示小地图" active={showMap} onClick={onToggleMap} />
+      <ToolButton icon="arrange" label="快速排版" onClick={onArrange} disabled={!canArrange || controlsDisabled}><span>排版</span></ToolButton>
     </div>
 
     <div className="wcc-studio-navigation-hint" aria-hidden="true">双指滑动／滚轮平移<span>·</span>捏合／＋－缩放</div>

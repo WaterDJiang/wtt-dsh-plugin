@@ -55,7 +55,7 @@ export function OutlineDesk({ version, versions = [], value, onChange, onClose, 
     : null, [view, comparison, source, draft, leftVersion, rightVersion])
   const selectionMessage = dirty ? '当前有未保存修改，先保存新版本再选择片段。' : passage
     ? `已选择第 ${lineAt(source, passage.start)}–${lineAt(source, passage.end - 1)} 行 · ${passage.quote.length} 字符`
-    : '在正文中选择片段，再交给 AI 制课。'
+    : '在正文中选择片段，再交给 AI。'
   useEffect(() => { setSelection(null) }, [version?.id, source])
 
   function readSelection() {

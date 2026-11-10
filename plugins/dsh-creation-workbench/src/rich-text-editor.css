@@ -14,6 +14,7 @@
 .wtt-rich-editor .tiptap :is(td,th){border:1px solid var(--wtt-ui-line);padding:5px;min-width:40px;vertical-align:top;position:relative}
 .wtt-rich-editor .tiptap .selectedCell:after{content:'';position:absolute;inset:0;background:#5d8beb25;pointer-events:none}
 .wtt-rich-editor .wtt-rich-raw{flex:1;min-height:80px;resize:none;white-space:pre-wrap;font:var(--wtt-text-md)/1.7 ui-monospace,monospace}
-.wtt-course-canvas .wcc-card.is-editing{min-height:280px}
-.wtt-course-canvas .wcc-card-inline-editor:has(.wtt-rich-editor){gap:3px}
+.wtt-course-canvas .wcc-text-editor-body{display:flex;flex:1;min-height:0;min-width:0;padding:0 var(--wtt-space-3) var(--wtt-space-3)}
+.wtt-course-canvas .wcc-text-editor-panel .wtt-user-error{flex-shrink:0;max-height:120px;overflow:auto;margin:var(--wtt-space-2) var(--wtt-space-3)}
+.wtt-course-canvas .wcc-text-editor-panel .wtt-rich-raw{padding:var(--wtt-space-2);border:1px solid var(--wtt-ui-line);background:var(--wtt-ui-surface);color:var(--wtt-ui-ink)}
 @media(max-width:600px){.wtt-rich-editor .tiptap{font-size:var(--wtt-text-lg)}}

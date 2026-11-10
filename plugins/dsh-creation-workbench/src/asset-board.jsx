@@ -71,14 +71,14 @@ export function AssetBoard({ projectId, requirementId, endpoint, request, onClos
     } catch (error) { setError(error.message) }
   }
   return <section ref={panelRef} tabIndex={-1} className="wtt-assets nodrag nopan nowheel" role="dialog" aria-label="资产看板" onPointerDown={event => event.stopPropagation()} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') onClose() }}>
-    <PanelHeader title="资产看板" subtitle="当前项目" onClose={onClose} closeLabel="关闭资产看板"/><PanelToolbar><select aria-label="资产看板课程" value={selected} disabled={busy} onChange={event => switchCourse(event.target.value)}>{(overview?.courses || []).map(item => <option key={item.requirement.id} value={item.requirement.id}>{item.requirement.title}</option>)}</select><UiButton variant="quiet" type="button" onClick={() => void load().catch(error => setError(error.message))}>刷新</UiButton></PanelToolbar>
+    <PanelHeader title="资产看板" subtitle="当前项目" onClose={onClose} closeLabel="关闭资产看板"/><PanelToolbar><select aria-label="资产看板画布" value={selected} disabled={busy} onChange={event => switchCourse(event.target.value)}>{(overview?.courses || []).map(item => <option key={item.requirement.id} value={item.requirement.id}>{item.requirement.title}</option>)}</select><UiButton variant="quiet" type="button" onClick={() => void load().catch(error => setError(error.message))}>刷新</UiButton></PanelToolbar>
     <nav role="tablist" aria-label="资产看板栏目">{[['deliveries', '内容与交付'], ['business', '业务跟进'], ['production', 'AI 用量'], ['environment', '设置与技能']].map(([id, label]) => <UiButton variant="custom" key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</UiButton>)}</nav>
     {error && <UserError className="wtt-assets-error" error={error} />}{notice && <p className="wtt-assets-notice" role="status">{notice}</p>}
     <div className="wtt-assets-body">
       {!course ? <p role="status">正在读取项目资产…</p> : tab === 'deliveries' ? <>
         <div className="wtt-assets-summary"><strong>{course.cards.length} 份成果文件</strong><span>{course.cards.filter(card => card.selectedVersionId).length} 份已选交付版本</span><UiButton variant="quiet" type="button" onClick={downloadManifest}>导出交付清单</UiButton></div>
         <p className="wtt-assets-help">先检查内容，再选入交付清单。选入清单不会自动发送文件；客户确认和收款需另外记录。</p>
-        {!course.cards.length && <p>还没有成果文件。返回画布，点击背景卡开始创作。</p>}
+        {!course.cards.length && <p>还没有成果文件。</p>}
         <div className="wtt-assets-grid">{course.cards.map(card => {
           const versionId = versions[card.id] || card.selectedVersionId || card.latestVersionId || card.versions.at(-1)?.id
           const version = card.versions.find(item => item.id === versionId), state = version?.review?.state || 'pending'
@@ -92,7 +92,7 @@ export function AssetBoard({ projectId, requirementId, endpoint, request, onClos
           </article>
         })}</div>
       </> : tab === 'business' ? <>
-        <div className="wtt-assets-summary"><strong>项目业务</strong><label>筛选 <select aria-label="筛选业务待办" value={businessFilter} onChange={event => setBusinessFilter(event.target.value)}><option value="all">全部课程</option><option value="due">今日及逾期待办</option><option value="waiting">等待反馈</option><option value="unpaid">待收款</option></select></label></div>
+        <div className="wtt-assets-summary"><strong>项目业务</strong><label>筛选 <select aria-label="筛选业务待办" value={businessFilter} onChange={event => setBusinessFilter(event.target.value)}><option value="all">全部画布</option><option value="due">今日及逾期待办</option><option value="waiting">等待反馈</option><option value="unpaid">待收款</option></select></label></div>
         <div className="wtt-business-stages" aria-label="项目阶段分布">{overview?.stages.map(stage => <div key={stage}><strong>{stage}</strong>{overview.courses.filter(item => item.business.stage === stage && (businessFilter === 'all' || businessFilter === 'due' && due(item.business) || businessFilter === 'waiting' && item.business.waitingFor || businessFilter === 'unpaid' && item.business.outstandingMinor > 0)).map(item => <UiButton variant="custom" key={item.requirement.id} type="button" disabled={busy} onClick={() => switchCourse(item.requirement.id)}>{item.requirement.title}{due(item.business) && <small className="wtt-due">到期待办</small>}{item.business.nextAction && <small>{item.business.nextAction}</small>}{item.business.followUpDate && <small>跟进 {item.business.followUpDate}</small>}</UiButton>)}</div>)}</div>
         <form className="wtt-assets-form" onSubmit={async event => { event.preventDefault(); const result = await act('save-business', { ...form, requirementId: selected }, '跟进信息已保存'); if (result) setDraft(null) }}>
           <h3>业务跟进</h3><label>阶段<select aria-label="业务阶段" value={form.stage} onChange={event => changeBusiness('stage', event.target.value)}>{overview?.stages.map(stage => <option key={stage}>{stage}</option>)}</select></label>
@@ -118,7 +118,7 @@ export function AssetBoard({ projectId, requirementId, endpoint, request, onClos
         </section>}
       </> : <>
         <h3>工具可用性检查</h3><p>检查课件制作、文档导出和技能所需的工具是否可用。</p><UiButton variant="quiet" type="button" disabled={busy} onClick={async () => { setBusy(true); setError(''); try { setDiagnostics(await readRef.current({ environmentCheck: 1 })) } catch (error) { setError(error.message) } finally { setBusy(false) } }}>检查工具是否可用</UiButton>
-        {diagnostics && <><ul>{diagnostics.checks?.map(item => <li key={item.name}><strong>{item.name}</strong> · {item.available ? '可用' : '待配置'}<details><summary>查看配置详情</summary><p>{item.message || item.path}</p></details></li>)}</ul><details><summary>诊断信息</summary><code>{diagnostics.fingerprint}</code></details><h3>本机技能</h3><p>课程技能从本机读取。点击卡旁输入框的“／技能 → 设置常用”，搜索后点星标即可；所有项目共用。</p></>}
+        {diagnostics && <><ul>{diagnostics.checks?.map(item => <li key={item.name}><strong>{item.name}</strong> · {item.available ? '可用' : '待配置'}<details><summary>查看配置详情</summary><p>{item.message || item.path}</p></details></li>)}</ul><details><summary>诊断信息</summary><code>{diagnostics.fingerprint}</code></details><h3>本机技能</h3><p>技能从本机读取。点击卡旁输入框的“／技能 → 设置常用”，搜索后点星标即可；所有项目共用。</p></>}
       </>}
     </div>
   </section>

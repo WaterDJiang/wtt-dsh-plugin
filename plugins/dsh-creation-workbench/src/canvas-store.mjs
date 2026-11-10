@@ -53,6 +53,12 @@ function coordinate(position) {
   return { x: position.x, y: position.y };
 }
 
+function canvasViewport(viewport) {
+  const position = coordinate(viewport);
+  if (!Number.isFinite(viewport.zoom) || viewport.zoom < 0.1 || viewport.zoom > 3) throw new Error('画布缩放无效');
+  return { ...position, zoom: viewport.zoom };
+}
+
 function directory(target) { try { mkdirSync(target); } catch (error) { if (error.code !== 'EEXIST') throw error; }
   if (lstatSync(target).isSymbolicLink() || !statSync(target).isDirectory()) throw new Error('素材目录不可用');
 }
@@ -571,6 +577,23 @@ export class CanvasStore {
     });
   }
 
+  saveViewport({ requirementId, expectedRevision, viewport }) {
+    const next = canvasViewport(viewport);
+    return this.#transaction(() => {
+      const row = this.db.prepare(`SELECT b.revision FROM canvas_spaces c
+        LEFT JOIN canvas_boards b ON b.requirement_id=c.id WHERE c.id=?`).get(requirementId);
+      if (!row) throw new Error('需求不存在');
+      const revision = row.revision ?? 0;
+      if (expectedRevision !== revision) throw new Error('画布已被其他操作修改，请保留当前布局并重新加载');
+      this.db.prepare(`INSERT INTO canvas_boards
+        (requirement_id, revision, positions_json, edges_json, groups_json, viewport_json)
+        VALUES (?, ?, '{}', '[]', '[]', ?)
+        ON CONFLICT(requirement_id) DO UPDATE SET revision=excluded.revision, viewport_json=excluded.viewport_json`)
+        .run(requirementId, revision + 1, JSON.stringify(next));
+      return { revision: revision + 1, viewport: next };
+    });
+  }
+
   saveBoard({ requirementId, expectedRevision, positions = {}, edges = [], groups = [], viewport, elements, sizes }) {
     const result = this.#transaction(() => {
       const board = this.store.cards.project(this.getRawBoard(requirementId));
@@ -647,8 +670,7 @@ export class CanvasStore {
         }
         return { id: group.id, title, nodeIds };
       }).filter(Boolean);
-      const nextViewport = viewport ? { ...coordinate(viewport), zoom: viewport.zoom } : board.viewport;
-      if (!Number.isFinite(nextViewport.zoom) || nextViewport.zoom < 0.1 || nextViewport.zoom > 3) throw new Error('画布缩放无效');
+      const nextViewport = canvasViewport(viewport || board.viewport);
       this.#write(board.requirementId, { positions: normalizedPositions, edges: normalizedEdges, groups: normalizedGroups, viewport: nextViewport, elements: nextElements, sizes: nextSizes }, board.revision + 1);
       return board.requirementId;
     });
@@ -764,7 +786,7 @@ export class CanvasStore {
     if (!uuid(input.operationId)) throw new Error('摘录操作标识无效');
     const title = text(input.title, '摘录标题', 600).trim();
     if (!title) throw new Error('请填写摘录标题');
-    const annotation = text(input.annotation, '讲师注释', 20_000);
+    const annotation = text(input.annotation, '注释', 20_000);
     const quote = text(input.quote, '摘录原文');
     const values = { requirementId: requirement.id, title, sourceCardId: input.sourceCardId, sourceHash: input.sourceHash,
       start: input.start, end: input.end, quote, annotation };

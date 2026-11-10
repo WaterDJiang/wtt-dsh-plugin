@@ -114,7 +114,7 @@ export function ProjectPicker({ currentProject, projects = [], browseDirectory, 
       const bounds = event.currentTarget.getBoundingClientRect()
       if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose()
     }}>
-    <DialogHeader title={isSkill?'选择技能文件夹':'选择项目文件夹'} titleId={titleId} descriptionId={hintId} description={isSkill?'选择存放技能的文件夹，只建立关联，不复制文件。':'这个文件夹用于保存课程资料、任务和生成的文件。'} onClose={onClose} closeLabel={isSkill?'关闭文件夹选择':'关闭项目选择'} busy={working}/>
+    <DialogHeader title={isSkill?'选择技能文件夹':'选择项目文件夹'} titleId={titleId} descriptionId={hintId} description={isSkill?'选择存放技能的文件夹，只建立关联，不复制文件。':'这个文件夹用于保存项目资料、任务和成果文件。'} onClose={onClose} closeLabel={isSkill?'关闭文件夹选择':'关闭项目选择'} busy={working}/>
     <div className="wtt-pp-body">
       <aside hidden={isSkill} className="wtt-pp-recent" aria-label="最近项目">
         <h3>最近项目</h3>

@@ -77,7 +77,7 @@ export class TaskStore {
   fingerprint(input) {
     const requirementId = id(input?.requirementId, '需求标识');
     const operationId = id(input.operationId, '操作标识');
-    if (typeof input.instruction !== 'string' || !input.instruction.trim() || input.instruction.length > 8000) throw new Error('请填写本次制课意图（最多 8000 字）');
+    if (typeof input.instruction !== 'string' || !input.instruction.trim() || input.instruction.length > 8000) throw new Error('请填写创作要求（最多 8000 字）');
     const generation = input.generation === undefined ? undefined : normalizeGeneration(input.generation);
     if (!Array.isArray(input.selectedCardIds) || input.selectedCardIds.length < (generation ? 0 : 1) || input.selectedCardIds.length > 24
       || input.selectedCardIds.some(value => typeof value !== 'string')) throw new Error('请选中 1–24 张卡片作为本次上下文');

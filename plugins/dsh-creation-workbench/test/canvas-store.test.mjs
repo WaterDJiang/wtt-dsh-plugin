@@ -93,6 +93,26 @@ test('stale revisions reject without overwriting; unknown cards and forged body 
   assert.deepEqual(canvas.getBoard(req.id).nodes[0].position, { x: 12, y: 34 });
 });
 
+test('viewport saves share layout revisions and leave positions, sizes, whiteboard and links untouched', (t) => {
+  const { store, canvas } = fixture(t);
+  const req = requirement(store);
+  const card = `requirement:${req.id}`, note = `whiteboard:${randomUUID()}`;
+  const viewport = { x: -36, y: 48, zoom: 0.55 };
+  assert.deepEqual(canvas.saveViewport({ requirementId: req.id, expectedRevision: 0, viewport }), { revision: 1, viewport });
+  const saved = canvas.saveBoard({ requirementId: req.id, expectedRevision: 1,
+    positions: { [card]: { x: 80, y: 130 }, [note]: { x: 340, y: 130 } },
+    sizes: { [card]: { width: 280, height: 180 } },
+    elements: [{ id: note, kind: 'note', text: '保留', width: 180, height: 100, colour: 'cream' }],
+    groups: [{ id: 'group-a', title: '已编组', nodeIds: [card, note] }],
+    edges: [{ id: 'manual-edge', source: note, target: card }] });
+  assert.throws(() => canvas.saveViewport({ requirementId: req.id, expectedRevision: 1, viewport }), /其他操作修改/);
+  assert.throws(() => canvas.saveViewport({ requirementId: req.id, expectedRevision: 2, viewport: { ...viewport, zoom: 0 } }), /缩放/);
+  const moved = { x: 40, y: -82, zoom: 1.2 };
+  assert.deepEqual(canvas.saveViewport({ requirementId: req.id, expectedRevision: 2, viewport: moved }), { revision: 3, viewport: moved });
+  assert.throws(() => canvas.saveBoard({ requirementId: req.id, expectedRevision: 2 }), /其他操作修改/);
+  assert.deepEqual(canvas.getBoard(req.id), { ...saved, revision: 3, viewport: moved });
+});
+
 test('material creates an immutable UTF-8 snapshot and replays once even after original disappears', (t) => {
   const { root, store, canvas } = fixture(t);
   const req = requirement(store);

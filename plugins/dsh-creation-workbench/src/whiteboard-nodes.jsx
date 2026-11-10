@@ -19,6 +19,7 @@ export const WhiteboardNode = memo(function WhiteboardNode({ id, data, selected,
   const editor = useRef(null)
   const closed = useRef(null)
   const autoEditStarted = useRef(false)
+  const editingRef = useRef(false)
   const kind = KINDS[data.elementKind] ? data.elementKind : 'note'
   const text = typeof data.text === 'string' ? data.text : ''
   const colour = COLOURS[data.colour] || COLOURS.cream
@@ -26,11 +27,13 @@ export const WhiteboardNode = memo(function WhiteboardNode({ id, data, selected,
   const label = KINDS[kind]
 
   useEffect(() => { if (!editing) setDraft(text) }, [text, editing])
+  useEffect(() => () => { if (editingRef.current) data.onEditEnd?.() }, [])
   useEffect(() => {
     if (!data.autoEdit || autoEditStarted.current) return
     autoEditStarted.current = true
     data.onEditStart?.()
     closed.current = null
+    editingRef.current = true
     setDraft(text)
     setEditing(true)
   }, [data.autoEdit])
@@ -46,6 +49,7 @@ export const WhiteboardNode = memo(function WhiteboardNode({ id, data, selected,
     if (editing) return
     data.onEditStart?.()
     closed.current = null
+    editingRef.current = true
     setDraft(text)
     setEditing(true)
   }
@@ -53,7 +57,9 @@ export const WhiteboardNode = memo(function WhiteboardNode({ id, data, selected,
   function finishEdit(commit) {
     if (closed.current) return
     closed.current = commit ? 'commit' : 'cancel'
+    editingRef.current = false
     setEditing(false)
+    data.onEditEnd?.()
     if (commit && draft !== text) data.onChange?.(id, { text: draft })
     if (!commit) setDraft(text)
   }

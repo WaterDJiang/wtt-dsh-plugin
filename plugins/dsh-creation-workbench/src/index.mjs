@@ -354,6 +354,7 @@ export function apply(ctx, config = {}) {
         }
         else if (action === 'save-card-text') result = service.canvas.saveCardText(data);
         else if (action === 'save-canvas') result = service.canvas.saveBoard(data);
+        else if (action === 'save-canvas-viewport') result = service.canvas.saveViewport(data);
         else if (action === 'add-material') result = service.canvas.addMaterial(data);
         else if (action === 'snapshot-whiteboard') result = service.canvas.snapshotWhiteboard(data);
         else if (action === 'add-excerpt') result = service.canvas.addExcerpt(data);
@@ -418,7 +419,7 @@ export function apply(ctx, config = {}) {
   const projectParameter = { type: 'string', description: '准备输入返回的 projectId；必须属于当前会话的原始项目目录' };
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_read_task_source',
-    description: '按需读取当前任务已选中的冻结正文、讲师注释或来源任务的配套文件路径与 hash。仅供该任务的主会话使用。',
+    description: '按需读取当前任务已选中的冻结正文、注释或来源任务的配套文件路径与 hash。仅供该任务的主会话使用。',
     parameters: {
       projectId: projectParameter,
       taskId: { type: 'string', required: true },

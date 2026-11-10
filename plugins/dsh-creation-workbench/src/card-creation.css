@@ -87,7 +87,7 @@
 .wcc-card-composer .wcc-creation-reference-options input { width: 12px; height: 12px; margin: 0; accent-color: var(--wtt-ui-accent, #8099c2); }
 .wcc-card-composer .wcc-creation-reference-options label > svg { flex-shrink: 0; color: var(--wtt-ui-muted, #9aaecb); }
 .wcc-card-composer .wcc-creation-reference-options label > span { flex: 1; min-width: 0; }
-.wcc-card-composer .wcc-creation-reference-options strong { display: block; overflow: hidden; color: var(--wtt-ui-muted, #7f91ac); font-size:var(--wtt-text-xs); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.wcc-card-composer .wcc-creation-reference-options strong { display: -webkit-box; overflow: hidden; color: var(--wtt-ui-muted, #7f91ac); font-size:var(--wtt-text-xs); font-weight: 500; overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .wcc-card-composer .wcc-creation-reference-options small { display: block; color: var(--wtt-ui-muted, #a9b3c3); font-size:var(--wtt-text-xs); }
 .wcc-card-composer .wcc-creation-reference-options > p { margin: 8px 3px; color: var(--wtt-ui-muted, #a3aec0); font-size:var(--wtt-text-xs); }
 .wtt-course-canvas .wcc-card-composer button.wcc-creation-reference-done { display: block; min-height: 24px; margin: 4px 0 0 auto; padding: 3px 7px; border: 0; color: var(--wtt-ui-muted, #7a94be); background: transparent; font-size:var(--wtt-text-xs); }

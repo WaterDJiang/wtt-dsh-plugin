@@ -29,7 +29,7 @@ test('canvas context contains selected material and required brief, never unrela
   const other = service.store.createRequirement({ title: '其他需求', operationId: randomUUID() });
   assert.throws(() => prepare([`requirement:${other.id}`]), /来源|卡片|需求/);
   assert.throws(() => prepare([]), /1–24/);
-  assert.throws(() => prepare([`requirement:${requirement.id}`], ''), /意图/);
+  assert.throws(() => prepare([`requirement:${requirement.id}`], ''), /创作要求/);
 });
 
 test('large selected text is bounded and explicitly marked as an excerpt', t => {

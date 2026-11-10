@@ -67,7 +67,7 @@ function CreationIcon({ type = 'outline', size = 17 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[type] || paths.outline}</svg>
 }
 
-function cardTitle(card) { return card?.title || `${KIND_LABELS[card?.kind] || '资料'}${card?.number ? ` v${card.number}` : ''}` }
+function cardTitle(card) { return card?.displayTitle || card?.title || `${KIND_LABELS[card?.kind] || '资料'}${card?.number ? ` v${card.number}` : ''}` }
 function referenceFormat(card) {
   const name=card.importedFile?.name||card.generatedFile?.name||card.path||card.sourcePath||card.title||'';
   const ext=name.match(/\.([a-z0-9]{1,8})(?:[?#].*)?$/i)?.[1]?.toLowerCase();
@@ -346,7 +346,7 @@ export function CardComposer({
     try {
       const engine = inputLocked ? context.pptEngine : pptEngineForSelection({ pptEngine: context.pptEngine, selectedSkills: chosenSkills })
       engineSummary = engine === 'baoyu' ? '宝玉制作' : !inputLocked && chosenSkills.includes('wtt-course-pptx-generator') && !chosenSkills.includes('wtt-course-pptx-builder') ? '仅分镜' : '原生 PPT'
-      engineDetail = inputLocked ? '沿用原任务冻结的制作方式' : chosenSkills.length ? `仅所选技能：${chosenSkills.join('、')}` : engine === 'baoyu' ? '默认制作引擎：claude-slides；不添加分镜技能' : '未选技能，按指令处理；不添加课程流程'
+      engineDetail = inputLocked ? '沿用原任务冻结的制作方式' : chosenSkills.length ? `仅所选技能：${chosenSkills.join('、')}` : engine === 'baoyu' ? '默认制作引擎：claude-slides；不添加分镜技能' : '未选技能，按指令处理'
     } catch (cause) { engineError = cause.message }
   }
   const referenceNotes = [...new Set((context?.referenceNotes || []).map(note => typeof note === 'string' ? note : note?.message || note?.note || '').filter(Boolean))]
@@ -356,7 +356,7 @@ export function CardComposer({
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || (!mediaReason && !mediaPending && !mediaLoading))
   const reason = recoveringMedia ? '' : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || '该创作能力暂不可用。' : ''))
   const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
-  const candidates = uniqueCards(availableReferences).filter(card => `${cardTitle(card)} ${KIND_LABELS[card.kind] || ''}`.toLowerCase().includes(search.toLowerCase()))
+  const candidates = uniqueCards(availableReferences).filter(card => [cardTitle(card), card.title, KIND_LABELS[card.kind]].join(' ').toLowerCase().includes(search.toLowerCase()))
   const projectReferences = new Map(availableReferences.filter(card => card.projectFile).map(card => [card.id, card.projectFile]))
   const referenceOptions = uniqueCards([...references, ...availableReferences])
     .filter(card => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith('video/')))
@@ -367,7 +367,7 @@ export function CardComposer({
       const detail = [isChosen(card) ? '已引用' : '画布', referenceFormat(card), projectPath].filter(Boolean).join(' · ')
       const readyProjectPath = projectFile?.status === 'ready' ? projectPath : undefined
       return { key: card.id, card, label, detail, mentionLabel: projectPath, path: readyProjectPath,
-        searchText: [label, detail].join(' ').normalize('NFC').toLowerCase() }
+        searchText: [label, card.title, detail].join(' ').normalize('NFC').toLowerCase() }
     })
   const mentionProps = {
     referenceOptions, searchReferences: searchProjectReferences,
@@ -613,7 +613,7 @@ export function CardComposer({
       else if(event.key==='Escape'&&previewOpen){event.preventDefault();setPreviewOpen(false);previewTrigger.current?.focus()}
     }}>
     <header className="wcc-creation-heading" hidden={!collapsed}>
-      <div className="wcc-creation-heading-copy" title={[context?.projectName, context?.requirementTitle].filter(Boolean).join(' / ')}><span className="wcc-creation-heading-icon"><CreationIcon type={outputType} /></span><div><div className="wcc-creation-title-row"><h3 id={`${id}-title`} title={cardTitle(headingCard)}>{cardTitle(headingCard)}</h3><span className="wcc-creation-current-type" aria-label="当前操作" title={selectedType?.message || selectedType?.label || KIND_LABELS[outputType]}>{revising ? '版本修订' : selectedType?.label || KIND_LABELS[outputType] || '课程创作'}</span></div></div></div>
+      <div className="wcc-creation-heading-copy" title={[context?.projectName, context?.requirementTitle].filter(Boolean).join(' / ')}><span className="wcc-creation-heading-icon"><CreationIcon type={outputType} /></span><div><div className="wcc-creation-title-row"><h3 id={`${id}-title`} title={cardTitle(headingCard)}>{cardTitle(headingCard)}</h3><span className="wcc-creation-current-type" aria-label="当前操作" title={selectedType?.message || selectedType?.label || KIND_LABELS[outputType]}>{revising ? '版本修订' : selectedType?.label || KIND_LABELS[outputType] || '创作任务'}</span></div></div></div>
       <div className="wcc-creation-window-actions">{headingCard?.kind === 'outline' && onAction && <UiButton variant="custom" type="button" className="wcc-creation-edit" aria-label="专注编辑当前大纲" disabled={busy} onClick={() => onAction('edit')}>编辑</UiButton>}<UiButton variant="custom" type="button" aria-label={collapsed ? '展开卡片创作框' : '收起卡片创作框'} aria-expanded={!collapsed} onClick={() => { setCollapsed(value => !value); setReferencesOpen(false) }}><CreationIcon type={collapsed ? 'expand' : 'collapse'} size={15} /></UiButton><UiButton variant="custom" type="button" aria-label="关闭卡片创作框" onClick={onClose}><CreationIcon type="close" size={15} /></UiButton></div>
     </header>
     <div ref={scrollBody} className="wcc-creation-scroll-body" hidden={collapsed}>
@@ -651,14 +651,14 @@ export function CardComposer({
         <div ref={picker} id={`${id}-references`} hidden={!referencesOpen} className="wcc-creation-reference-picker" aria-label="选择引用资料">
           <div className="wcc-creation-reference-sources" hidden={referenceSource === 'board'}>
             <UiButton variant="custom" ref={boardSourceButton} type="button" disabled={referencesBusy} onClick={() => { setReferenceSource('board'); setSearch('') }}><CreationIcon type="whiteboard" size={16} /><span>从画布选择</span><span aria-hidden="true">›</span></UiButton>
-            <UiButton variant="custom" type="button" disabled={referencesBusy || !onImportFiles} title={!onImportFiles ? '电脑素材导入尚未就绪' : '添加本机课程资料'} onClick={() => fileInput.current?.click()}><CreationIcon type="computer" size={16} /><span>从电脑添加</span><span aria-hidden="true">›</span></UiButton>
+            <UiButton variant="custom" type="button" disabled={referencesBusy || !onImportFiles} title={!onImportFiles ? '电脑素材导入尚未就绪' : '添加本机资料'} onClick={() => fileInput.current?.click()}><CreationIcon type="computer" size={16} /><span>从电脑添加</span><span aria-hidden="true">›</span></UiButton>
           </div>
           <div className="wcc-creation-board-picker" hidden={referenceSource !== 'board'}>
           <div className="wcc-creation-reference-picker-heading"><UiButton variant="custom" type="button" aria-label="返回引用来源" disabled={referencesBusy} onClick={() => setReferenceSource(null)}>‹</UiButton><span>从画布选择</span></div>
           <input ref={boardSearch} aria-label="搜索引用资料" value={search} disabled={referencesBusy} onChange={event => setSearch(event.target.value)} placeholder="搜索当前画布内的资料" spellCheck={false} />
           <div className="wcc-creation-reference-options">{candidates.map(card => {
             const unavailable = unavailableReason(card)
-            return <label key={card.id} title={unavailable || card.referenceNote || cardTitle(card)}><input type="checkbox" checked={isChosen(card)} disabled={referencesBusy || isPinned(card) || Boolean(unavailable && !isChosen(card))} onChange={() => toggleReference(card)} /><CreationIcon type={card.kind} size={14} /><span><strong>{cardTitle(card)}</strong><small>{unavailable || card.referenceNote || (isPinned(card) ? '来源卡片 · 保留引用' : KIND_LABELS[card.kind] || '资料')}</small></span></label>
+            return <label key={card.id} title={cardTitle(card)}><input type="checkbox" checked={isChosen(card)} disabled={referencesBusy || isPinned(card) || Boolean(unavailable && !isChosen(card))} onChange={() => toggleReference(card)} /><CreationIcon type={card.kind} size={14} /><span><strong>{cardTitle(card)}</strong><small>{unavailable || card.referenceNote || (isPinned(card) ? '来源卡片 · 保留引用' : KIND_LABELS[card.kind] || '资料')}</small></span></label>
           })}{!candidates.length && <p>{search ? '没有匹配的引用资料。' : '当前画布没有可添加的资料。'}</p>}</div>
           <UiButton variant="custom" type="button" className="wcc-creation-reference-done" onClick={() => { setReferencesOpen(false); addButton.current?.focus() }}>完成选择</UiButton>
           </div>
@@ -671,7 +671,7 @@ export function CardComposer({
           {card.referenceNote && <p className="wcc-creation-preview-note">{card.referenceNote}</p>}
           {(card.importedFile || card.generatedFile) && getReferenceFileHref && <ImportedReferenceFile card={card} getHref={getReferenceFileHref} />}
           <pre>{card.previewText ?? card.content ?? '本次未提供正文预览。'}</pre>
-          {(card.excerptInfo?.annotation || card.annotation) && <div className="wcc-creation-preview-annotation"><span>讲师注释</span><pre>{card.excerptInfo?.annotation || card.annotation}</pre></div>}
+          {(card.excerptInfo?.annotation || card.annotation) && <div className="wcc-creation-preview-annotation"><span>注释</span><pre>{card.excerptInfo?.annotation || card.annotation}</pre></div>}
         </details>)}</div></div>}
       </section>
       {inputLocked && <div className={`wcc-creation-pending-state is-${context?.pendingGeneration?.phase || 'unknown'}`} role="status"><strong>{pendingLabel(context?.pendingGeneration)}</strong><p>{context?.pendingGeneration?.error || context?.pendingGeneration?.message || '成果文件保存后会原位更新卡片。'}</p><small>任务已提交。需要补充要求或确认时，请打开「任务对话」。</small></div>}

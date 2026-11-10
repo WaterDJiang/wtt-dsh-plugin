@@ -14,8 +14,8 @@ const FILE_KINDS = { image: '生成图片', video: '生成视频', text: '文本
 function taskName(task) {
   return task.files?.find(file => !['support', 'storyboard'].includes(file.kind))?.title || task.instruction?.replace(/(^|\s)\/[a-z0-9-]+(?=\s|$)/g, ' ').replace(/CW[- ]?\d+\s*[A-Z0-9]*[：:]?/g, '').trim().slice(0, 70) || task.title || '未命名任务'
 }
-const REQUIREMENT_FIELDS = { title: '课程名称', customer: '客户', client: '客户', audience: '学员',
-  background: '培训背景', objectives: '培训目标', goals: '培训目标', duration: '课程时长',
+const REQUIREMENT_FIELDS = { title: '画布名称', customer: '客户', client: '客户', audience: '受众',
+  background: '背景', objectives: '目标', goals: '培训目标', duration: '时长',
   description: '需求描述', status: '需求状态', participants: '参训对象', notes: '备注' }
 
 function messageOf(value) { return value instanceof Error ? value.message : String(value) }
@@ -36,8 +36,8 @@ function SourceSnapshot({ source }) {
       {(excerpt.sourceTitle || excerpt.rangeLabel) && <p className="wcc-task-source-origin">{excerpt.sourceTitle}{excerpt.rangeLabel ? ` · ${excerpt.rangeLabel}` : ''}</p>}
       <span className="wcc-task-field-label">摘录原文</span>
       <pre>{excerpt.quote ?? source.content ?? '原文未提供'}</pre>
-      <span className="wcc-task-field-label">讲师注释</span>
-      <pre className="wcc-task-annotation">{excerpt.annotation || '未填写讲师注释。'}</pre>
+      <span className="wcc-task-field-label">注释</span>
+      <pre className="wcc-task-annotation">{excerpt.annotation || '未填写注释。'}</pre>
     </> : <pre>{source.content || '该来源未提供可用正文。'}</pre>}
     {(source.path || source.hash || source.sourceHash) && <div className="wcc-task-source-meta">
       {source.path && <span>文件：<code>{source.path}</code></span>}
@@ -69,7 +69,7 @@ function TaskInput({ input }) {
     <section className="wcc-task-instruction"><h4>创作要求</h4><pre>{input.instruction || '未填写创作要求。'}</pre></section>
     {input.media && <section><h4>生成参数</h4><dl>{[['模型', input.media.model], ['比例', input.media.ratio], ['分辨率', input.media.resolution], ['时长（秒）', input.media.duration]].filter(([, value]) => value != null).map(([label, value]) => <React.Fragment key={label}><dt>{label}</dt><dd>{String(value)}</dd></React.Fragment>)}</dl></section>}
     {input.effectivePrompt && <details><summary>实际发送的提示词</summary><pre>{input.effectivePrompt}</pre></details>}
-    {skill && <details className="wcc-task-skill"><summary>课程技能</summary><pre>{textOf(skill)}</pre></details>}
+    {skill && <details className="wcc-task-skill"><summary>所用技能</summary><pre>{textOf(skill)}</pre></details>}
   </div>
 }
 
@@ -137,7 +137,7 @@ export function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenA
     {!tasks.length ? <div className="wcc-tasks-empty"><span aria-hidden="true">☷</span><p>还没有创作任务</p><small>点击卡片填写要求，即可开始创作；手动保存的新版本也会记录在这里。</small></div> : <>
       <div className="wcc-task-list" aria-label="选择任务">
         {visibleTasks.map(item => <UiButton variant="custom" type="button" key={item.id} className={`wcc-task-list-item${item.id === activeId ? ' is-active' : ''}`} aria-pressed={item.id === activeId} onClick={() => setSelectedId(item.id)}>
-          <span className="wcc-task-list-top"><span>{item.kind === 'manual' ? '人工修订' : item.kind === 'media' ? 'AI 媒体生成' : 'AI 制课'}</span><time dateTime={item.createdAt}>{timeLabel(item.createdAt)}</time></span>
+          <span className="wcc-task-list-top"><span>{item.kind === 'manual' ? '人工修订' : item.kind === 'media' ? 'AI 媒体生成' : 'AI 创作'}</span><time dateTime={item.createdAt}>{timeLabel(item.createdAt)}</time></span>
           <strong>{taskName(item)}</strong>
           <span className={`wcc-task-status is-${item.status}`}>{STATUS[item.status] || item.status || '状态未提供'}{item.artifacts?.length ? ` · ${item.artifacts.length} 个大纲版本` : ''}{item.files?.length ? ` · ${item.files.length} 个文件` : ''}</span>
         </UiButton>)}

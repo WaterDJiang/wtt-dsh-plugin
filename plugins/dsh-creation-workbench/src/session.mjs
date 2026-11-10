@@ -83,7 +83,7 @@ function valueOf(result) {
 async function availableSession(ctx, { cwd, agentPreset }, existingSessionId) {
   const catalog = valueOf(await ctx.remote.session.modelCatalog());
   if (!catalog.routableProviders.length) {
-    throw new Error('尚未配置模型。请先在 DSH 中添加 API Key 或登录，再开始制课；需求和文件已保留。');
+    throw new Error('尚未配置模型。请先在 DSH 中添加 API Key 或登录，再开始创作。');
   }
   if (existingSessionId !== undefined) return existingSessionId;
   const createdWorkspace = valueOf(await ctx.remote.workspace.create({ path: cwd }));

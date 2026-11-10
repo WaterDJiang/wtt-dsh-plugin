@@ -140,9 +140,9 @@ export function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draf
       </p>
     </> : <p className="wcc-inline-warning">{card.extracted === false
       ? '该文件尚未提取正文，当前不能读取或摘录。' : '当前卡片没有可用的已保存正文。'}</p>}
-    {excerpt && <section className="wcc-reader-annotation" aria-label="讲师注释">
-      <span className="wcc-source-kicker">讲师注释</span>
-      <p>{excerpt.annotation || '未填写讲师注释。'}</p>
+    {excerpt && <section className="wcc-reader-annotation" aria-label="注释">
+      <span className="wcc-source-kicker">注释</span>
+      <p>{excerpt.annotation || '未填写注释。'}</p>
     </section>}
     {textAvailable && !intact && <p className="wcc-inline-warning">{sourceState(card.status)}。保留的正文可供核对；核对并另存可用来源后再摘录。</p>}
     {textAvailable && intact && !card.sourceHash && <p className="wcc-inline-warning">暂时无法核对来源。请刷新内容后再保存摘录。</p>}
@@ -150,7 +150,7 @@ export function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draf
       <div className="wcc-reader-heading"><strong>另存为摘录卡</strong><span>可回到原文位置</span></div>
       {selection?.quote.trim() && <blockquote className="wcc-excerpt-selection">{selection.quote}</blockquote>}
       <label htmlFor={`${id}-title`}>摘录名称<input id={`${id}-title`} value={title} onChange={event => { setTitle(event.target.value); rememberDraft({ title: event.target.value }) }} disabled={pending} required /></label>
-      <label htmlFor={`${id}-annotation`}>讲师注释 <small>单独保存，不混入摘录原文</small><textarea id={`${id}-annotation`} rows={3} value={annotation} onChange={event => { setAnnotation(event.target.value); rememberDraft({ annotation: event.target.value }) }} placeholder="这个片段与课程有什么关系？" disabled={pending} /></label>
+      <label htmlFor={`${id}-annotation`}>注释 <small>单独保存，不混入摘录原文</small><textarea id={`${id}-annotation`} rows={3} value={annotation} onChange={event => { setAnnotation(event.target.value); rememberDraft({ annotation: event.target.value }) }} placeholder="补充用途或说明" disabled={pending} /></label>
       <UiButton variant="primary" className="wcc-primary" type="submit" disabled={pending || !selection?.quote.trim() || !title.trim() || !onExcerpt}>{saving || busy === 'excerpt' ? '正在保存摘录…' : '保存摘录卡'}</UiButton>
     </form>}
     {(error || localError) && <UserError className="wcc-error" error={messageOf(error || localError)} />}

@@ -14,11 +14,6 @@
 .wtt-course-canvas .wcc-card-body .wtt-output-preview { max-height:none; }
 .wtt-course-canvas .wcc-content-resize-handle { width:9px;height:9px;border-radius:3px; }
 .wtt-course-canvas .wcc-content-resize-line { border-width:1px; }
-.wtt-course-canvas .wcc-card-inline-editor { display:flex;flex:1;min-height:0;flex-direction:column;gap:6px;padding:8px; }
-.wtt-course-canvas .wcc-card-inline-editor textarea { flex:1;min-height:36px;width:100%;resize:none;border:0;background:var(--wtt-ui-subtle);color:var(--wtt-ui-ink);font-size:var(--wtt-text-md);line-height:1.6;padding:7px;box-sizing:border-box; }
-.wtt-course-canvas .wcc-card-inline-editor>div { display:flex;justify-content:flex-end;gap:6px; }
-.wtt-course-canvas .wcc-card-inline-editor button { min-height:28px;padding:3px 8px;font-size:var(--wtt-text-sm); }
-.wtt-course-canvas .wcc-card-inline-editor p { margin:0;max-height:56px;overflow:auto;color:var(--wtt-ui-danger);font-size:var(--wtt-text-sm); }
 .wtt-course-canvas .wcc-card-composer .wcc-creation-main { position:relative;padding:10px 12px 4px; }
 .wtt-course-canvas .wcc-card-composer .wcc-creation-compact-actions { position:absolute;top:10px;right:9px;display:flex;gap:0; }
 .wtt-course-canvas .wcc-card-composer .wcc-creation-compact-actions button { display:grid;place-items:center;min-height:26px;width:26px;padding:0;border:0;background:transparent;color:var(--wtt-ui-muted);font-size:var(--wtt-text-xl); }
@@ -60,7 +55,6 @@
 .wtt-course-canvas .wtt-canvas-search [role=listbox]>p { margin:0;padding:12px;color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm);line-height:1.6; }
 .wtt-course-canvas .wtt-canvas-search input { flex:1;min-width:0; }
 @media(max-width:600px) { .wtt-course-canvas .wtt-canvas-search.is-compact>button { min-height:40px;width:40px; } }
-.wtt-course-canvas .wcc-card-inline-editor .wtt-user-error { max-height:100px;overflow:auto;flex-shrink:0; }
 .wtt-course-canvas .wcc-file-path summary { cursor:pointer; }
 @media(max-height:620px) { .wtt-course-canvas .wtt-canvas-search.is-compact { top:64px!important; } }
 

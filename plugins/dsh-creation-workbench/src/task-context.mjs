@@ -53,7 +53,7 @@ export function readTaskSource(input, { cardId, field = 'content', offset = 0 })
     const end = Math.min(files.length, offset + 20);
     return { cardId, field, files: files.slice(offset, end), length: files.length, nextOffset: end < files.length ? end : null };
   }
-  if (!['content', 'annotation'].includes(field)) throw new Error('请选择正文、讲师注释或配套文件。');
+  if (!['content', 'annotation'].includes(field)) throw new Error('请选择正文、注释或配套文件。');
   const value = source[field] || '';
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > value.length || /[\uDC00-\uDFFF]/.test(value.charAt(offset))) {
     throw new Error('读取位置无效，请使用上次返回的 nextOffset。');

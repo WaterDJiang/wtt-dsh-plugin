@@ -92,8 +92,8 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
       document.removeEventListener('keydown', dismissOnEscape)
     }
   }, [menuOpen])
-  return <header className="wtt-project-bar" aria-label="当前课程画布">
-    <h1 className="wtt-visually-hidden">课程画布</h1>
+  return <header className="wtt-project-bar" aria-label="当前画布">
+    <h1 className="wtt-visually-hidden">创作画布</h1>
     {!filesOpen&&<UiButton variant="ghost" type="button" className="wtt-open-files" aria-label={`打开文件栏 · ${project.name}`} title={`打开文件栏 · ${project.name}`} onClick={onToggleFiles} aria-expanded={false}>
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z" /></svg>
       <span className="wtt-open-files-name">{project.name||'文件栏'}</span>
@@ -107,10 +107,10 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </UiButton>
     <div className="wtt-project-menu" ref={menu}>
-      <UiButton variant="quiet" type="button" className="wtt-project-button" aria-label="课程画布菜单" title="课程画布菜单" aria-expanded={menuOpen} aria-controls={menuId} aria-haspopup="menu" onClick={() => setMenuOpen(open => !open)}>
+      <UiButton variant="quiet" type="button" className="wtt-project-button" aria-label="画布菜单" title="画布菜单" aria-expanded={menuOpen} aria-controls={menuId} aria-haspopup="menu" onClick={() => setMenuOpen(open => !open)}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
       </UiButton>
-      {menuOpen && <div className="wtt-project-options" id={menuId} role="menu" aria-label="课程画布菜单">
+      {menuOpen && <div className="wtt-project-options" id={menuId} role="menu" aria-label="画布菜单">
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onList() }}>列表编辑<span>查看大纲与版本</span></UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onRename() }}>重命名画布</UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onBackground() }}>背景资料</UiButton>
@@ -640,9 +640,9 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
         {!selected ? <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>使用已有资料继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div> : <>
           <div className="wtt-detail-heading">
             <div><h2>{selected.title}</h2><UiButton variant="quiet" className="wtt-button wtt-button-text" disabled={Boolean(busy)} onClick={showRename}>重命名画布</UiButton></div>
-            <UiButton variant="primary" className="wtt-button wtt-button-primary" disabled={Boolean(busy)} onClick={startCourse}>{busy === 'prepare-course' ? '正在准备会话…' : '开始制课'}</UiButton>
+            <UiButton variant="primary" className="wtt-button wtt-button-primary" disabled={Boolean(busy)} onClick={startCourse}>{busy === 'prepare-course' ? '正在准备会话…' : '生成课程大纲'}</UiButton>
           </div>
-          <p className="wtt-session-hint">开始制课将在 DSH 对话中引用当前画布资料，沿用课程技能的确认步骤。完成后可返回这里查看或保存大纲。</p>
+          <p className="wtt-session-hint">根据画布背景生成大纲，确认步骤在 DSH 对话中完成。</p>
           <RequirementBrief requirement={selected} />
 
           <section className="wtt-outline-section" aria-labelledby={outlineTitleId}>
@@ -650,7 +650,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
             {versions.length > 0 && <div className="wtt-versions" aria-label="大纲版本">
               {[...versions].sort((a, b) => b.number - a.number).map(version => <UiButton variant="custom" key={version.id} className={`wtt-version ${version.id === versionId ? 'is-selected' : ''}`} aria-pressed={version.id === versionId} title={formatTime(version.createdAt)} disabled={Boolean(busy)} onClick={() => chooseVersion(version)}>v{version.number}<span>{formatTime(version.createdAt)}</span></UiButton>)}
             </div>}
-            <label className="wtt-outline-editor"><span className="wtt-visually-hidden">大纲 Markdown 内容</span><textarea value={markdown} disabled={Boolean(busy)} onChange={event => { setMarkdown(event.target.value); setError(''); setNotice('') }} spellCheck={false} placeholder="粘贴已有大纲，或通过「开始制课」调用课程技能。支持 Markdown；保存时会创建独立版本。" /></label>
+            <label className="wtt-outline-editor"><span className="wtt-visually-hidden">大纲 Markdown 内容</span><textarea value={markdown} disabled={Boolean(busy)} onChange={event => { setMarkdown(event.target.value); setError(''); setNotice('') }} spellCheck={false} placeholder="粘贴已有大纲，或通过「生成课程大纲」调用课程技能。支持 Markdown；保存时会创建独立版本。" /></label>
             <div className="wtt-editor-footer">
               <p>{activeVersion ? `v${activeVersion.number} · ${formatTime(activeVersion.createdAt)}` : '保存后可以导出对应的 Word 文件。'}</p>
               <div className="wtt-editor-actions">
@@ -749,7 +749,7 @@ function ProjectWorkbench(props) {
   return <div className="wtt-project-workbench">
     {!registry && <div className="wtt-project-boot">
       <BookIcon /><h1>WTT 创作工作台</h1>
-      <p role={error ? 'alert' : 'status'}>{error || (loading ? '正在打开项目目录…' : '选择文件夹，开始管理课程与成果文件。')}</p>
+      <p role={error ? 'alert' : 'status'}>{error || (loading ? '正在打开项目目录…' : '选择项目文件夹，开始创作。')}</p>
       {!loading && <div><UiButton variant="quiet" onClick={() => void loadProjects()}>重新读取</UiButton><UiButton variant="quiet" onClick={() => setPickerOpen(true)}>选择项目目录</UiButton></div>}
     </div>}
     {registry && error && <div className="wtt-project-warning" role="alert">{error}<UiButton variant="ghost" size="compact" onClick={() => setError('')} aria-label="关闭项目提示">×</UiButton></div>}

@@ -242,7 +242,6 @@
 .wtt-course-canvas .wcc-card:not(.is-editing){cursor:grab;user-select:none}
 .wtt-course-canvas .react-flow__node.dragging .wcc-card{cursor:grabbing}
 .wtt-course-canvas .wcc-card .wtt-output-ppt-cover{cursor:inherit}
-.wtt-course-canvas .wcc-card.is-editing{cursor:default;user-select:text}
 
 .wcc-outcome-actions{display:flex;gap:4px;flex-wrap:wrap;padding:4px 10px;flex:none}
 .wcc-text-draft-actions{display:flex;gap:6px;flex-wrap:wrap}

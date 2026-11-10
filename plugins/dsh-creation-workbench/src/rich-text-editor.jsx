@@ -11,12 +11,13 @@ const needsSource=value=>/<\/?[a-z][^>]*>|!\[[^\]]*\]\(|^\s*[-*]\s+\[[ x]\]|^\[\
 const plainDocument=value=>({type:'doc',content:value.split('\n').map(line=>({type:'paragraph',...(line?{content:[{type:'text',text:line}]}:{})}))})
 export const RichTextEditor=forwardRef(function RichTextEditor({value,onChange,markdown=false,disabled=false,label='编辑正文'},ref){
   const latest=useRef({value,onChange});latest.current={value,onChange}
+  const raw=useRef(null)
   const [source,setSource]=useState(()=>markdown&&needsSource(value))
   const editor=useEditor({extensions:[StarterKit,...(markdown?[TableKit,Markdown]:[])],content:markdown?value:plainDocument(value),...(markdown?{contentType:'markdown'}:{}),
     editable:!disabled,editorProps:{attributes:{role:'textbox','aria-label':label,'aria-multiline':'true',spellcheck:'false'}},
     onUpdate:({editor})=>latest.current.onChange(markdown?editor.getMarkdown():editor.getText({blockSeparator:'\n'})),
   })
-  useImperativeHandle(ref,()=>({focus:()=>editor?.commands.focus()}),[editor])
+  useImperativeHandle(ref,()=>({focus:()=>source?raw.current?.focus({preventScroll:true}):editor?.commands.focus()}),[editor,source])
   useEditorState({editor,selector:({editor})=>editor?`${editor.state.selection.from}:${editor.state.selection.to}:${editor.isActive('bold')}:${editor.isActive('heading')}:${editor.can().undo()}`:''})
   useEffect(()=>{editor?.setEditable(!disabled,false)},[editor,disabled])
   function switchMode(){
@@ -30,6 +31,6 @@ export const RichTextEditor=forwardRef(function RichTextEditor({value,onChange,m
       {markdown&&<>{command('标题',chain=>chain.toggleHeading({level:2}),editor?.isActive('heading'))}{command('加粗',chain=>chain.toggleBold(),editor?.isActive('bold'))}{command('列表',chain=>chain.toggleBulletList(),editor?.isActive('bulletList'))}{command('表格',chain=>chain.insertTable({rows:3,cols:2,withHeaderRow:true}))}</>}
       {markdown&&<UiButton variant="custom" type="button" className="wtt-rich-source" disabled={disabled||(source&&needsSource(value))} title={source&&needsSource(value)?'此内容含复杂 Markdown，请保留源文编辑。':'切换 Markdown 源文与排版编辑'} onClick={switchMode}>{source?'排版':'源文'}</UiButton>}
     </div>
-    {source?<textarea className="wtt-rich-raw" aria-label={`${label}（Markdown 源文）`} value={value} disabled={disabled} onChange={event=>onChange(event.target.value)}/>:<EditorContent editor={editor}/>}
+    {source?<textarea ref={raw} className="wtt-rich-raw" aria-label={`${label}（Markdown 源文）`} value={value} disabled={disabled} onChange={event=>onChange(event.target.value)}/>:<EditorContent editor={editor}/>}
   </div>
 })
