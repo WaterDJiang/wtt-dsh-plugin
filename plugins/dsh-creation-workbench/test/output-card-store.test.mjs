@@ -35,7 +35,7 @@ test('new text cards publish only a primary, preserve attachments and append V2/
   assert.equal(outputNodes(service, requirement.id)[0].kind, 'generation');
   assert.equal(outputNodes(service, requirement.id)[0].outputCard.versions.length, 0);
   assert.ok(first.task.outputCardId);
-  const attachment = await file(first, 'attachment.md', '同代附件', { primary: false });
+  const attachment = await file(first, 'attachment.md', '同代附件', { presentation: 'attachment' });
   assert.equal(service.tasks.get(first.task.id).status, 'output');
   assert.equal(outputNodes(service, requirement.id)[0].kind, 'generation');
   assert.equal(outputNodes(service, requirement.id)[0].outputCard.versions.length, 0);
@@ -77,7 +77,7 @@ test('new text cards publish only a primary, preserve attachments and append V2/
 test('PPT production files do not publish versions; only an actual validated PPTX becomes the primary', async t => {
   const { service, requirement, create, file, root } = fixture(t);
   const created = create({ outputType: 'pptx' });
-  await file(created, 'storyboard.md', '# 分镜素材', { kind: 'storyboard' });
+  await file(created, 'storyboard.md', '# 分镜素材', { kind: 'storyboard', presentation: 'attachment' });
   assert.equal(outputNodes(service, requirement.id).length, 1);
   assert.equal(outputNodes(service, requirement.id)[0].kind, 'generation');
   assert.equal(outputNodes(service, requirement.id)[0].outputCard.versions.length, 0);
@@ -86,7 +86,7 @@ test('PPT production files do not publish versions; only an actual validated PPT
   const result = spawnSync('python3', ['-c', 'import sys; from pptx import Presentation; from pptx.util import Inches; p=Presentation(); s=p.slides.add_slide(p.slide_layouts[6]); s.shapes.add_textbox(Inches(1),Inches(1),Inches(6),Inches(1)).text="CW10 editable output"; p.save(sys.argv[1])', deck]);
   assert.equal(result.status, 0, result.stderr.toString());
   const artifact = await file(created, 'real.pptx', readFileSync(deck), { kind: 'pptx', primary: true });
-  await file(created, 'notes.md', '# PPT附属资料', { kind: 'support' });
+  await file(created, 'notes.md', '# PPT附属资料', { kind: 'support', presentation: 'attachment' });
   const nodes = outputNodes(service, requirement.id);
   assert.equal(nodes.length, 1);
   assert.equal(nodes[0].outputCard.type, 'pptx');

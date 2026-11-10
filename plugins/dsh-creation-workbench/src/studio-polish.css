@@ -64,11 +64,11 @@
 .wtt-course-canvas .wcc-file-path summary { cursor:pointer; }
 @media(max-height:620px) { .wtt-course-canvas .wtt-canvas-search.is-compact { top:64px!important; } }
 
-/* CW-41：使用整体底板承载创作，普通文本默认600×210；状态和展开面板自适应。 */
+/* CW-41：紧凑输入共用轻底板，设置和任务对话按需展开。 */
 .wtt-course-canvas .wcc-card-composer{width:min(600px,calc(100% - 24px));border:0;border-radius:18px;background:var(--wtt-ui-surface);color:var(--wtt-ui-ink);box-shadow:0 0 0 1px color-mix(in srgb,var(--wtt-ui-line) 40%,transparent),0 12px 38px var(--wtt-ui-shadow)}
 .wtt-course-canvas .wcc-card-composer:has(textarea:focus-visible){box-shadow:0 0 0 1px color-mix(in srgb,var(--wtt-ui-accent) 50%,transparent),0 12px 38px var(--wtt-ui-shadow)}
-.wtt-course-canvas .wcc-card-composer .wcc-creation-main{padding:12px 13px 0}
-.wtt-course-canvas .wcc-card-composer .wcc-creation-compact-actions{top:12px;right:10px}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-main{padding:8px 10px 0}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-compact-actions{top:8px;right:8px}
 .wtt-course-canvas .wcc-card-composer .wcc-creation-compact-actions button{width:28px;min-height:28px;border-radius:7px;font-size:var(--wtt-text-xl)}
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area{display:flex;align-items:flex-start;flex-wrap:wrap;gap:6px;min-height:30px;margin-right:64px;margin-bottom:8px}
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-chips{flex:0 1 auto;width:auto;max-width:calc(100% - 68px);min-height:28px}
@@ -80,17 +80,17 @@
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-preview[open]{flex-basis:100%;width:100%}
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-preview[open]>summary{position:absolute;top:0;right:0}
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-picker,.wtt-course-canvas .wcc-card-composer .wcc-creation-reference-pending{flex:1 0 100%;width:100%}
-.wtt-course-canvas .wcc-card-composer .wcc-creation-instruction-toolbar{position:static;display:flex;align-items:center;gap:4px;min-width:0;height:24px;margin:0 0 8px;padding:0}
-.wtt-course-canvas .wcc-card-composer .wcc-creation-instruction:has(.wcc-creation-skill-picker) .wcc-creation-instruction-toolbar{justify-content:flex-start;margin-bottom:8px}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-instruction-toolbar{position:static;display:flex;align-items:center;gap:4px;min-width:0;height:28px;margin:0 0 4px;padding:0}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-instruction:has(.wcc-creation-skill-picker) .wcc-creation-instruction-toolbar{justify-content:flex-start;margin-bottom:4px}
 .wtt-course-canvas .wcc-card-composer button.wcc-creation-skill-trigger{min-height:24px;height:24px;padding:2px 6px 2px 2px;background:transparent;color:var(--wtt-ui-ink);font-size:var(--wtt-text-sm)}
 .wtt-course-canvas .wcc-card-composer .wcc-user-favorites{flex:1;min-width:0;gap:4px;max-width:100%;padding:0;margin:0;height:24px}
 .wtt-course-canvas .wcc-card-composer .wcc-user-favorite-shortcuts{gap:4px;scrollbar-width:none}
 .wtt-course-canvas .wcc-card-composer .wcc-user-favorites button{min-height:28px;height:auto;padding:3px 9px;border:1px solid color-mix(in srgb,var(--wtt-ui-line) 70%,transparent);border-radius:7px;background:var(--wtt-ui-subtle);color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm)}
 .wtt-course-canvas .wcc-card-composer .wcc-user-favorites>.wcc-manage-favorites{display:grid;place-items:center;width:28px;flex-basis:28px;padding:0;border:0;background:transparent}
-.wtt-course-canvas .wcc-card-composer .wcc-creation-instruction textarea{height:76px;min-height:76px;max-height:240px;padding:1px 2px;border:0;border-radius:0;background:transparent;color:var(--wtt-ui-ink);font-size:var(--wtt-text-md);line-height:1.6;resize:vertical}
+.wtt-course-canvas .wcc-card-composer .wcc-reference-prompt textarea{display:block;height:52px;min-height:52px;max-height:240px;padding:1px 2px;border:0;border-radius:0;background:transparent;color:var(--wtt-ui-ink);font-size:var(--wtt-text-md);line-height:1.6;resize:vertical}
 .wtt-course-canvas .wcc-card-composer .wcc-creation-instruction textarea:focus-visible,.wtt-course-canvas .wcc-card-composer .wcc-media-creation textarea:focus-visible{outline:none}
 .wtt-course-canvas .wcc-card-composer .wcc-media-creation textarea{border:0;background:transparent;border-radius:0;color:var(--wtt-ui-ink)}
-.wtt-course-canvas .wcc-card-composer .wcc-creation-submit{align-items:center;gap:8px;padding:8px 13px 12px;border:0;background:transparent}
+.wtt-course-canvas .wcc-card-composer .wcc-creation-submit{align-items:center;gap:8px;padding:4px 10px 8px;border:0;background:transparent}
 .wtt-course-canvas .wcc-card-composer .wcc-model-selection-disclosure>summary{border:0;background:transparent;color:var(--wtt-ui-muted)}
 .wtt-course-canvas .wcc-card-composer button.wcc-creation-send{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;min-height:32px;padding:0;border:0;border-radius:50%;background:var(--wtt-ui-ink);color:var(--wtt-ui-surface)}
 .wtt-course-canvas .wcc-card-composer button.wcc-creation-send:hover:not(:disabled){border:0;background:var(--wtt-ui-ink);filter:brightness(.9)}

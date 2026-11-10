@@ -3,9 +3,12 @@ import { mkdirSync, lstatSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const DEFAULTS = { contextMode: 'economy', maxSteps: 200, maxInputTokens: 20_000_000, maxOutputTokens: 300_000 };
+const STANDARD_REQUEST_LIMIT = 48_000;
+const SELECTION_REQUEST_LIMIT = 16_000;
 const number = value => Number.isFinite(value) && value >= 0 ? value : null;
+const tokenLimit = value => Number.isSafeInteger(value) && value > 0 ? value : Infinity;
 export function normalizePolicy(input) {
-  if (!input || !['economy', 'host'].includes(input.contextMode)) throw new Error('请选择课程节省上下文或宿主预设');
+  if (!input || !['economy', 'host'].includes(input.contextMode)) throw new Error('请选择工作台节省模式或 DSH 默认模式');
   const result = { contextMode: input.contextMode };
   for (const [key, maximum] of [['maxSteps', 10000], ['maxInputTokens', 2_000_000_000], ['maxOutputTokens', 10_000_000]]) {
     if (!Number.isSafeInteger(input[key]) || input[key] < 1 || input[key] > maximum) throw new Error(`生产预算 ${key} 无效`);
@@ -33,7 +36,7 @@ export class ProductionControl {
     if (!row) throw new Error('生产任务不存在');
     return row;
   }
-  sample(taskId, values, time = Date.now()) {
+  sample(taskId, values, time = Date.now(), request) {
     this.taskRow(taskId);
     const usage = values?.tokenUsage, stats = values?.sessionStats, context = values?.contextPressure;
     if (!usage && !stats) return this.usage(taskId);
@@ -42,6 +45,7 @@ export class ProductionControl {
       uncachedInputTokens: number(usage?.uncachedInputTokens), cacheReadTokens: number(usage?.cacheReadTokens),
       cacheWriteTokens: number(usage?.cacheWriteTokens), outputTokens: number(usage?.outputTokens),
       contextTokens: number(context?.projectedTokens ?? context?.pressureTokens), contextWindow: number(context?.contextWindow),
+      requestMaxTokens: number(request ? request.maxTokens : previous.requestMaxTokens),
       source: 'DSH 官方全日志投影', lastUpdatedAt: new Date(time).toISOString(),
       ...(previous.budgetStop ? { budgetStop: previous.budgetStop } : {}) };
     if (data.available) { data.inputTokens = data.uncachedInputTokens + data.cacheReadTokens + data.cacheWriteTokens; data.mainInputTokens = data.inputTokens; data.mainOutputTokens = data.outputTokens; }
@@ -138,23 +142,52 @@ export class ProductionControl {
 export function createProductionObserver(ctx) {
   const services = new Set(), stops = [], hydrated = new Set();
   const lookup = name => { try { return ctx.get?.(name) || ctx[name]; } catch { return null; } };
+  function boundTasks(service, session) {
+    if (!session || service.store.closed || session.header?.cwd !== service.workspaceRoot) return [];
+    return service.store.db.prepare('SELECT id,session_id,input_json FROM course_tasks WHERE session_id=?').all(session.id);
+  }
   function read(service, row, session) {
     const agent = lookup('agents')?.get(row.session_id);
     const actual = session || agent?.session;
     if (!actual || actual.header?.cwd !== service.workspaceRoot || actual.id !== row.session_id) return;
     const snapshot = lookup('sessionProjections')?.snapshot(actual, ['tokenUsage', 'sessionStats', 'contextPressure']);
-    if (snapshot?.values) service.production.sample(row.id, snapshot.values);
+    if (snapshot?.values) service.production.sample(row.id, snapshot.values, Date.now(), actual.requestHeader?.()?.config);
   }
   if (ctx.on) {
+    stops.push(ctx.on('agent/request', async ({ agent, signal }, next) => {
+      const request = await next();
+      let limit = Infinity;
+      for (const service of services) {
+        for (const row of boundTasks(service, agent.session)) {
+          const input = JSON.parse(row.input_json);
+          if (input.productionPolicy?.contextMode === 'economy') {
+            const taskLimit = input.selection ? SELECTION_REQUEST_LIMIT : STANDARD_REQUEST_LIMIT;
+            limit = Math.min(limit, taskLimit);
+          }
+        }
+      }
+      if (!Number.isFinite(limit) || !request.provider || !request.model) return request;
+      let model;
+      try { model = await lookup('llm')?.resolveModelInfo?.(request.provider, request.model, signal); }
+      catch (error) {
+        signal?.throwIfAborted();
+        // The host resolves the model again and reports its normal routing error.
+        return request;
+      }
+      const window = model?.context?.contextWindow;
+      if (!Number.isSafeInteger(window) || window < 4) return request;
+      const maxTokens = Math.min(limit, Math.floor(window / 4), tokenLimit(model.defaultMaxTokens), tokenLimit(request.maxTokens));
+      return maxTokens === request.maxTokens ? request : { ...request, maxTokens };
+    }, { prepend: true }));
     stops.push(ctx.on('session/event', (session, event) => {
-      if (!['assistant/message', 'assistant/attempt', 'step/start', 'step/end', 'llm/retry-started', 'turn/end', 'compaction/summary'].includes(event.type)) return;
-      for (const service of services) if (!service.store.closed && session.header?.cwd === service.workspaceRoot) {
-        for (const row of service.store.db.prepare('SELECT id,session_id FROM course_tasks WHERE session_id=?').all(session.id)) { service.production.auxiliary(row.id, event); read(service, row, session); }
+      if (!['request/header', 'assistant/message', 'assistant/attempt', 'step/start', 'step/end', 'llm/retry-started', 'turn/end', 'compaction/summary'].includes(event.type)) return;
+      for (const service of services) {
+        for (const row of boundTasks(service, session)) { service.production.auxiliary(row.id, event); read(service, row, session); }
       }
     }));
     stops.push(ctx.on('agent/pre-step', async ({ agent }, next) => {
-      for (const service of services) if (!service.store.closed && agent.session.header?.cwd === service.workspaceRoot) {
-        for (const row of service.store.db.prepare('SELECT id,session_id FROM course_tasks WHERE session_id=?').all(agent.id)) {
+      for (const service of services) {
+        for (const row of boundTasks(service, agent.session)) {
           read(service, row, agent.session);
           if (service.production.check(row.id)) return { kind: 'reject' };
         }
@@ -173,7 +206,10 @@ export function createProductionObserver(ctx) {
           for (const event of observation.events || []) service.production.auxiliary(row.id, event);
           hydrated.add(row.session_id);
         }
-        if (observation.projections?.values) service.production.sample(row.id, observation.projections.values);
+        if (observation.projections?.values) {
+          const request = observation.events?.findLast(event => event.type === 'request/header')?.data.header.config;
+          service.production.sample(row.id, observation.projections.values, Date.now(), request);
+        }
       } finally { observation[Symbol.dispose](); }
     },
     close() { for (const stop of stops) if (typeof stop === 'function') stop(); services.clear(); } };

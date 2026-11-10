@@ -1,4 +1,4 @@
-import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton } from './ui/controls.jsx'
+import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton, UiIcon } from './ui/controls.jsx'
 import {DeleteNodesDialog,ProjectRecycleDialog} from './canvas-recycle.jsx'
 import {PROJECT_FILE_DRAG, ProjectFilePreview} from './project-explorer.jsx'
 import { SvgSourceView } from './svg-source-view.jsx'
@@ -31,12 +31,13 @@ import './studio-polish.css'
 import { useDockLayout } from './dock-layout.jsx'
 import { PptEditor } from './ppt-editor.jsx'
 import { BaoyuSlides } from './baoyu-slides.jsx'
-import { createPendingContext, generationStateSignature, nativePendingState, pendingCardTitle, pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
+import { createPendingContext, generationStateSignature, isActiveTaskPhase, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from './pending-card-state.mjs'
 
 import { taskInteractions, interactionLabel } from './skill-interactions.mjs'
 import { SkillConfirmation } from './skill-confirmation.jsx'
 import { attachCanvasGestures } from './canvas-gestures.mjs'
-import { editableCardText, cardTextDraftKey } from './card-text.mjs'
+import { cardCapabilities, cardTextDraftKey } from './card-capabilities.mjs'
+import { VersionSelect } from './version-select.jsx'
 
 const CARD_WIDTH = 258
 const CARD_HEIGHT = 208
@@ -85,19 +86,6 @@ function stateLabel(card) {
   return '背景资料'
 }
 
-// 展示格式与需求／参考用途独立；不改变业务 kind 或版本规则。
-function cardFormat(card) {
-  if (['requirement', 'outline', 'excerpt'].includes(card.kind)) return 'text'
-  const type = card.outputCard?.type || card.artifactKind
-  const mime = card.generatedFile?.mime || card.importedFile?.mime || card.mime || ''
-  const file = card.importedFile?.name || (card.kind === 'material' ? card.sourcePath || card.path : card.path) || ''
-  if (type === 'pptx' || /presentation|powerpoint/.test(mime) || /\.(pptx?|odp)$/i.test(file)) return 'pptx'
-  if (type === 'image' || mime.startsWith('image/') || card.imagePreview || /\.(png|jpe?g|webp|gif|svg)$/i.test(file)) return 'image'
-  if (type === 'video' || mime.startsWith('video/') || card.videoPreview || /\.(mp4|webm|mov)$/i.test(file)) return 'video'
-  if (card.kind === 'word' || /\.(pdf|docx?|xlsx?|csv|ods|odt)$/i.test(file) || /pdf|word|spreadsheet|csv/.test(mime)) return 'document'
-  if (card.kind === 'material' || /\.(md|txt|jsonl?|html?)$/i.test(file) || ['text', 'outline', 'script', 'storyboard', 'excerpt'].includes(type)) return 'text'
-  return null
-}
 
 export const ContentCard = memo(function ContentCard({ id, data, selected, isConnectable }) {
   const [videoError, setVideoError] = useState(false)
@@ -105,19 +93,47 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  const [openMenu, setOpenMenu] = useState(false)
+  const [openApps, setOpenApps] = useState(null)
   const editor = useRef(null)
   const wasEditing = useRef(false)
-  useEffect(()=>{if(wasEditing.current&&!editing)data.onEditEnd?.();wasEditing.current=editing},[editing])
+  const cancelled = useRef(false)
+  const openMenuRef = useRef(null)
+  const officeDraft = useRef(null)
+  const caps = cardCapabilities(data)
+  const writeBack = ['project-file', 'snapshot'].includes(caps.writeBack.mode)
+  const textDraft = caps.writeBack.mode === 'draft'
+  const openTarget = caps.openWith ? { ...caps.openWith, hash: data.sourceHash,
+    ...(data.refId && !caps.openWith.sourceRef && ['material', 'artifact', 'word', 'outline'].includes(data.kind) ? { sourceRef: `${data.kind}:${data.refId}` } : {}),
+    ...(data.outputCard ? { cardId: data.outputCard.id, versionId: data.outputCard.versionId } : {}) } : null
+  useEffect(() => {
+    if (!openMenu) return
+    const close = event => { if (!openMenuRef.current?.contains(event.target)) setOpenMenu(false) }
+    const key = event => { if (event.key === 'Escape') setOpenMenu(false) }
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key) }
+  }, [openMenu])
+  function loadOpenApps() {
+    if (!openTarget || openApps) return
+    setOpenApps('loading')
+    data.onLoadOpenApps?.(openTarget).then(result => {
+      officeDraft.current = result.mode === 'office' ? { draftId: result.draftId } : null
+      setOpenApps(result.applications || [])
+    }).catch(() => setOpenApps([]))
+  }
+  useEffect(()=>{if(wasEditing.current&&!editing){if(!cancelled.current&&writeBack&&draft.trim()&&draft!==text)void saveText();data.onEditEnd?.()}wasEditing.current=editing},[editing])
   useEffect(()=>()=>{if(wasEditing.current)data.onEditEnd?.()},[])
   const documentExtension = (data.importedFile?.name || data.path || '').match(/\.(csv|docx|pdf)$/i)?.[1]?.toUpperCase()
-  const text = cardFormat(data) === 'text' ? editableCardText(data) : null
+  const text = caps.editableText.base
   const draftKey = cardTextDraftKey(data)
   useEffect(() => { setEditing(false); setEditError('') }, [draftKey])
   useEffect(() => { if (!selected && !saving) setEditing(false) }, [selected, saving])
   useEffect(() => { if (editing) editor.current?.focus({ preventScroll: true }) }, [editing])
+  useEffect(() => { if (data.autoEdit && selected) beginEdit() }, [data.autoEdit, selected])
   function beginEdit(event) {
     if (text === null || saving) return
-    event.preventDefault(); event.stopPropagation()
+    event?.preventDefault(); event?.stopPropagation()
+    cancelled.current = false
     data.onEditStart?.()
     setDraft(data.getTextDraft?.(draftKey) ?? text); setEditError(''); setEditing(true)
   }
@@ -125,14 +141,15 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
     if (saving || !draft.trim() || draft === text) return
     setSaving(true); setEditError('')
     try { await data.onSaveText?.(data, draft); data.setTextDraft?.(draftKey, null); setEditing(false) }
-    catch (cause) { setEditError(messageOf(cause)) }
+    catch (cause) { setEditError(messageOf(cause)); if (writeBack) setEditing(true) }
     finally { setSaving(false) }
   }
-  const pending = nativePendingState(data.pendingGeneration, data.nativeSessionStatus)
-  const format = cardFormat(data)
+  const execution = data.publishedGeneration || nativePendingState(data.pendingGeneration, data.nativeSessionStatus)
+  const pending = execution?.published && !isActiveTaskPhase(execution.phase) ? undefined : execution
+  const format = caps.format
   const fileDeck = data.defaultOutcome?.format === 'pptx' ? data.defaultOutcome : null
+  const purpose = caps.purpose
   const formatLabel = data.defaultOutcome?.format?.toUpperCase() || (format === 'document' && documentExtension ? documentExtension : { text: '文本', pptx: 'PPT', image: '图片', video: '视频', document: '文档' }[format] || '内容')
-  const purpose = data.kind === 'requirement' ? '背景' : ['material', 'excerpt'].includes(data.kind) ? '参考' : null
   useEffect(() => { setVideoError(false) }, [data.videoPreview])
   const warning = data.delivery?.status === 'failed' || /missing|modified|changed|unavailable|缺失|变化|外改/.test(`${data.status || ''} ${data.sourceStatus || ''} ${data.projectFile?.status || ''}`)
   return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${editing ? ' is-editing' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${data.title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined} onDoubleClick={beginEdit}>
@@ -142,29 +159,48 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
     <Handle type="target" position={Position.Left} isConnectable={isConnectable} aria-label={`连接到 ${data.title}`} />
     <header className="wcc-card-grip">
       <div className="wcc-card-heading"><h3 title={data.defaultOutcome?.name || data.title}>{data.defaultOutcome?.name || data.title || pendingCardTitle(data)}</h3><div className="wcc-card-metadata"><span className="wcc-card-kind">{formatLabel}</span>{purpose && <span className="wcc-card-purpose">{purpose}</span>}</div></div>
-      <div className="wcc-card-heading-actions">{data.outputCard?.versions?.length > 0 ? <select className="wcc-card-versions nodrag nopan" aria-label={`选择 ${data.title} 的版本`} value={data.outputCard.versionId}
-        onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
-        onChange={event => { event.stopPropagation(); data.onVersionChange?.(event.target.value) }}>
-        {data.outputCard.versions.map(version => <option key={version.id} value={version.id}>V{version.number}{version.baseVersionId ? ` · 基于 V${data.outputCard.versions.find(item => item.id === version.baseVersionId)?.number || '?'}` : ''}</option>)}
-      </select> : data.number != null && <span className="wcc-version">v{String(data.number).padStart(3, '0')}</span>}
+      <div className="wcc-card-heading-actions">{caps.versioned && <VersionSelect className="wtt-version-compact" ariaLabel={`选择 ${data.title} 的版本`}
+        versions={data.outputCard?.versions?.length ? data.outputCard.versions : data.materialVersions}
+        value={data.outputCard?.versionId || data.currentMaterialVersionId}
+        onChange={value => data.outputCard ? data.onVersionChange?.(value) : data.onMaterialVersionView?.(value)} />}
+        {!caps.versioned && data.number != null && <span className="wcc-version">v{String(data.number).padStart(3, '0')}</span>}
+      {openTarget && <span className="wcc-card-open-wrap" ref={openMenuRef}>
+        <UiButton variant="ghost" size="compact" iconOnly type="button" className="nodrag nopan" aria-label={`打开方式：${data.title}`} title="打开方式" aria-haspopup="menu" aria-expanded={openMenu || undefined}
+          onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setOpenMenu(value => { const next = !value; if (next) loadOpenApps(); return next }) }}><UiIcon name="more" /></UiButton>
+        {openMenu && <div className="wcc-card-open-menu nodrag nopan" role="menu" aria-label={`打开方式：${data.title}`} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+          <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setOpenMenu(false); data.onOpenInspect?.() }}>查看内容</UiButton>
+          {data.projectFile?.status === 'missing' && <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setOpenMenu(false); data.onRestoreFile?.() }}>重新生成源文件</UiButton>}
+          <div className="wcc-card-open-divider" role="separator" />
+          {openApps === 'loading' && <p className="wcc-card-open-status" role="status">正在获取应用列表…</p>}
+          {Array.isArray(openApps) && openApps.map(app => <UiButton variant="custom" type="button" role="menuitem" key={app.id} onClick={() => { setOpenMenu(false); data.onOpenWithApp?.(openTarget, app.id, officeDraft.current?.draftId) }}>{app.name}</UiButton>)}
+          {Array.isArray(openApps) && !openApps.length && <p className="wcc-card-open-status">未检测到其他本机应用。</p>}
+          <div className="wcc-card-open-divider" role="separator" />
+          <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setOpenMenu(false); data.onRevealFile?.(openTarget) }}>打开所在文件夹</UiButton>
+        </div>}
+      </span>}
       <span className="wcc-grip" aria-hidden="true">⠿</span></div>
     </header>
     {editing ? <div className="wcc-card-inline-editor nodrag nopan nowheel" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => {
       event.stopPropagation()
       if (event.nativeEvent?.isComposing || saving) return
-      if (event.key === 'Escape') { event.preventDefault(); data.setTextDraft?.(draftKey, null); setEditing(false) }
+      if (event.key === 'Escape') { event.preventDefault(); cancelled.current = true; data.setTextDraft?.(draftKey, null); setEditing(false) }
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void saveText() }
     }}>
-      <RichTextEditor ref={editor} label={`编辑 ${data.title} 的正文`} value={draft} disabled={saving} markdown={data.kind==='outline'||/\.md$/i.test(data.path||data.importedFile?.name||'')} onChange={value=>{setDraft(value);data.setTextDraft?.(draftKey,value)}} />
+      <RichTextEditor ref={editor} label={`编辑 ${data.title} 的正文`} value={draft} disabled={saving} markdown={textDraft||data.kind==='outline'||/\.md$/i.test(data.path||data.importedFile?.name||'')} onChange={value=>{setDraft(value);data.setTextDraft?.(draftKey,value)}} />
       {editError && <UserError error={editError} />}
-      <div><UiButton variant="quiet" type="button" disabled={saving} onClick={() => { data.setTextDraft?.(draftKey, null); setEditing(false) }}>取消</UiButton><UiButton variant="quiet" type="button" disabled={saving || !draft.trim() || draft === text} onClick={() => void saveText()}>{saving ? '保存中…' : data.kind === 'requirement' ? '保存背景' : data.outputCard ? '保存新版本' : '另存素材'}</UiButton></div>
+      <div><UiButton variant="quiet" type="button" disabled={saving} onClick={() => { cancelled.current = true; data.setTextDraft?.(draftKey, null); setEditing(false) }}>取消</UiButton><UiButton variant="quiet" type="button" disabled={saving || !draft.trim() || draft === text} onClick={() => void saveText()}>{saving ? '保存中…' : textDraft ? '保存正文' : data.kind === 'requirement' ? '保存背景' : writeBack ? '保存到文件' : data.outputCard ? '保存新版本' : '另存素材'}</UiButton></div>
     </div> : <div className="wcc-card-body">
+      {data.projectFile?.status === 'missing' && <p className="wcc-card-missing" role="status">源文件已被删除，可在「打开方式」菜单重新生成。</p>}
       {data.skillTodo && <UiButton variant="custom" type="button" className="wcc-skill-todo nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenSkillTodo?.() }}><strong>待办 · {interactionLabel(data.skillTodo.interaction)}</strong><span>{data.skillTodo.interaction.questions?.[0]?.question || '核对执行权限'} →</span></UiButton>}
-      {pending && !data.skillTodo && <UiButton variant="custom" className={`wcc-card-generation-status nodrag nopan is-${pending.phase || 'unknown'}`} type="button"
+      {textDraft && <div className="wcc-text-draft-actions nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
+        <UiButton variant="quiet" size="compact" type="button" onClick={beginEdit}>编辑正文</UiButton>
+        <UiButton variant="quiet" size="compact" type="button" onClick={event => { event.stopPropagation(); data.onOpenPending?.() }}>用 AI 创作</UiButton>
+      </div>}
+      {pending && !data.skillTodo && !textDraft && <UiButton variant="custom" className={`wcc-card-generation-status nodrag nopan is-${pending.phase || 'unknown'}`} type="button"
         onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenPending?.() }} title={pending.error || pending.message}>
-        <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : '查看任务 →'}</span>
+        <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' && !pending.published ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : pendingContinueAllowed(pending) ? '继续任务 →' : '查看任务 →'}</span>
       </UiButton>}
-      {fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
+      {textDraft ? null : fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
         extracted={data.extracted !== false} mime={data.generatedFile?.mime || data.importedFile?.mime} src={data.videoPreview || data.imagePreview}
         status={data.status || 'ready'} downloadHref={data.downloadHref} artifactId={data.artifactKind === 'pptx' ? data.refId : undefined}
         hash={data.sourceHash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={data.onOpenDeck} />
@@ -309,8 +345,8 @@ function GroupDialog({ busy, onClose, onSubmit }) {
   </dialog>
 }
 
-function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
-  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions }) {
+function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
+  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
@@ -378,6 +414,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const [sidebar, setSidebar] = useState(false)
   const [editingTextCard,setEditingTextCard] = useState(null)
   const [tool, setTool] = useState('select')
+  const paneInsertTimer = useRef(null)
+  function cancelPaneInsert() {
+    clearTimeout(paneInsertTimer.current)
+    paneInsertTimer.current = null
+  }
+  useEffect(() => cancelPaneInsert, [active, requirement.id, tool, busy, loading])
   const [zoom, setZoom] = useState(1)
   const [showMap, setShowMap] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
@@ -385,6 +427,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const [tasks, setTasks] = useState([])
   const tasksRef = useRef(tasks)
   tasksRef.current = tasks
+  const creationTask = creation?.taskId && tasks.find(task => task.id === creation.taskId && task.sessionId === creation.sessionId)
+  const publishedExecution = publishedTaskGeneration(creationTask, effectiveStatuses.get(creationTask?.sessionId))
   const [skillReview, setSkillReview] = useState(null)
   const [skillDeckPreview, setSkillDeckPreview] = useState(null)
   const skillDrafts = useRef(new Map())
@@ -487,7 +531,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const deskVisible = focusOpen && selectedCard?.kind === 'outline'
   const dockOpen = !assetsOpen && !deskVisible && Boolean(sidebar || deckPreview || documentView || projectFileSelection || outcomeView)
   const finishEditorClose = () => { onCloseProjectFile?.();setOutcomeView(null);setSidebar(false);setDeckPreview(null);setDocumentView(null);closeCreation();rootRef.current?.focus({preventScroll:true}) }
-  const closeDock = () => { if(deckPreview&&editorCloseRequest.current)editorCloseRequest.current();else finishEditorClose() }
+  const closeDock = () => {
+    if (projectFileSelection?.fromConversation) onCloseProjectFile?.()
+    else if (deckPreview && editorCloseRequest.current) editorCloseRequest.current()
+    else finishEditorClose()
+  }
   const outlineVersions = (board?.nodes || []).filter(card => card.kind === 'outline').map(card => ({
     id: card.refId, number: card.number, markdown: card.content, sourceHash: card.sourceHash,
     wordPath: card.wordPath || (board?.nodes || []).find(node => node.kind === 'word' && node.refId === card.refId)?.path,
@@ -514,7 +562,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     bottom: (sourcePoint.y + nodeSize(sourceNode).height) * liveViewport.zoom + liveViewport.y,
   } : { left: 40, right: 220, top: 100, bottom: 240 }
   const creationAvailableWidth = canvasSize.width
-  const creationWidth = Math.min(600, creationAvailableWidth - 24)
+  const creationWidth = Math.min(creation?.pendingTaskId || creation?.intent === 'revise' && creation.sessionId ? 600 : 480, creationAvailableWidth - 24)
   const composerPosition = {
     x: Math.max(12, Math.min(creationAvailableWidth - creationWidth - 12, (sourceScreen.left + sourceScreen.right - creationWidth) / 2)),
     y: Math.max(76, Math.min(sourceScreen.bottom + 14, Math.max(76, canvasSize.height - 260))), width: creationWidth, canvasHeight: canvasSize.height,
@@ -897,8 +945,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         return
       }
       const previous = cache.current.drafts.get(cache.current.cardKeys.get(card.id))
-      const file = card.importedFile || card.generatedFile
-      const outputType = previous?.outputType || (file?.mime?.startsWith('video/') ? 'video' : file?.mime?.startsWith('image/') ? 'image' : card.kind === 'word' ? 'word' : card.artifactKind === 'pptx' ? 'pptx' : 'text')
+      const outputType = previous?.outputType || ({ pptx: 'pptx', image: 'image', video: 'video' }[cardCapabilities(card).format] || (card.kind === 'word' ? 'word' : 'text'))
       if (selectionBlocked) selectCard(card.id)
       openCreation(card, outputType, previous?.anchor.sourceHash === card.sourceHash ? previous.selection : undefined)
     }, 240)
@@ -937,8 +984,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const result=await request('create-output-draft',{requirementId:requirement.id,outputType,position,
         selectedCardIds:frame.references.map(source=>source.id),sourceRefs:frame.references.map(source=>({cardId:source.id,hash:source.sourceHash})),operationId:crypto.randomUUID()});
       if(!mounted.current||epoch!==epochRef.current)return;
-      await loadBoard({selectIds:[result.node.id],preserveViewport:true,selectionIntent:intent});
+      const editText = blank && outputType === 'text';
+      await loadBoard({selectIds:[result.node.id],preserveViewport:true,selectionIntent:intent,autoEditId:editText ? result.node.id : undefined});
       if(creationIntent.current!==intent||!activeRef.current)return;
+      if(editText)return;
       openComposition(result);
       if(seed)updateCreation(creationRef.current.key,{instruction:seed.instruction,mediaOptions:seed.mediaOptions,selectedSkills:seed.selectedSkills||[]});
     }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}
@@ -1032,6 +1081,9 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const node = result.nodes.find(card => card.outputCard?.id === pending.cardId)
       const version = node?.outputCard.versions.find(value => value.taskId === taskId)
       if (!node || !version) continue
+      const task = result.tasks?.find(item => item.id === taskId)
+      if ((node.pendingGeneration?.published && node.pendingGeneration.taskId === taskId)
+        || publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId))) continue
       cache.current.outputTracking.delete(taskId)
       cache.current.reservations.delete(taskId)
       const frame = creationRef.current
@@ -1198,7 +1250,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     let stopped = false
     let timer
     async function poll() {
-      const nativeWaiting = tasksRef.current.some(task => task.kind === 'ai' && task.outputCardId && !task.cardVersionId && !['draft', 'failed'].includes(task.dispatchStatus || task.status))
+      const nativeWaiting = tasksRef.current.some(task => task.kind === 'ai' && task.outputCardId && !['draft', 'failed'].includes(task.dispatchStatus || task.status)
+        && (!task.cardVersionId || isActiveTaskPhase(task.runtimeState?.phase) || publishedTaskGeneration(task, nativeStatusesRef.current.get(task.sessionId))))
         || [...cache.current.outputTracking.values()].some(entry => entry.projectId === projectId && entry.requirementId === requirement.id
           && tasksRef.current.some(task => task.id === entry.taskId && task.kind === 'ai' && !['draft', 'failed'].includes(task.dispatchStatus || task.status)))
         || generationStateSignature(tasksRef.current) !== generationStateSignature(boardRef.current?.tasks)
@@ -1327,6 +1380,28 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (mounted.current && epoch === epochRef.current) { setOutcomeView(null);setDocumentView(null); setSidebar(true); setTab('tasks') }
   }
 
+  async function openProjectFileAction(action, entry) {
+    if (!entry?.path) return
+    try {
+      const file = await request(action, { path: entry.path })
+      setNotice(action === 'project-file-reveal' ? `已在 Finder 定位 ${file.fileName}` : `已用默认应用打开 ${file.fileName}`)
+    } catch (cause) { setError(messageOf(cause)) }
+  }
+
+  const [materialVersionView, setMaterialVersionView] = useState(null)
+  async function viewMaterialVersion(card, versionId) {
+    try { setMaterialVersionView(await request('material-version', { requirementId: requirement.id, materialId: card.refId, versionId })) }
+    catch (cause) { setError(messageOf(cause)) }
+  }
+  async function restoreMaterialFile(card) {
+    try {
+      const result = await request('material-restore-project-file', { requirementId: requirement.id, materialId: card.refId })
+      setNotice(`已从卡片内容重建源文件「${result.fileName}」，链接已恢复。`)
+      await loadBoard({ preserveViewport: true })
+      onFilesChanged?.()
+    } catch (cause) { setError(messageOf(cause)) }
+  }
+
   async function saveCardText(card, content) {
     const intent = creationIntent.current
     const key = cardTextDraftKey(card)
@@ -1349,7 +1424,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       await onChanged?.()
       if (!mounted.current || epoch !== epochRef.current) return
       await loadBoard({ preserveViewport: true })
-      setNotice(card.kind === 'requirement' ? '背景信息已保存。' : card.outputCard ? '已保存同卡新版本，原文件保留。' : '已另存素材，原件保留。')
+      onFilesChanged?.()
+      setNotice(result.savedTo ? `已保存到「${result.savedTo}」。` : card.kind === 'requirement' ? '背景信息已保存。' : card.composition ? '正文已保存为 Markdown。' : card.outputCard ? '已保存同卡新版本，原文件保留。' : '已另存素材，原件保留。')
     })
     if (!outcome.ok) throw outcome.error
   }
@@ -1367,6 +1443,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const card = referenceResultCard(result)
       openCreation({ ...card, nodeId: id, position: absolutePosition(node, nodesRef.current), ...nodeSize(node) }, 'text')
       await loadBoard({ preserveViewport: true })
+      onFilesChanged?.()
     } catch (cause) { if (mounted.current && epoch === epochRef.current && intent === creationIntent.current) setError(messageOf(cause)) }
   }
 
@@ -1375,8 +1452,21 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function decorate(flowNodes, autoEditId) {
-    return flowNodes.map(node => node.type === 'content' ? { ...node, data: { ...node.data, onCreate: openNodeMenu,
-      onEditStart: () => { setEditingTextCard(node.id);closeCreation(); setFocusOpen(false); setSidebar(false); setDeckPreview(null); setOutcomeView(null);setDocumentView(null) },
+    const taskById = new Map(tasksRef.current.map(task => [task.id, task]))
+    return flowNodes.map(node => {
+      if (node.type === 'whiteboard') return {
+        ...node, data: { ...node.data, onChange: changeElement, onResizeStart: beginResize, onEditStart: closeCreation, autoEdit: node.id === autoEditId },
+      }
+      if (node.type !== 'content') return node
+      const card = node.data.outputCard
+      const head = card?.versions.find(version => version.id === card.latestVersionId)
+      const task = taskById.get(head?.taskId)
+      const publishedGeneration = (!node.data.pendingGeneration || node.data.pendingGeneration.published)
+        ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : undefined
+      return { ...node, data: { ...node.data, onCreate: openNodeMenu,
+      publishedGeneration,
+      autoEdit: node.id === autoEditId,
+      onEditStart: () => { if (node.data.composition && !node.selected) selectCard(node.id);setEditingTextCard(node.id);closeCreation(); setFocusOpen(false); setSidebar(false); setDeckPreview(null); setOutcomeView(null);setDocumentView(null) },
       onEditEnd: () => { setEditingTextCard(current=>current===node.id?null:current);cache.current.visible=false;setCreationVisible(false) },
       getTextDraft: key => cache.current.textDrafts.get(key),
       setTextDraft: (key, value) => value === null ? cache.current.textDrafts.delete(key) : cache.current.textDrafts.set(key, value),
@@ -1384,7 +1474,17 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       nativeSessionStatus: nativeStatusesRef.current?.get(node.data.pendingGeneration?.sessionId),
       skillTodo: interactionsRef.current.find(entry => (entry.task.outputCardId && entry.task.outputCardId === node.data.outputCard?.id) || node.data.outputCard?.versions?.some(version => version.taskId === entry.task.id)),
       onOpenSkillTodo: () => openSkillReview(interactionsRef.current.find(entry => (entry.task.outputCardId && entry.task.outputCardId === node.data.outputCard?.id) || node.data.outputCard?.versions?.some(version => version.taskId === entry.task.id))),
-      onOpenPending: () => void openPendingCard(node.data, { showDeck: false }),
+      onOpenPending: () => publishedGeneration || node.data.pendingGeneration?.published
+        ? void openOutputCard(node.data, card.latestVersionId, { showDeck: false }) : void openPendingCard(node.data, { showDeck: false }),
+      onOpenInspect: () => { closeCreation(); setSidebar(true); setTab('inspect') },
+      onRevealFile: entry => void openProjectFileAction('project-file-reveal', entry),
+      onOpenExternal: entry => void openProjectFileAction('project-file-open', entry),
+      onLoadOpenApps: entry => request('card-open-applications', { ...entry, requirementId: requirement.id }),
+      onOpenWithApp: (entry, application, draftId) => request(draftId ? 'document-open-application' : 'card-open-application',
+        draftId ? { draftId, application } : { ...entry, application, requirementId: requirement.id }),
+      onLoadMaterialVersion: versionId => request('material-version', { requirementId: requirement.id, materialId: node.data.refId, versionId }),
+      onMaterialVersionView: versionId => void viewMaterialVersion(node.data, versionId),
+      onRestoreFile: () => void restoreMaterialFile(node.data),
       onOpenFile: async () => {
         try {
           const file = await request('open-deliverable', { requirementId: requirement.id, sourceRef: `${node.data.kind}:${node.data.refId}` });
@@ -1403,8 +1503,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       ...(node.data.generatedFile?.mime?.startsWith('video/') && node.data.status === 'ready'
         ? { videoPreview: endpoint({ downloadArtifact: node.data.refId, preview: '1' }).href } : {}),
       ...(node.data.generatedFile?.mime?.startsWith('image/') && node.data.status === 'ready'
-        ? { imagePreview: endpoint({ downloadArtifact: node.data.refId, preview: '1' }).href } : {}) } } : node.type !== 'whiteboard' ? node : {
-      ...node, data: { ...node.data, onChange: changeElement, onResizeStart: beginResize, onEditStart: closeCreation, autoEdit: node.id === autoEditId },
+        ? { imagePreview: endpoint({ downloadArtifact: node.data.refId, preview: '1' }).href } : {}) } }
     })
   }
 
@@ -1607,7 +1706,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
   finishPositionRef.current = finishPositionChange
 
-  async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false } = {}) {
+  async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false, autoEditId } = {}) {
     const epoch = epochRef.current
     const previousLayout = requireStableLayout ? JSON.stringify(layoutSnapshot()) : null
     setLoading(true)
@@ -1643,7 +1742,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const nextViewport = { epoch, viewport: { ...viewportRef.current }, focusIds: preserveViewport ? undefined : currentSelectIds }
       viewportRequest.current = nextViewport
       setLoadedViewport(nextViewport)
-      replaceNodes(decorate(flowFromBoard(result, ids)))
+      replaceNodes(decorate(flowFromBoard(result, ids), currentSelectIds ? autoEditId : undefined))
       replaceEdges(flowEdges(result.edges))
       setBoard(result)
       tasksRef.current = result.tasks || []
@@ -1999,6 +2098,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         setMaterialDialog(null)
         await onChanged?.()
         await loadBoard({ selectIds: [`material:${result.material.id}`] })
+        onFilesChanged?.()
         setTab('inspect')
         setSidebar(true)
         setNotice('素材已保存到当前工作目录。')
@@ -2161,6 +2261,35 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     return anchor ? adjacentCreationPosition(anchor, board.nodes) : context.outputPosition
   }
 
+  const searchCreationFiles = useCallback(async (query, signal) => {
+    const response = await fetch(apiEndpoint({ projectReferenceSearch: query }, projectId), { credentials: 'same-origin', signal })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error || '项目文件读取失败')
+    return result
+  }, [projectId])
+
+  async function referenceCreationFile(path) {
+    const context = creationRef.current
+    if (!context || context.pendingTaskId) throw new Error('当前创作不能更换引用。')
+    if (context.references.length >= 24) throw new Error('一次创作最多引用 24 份资料，请先移除部分引用。')
+    const outcome = await perform('reference', async () => {
+      const occupied = nodesRef.current.filter(isObject).map(node => ({
+        id: node.id, position: absolutePosition(node, nodesRef.current), ...nodeSize(node),
+      }))
+      const anchor = occupied.find(node => node.id === (context.composerNodeId || context.anchor.nodeId || context.anchor.id))
+        || { position: context.outputPosition }
+      const position = adjacentCreationPosition(anchor, occupied)
+      const result = await request('project-file-reference', { requirementId: context.requirementId, path,
+        useCurrentFile: true, position, operationId: crypto.randomUUID() })
+      const card = referenceResultCard(result)
+      updateCreation(context.key, current => ({ ...updateCreationReferences(current, [...current.references, card]),
+        referencesEdited: true, error: '' }))
+      await cache.current.onMaterialsChanged?.()
+      onFilesChanged?.()
+    })
+    if (!outcome.ok) throw outcome.error
+  }
+
   async function changeCreationReferences(cards) {
     const context = creationRef.current
     if (!context) return
@@ -2190,7 +2319,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
             outputPosition: nextReferencePosition(current, result.board), referencesEdited: true, error: '' }))
         }
         updateCreation(context.key, current => ({ ...updateCreationReferences(current, references), referencesEdited: true, error: '' }))
-      } finally { if (changed) await cache.current.onMaterialsChanged?.() }
+      } finally { if (changed) { await cache.current.onMaterialsChanged?.(); onFilesChanged?.() } }
     })
     if (!outcome.ok) { updateCreation(context.key, { error: messageOf(outcome.error) }); throw outcome.error }
   }
@@ -2271,6 +2400,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         if (!mounted.current || epoch !== epochRef.current) return
         attempt.current = null
         await loadBoard({ selectIds: [`material:${result.material.id}`], preserveViewport: true, selectionIntent })
+        onFilesChanged?.()
         const anchor = nodesRef.current.find(node => node.id === (context.anchor.nodeId || context.anchor.id))
         const nextPosition = anchor ? adjacentCreationPosition({ position: absolutePosition(anchor, nodesRef.current), ...nodeSize(anchor) }, nodesRef.current.filter(isObject).map(node => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize(node) }))) : context.outputPosition
         updateCreation(context.key, current => ({ ...current, materialContent: current.materialContent === context.materialContent ? '' : current.materialContent, outputPosition: nextPosition, error: '' }))
@@ -2292,6 +2422,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         if (!mounted.current || epoch !== epochRef.current) return
         excerptAttempt.current = null
         await loadBoard({ selectIds: [`material:${result.material.id}`], preserveViewport: preserveViewport || selectionIntent !== creationIntent.current, selectionIntent })
+        onFilesChanged?.()
         if (selectionIntent === creationIntent.current) openPanel('inspect')
         setNotice(`摘录「${values.title}」与讲师注释已保存，原始资料保持独立。`)
       } catch (cause) { setExcerptError(messageOf(cause)); throw cause }
@@ -2301,7 +2432,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   const handledFileAdd=useRef(null)
   useEffect(()=>{
-    if(projectFileSelection){closeCreation();setSidebar(false);setDeckPreview(null);setOutcomeView(null);setDocumentView(null);setFocusOpen(false);setAssetsOpen(false)}
+    if (!projectFileSelection) return
+    if (!projectFileSelection.fromConversation) closeCreation()
+    setSidebar(false)
+    setDeckPreview(null)
+    setOutcomeView(null)
+    setDocumentView(null)
+    setFocusOpen(false)
+    setAssetsOpen(false)
   },[projectFileSelection?.token])
   useEffect(()=>{
     if(!active||!board||!fileAddRequest||fileAddRequest.projectId!==projectId||fileAddRequest.requirementId!==requirement.id||handledFileAdd.current===fileAddRequest.token)return
@@ -2319,20 +2457,36 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const result=await request('project-file-reference',{requirementId:requirement.id,path:entry.path,hash,position,operationId:crypto.randomUUID()})
       if(!mounted.current||epoch!==epochRef.current)return
       await loadBoard({selectIds:[`material:${result.material.id}`],preserveViewport:true})
+      onFilesChanged?.()
       onCloseProjectFile?.()
     }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}finally{if(mounted.current&&epoch===epochRef.current)setBusy('')}
   }
+  function clickPane(event) {
+    setContextMenu(null)
+    setCreationMenu(null)
+    if (tool === 'select' || tool === 'hand' || event.detail > 1 || busy || loading) return
+    const point = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
+    const epoch = epochRef.current
+    cancelPaneInsert()
+    // Wait for the double-click before committing a one-shot drawing tool.
+    paneInsertTimer.current = setTimeout(() => {
+      paneInsertTimer.current = null
+      if (mounted.current && activeRef.current && epoch === epochRef.current) addElement(tool, point)
+    }, 500)
+  }
+
   function blankMenu(event){
-    if(!event.target.closest?.('.react-flow__pane')||busy||loading||operationLock.current||event.target.closest?.('.react-flow__node'))return
+    if(!event.target.matches?.('.react-flow__pane')||busy||loading||operationLock.current)return
+    cancelPaneInsert()
+    if (tool !== 'select' && tool !== 'hand') setTool('select')
     event.preventDefault();cancelCardOpen();closeCreation();setContextMenu(null)
     const rect=graphRef.current.getBoundingClientRect(),size=canvasSizeRef.current
     setCreationMenu({blank:true,point:flow.screenToFlowPosition({x:event.clientX,y:event.clientY}),position:{x:Math.max(8,Math.min(size.width-272,event.clientX-rect.left)),y:Math.max(8,Math.min(size.height-340,event.clientY-rect.top))}})
   }
   function chooseNewType(type){
     const menu=creationMenu
-    if(!menu?.blank){openCreation(menu.anchor,type,undefined,{explicitNew:true});return}
-    setCreationMenu(null)
-    if(type==='text'){addElement('text',menu.point);return}
+    if(!menu)return
+    if(!menu.blank){openCreation(menu.anchor,type,undefined,{explicitNew:true});return}
     const anchor={id:`canvas:${requirement.id}`,kind:'canvas',title:'新建内容',position:menu.point}
     openCreation(anchor,type,undefined,{explicitNew:true,blank:true,outputPosition:menu.point})
   }
@@ -2396,6 +2550,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   function keyboard(event) {
     if (deskVisible) return
     if (event.target.closest('input,textarea,select,[contenteditable="true"],[role="textbox"],[role="separator"]') || event.nativeEvent?.isComposing) return
+    cancelPaneInsert()
     const key = event.key.toLowerCase(), command = event.metaKey || event.ctrlKey
     if (key === 'escape') { setTool('select'); setContextMenu(null); selectCard(null); return }
     if (command && key === 'a') { event.preventDefault(); selectAllCards(); return }
@@ -2437,10 +2592,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     { label: '适应全部', onClick: () => void flow.fitView({ padding: 0.16, maxZoom: 1, duration: 180 }) },
   ]
 
-  return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onMouseDownCapture={event => {
+  return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}`}>
     {deletePlan&&<DeleteNodesDialog plan={deletePlan} request={request} onClose={()=>setDeletePlan(null)} onDone={recycledChanged}/>}
+    {materialVersionView && <dialog className="wcc-version-view-dialog" open aria-labelledby="wcc-version-view-title">
+      <DialogHeader title={`${materialVersionView.title} · V${materialVersionView.number}`} titleId="wcc-version-view-title" onClose={() => setMaterialVersionView(null)} />
+      <DialogBody><pre className="wcc-version-view-body">{materialVersionView.content}</pre></DialogBody>
+      <DialogFooter><span className="wcc-version-view-meta">{materialVersionView.origin === 'card-edit' ? '卡内编辑版本' : '导入基线'} · {new Date(materialVersionView.createdAt).toLocaleString()}</span><UiButton variant="quiet" type="button" onClick={() => setMaterialVersionView(null)}>关闭</UiButton></DialogFooter>
+    </dialog>}
     {recycleOpen&&<ProjectRecycleDialog request={request} endpoint={endpoint} onClose={()=>{setRecycleOpen(false);onCloseRecycle?.()}} onChanged={recycledChanged}/>}
     {(error || notice) && <div className={`wcc-message${error ? ' is-error' : ''}`} role={error ? 'alert' : 'status'}>{error ? <UserError error={error} announce={false} /> : <span>{notice}</span>}<UiButton variant="ghost" size="compact" onClick={() => { setError(''); setNotice('') }} aria-label="关闭提示">×</UiButton></div>}
     <div className="wcc-workspace">
@@ -2458,7 +2618,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           onNodeDragStart={beginNodeDrag} onSelectionDragStart={beginNodeDrag}
           onNodeDragStop={finishNodeDrag}
           onSelectionDragStop={finishNodeDrag}
-          onMove={(_, viewport) => { if (active) { viewportRef.current = viewport; setZoom(viewport.zoom); if (creationMenu) setCreationMenu(null) } }}
+          onMove={(_, viewport) => { if (active) { cancelPaneInsert(); viewportRef.current = viewport; setZoom(viewport.zoom); if (creationMenu) setCreationMenu(null) } }}
           onMoveEnd={(_, viewport) => { if (active) { viewportRef.current = viewport; setZoom(viewport.zoom); if (!restoringViewport.current && !gestureViewportActive.current) void saveLayout() } }}
           defaultViewport={board.viewport || { x: 0, y: 0, zoom: 1 }}
           minZoom={0.1} maxZoom={3} selectionMode={SelectionMode.Partial} nodeDragThreshold={5} nodeClickDistance={5}
@@ -2469,12 +2629,13 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           panOnDrag={tool === 'hand' ? true : [1]} zoomOnDoubleClick={false}
           nodesDraggable={!busy && tool === 'select'} nodesConnectable={!busy && tool === 'select'} elementsSelectable={!busy && tool === 'select'} disableKeyboardA11y={!!busy}
           deleteKeyCode={null}
-          onPaneClick={event => { setContextMenu(null);setCreationMenu(null); if (!['select', 'hand'].includes(tool)) addElement(tool, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })) }}
+          onPaneClick={clickPane}
           onNodeClick={openClickedCard}
           onNodeDoubleClick={(_event, node) => { cancelCardOpen(); if (node.type === 'content') {
             selectCard(node.id)
-            if (node.data.outputCard && (editableCardText(node.data) === null || ['pptx','document'].includes(cardFormat(node.data)))) void openOutputCard(node.data, node.data.outputCard.versionId)
-            else if (node.data.refId && editableCardText(node.data) === null) openOutcomes(node.data)
+            const nodeCaps = cardCapabilities(node.data)
+            if (node.data.outputCard && (nodeCaps.editableText.base === null || ['pptx','document'].includes(nodeCaps.format))) void openOutputCard(node.data, node.data.outputCard.versionId)
+            else if (node.data.refId && nodeCaps.editableText.base === null) openOutcomes(node.data)
             else openPanel('inspect')
           } }}
           onPaneContextMenu={event => showContext(event)} onNodeContextMenu={showContext}
@@ -2504,14 +2665,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           canDuplicate={onlyWhiteboard} onDuplicate={duplicateElements} canDelete={selectedNodes.length>0} onDelete={removeElements} />}
         {contextMenu && <CanvasContextMenu {...contextMenu} items={contextItems} onClose={() => setContextMenu(null)} />}
         {creationMenu && <NodeCreateMenu caption={creationMenu.blank?'新建卡片':undefined} position={creationMenu.position} items={creationMenuItems(creationMenu.blank?{kind:'canvas'}:creationMenu.anchor).map(item=>creationMenu.blank?{...item,description:undefined}:item)} onAction={chooseNewType} onClose={() => setCreationMenu(null)} />}
-        {board && !loading && !loadError && <div className="wcc-canvas-hint">V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 双击编辑</div>}
+        {board && !loading && !loadError && <div className="wcc-canvas-hint">V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 空白双击新建 · 卡片双击编辑</div>}
         {draggingFile && <div className="wcc-drop-overlay">松开以添加到画布</div>}
         {projectBar}
     <CanvasSearch width={canvasSize.width} panelOpen={false} hidden={deskVisible || Boolean(deckPreview) || assetsOpen || Boolean(documentView)}
       query={searchQuery} onQuery={setSearchQuery} nodes={nodes} allRelations={allRelations} onRelations={() => setAllRelations(value => !value)}
       onOpen={() => setSidebar(false)} onSelect={node => { selectCard(node.id); void flow.fitView({ nodes: [node], padding: .4, maxZoom: 1, duration: 160 }) }} />
     <CardComposer suspended={draggingCard} visible={creationVisible && !editingTextCard && !deskVisible && !deckPreview && !assetsOpen && !documentView} position={composerPosition} context={creation ? { ...creation,
-      pendingGeneration: nativePendingState(creation.pendingGeneration, nativeSessionStatuses?.get(creation.pendingGeneration?.sessionId || creation.sessionId)) } : creation}
+      pendingGeneration: publishedExecution || nativePendingState(creation.pendingGeneration, effectiveStatuses.get(creation.pendingGeneration?.sessionId || creation.sessionId)) } : creation}
       references={creationReferences} availableReferences={availableReferences}
       creationTypes={creation ? [...creationMenuItems(creation.anchor).map(item => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...['outline', 'exercise', 'script'].map(id => ({ id, label: '文本', available: true })), ...['word', 'excerpt', 'material'].map(id => ({ id, label: OUTPUT_LABELS[id], available: true }))] : productionTypes}
       skillCatalog={skillCatalog} skillCatalogLoading={skillCatalogLoading} skillCatalogError={skillCatalogError}
@@ -2524,13 +2685,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onGenerateMedia={generateMedia} onNewMedia={newMediaTask} onResumeMedia={() => creation?.mediaJob && void resumeMediaTask(creation.mediaJob.taskId, creation.key).catch(cause => updateCreation(creation.key, { error: messageOf(cause) }))}
       instruction={creation?.instruction || ''} onInstructionChange={value => creation && updateCreation(creation.key, { instruction: value, error: '' })}
       onReferencesChange={changeCreationReferences} onImportFiles={importCreationFiles}
+      searchProjectReferences={searchCreationFiles} onReferenceProjectFile={referenceCreationFile}
+      projectRoot={project.path} onOpenReviewDraft={onPreviewProjectFile}
       acceptedFileTypes=".txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm"
       getReferenceFileHref={(card, preview = false) => endpoint({ [card.generatedFile ? 'downloadArtifact' : 'materialFile']: card.refId, ...(preview ? { preview: '1' } : {}) }).href}
       onClose={closeCreation} onSend={sendToAI} onAction={creationAction}
       busy={!!busy || loading || !!creation?.mediaRestoring} error={creation?.error}
       sendLabel={creation?.outputType === 'material' ? '保存关联素材' : creation?.outputType === 'word' ? '导出当前版本 Word' : `开始创作 ${OUTPUT_LABELS[creation?.outputType] || ''}`}
       canSend={!!creation && !creation.mediaRecoveryError && (creation.pendingTaskId ? pendingRetryAllowed(creation.pendingGeneration) && !['image', 'video'].includes(creation.outputType) : creation.outputType === 'material' ? !!creation.materialTitle?.trim() && !!creation.materialContent?.trim() : creation.outputType === 'word' ? ['outline', 'word'].includes(creation.anchor.kind) : !!creation.instruction.trim() && (!!creation.generation || creation.references.length > 0) && creation.references.length <= 24)}
-      hideSubmit={creation?.outputType === 'excerpt'} conversation={pptOwnsConversation ? null : conversation} conversationVisible={Boolean(creation?.sessionId && creation.sessionId === conversationSessionId)} onOpenConversation={openCreationConversation}
+      hideSubmit={creation?.outputType === 'excerpt'} conversation={pptOwnsConversation ? null : conversation} conversationVisible={Boolean(creation?.sessionId && creation.sessionId === conversationSessionId)} onOpenConversation={openCreationConversation} onPrepareContinuation={onPrepareContinuation}
       actionContent={creation?.outputType === 'material' ? <div className="wcc-creation-material-fields">
         <label>素材名称<input aria-label="关联素材名称" disabled={!!busy} maxLength={200} value={creation.materialTitle || ''} onChange={event => updateCreation(creation.key, { materialTitle: event.target.value, error: '' })} /></label>
         <label>素材正文<textarea aria-label="关联素材正文" disabled={!!busy} rows={5} value={creation.materialContent || ''} onChange={event => updateCreation(creation.key, { materialContent: event.target.value, error: '' })} /></label>
@@ -2547,10 +2710,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         {!dock.mobile && !editorFullscreen && <div className="wcc-dock-separator" {...dock.separator} />}
         <div className="wcc-dock-mobile-header"><UiButton variant="quiet" type="button" onClick={closeDock}>← 返回画布</UiButton></div>
       {(projectFileSelection || outcomeView) && <OutcomeViewer key={projectFileSelection?.token || JSON.stringify(outcomeView)}
-        target={projectFileSelection ? {projectPath:projectFileSelection.path,title:projectFileSelection.name,requirementId:requirement.id} : outcomeView}
+        target={projectFileSelection ? { projectPath: projectFileSelection.path, title: projectFileSelection.name, requirementId: requirement.id,
+          ...(projectFileSelection.reviewDraft ? { hash: projectFileSelection.hash, reviewDraft: true } : {}) } : outcomeView}
         endpoint={endpoint} request={request} renderNativePreview={renderNativePreview} active={active}
         onClose={() => {setOutcomeView(null);onCloseProjectFile?.()}}
-        onAdd={projectFileSelection ? onAddProjectFile : undefined} onToggleWidth={dock.toggleExpanded} widthExpanded={dock.expanded}
+        onAdd={projectFileSelection && !projectFileSelection.reviewDraft ? onAddProjectFile : undefined} onToggleWidth={dock.toggleExpanded} widthExpanded={dock.expanded}
         onSaved={async result => { cache.current.versionViews.delete(result.cardId);setOutcomeView(null);await onChanged?.();await loadBoard({preserveViewport:true}) }}
         onEditPpt={scope => setDeckPreview({...scope,viewIntent:++creationIntent.current,viewEpoch:epochRef.current})}
         onOpenSlides={manifest => setDeckPreview({slideProject:manifest.slideProject,artifactId:manifest.slideProject.artifactId,hash:manifest.slideProject.artifactHash,title:manifest.title,cardId:manifest.cardId,

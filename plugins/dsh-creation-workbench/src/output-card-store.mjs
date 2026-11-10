@@ -1,10 +1,35 @@
 import { randomUUID } from 'node:crypto';
 import { OutputDraftStore } from './output-draft-store.mjs';
+import { isActiveTaskPhase } from './pending-card-state.mjs';
 
 const REF = /^(artifact|outline|word|material):[0-9a-f-]{36}$/;
 const typeOf = type => type === 'pptx' ? 'pptx' : ['image', 'video'].includes(type) ? type : 'text';
 const legacyId = ref => `legacy:${ref}`;
 const legacyVersion = ref => `legacy-v1:${ref}`;
+
+function nextOutputPosition(anchor, occupied) {
+  const width = 258, height = 208, gap = 28, limit = 999_000;
+  const free = (x, y) => x >= -limit && x <= limit && y >= -limit && y <= limit
+    && occupied.every(node => x + width + gap <= node.position.x || x >= node.position.x + (node.width || width) + gap
+      || y + height + gap <= node.position.y || y >= node.position.y + (node.height || height) + gap);
+  const right = anchor.position.x + (anchor.width || width) + gap;
+  for (let row = 0; row <= occupied.length; row++) {
+    for (const direction of row === 0 ? [1] : [1, -1]) {
+      const y = anchor.position.y + direction * row * (height + gap);
+      for (let column = 0; column < 3; column++) {
+        const x = right + column * (width + gap);
+        if (free(x, y)) return { x, y };
+      }
+    }
+  }
+  // Large existing cards can cover several nearby slots. Use a wider grid only as a fallback.
+  const step = 1600, columns = Math.floor(2 * limit / step);
+  for (let index = 0; index <= occupied.length * 4; index++) {
+    const x = -limit + (index % columns) * step, y = -limit + Math.floor(index / columns) * step;
+    if (free(x, y)) return { x, y };
+  }
+  throw new Error('画布没有可用的产物卡位置');
+}
 
 export function normalizeGeneration(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('产物卡生成目标无效');
@@ -24,7 +49,7 @@ export class OutputCardStore {
     this.db.exec(`CREATE TABLE IF NOT EXISTS output_cards (
       id TEXT PRIMARY KEY, requirement_id TEXT NOT NULL REFERENCES canvas_spaces(id), type TEXT NOT NULL,
       title TEXT NOT NULL, node_id TEXT, head_version_id TEXT, head_sequence INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL, initial_position_json TEXT
     );
     CREATE TABLE IF NOT EXISTS output_card_versions (
       id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES output_cards(id), number INTEGER NOT NULL,
@@ -40,6 +65,9 @@ export class OutputCardStore {
       source_ref TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES output_cards(id),
       task_id TEXT REFERENCES course_tasks(id), version_id TEXT REFERENCES output_card_versions(id), role TEXT NOT NULL
     )`);
+    if (!this.db.prepare('PRAGMA table_info(output_cards)').all().some(column => column.name === 'initial_position_json')) {
+      this.db.exec('ALTER TABLE output_cards ADD COLUMN initial_position_json TEXT');
+    }
     this.drafts = new OutputDraftStore(store);
   }
 
@@ -75,7 +103,8 @@ export class OutputCardStore {
   }
   #card(row) {
     return { id: row.id, requirementId: row.requirement_id, type: row.type, title: row.title, nodeId: row.node_id || `output:${row.id}`,
-      latestVersionId: row.head_version_id, versions: this.db.prepare('SELECT * FROM output_card_versions WHERE card_id=? ORDER BY number').all(row.id).map(value => this.#version(value)), legacy: false };
+      latestVersionId: row.head_version_id, versions: this.db.prepare('SELECT * FROM output_card_versions WHERE card_id=? ORDER BY number').all(row.id).map(value => this.#version(value)), legacy: false,
+      ...(row.initial_position_json ? { initialPosition: JSON.parse(row.initial_position_json) } : {}) };
   }
 
   binding(taskId) {
@@ -133,16 +162,16 @@ export class OutputCardStore {
   }
 
   /** Called only after real output validation, inside its existing registration transaction. */
-  recordOutput(taskId, sourceRef, { primary } = {}) {
+  recordOutput(taskId, sourceRef, { primary, separate = false } = {}) {
     const binding = this.db.prepare('SELECT * FROM output_card_tasks WHERE task_id=?').get(taskId);
     if (!binding) return;
     const card = this.db.prepare('SELECT * FROM output_cards WHERE id=?').get(binding.card_id);
     const [kind, id] = sourceRef.split(':');
-    let match = false;
+    let match = false, artifact;
     if (kind === 'artifact') {
-      const artifact = this.db.prepare('SELECT * FROM task_files WHERE id=? AND task_id=? AND requirement_id=?').get(id, taskId, card.requirement_id);
+      artifact = this.db.prepare('SELECT * FROM task_files WHERE id=? AND task_id=? AND requirement_id=?').get(id, taskId, card.requirement_id);
       if (!artifact) throw new Error('版本产物不属于当前任务');
-      match = card.type === 'text' ? ['text', 'script', 'exercise'].includes(artifact.kind)
+      match = card.type === 'text' ? ['text', 'script', 'exercise', 'storyboard'].includes(artifact.kind)
         : artifact.kind === card.type;
     } else if (kind === 'outline') {
       if (!this.db.prepare('SELECT version_id FROM task_artifacts WHERE task_id=? AND version_id=?').get(taskId, id)) throw new Error('大纲不属于当前任务');
@@ -151,6 +180,10 @@ export class OutputCardStore {
     if (primary !== undefined && typeof primary !== 'boolean') throw new Error('主产物标识必须是布尔值');
     if (primary === true && !match) throw new Error('主产物必须匹配逻辑卡类型，制作资料不能发布正式版本');
     let version = this.db.prepare('SELECT * FROM output_card_versions WHERE task_id=? AND card_id=? AND legacy=0').get(taskId, card.id);
+    if (separate && artifact && (version || !match || primary === false)) {
+      this.#createIndependent(card, artifact, sourceRef);
+      return;
+    }
     this.db.prepare('INSERT OR IGNORE INTO output_card_outputs VALUES (?,?,?,?,?)')
       .run(sourceRef, card.id, taskId, version?.id || null, match ? 'attachment' : 'intermediate');
     if (!version && match && primary !== false) {
@@ -163,6 +196,22 @@ export class OutputCardStore {
       this.db.prepare('UPDATE output_cards SET node_id=COALESCE(node_id,?),head_version_id=?,head_sequence=? WHERE id=? AND head_sequence<=?')
         .run(`output:${card.id}`, versionId, binding.request_sequence, card.id, binding.request_sequence);
     }
+  }
+
+  #createIndependent(parent, artifact, sourceRef) {
+    const raw = this.#raw(parent.requirement_id);
+    const occupied = this.project(raw).nodes.filter(node => node.id !== sourceRef);
+    const anchor = occupied.find(node => node.id === (parent.node_id || `output:${parent.id}`))
+      || { position: { x: 410, y: 60 } };
+    const position = nextOutputPosition(anchor, occupied);
+    const cardId = randomUUID(), versionId = randomUUID(), now = new Date().toISOString();
+    const type = /\.pptx$/i.test(artifact.path) ? 'pptx' : typeOf(artifact.kind);
+    this.db.prepare(`INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at,initial_position_json)
+      VALUES (?,?,?,?,?,?,0,?,?)`).run(cardId, parent.requirement_id, type, artifact.title, `output:${cardId}`, versionId, now, JSON.stringify(position));
+    this.db.prepare('INSERT INTO output_card_versions VALUES (?,?,1,?,NULL,?,0,0,?)')
+      .run(versionId, cardId, artifact.task_id, sourceRef, now);
+    this.db.prepare("INSERT INTO output_card_outputs VALUES (?,?,?,?,'primary')")
+      .run(sourceRef, cardId, artifact.task_id, versionId);
   }
 
   #editor(version, raw) {
@@ -191,28 +240,32 @@ export class OutputCardStore {
       ...(!recorded ? { note: '未记录生成提示词' } : {}) };
   }
 
-  #node(card, version, raw) {
+  #node(card, version, raw, pending = this.#pendingTask(card)) {
     const actual = this.#source(card.requirementId, version.primaryRef, raw);
     const original = raw.nodes.find(node => node.id === card.nodeId);
     const firstTask = this.db.prepare(`SELECT t.input_json FROM output_card_tasks b
       JOIN course_tasks t ON t.id=b.task_id WHERE b.card_id=? ORDER BY b.request_sequence LIMIT 1`).get(card.id);
-    const initialPosition = firstTask && JSON.parse(firstTask.input_json).outputPosition;
+    const initialPosition = card.initialPosition || (firstTask && JSON.parse(firstTask.input_json).outputPosition);
     const node = { ...actual, id: card.nodeId, sourceId: version.primaryRef,
       position: raw.layoutPositions?.[card.nodeId] || original?.position || initialPosition || actual.position, ...(raw.sizes?.[card.nodeId] || {}), outputCard: { ...card, versionId: version.id, number: version.number } };
-    const pending = this.#pendingTask(card.id);
     if (pending) node.pendingGeneration = this.#pendingGeneration(pending);
     if (version.primaryRef.startsWith('outline:')) node.wordPath = this.store.getVersion(actual.refId)?.wordPath || null;
     const annotated = this.store.slides?.annotate(node) || node;
     return this.store.outcomes?.annotate(annotated, version, pending) || annotated;
   }
 
-  #pendingTask(cardId) {
+  #pendingTask(card, taskById) {
     const binding = this.db.prepare(`SELECT b.task_id FROM output_card_tasks b
       JOIN output_cards c ON c.id=b.card_id
       LEFT JOIN output_card_versions v ON v.task_id=b.task_id AND v.card_id=b.card_id AND v.legacy=0
       WHERE b.card_id=? AND b.request_sequence>c.head_sequence AND v.id IS NULL
-      ORDER BY b.request_sequence DESC LIMIT 1`).get(cardId);
-    return binding ? this.store.tasks.get(binding.task_id) : null;
+      ORDER BY b.request_sequence DESC LIMIT 1`).get(card.id);
+    if (binding) return this.store.tasks.get(binding.task_id);
+    const head = card.versions.find(version => version.id === card.latestVersionId);
+    if (!head?.taskId || head.legacy) return null;
+    const task = taskById ? taskById.get(head.taskId) : this.store.tasks.get(head.taskId);
+    if (task?.kind !== 'ai' || task.outputCardId !== card.id || !task.sessionId || !isActiveTaskPhase(task.runtimeState?.phase)) return null;
+    return taskById ? this.store.tasks.get(task.id) : task;
   }
 
   #pendingGeneration(task) {
@@ -231,6 +284,7 @@ export class OutputCardStore {
       failed: '生成失败，请查看原任务', unknown: '状态待核对，请查看执行' };
     return { taskId: task.id, outputType: task.input.outputType || 'outline', status, phase,
       message: message || messages[phase], sessionId: task.sessionId,
+      ...(task.cardVersionId ? { published: true } : {}),
       ...(task.error || mediaJob?.error ? { error: mediaJob?.error || task.error } : {}),
       ...(mediaJob ? { mediaJob, canResume: Boolean(mediaJob.canResume) } : {}) };
   }
@@ -261,10 +315,10 @@ export class OutputCardStore {
     if (typeof cardId !== 'string') throw new Error('产物卡标识无效');
     const row = this.db.prepare('SELECT * FROM output_cards WHERE id=? AND requirement_id=?').get(cardId, requirementId);
     if (!row) throw new Error('产物卡不存在或不属于当前需求');
-    const card = this.#card(row), task = this.#pendingTask(card.id);
+    const card = this.#card(row), task = this.#pendingTask(card);
     if (!task) throw new Error('此卡没有未完成的生成任务，请刷新画布');
     const version = card.versions.find(value => value.id === card.latestVersionId);
-    const node = version ? this.#node(card, version, raw) : this.#pendingNode(card, task, raw);
+    const node = version ? this.#node(card, version, raw, task) : this.#pendingNode(card, task, raw);
     return { card, node, task, pendingGeneration: node.pendingGeneration };
   }
 
@@ -287,6 +341,7 @@ export class OutputCardStore {
   }
 
   project(raw) {
+    const taskById = new Map(raw.tasks.map(task => [task.id, task]));
     const cards = this.db.prepare('SELECT * FROM output_cards WHERE requirement_id=?').all(raw.requirementId);
     const outputs = this.db.prepare('SELECT o.* FROM output_card_outputs o JOIN output_cards c ON c.id=o.card_id WHERE c.requirement_id=?').all(raw.requirementId);
     const hidden = new Set(outputs.map(output => output.source_ref));
@@ -303,9 +358,9 @@ export class OutputCardStore {
     const visible = new Map();
     for (const row of cards) {
       const card = this.#card(row), version = card.versions.find(value => value.id === row.head_version_id);
-      if (version) nodes.push(this.#node(card, version, raw));
+      if (version) nodes.push(this.#node(card, version, raw, this.#pendingTask(card, taskById)));
       else {
-        const task = this.#pendingTask(card.id);
+        const task = this.#pendingTask(card);
         if (!task) {
           if(!this.db.prepare('SELECT 1 FROM output_card_drafts WHERE card_id=?').get(card.id))continue;
           nodes.push(this.#draftNode(card,this.drafts.get(raw.requirementId,card.id),raw));

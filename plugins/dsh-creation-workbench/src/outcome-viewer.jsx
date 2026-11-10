@@ -33,7 +33,10 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     setSource(null); setError('')
     read({ nativePreview: selected, requirementId: target.requirementId,
       ...(file.hash ? { hash: file.hash } : {}), ...(target.projectPath ? { projectPath: target.projectPath } : {}) })
-      .then(value => { if (live) setSource({ key: selectionKey, value }) }).catch(cause => { if (live) setError(cause.message) })
+      .then(value => { if (live) setSource({ key: selectionKey, value }) }).catch(cause => {
+        if (live) setError(target.projectPath && cause.message.includes('ENOENT')
+          ? '找不到此文件。请在文件栏确认它是否已移动或重命名。' : cause.message)
+      })
     return () => { live = false }
   }, [selectionKey, Boolean(file)])
   // Text/HTML retain relative-asset paths; refuse a changed archived source.
@@ -42,7 +45,9 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     const textLike = ['md', 'markdown', 'txt', 'csv', 'json', 'jsonl', 'yaml', 'yml', 'html', 'css', 'js', 'mjs', 'py', 'xml', 'log'].includes(source.format)
     if (target.projectPath ? !textLike : !['html', 'htm', 'md', 'markdown'].includes(source.format)) return
     let live = true
-    const timer = setInterval(() => { void read({ nativePreview: selected, requirementId: target.requirementId, ...(target.projectPath ? { projectPath: target.projectPath } : { hash: source.hash }) })
+    const timer = setInterval(() => { void read({ nativePreview: selected, requirementId: target.requirementId,
+      ...(target.projectPath ? { projectPath: target.projectPath } : {}),
+      ...(!target.projectPath || target.hash ? { hash: source.hash } : {}) })
       .catch(cause => { if (live) setError(cause.message) }) }, 4000)
     return () => { live = false; clearInterval(timer) }
   }, [source?.path, source?.hash, active, target.projectPath])
@@ -78,7 +83,7 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     requirementId={target.requirementId} cardId={manifest.cardId} versionId={manifest.versionId} outcome active={active}
     fileActions={choices} outcomeRole={file.role} renderNativePreview={renderNativePreview} downloadHref={downloadHref} onClose={onClose} onSaved={onSaved}
     onToggleWidth={onToggleWidth} widthExpanded={widthExpanded} />
-  return <aside className="wtt-outcome-viewer nodrag nopan nowheel" aria-label="成果文件预览" onPointerDown={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+  return <aside className="wtt-outcome-viewer nodrag nopan nowheel" aria-label={target.reviewDraft ? '待审稿预览' : '成果文件预览'} onPointerDown={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
     <PanelHeader title={file?.name || target.title || '成果文件'} format={source?.format?.toUpperCase()} downloadHref={downloadHref}
       expanded={widthExpanded} onToggleWidth={onToggleWidth} onClose={onClose} closeLabel="关闭成果预览" />
     <PanelToolbar>{choices(false)}

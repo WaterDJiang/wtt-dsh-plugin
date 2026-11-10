@@ -7,12 +7,15 @@ import { SkillSettings } from './skill-settings.jsx'
 import { MediaPrompt, MediaSettings, mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
 import { ModelSelection } from './model-selection.jsx'
 import { TaskInputSummary } from './task-input-summary.jsx'
-import { pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
+import { pendingContinueAllowed, pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
+import { ReferencePromptInput } from './reference-prompt-input.jsx'
+import { reviewDraftFromQuestion } from './conversation-file.mjs'
 import './card-creation.css'
 import './task-stage.css'
 
 const KIND_LABELS = { requirement: '需求', material: '素材', excerpt: '摘录', outline: '大纲', word: 'Word', artifact: '成果文件', text: '文本', pptx: 'PPT', image: '图片', video: '视频', exercise: '练习', script: '逐字稿', whiteboard: '白板内容' }
 const ACTION_TYPES = new Set(['material', 'excerpt', 'word'])
+const ACTIVE_NATIVE_QUESTION = '[data-question-key] > section:has([data-question-scroll])'
 const DEFAULT_ACCEPTED_FILES = '.txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm'
 
 
@@ -41,7 +44,6 @@ function referenceErrorMessage(error) { return error?.rpcError?.message || error
 
 function CreationIcon({ type = 'outline', size = 17 }) {
   const paths = {
-    text: <><path d="M4 5h16M12 5v15M8 20h8M4 8V5M20 8V5" /></>,
     image: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8" cy="9" r="1.5" /><path d="m4 18 6-6 4 4 3-3 4 4" /></>,
     video: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m10 8 6 4-6 4Z" /></>,
     outline: <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
@@ -90,7 +92,7 @@ function selectionLabel(context) {
   return first === last ? `第 ${first} 行` : `第 ${first}–${last} 行`
 }
 
-function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit }) {
+function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit, mentionProps }) {
   const id = useId()
   const root = useRef(null)
   const textarea = useRef(null)
@@ -191,13 +193,10 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
       <UiButton variant="custom" type="button" className="wcc-manage-favorites" aria-label="设置常用技能" title="设置常用技能" disabled={disabled} onClick={onOpenSettings}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></UiButton>
     </div>
     </div>
-    <textarea ref={textarea} id={`${id}-instruction`} aria-label="创作要求" value={instruction} disabled={disabled} rows={3} maxLength={8000}
-      onChange={event => { onChange?.(event.target.value); updateQuery(event.target) }} onSelect={event => { remember(event.target); if (popup?.mode === 'inline') updateQuery(event.target) }} onClick={event => updateQuery(event.currentTarget)}
+    <ReferencePromptInput textareaRef={textarea} id={`${id}-instruction`} aria-label="创作要求" value={instruction} disabled={disabled} rows={2}
+      onValueChange={onChange} onCursor={updateQuery} onSelect={element => { remember(element); if (popup?.mode === 'inline') updateQuery(element) }}
       aria-autocomplete="list" aria-controls={popup ? `${id}-skills` : undefined} aria-activedescendant={popup && candidates[activeIndex] ? `${id}-skill-${activeIndex}` : undefined}
-      placeholder="描述你的要求，输入 / 调用技能…" spellCheck={false} onKeyDown={event => {
-        if (keyboard(event)) return
-        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !event.nativeEvent?.isComposing) { event.preventDefault(); onSubmit?.() }
-      }} />
+      placeholder="描述创作要求，@ 引用资料，/ 调用技能" spellCheck={false} onKeyDown={keyboard} onSubmit={onSubmit} {...mentionProps} />
     {popup && <div className="wcc-creation-skill-picker"><div className="wcc-creation-skill-picker-heading">{popup.mode === 'browse' ? <input ref={search} role="combobox" aria-label="搜索技能" aria-expanded="true" aria-controls={`${id}-skills`} aria-activedescendant={candidates[activeIndex] ? `${id}-skill-${activeIndex}` : undefined} value={popup.query} onChange={event => setPopup(current => ({ ...current, query: event.target.value }))} onKeyDown={keyboard} placeholder="搜索技能 名称或说明" /> : <span>/{popup.query || '…'} · 选择技能</span>}<UiButton variant="custom" type="button" disabled={refreshing || loading || !onRefresh} onClick={() => void refresh()}>{refreshing || loading ? '读取中…' : '刷新'}</UiButton><UiButton variant="custom" type="button" aria-label="设置常用技能" onClick={() => { setPopup(null); onOpenSettings?.() }}>设置常用</UiButton></div>
       <div ref={options} id={`${id}-skills`} className="wcc-creation-skill-options" role="listbox" aria-label="可选技能">{candidates.map((skill, index) => <UiButton variant="custom" id={`${id}-skill-${index}`} key={skill.name} data-skill-index={index} type="button" role="option" title={`/${skill.name}`} tabIndex={-1} aria-selected={index === activeIndex} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => insertSkill(skill)}><strong>{skillLabel(skill)}{(skill.favorite || favoriteNames.has(skill.name)) && <small>常用</small>}</strong><span>{skill.description || '暂无说明'}</span></UiButton>)}{!candidates.length && <p>{loading ? '正在读取技能列表…' : '没找到相关技能，换个关键词或刷新列表。'}</p>}</div>
       {!!catalog?.warnings?.length && <p className="wcc-creation-preview-note">有 {catalog.warnings.length} 项技能来源提示，可在设置中查看。</p>}
@@ -270,7 +269,8 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [],
 export function CardComposer({
   visible = true, suspended = false, position = { x: 0, y: 0 }, context, references: referenceItems = [], availableReferences = [], creationTypes = [],
   instruction = '', onInstructionChange, onReferencesChange, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onClose, onSend, onAction,
-  busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, actionContent, hideSubmit = false,
+  searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft,
+  busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
   mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onSaveMediaSettings, onMediaOptionsChange, onGenerateMedia, onResumeMedia, onNewMedia,
   modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError,
@@ -302,6 +302,7 @@ export function CardComposer({
   const [conversationOpen, setConversationOpen] = useState(false)
   const [conversationOpening, setConversationOpening] = useState(null)
   const [conversationError, setConversationError] = useState(null)
+  const [reviewQuestion, setReviewQuestion] = useState(null)
   const [revisionEditing, setRevisionEditing] = useState(false)
   const conversationAutoScope = useRef(null)
   const [nativeComposerHeight, setNativeComposerHeight] = useState(0)
@@ -313,8 +314,9 @@ export function CardComposer({
   const revising = context?.intent === 'revise'
   const inputLocked = Boolean(context?.pendingTaskId)
   const isMedia = outputType === 'image' || outputType === 'video'
-  const taskMode = inputLocked && !isMedia
-  const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !inputLocked && !revisionEditing
+  const taskMode = (inputLocked || context?.pendingGeneration?.published) && !isMedia
+  const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation)
+  const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing
   const showInitialInput = !taskMode && !reviewingResult
   const mediaOptions = mediaOptionsFor(outputType, mediaCapabilities, context?.mediaOptions)
   const mediaModel = mediaCapabilities?.models?.find(model => model.type === outputType && model.id === mediaOptions.model)
@@ -323,6 +325,7 @@ export function CardComposer({
   const hasConversation = !isMedia && Boolean(conversation) && conversationVisible
   const hasExecution = !isMedia && (hasConversation || Boolean(context?.sessionId))
   const executionExpanded = hasConversation && conversationOpen && !collapsed
+  const reviewDraft = reviewQuestion?.scope === conversationScope && reviewDraftFromQuestion(projectRoot, reviewQuestion.text)
   const frameTop = executionExpanded && Number.isFinite(position.canvasHeight)
     ? Math.max(12, Math.min(position.y, position.canvasHeight - Math.min(560, position.canvasHeight - 24))) : position.y
   const references = uniqueCards(referenceItems)
@@ -354,6 +357,23 @@ export function CardComposer({
   const reason = recoveringMedia ? '' : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || '该创作能力暂不可用。' : ''))
   const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
   const candidates = uniqueCards(availableReferences).filter(card => `${cardTitle(card)} ${KIND_LABELS[card.kind] || ''}`.toLowerCase().includes(search.toLowerCase()))
+  const projectReferences = new Map(availableReferences.filter(card => card.projectFile).map(card => [card.id, card.projectFile]))
+  const referenceOptions = uniqueCards([...references, ...availableReferences])
+    .filter(card => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith('video/')))
+    .map(card => {
+      const projectFile = projectReferences.get(card.id)
+      const projectPath = projectFile?.path
+      const label = cardTitle(card)
+      const detail = [isChosen(card) ? '已引用' : '画布', referenceFormat(card), projectPath].filter(Boolean).join(' · ')
+      const readyProjectPath = projectFile?.status === 'ready' ? projectPath : undefined
+      return { key: card.id, card, label, detail, mentionLabel: projectPath, path: readyProjectPath,
+        searchText: [label, detail].join(' ').normalize('NFC').toLowerCase() }
+    })
+  const mentionProps = {
+    referenceOptions, searchReferences: searchProjectReferences,
+    acceptProjectFile: entry => !isMedia || !/\.(mp4|webm)$/i.test(entry.name),
+    onMention: mentionReference,
+  }
   const label = recoveringMedia ? '取回生成结果' : inputLocked ? pendingRetryAllowed(context?.pendingGeneration) && !isMedia ? '重试原任务' : pendingLabel(context?.pendingGeneration) : isAction ? sendLabel || { material: '添加素材', excerpt: '选择原文摘录', word: '导出 Word' }[outputType] : revising ? '生成新版本' : `生成${['outline', 'exercise', 'script'].includes(outputType) ? '文本' : KIND_LABELS[outputType] || '文本'}`
   const acceptedFiles = Array.isArray(acceptedFileTypes) ? acceptedFileTypes.join(',') : acceptedFileTypes
   const submitFooter = !hideSubmit && showInitialInput && <footer className={`wcc-creation-submit${isMedia ? ' is-media' : ''}`}>
@@ -391,10 +411,30 @@ export function CardComposer({
   useEffect(() => {
     if (scrollBody.current) scrollBody.current.scrollTop = 0
   }, [visible, collapsed, executionExpanded, conversationScope])
+
+  function scrollToQuestion(question, showHistory = false) {
+    const scrollport = question?.closest('[data-conversation-scroll]')
+    if (!scrollport) return
+    const questionTop = question.getBoundingClientRect().top - scrollport.getBoundingClientRect().top
+    scrollport.scrollTop += questionTop - (showHistory ? scrollport.clientHeight * .8 : 12)
+  }
+
+  function jumpToReview(showHistory) {
+    scrollToQuestion(conversationPanel.current?.querySelector(ACTIVE_NATIVE_QUESTION), showHistory)
+  }
+
+  function openReviewDraft() {
+    const question = conversationPanel.current?.querySelector(ACTIVE_NATIVE_QUESTION)
+    const draft = reviewDraftFromQuestion(projectRoot, question?.querySelector('h2')?.textContent)
+    if (draft?.path === reviewDraft.path && draft.hash === reviewDraft.hash) onOpenReviewDraft(draft)
+  }
+
   useEffect(() => {
     if (!visible || !executionExpanded || !conversationPanel.current) return
     const panel = conversationPanel.current
     let seat = null
+    let question = null
+    let questionId = null
     let frame = null
     const resize = new ResizeObserver(measure)
     const mutation = new MutationObserver(measure)
@@ -410,11 +450,19 @@ export function CardComposer({
           seat = next
           if (seat) resize.observe(seat)
         }
+        const activeQuestion = seat?.querySelector(ACTIVE_NATIVE_QUESTION) || null
+        const activeId = activeQuestion?.getAttribute('aria-labelledby') || null
+        if (activeQuestion && (activeQuestion !== question || activeId !== questionId)) scrollToQuestion(activeQuestion)
+        const text = activeQuestion?.querySelector('h2')?.textContent
+        setReviewQuestion(previous => previous?.scope === conversationScope && previous.text === text
+          ? previous : { scope: conversationScope, text })
+        question = activeQuestion
+        questionId = activeId
         const height = Math.ceil(seat?.getBoundingClientRect().height || 0)
         setNativeComposerHeight(previous => previous === height ? previous : height)
       })
     }
-    mutation.observe(panel, { childList: true, subtree: true })
+    mutation.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-labelledby'] })
     measure()
     return () => {
       resize.disconnect()
@@ -474,6 +522,18 @@ export function CardComposer({
     })
   }
 
+  async function mentionReference(option) {
+    if (referencesBusy) return false
+    if (option.card && isChosen(option.card)) return true
+    setReferencesOpen(false)
+    setPreviewOpen(false)
+    return runReferenceOperation(() => {
+      if (option.projectFile && onReferenceProjectFile) return onReferenceProjectFile(option.projectFile)
+      if (option.card && onReferencesChange) return onReferencesChange([...references, option.card])
+      throw new Error('引用选择暂不可用，请稍后重试。')
+    })
+  }
+
   function removeReference(card) {
     if (referencesBusy) return
     if (isPinned(card)) return
@@ -506,7 +566,7 @@ export function CardComposer({
     else onSend?.()
   }
 
-  async function toggleConversation(forceOpen = false) {
+  async function toggleConversation(forceOpen = false, prepareContinuation = false) {
     if (conversationOpen && !forceOpen) { setConversationOpen(false); return }
     if (conversationOpening === conversationScope) return
     const scope = conversationScope
@@ -514,7 +574,13 @@ export function CardComposer({
     setConversationError(null)
     try {
       await onOpenConversation?.()
-      if (mounted.current && liveConversationScope.current === scope) setConversationOpen(true)
+      if (mounted.current && liveConversationScope.current === scope) {
+        const focus = prepareContinuation ? onPrepareContinuation(context.sessionId) : null
+        setConversationOpen(true)
+        if (focus) requestAnimationFrame(() => {
+          if (mounted.current && liveConversationScope.current === scope) focus()
+        })
+      }
     } catch (cause) {
       if (mounted.current && liveConversationScope.current === scope) setConversationError({ scope, message: referenceErrorMessage(cause) })
     } finally {
@@ -560,6 +626,8 @@ export function CardComposer({
         renderFile={getReferenceFileHref ? reference => (reference.importedFile || reference.generatedFile) && <ImportedReferenceFile card={reference} getHref={getReferenceFileHref} /> : undefined} />
       {context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={context.pendingGeneration.error} />}
       {displayError && displayError !== context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={displayError} />}
+      {canContinue && <div className="wcc-task-stage-actions"><UiButton variant="primary" size="compact" disabled={busy || conversationOpening === conversationScope}
+        onClick={() => void toggleConversation(true, true)}>继续任务</UiButton></div>}
       {taskMode && pendingRetryAllowed(context.pendingGeneration) && <div className="wcc-task-stage-actions"><UiButton variant="primary" disabled={!ready} onClick={submit}>重试原任务</UiButton></div>}
       {taskMode && pendingRetryAllowed(context.pendingGeneration) && reason && <p className="wcc-creation-disabled-reason" role="status">{reason}</p>}
       {taskMode && !context?.sessionId && <p className="wcc-creation-execution-note" role="status">{context?.pendingGeneration?.status === 'unknown' ? '提交结果待核对，请从创作任务查看；不要重复发送。' : '尚未连接原任务对话。'}</p>}
@@ -571,8 +639,8 @@ export function CardComposer({
       {referenceNotes.map(note => <p key={note} className="wcc-creation-history-note" role="status">{note}</p>)}
       {context?.selection && <div className="wcc-creation-selection-scope" role="status"><span>仅引用所选片段 · {selectionLabel(context)} · {Array.from(context.selection.quote || '').length} 个字符</span><UiButton variant="custom" type="button" disabled={busy || inputLocked || !onAction} onClick={() => onAction('whole-source')}>使用整份原文</UiButton></div>}
       <div className="wcc-creation-compact-actions"><UiButton variant="custom" type="button" aria-label="收起卡片创作框" onClick={() => setCollapsed(true)}>⌄</UiButton><UiButton variant="custom" type="button" aria-label="关闭卡片创作框" onClick={onClose}>×</UiButton></div>
-      <section className="wcc-creation-reference-area" aria-label="引用资料">
-        <div className="wcc-creation-reference-caption"><span>引用</span><small aria-live="polite">{references.length}份</small></div>
+      <section className={`wcc-creation-reference-area${references.length ? '' : ' is-empty'}`} aria-label="引用资料">
+        {!!references.length && <div className="wcc-creation-reference-caption"><span>引用</span><small aria-live="polite">{references.length}份</small></div>}
         <div className="wcc-creation-reference-chips">{references.map(card => <span key={card.id} className={`wcc-creation-reference-chip${unavailableReason(card) ? ' is-unavailable' : ''}`} title={`${cardTitle(card)}${unavailableReason(card) || card.referenceNote ? ` · ${unavailableReason(card) || card.referenceNote}` : ''}`}>
           <span className="wcc-reference-format">{referenceFormat(card)}</span><UiButton variant="custom" className="wcc-reference-name" type="button" aria-label={`查看引用 ${cardTitle(card)}`} aria-expanded={previewOpen} aria-controls={`${id}-reference-preview`} onClick={event=>{previewTrigger.current=event.currentTarget;setPreviewOpen(true);setReferencesOpen(false);const detail=referenceDetails.current.get(card.id);if(detail)detail.open=true}}>{cardTitle(card)}</UiButton>
           {isPinned(card) ? <span className="wcc-creation-reference-lock" title={inputLocked ? '本次任务使用的资料版本' : '以来源卡片为创作依据'} aria-label={inputLocked ? '本次使用的资料版本' : '来源卡片，保留为引用'}>{inputLocked?<CreationIcon type="lock" size={11}/>: '来源'}</span> : <UiButton variant="custom" type="button" className="wcc-reference-remove" disabled={referencesBusy} aria-label={`移除引用 ${cardTitle(card)}`} onClick={() => removeReference(card)}><CreationIcon type="close" size={12} /></UiButton>}
@@ -608,14 +676,22 @@ export function CardComposer({
       </section>
       {inputLocked && <div className={`wcc-creation-pending-state is-${context?.pendingGeneration?.phase || 'unknown'}`} role="status"><strong>{pendingLabel(context?.pendingGeneration)}</strong><p>{context?.pendingGeneration?.error || context?.pendingGeneration?.message || '成果文件保存后会原位更新卡片。'}</p><small>任务已提交。需要补充要求或确认时，请打开「任务对话」。</small></div>}
       {isMedia && inputLocked ? <div className="wcc-creation-frozen-media"><label>原提示词<textarea value={instruction} readOnly rows={4} /></label><p>{[context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} 秒`].filter(Boolean).join(' · ')}</p>{context?.mediaJob?.error && <p className="wcc-creation-error">{context.mediaJob.error}</p>}{context?.mediaJob?.canResume && <UiButton variant="custom" type="button" disabled={busy} onClick={onResumeMedia}>查看进度或取回文件</UiButton>}{['unknown', 'download_failed', 'registration_failed'].includes(context?.mediaJob?.status) && <UiButton variant="custom" type="button" disabled={busy} onClick={onNewMedia}>确认后重新生成</UiButton>}</div>
-        : isMedia ? <MediaPrompt type={outputType} instruction={instruction} onChange={onInstructionChange} options={mediaOptions} onOptionsChange={onMediaOptionsChange} capabilities={mediaCapabilities} loading={mediaLoading} error={mediaError} job={context?.mediaJob} onRefresh={onRefreshMedia} onOpenSettings={() => setMediaSettingsOpen(true)} onResume={onResumeMedia} onPrepareNew={onNewMedia} onSubmit={submit} disabled={referencesBusy} /> : isAction ? (actionContent != null ? <div className="wcc-creation-action-content">{actionContent}</div> : <label className="wcc-creation-instruction"><span>处理说明</span><textarea value={instruction} onChange={event => onInstructionChange?.(event.target.value)} disabled={busy} rows={4} maxLength={8000} /></label>) : <SkillCommandInput key={context?.key} instruction={instruction} onChange={onInstructionChange} disabled={busy || inputLocked} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onOpenSettings={() => setSkillSettingsOpen(true)} onSubmit={submit} />}
+        : isMedia ? <MediaPrompt key={context?.key} type={outputType} instruction={instruction} onChange={onInstructionChange} options={mediaOptions} onOptionsChange={onMediaOptionsChange} capabilities={mediaCapabilities} loading={mediaLoading} error={mediaError} job={context?.mediaJob} onRefresh={onRefreshMedia} onOpenSettings={() => setMediaSettingsOpen(true)} onResume={onResumeMedia} onPrepareNew={onNewMedia} onSubmit={submit} disabled={referencesBusy} mentionProps={mentionProps} /> : isAction ? (actionContent != null ? <div className="wcc-creation-action-content">{actionContent}</div> : <label className="wcc-creation-instruction"><span>处理说明</span><textarea value={instruction} onChange={event => onInstructionChange?.(event.target.value)} disabled={busy} rows={4} maxLength={8000} /></label>) : <SkillCommandInput key={context?.key} instruction={instruction} onChange={onInstructionChange} disabled={busy || inputLocked} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onOpenSettings={() => setSkillSettingsOpen(true)} onSubmit={submit} mentionProps={mentionProps} />}
 
       {reason && <p className="wcc-creation-disabled-reason" role="status">{reason}</p>}
       {displayError && <UserError className="wcc-creation-error" error={displayError} />}
     </div>
     {!collapsed && submitFooter}
     </>}
-    <div className="wcc-creation-conversation-heading" hidden={collapsed || !hasExecution || (revisionEditing && !taskMode)}><UiButton variant="custom" type="button" aria-expanded={conversationOpen} aria-controls={`${id}-conversation`} disabled={conversationOpening === conversationScope} onClick={() => void toggleConversation()}><CreationIcon type="spark" size={13} /><span>{reviewingResult ? '查看原任务对话' : '任务对话'}</span><small>{conversationOpening === conversationScope ? '正在恢复…' : conversationOpen ? '收起' : taskMode ? '继续当前任务' : '查看'}</small><CreationIcon type={conversationOpen ? 'collapse' : 'expand'} size={13} /></UiButton></div>
+    <div className="wcc-creation-conversation-heading" hidden={collapsed || !hasExecution || (revisionEditing && !taskMode)}>
+      <UiButton variant="custom" type="button" aria-expanded={conversationOpen} aria-controls={`${id}-conversation`} disabled={conversationOpening === conversationScope} onClick={() => void toggleConversation()}><CreationIcon type="spark" size={13} /><span>{reviewingResult ? '查看原任务对话' : '任务对话'}</span><small>{conversationOpening === conversationScope ? '正在恢复…' : conversationOpen ? '收起' : taskMode ? '继续当前任务' : '查看'}</small><CreationIcon type={conversationOpen ? 'collapse' : 'expand'} size={13} /></UiButton>
+      {executionExpanded && <div className="wcc-review-jumps">
+        {onOpenReviewDraft && reviewDraft && <UiButton variant="quiet" size="compact"
+          title={reviewDraft.name} onClick={openReviewDraft}>查看待审稿</UiButton>}
+        <UiButton variant="quiet" size="compact" onClick={() => jumpToReview(true)}>看过程</UiButton>
+        <UiButton variant="quiet" size="compact" onClick={() => jumpToReview(false)}>看审核</UiButton>
+      </div>}
+    </div>
     {!collapsed && conversationError?.scope === conversationScope && <UserError className="wcc-creation-error wcc-creation-task-error" error={conversationError.message} />}
     {!collapsed && conversationOpen && !hasConversation && <p className="wcc-creation-execution-note" role="status">此版本的执行会话尚未恢复，请重新展开或从任务中核对。</p>}
     <div ref={conversationPanel} id={`${id}-conversation`} className="wcc-creation-conversation" hidden={!visible || collapsed || !conversationOpen || !hasConversation}>{conversation}</div>

@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WorkbenchService, runProcess } from '../src/service.mjs';
+import { createProductionObserver } from '../src/production-control.mjs';
 
 const ref = name => ({ name, hash: 'a'.repeat(64), path: null });
 function fixture(t, config = {}) {
@@ -20,6 +21,65 @@ function fixture(t, config = {}) {
   };
   return { root, service, requirement, input, create };
 }
+
+test('workbench requests use the resolved model and task scope across formats and skills', async t => {
+  const listeners = new Map();
+  const models = {
+    luna: { context: { contextWindow: 272_000 }, defaultMaxTokens: 128_000 },
+    glm: { context: { contextWindow: 1_000_000 }, defaultMaxTokens: 131_072 },
+    small: { context: { contextWindow: 32_000 }, defaultMaxTokens: 6_000 },
+  };
+  const calls = [];
+  const ctx = {
+    on(name, handler, options) { listeners.set(name, { handler, options }); return () => listeners.delete(name); },
+    llm: { async resolveModelInfo(provider, model) { calls.push([provider, model]); return models[model]; } },
+    sessionProjections: { snapshot: () => ({ values: { sessionStats: { steps: 1 }, contextPressure: { contextWindow: 1_000_000 } } }) },
+  };
+  const observer = createProductionObserver(ctx);
+  t.after(() => observer.close());
+  const { root, service, create, requirement } = fixture(t, { attachProduction: observer.attach });
+  const bind = extra => {
+    const { task } = create(extra);
+    const session = { id: `session:${task.id}`, header: { cwd: root } };
+    service.tasks.bindSession({ taskId: task.id, sessionId: session.id });
+    return { task, session };
+  };
+  const { handler, options } = listeners.get('agent/request');
+  assert.equal(options.prepend, true);
+  const run = (session, request) => handler({ agent: { id: session.id, session } }, async () => request);
+  const { task, session } = bind({ selectedSkills: ['wtt-course-pptx-builder'] });
+  const luna = { provider: 'openai', model: 'luna', reasoningEffort: 'high' };
+  const glm = { provider: 'zai', model: 'glm' };
+  assert.deepEqual(await run(session, luna), { ...luna, maxTokens: 48_000 });
+  assert.deepEqual(await run(session, glm), { ...glm, maxTokens: 48_000 });
+  assert.deepEqual(calls.slice(0, 2), [['openai', 'luna'], ['zai', 'glm']]);
+  assert.equal((await run(session, { ...luna, maxTokens: 8_000 })).maxTokens, 8_000);
+  assert.equal((await run(session, { ...luna, model: 'small' })).maxTokens, 6_000);
+  const unknown = { ...luna, model: 'unknown' };
+  assert.equal(await run(session, unknown), unknown);
+  assert.equal(await run({ ...session, header: { cwd: '/another-project' } }, luna), luna);
+  assert.equal(await run({ ...session, id: 'unbound' }, luna), luna);
+  const text = { outputType: 'text', pptEngine: undefined, selectedSkills: [] };
+  const custom = { ...text, selectedSkills: ['custom-production'] };
+  assert.equal((await run(bind({ pptStage: 'edit', selectedSkills: [] }).session, glm)).maxTokens, 48_000);
+  assert.equal((await run(bind(text).session, luna)).maxTokens, 48_000);
+  assert.equal((await run(bind(custom).session, luna)).maxTokens, 48_000);
+  const material = service.canvas.addMaterial({ requirementId: requirement.id, title: '验收资料', content: '选段正文和全文内容', operationId: randomUUID() }).material;
+  const sourceCardId = `material:${material.id}`;
+  const selected = { selectedCardIds: [sourceCardId], selection: { sourceCardId, sourceHash: material.hash, start: 0, end: 4, quote: '选段正文' } };
+  assert.equal((await run(bind({ ...custom, ...selected }).session, luna)).maxTokens, 16_000);
+  assert.equal((await run(bind({ selectedSkills: ['wtt-course-pptx-builder'], ...selected }).session, luna)).maxTokens, 16_000);
+
+  session.requestHeader = () => ({ config: { ...glm, maxTokens: 48_000 } });
+  listeners.get('session/event').handler(session, { type: 'request/header' });
+  const { usage, policy } = service.production.inspect(task.id);
+  assert.equal(usage.contextWindow, 1_000_000);
+  assert.equal(usage.requestMaxTokens, 48_000);
+  assert.equal(policy.maxOutputTokens, 300_000);
+
+  service.production.savePolicy({ ...policy, contextMode: 'host' });
+  assert.equal(await run(bind({ ...custom, ...selected }).session, luna), luna);
+});
 
 test('explicit Builder needs no Generator and freezes build-only prompts on replay and restart', t => {
   const { root, service, create, input } = fixture(t, { pptGeneratorSkillDir: path.join(os.tmpdir(), randomUUID()) });
@@ -38,6 +98,68 @@ test('explicit Builder needs no Generator and freezes build-only prompts on repl
   const restarted = new WorkbenchService({ workspaceRoot: root });
   try { assert.equal(restarted.prepareTask({ taskId: created.task.id }).prepared.prompt, created.prepared.prompt); }
   finally { restarted.close(); }
+});
+
+test('any explicit Skill can register independently positioned outputs, with one primary and optional attachments', async t => {
+  const { root, service, create } = fixture(t);
+  const skill = create({ outputType: 'text', pptEngine: undefined, selectedSkills: ['custom-production'],
+    generation: { mode: 'new' }, outputPosition: { x: 400, y: 100 } });
+  const task = skill.task, sessionId = 'custom-production-session';
+  const write = (relative, content) => {
+    const filename = path.join(root, relative);
+    mkdirSync(path.dirname(filename), { recursive: true });
+    writeFileSync(filename, content);
+    return relative;
+  };
+  assert.match(skill.prepared.prompt, /按文件各建卡/);
+  assert.doesNotMatch(skill.prepared.prompt, /course-handoff|wtt-course-pptx-generator/);
+  service.tasks.bindSession({ taskId: task.id, sessionId });
+  const canvas = service.canvas.getBoard(task.requirementId);
+  const anchor = canvas.nodes.find(node => node.outputCard?.id === task.outputCardId);
+  service.canvas.saveBoard({ requirementId: task.requirementId, expectedRevision: canvas.revision, positions: {
+    [anchor.id]: anchor.position, [`requirement:${task.requirementId}`]: { x: 686, y: 100 },
+  }, viewport: canvas.viewport });
+  const files = [
+    { kind: 'exercise', title: '练习题', name: '练习.csv', bytes: '项目,得分\n一,10\n', primary: false },
+    { kind: 'support', title: '交接数据', name: '交接.json', bytes: '{"ready":true}' },
+    { kind: 'storyboard', title: '确认分镜', name: '分镜.md', bytes: '# 已确认的分镜', primary: true },
+    { kind: 'support', title: '内部说明', name: '内部.md', bytes: '# 内部说明', presentation: 'attachment' },
+    { kind: 'script', title: '讲稿', name: '讲稿.md', bytes: '# 独立讲稿' },
+  ].map(({ name, bytes, ...file }) => ({ ...file, path: write(`${skill.prepared.deliveryDirectory}/${name}`, bytes), operationId: randomUUID() }));
+  const args = { taskId: task.id, files };
+  const registered = await service.tasks.files.registerBatch(args, { sessionId });
+  assert.equal(registered.succeeded, 5);
+  const replay = await service.tasks.files.registerBatch(args, { sessionId });
+  assert.deepEqual(replay.results.map(item => item.id), registered.results.map(item => item.id));
+  const result = service.canvas.getBoard(task.requirementId);
+  const cards = result.nodes.filter(node => node.taskId === task.id);
+  assert.deepEqual(cards.map(node => node.title).sort(), ['交接数据', '确认分镜', '练习题', '讲稿'].sort());
+  const overlaps = (a, b) => a.position.x < b.position.x + 258 && a.position.x + 258 > b.position.x
+    && a.position.y < b.position.y + 208 && a.position.y + 208 > b.position.y;
+  for (const card of cards) assert.ok(result.nodes.every(node => node.id === card.id || !overlaps(node, card)));
+  const main = service.outcomes.manifest({ requirementId: task.requirementId, cardId: task.outputCardId });
+  assert.equal(main.selectedRef, `artifact:${registered.results[2].id}`);
+  assert.deepEqual(main.files.map(file => file.title).sort(), ['内部说明', '确认分镜'].sort());
+  const child = cards.find(node => node.title === '交接数据');
+  const childManifest = service.outcomes.manifest({ requirementId: task.requirementId, cardId: child.outputCard.id });
+  assert.deepEqual(childManifest.files.map(file => file.title), ['交接数据']);
+  assert.ok(result.edges.some(edge => edge.target === child.id));
+  const next = create({ selectedCardIds: [child.sourceId], selectedSkills: ['another-skill'] });
+  service.tasks.bindSession({ taskId: next.task.id, sessionId: 'consumer-session' });
+  assert.match(next.prepared.prompt, /field=files/);
+  const related = service.readTaskSource({ taskId: next.task.id, cardId: child.sourceId, field: 'files' }, 'consumer-session');
+  assert.equal(related.length, 4);
+  assert.ok(related.files.some(file => file.path === registered.results[2].path && file.hash === registered.results[2].hash));
+  const position = { x: 300, y: 800 };
+  service.canvas.saveBoard({ requirementId: task.requirementId, expectedRevision: result.revision,
+    positions: { ...Object.fromEntries(result.nodes.map(node => [node.id, node.position])), [child.id]: position }, viewport: result.viewport });
+  service.close();
+  const reopened = new WorkbenchService({ workspaceRoot: root });
+  try {
+    const restored = reopened.canvas.getBoard(task.requirementId).nodes;
+    assert.deepEqual(restored.find(node => node.id === child.id).position, position);
+    for (const card of cards.filter(node => node.id !== child.id)) assert.deepEqual(restored.find(node => node.id === card.id).position, card.position);
+  } finally { reopened.close(); }
 });
 
 test('registered storyboard selects Builder; titles and natural-language claims cannot assert a handoff', async t => {

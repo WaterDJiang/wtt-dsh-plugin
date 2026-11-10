@@ -232,6 +232,10 @@
 .wcc-creation-material-fields input, .wcc-creation-material-fields textarea { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--wtt-ui-control-line, #dfe5ef); border-radius: 7px; background: var(--wtt-ui-surface, #fff); color: var(--wtt-ui-text, #35435c); font: var(--wtt-text-sm)/1.7 -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; resize: vertical; }
 .wcc-creation-word-preview { color: var(--wtt-ui-text, #65738b); font-size:var(--wtt-text-sm); line-height: 1.8; }
 .wtt-course-canvas .wcc-card-versions { max-width: 132px; margin-left: auto; padding: 2px 4px; border: 1px solid var(--wtt-ui-line, #dce5f2); border-radius: 5px; background: var(--wtt-ui-accent-paper, #f6f9fe); color: var(--wtt-ui-muted, #7b8faf); font-size:var(--wtt-text-xs); cursor: pointer; }
+.wcc-card-open-wrap { position: relative; display: inline-flex; }
+.wtt-course-canvas .wcc-card-open-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; display: flex; flex-direction: column; align-items: stretch; min-width: 148px; padding: 4px; gap: 2px; border: 1px solid var(--wtt-ui-line, #dce2eb); border-radius: 9px; background: var(--wtt-ui-surface, #fff); box-shadow: 0 10px 28px var(--wtt-ui-shadow, #25344b1f); }
+.wtt-course-canvas .wcc-card-open-menu [data-ui-variant='custom'][role='menuitem'] { justify-content: flex-start; width: 100%; padding: 7px 10px; border-radius: 6px; font-size:var(--wtt-text-sm); text-align: left; }
+.wtt-course-canvas .wcc-card-open-menu [data-ui-variant='custom'][role='menuitem']:hover, .wtt-course-canvas .wcc-card-open-menu [data-ui-variant='custom'][role='menuitem']:focus-visible { background: var(--wtt-ui-accent-paper, #eef3ff); }
 .wtt-course-canvas .wtt-deck-preview { width: min(620px, calc(100% - 32px)); }
 .wtt-course-canvas .wcc-card-body .wtt-output-preview { max-height: 112px; overflow: hidden; }
 
@@ -241,3 +245,11 @@
 .wtt-course-canvas .wcc-card.is-editing{cursor:default;user-select:text}
 
 .wcc-outcome-actions{display:flex;gap:4px;flex-wrap:wrap;padding:4px 10px;flex:none}
+.wcc-text-draft-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+.wtt-course-canvas .wcc-version-view-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: min(80vh, 640px); width: min(640px, calc(100vw - 48px)); z-index: 80; display: flex; flex-direction: column; border: 1px solid var(--wtt-ui-line, #dce2eb); border-radius: 12px; background: var(--wtt-ui-surface, #fff); color: var(--wtt-ui-text, #35435c); box-shadow: 0 18px 48px var(--wtt-ui-shadow, #25344b2e); padding: 0; }
+.wtt-course-canvas .wcc-version-view-dialog .wtt-ui-dialog-body { display: block; min-height: 0; overflow: auto; }
+.wtt-course-canvas .wcc-version-view-body { margin: 0; max-height: 52vh; overflow: auto; padding: 4px 14px; white-space: pre-wrap; word-break: break-word; font: var(--wtt-text-sm)/1.7 -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; }
+.wtt-course-canvas .wcc-version-view-meta { color: var(--wtt-ui-muted, #7b8faf); font-size: var(--wtt-text-xs, 12px); }
+
+.wtt-course-canvas .wcc-card-missing { margin: 0 0 6px; padding: 6px 8px; border: 1px solid var(--wtt-ui-warning, #e6ce8d); border-radius: 6px; background: color-mix(in srgb, var(--wtt-ui-warning, #e6ce8d) 16%, transparent); color: var(--wtt-ui-text, #35435c); font-size: var(--wtt-text-xs, 12px); line-height: 1.5; }

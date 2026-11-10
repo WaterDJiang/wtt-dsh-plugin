@@ -138,6 +138,35 @@ test('only real runtime signals say generating or waiting; acceptance and interm
   assert.equal(f.card().outputCard.versions.length, 0);
 });
 
+test('publishing an outline keeps the original execution on the same versioned card until it stops', t => {
+  const f = fixture(t), created = f.service.createTask(f.input());
+  f.accept(created.task);
+  let phase = 'generating';
+  f.service.tasks.runtimeStateReader = task => task.id === created.task.id ? { phase } : null;
+  const nodeId = f.card().id;
+  const version = f.service.store.saveOutline({ requirementId: f.requirement.id, taskId: created.task.id,
+    operationId: randomUUID(), markdown: '# 大纲阶段稿', executionSessionId: `session:${created.task.id}` });
+  const scope = { requirementId: f.requirement.id, cardId: created.task.outputCardId };
+  for (const nextPhase of ['generating', 'awaiting-input', 'awaiting-approval']) {
+    phase = nextPhase;
+    const { node, task, pendingGeneration } = f.service.cards.describePending(scope);
+    assert.equal(node.id, nodeId);
+    assert.equal(node.sourceId, `outline:${version.id}`);
+    assert.equal(node.outputCard.number, 1);
+    assert.equal(task.id, created.task.id);
+    assert.equal(pendingGeneration.phase, nextPhase);
+    assert.equal(pendingGeneration.published, true);
+    assert.equal(pendingGeneration.sessionId, `session:${created.task.id}`);
+  }
+  phase = 'idle';
+  assert.equal(f.card().pendingGeneration, undefined);
+  assert.equal(f.card().outputCard.number, 1);
+  phase = 'generating';
+  assert.equal(f.card().pendingGeneration.taskId, created.task.id, 'the same session can resume after saving');
+  const revision = f.service.createTask(f.input({ generation: { mode: 'revise', cardId: scope.cardId, baseVersionId: f.card().outputCard.versionId } }));
+  assert.equal(f.card().pendingGeneration.taskId, revision.task.id);
+});
+
 test('revision keeps the old physical source and version while a new attempt runs; late work does not replace a newer head', async t => {
   const f = fixture(t), first = f.service.createTask(f.input());
   const original = await f.file(first), one = f.card();

@@ -15,6 +15,7 @@ import { ProjectExplorer, ProjectFilePreview } from './project-explorer.jsx'
 import { ProjectPicker } from './project-picker.jsx'
 import { normalizeModelCatalog, openNativeModelSettings } from './model-selection.mjs'
 import { CANVAS_CONVERSATION_SLOT, CANVAS_CONVERSATION_CHILDREN, registerCanvasConversation } from './embedded-conversation.jsx'
+import { conversationFileSelection, nativeConversationFilePath } from './conversation-file.mjs'
 import './ui/controls.css'
 import './card-reference-ui.css'
 
@@ -197,7 +198,7 @@ function RenameRequirementDialog({ value, onChange, busy, error, onClose, onSubm
   </dialog>
 }
 
-function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStart, onStartCanvas, onRestoreCanvas, onWatchTaskSessions, acquirePreviewSession, acquireEditingSession,nativeEditorBridge,SessionProvider, renderSlot,
+function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStart, onStartCanvas, onRestoreCanvas, onPrepareContinuation, onWatchTaskSessions, acquirePreviewSession, acquireEditingSession,nativeEditorBridge,SessionProvider, renderSlot,
   modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError, nativeSessionStatuses }) {
   const outlineTitleId = useId()
   const activeRef = useRef(active)
@@ -225,6 +226,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   const [view, setView] = useState('canvas')
   const [filesOpen,setFilesOpen]=useState(false)
   const [projectFileSelection,setProjectFileSelection]=useState(null)
+  const [conversationFileError,setConversationFileError]=useState(null)
   const [fileAddRequest,setFileAddRequest]=useState(null)
   const [recycleRequest,setRecycleRequest]=useState(null)
   const [fileRefresh,setFileRefresh]=useState(0)
@@ -233,6 +235,18 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   const [backgroundError,setBackgroundError]=useState('')
   const backgroundAttempt=useRef(null)
   const previewProjectFile=entry=>{setProjectFileSelection({...entry,token:crypto.randomUUID()});if(window.innerWidth<=700)setFilesOpen(false)}
+  function openConversationFile(event) {
+    const file = nativeConversationFilePath(event.target.closest?.('button'))
+    if (!file) return
+    event.preventDefault()
+    event.stopPropagation()
+    try {
+      previewProjectFile(conversationFileSelection(project.path, file))
+      setConversationFileError(null)
+    } catch (cause) {
+      setConversationFileError({ sessionId: reference.sessionId, message: messageOf(cause) })
+    }
+  }
   const addProjectFile=entry=>{setFileAddRequest({...entry,projectId:project.id,requirementId:selectedId,token:crypto.randomUUID()});setProjectFileSelection(null);if(window.innerWidth<=700)setFilesOpen(false)}
   const [sessionGeneration, setSessionGeneration] = useState(0)
   const [sessionErrors, setSessionErrors] = useState({})
@@ -557,7 +571,8 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   }, [sessionGeneration, reference])
   const conversation = reference || sessionErrors[selectedId] ? <>
     {sessionErrors[selectedId] && <UserError className="wtt-inline-error" error={sessionErrors[selectedId]} />}
-    {reference && <div className="wtt-native-conversation" data-generation={sessionGeneration}>
+    {reference && <div className="wtt-native-conversation" data-generation={sessionGeneration} onClickCapture={openConversationFile}>
+      {conversationFileError?.sessionId === reference.sessionId && <UserError className="wtt-inline-error" error={conversationFileError.message} />}
       <SessionProvider key={reference.sessionId} session={reference}>{renderSlot(CANVAS_CONVERSATION_SLOT, {
         onSettled: () => setCanvasSignals(signals => ({ ...signals, [selectedId]: (signals[selectedId] || 0) + 1 })),
       })}</SessionProvider>
@@ -599,8 +614,9 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {modelError && <div className="wtt-feedback wtt-feedback-error wtt-model-feedback" role="alert"><UserError error={modelError} announce={false} /><UiButton variant="quiet" className="wtt-button" onClick={onRefreshModels} disabled={modelLoading}>刷新模型</UiButton></div>}
 
     {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={sessionId => restoreCanvasSession(sessionId, selected.id)}
+      onPreviewProjectFile={previewProjectFile}
       onAssetNavigate={(requirementId, cardId, versionId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId }; selectRequirement(target) }}
-      modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} />}
+      modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
     {!selected&&recycleRequest&&<ProjectRecycleDialog request={request} endpoint={q=>endpoint(q,project.id)} onClose={()=>setRecycleRequest(null)} onChanged={()=>setFileRefresh(v=>v+1)}/>}
     {view==='canvas'&&!selected&&projectFileSelection&&<div className="wtt-empty-file-preview"><ProjectFilePreview selection={projectFileSelection} endpoint={q=>endpoint(q,project.id)} onClose={()=>setProjectFileSelection(null)}/></div>}
     {view === 'canvas' && workspace && !selected && <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>拖入文件，继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div>}
@@ -772,6 +788,21 @@ export function apply(ctx) {
       onStart: (prepared, shouldOpen) => startCourseSession(ctx, prepared, shouldOpen),
       onStartCanvas: (prepared, sessionId, lifecycle) => acquireCourseConversation(ctx, prepared, sessionId, lifecycle),
       onRestoreCanvas: (sessionId, project) => restoreCourseConversation(ctx, { sessionId, cwd: project.path, projectId: project.id }),
+      onPrepareContinuation: sessionId => {
+        const binding = ctx.sessions.binding(sessionId)
+        if (!binding) throw new Error('请重新打开原任务对话，再继续任务。')
+        const status = ctx.uiSession.sessionStatus.getSnapshot().get(sessionId)
+        if (status?.pendingInteraction) throw new Error('任务已有待处理的问题或授权，请在原对话中处理。')
+        if (status?.running) throw new Error('任务正在执行，请等待本轮结束。')
+        const input = binding.ctx.get('conversation')?.input
+        if (!input) throw new Error('请在原任务对话的输入框填写续办要求。')
+        const result = input.requestDraftInitialization(binding, {
+          prompt: '请从上次停下的步骤继续，沿用已写入的文件。若有待确认的内容或需要授权，请先发起确认，等我明确回复后再推进。',
+          whenDraftExists: 'keep',
+        })
+        if (result === 'blocked') throw new Error('原对话正在处理输入，请稍后再试。')
+        return () => input.for(binding.ctx).focus()
+      },
       acquirePreviewSession,acquireEditingSession,nativeEditorBridge,
       onWatchTaskSessions: (scope, onChange, onError) => watchCourseTaskSessions(ctx, scope, onChange, onError),
       browseDirectory,

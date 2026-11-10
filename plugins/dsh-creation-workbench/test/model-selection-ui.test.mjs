@@ -23,11 +23,17 @@ test('compact model disclosure starts closed and announces actual selection', ()
   assert.doesNotMatch(html, /<details[^>]*\sopen/u);
 });
 
-test('folding does not hide catalog failure, missing model or provider warnings', () => {
-  for (const props of [{ error: new Error('目录读取失败') }, { selection: { provider: 'gone', model: 'missing' } },
-    { catalog: { ...catalog, failures: [{ id: 'other', name: '另一提供商', message: '不可用' }] } }, { catalog: null }]) {
+test('folded model summary surfaces the issue and keeps diagnostics inside the disclosure', () => {
+  for (const [props, state, detail] of [
+    [{ error: new Error('目录读取失败') }, '加载失败', '目录读取失败'],
+    [{ selection: { provider: 'gone', model: 'missing' } }, '不可用', '这个模型目前不可用'],
+    [{ catalog: { ...catalog, failures: [{ id: 'other', name: '另一提供商', message: '不可用' }] } }, '部分不可用', '另一提供商：不可用'],
+    [{ catalog: null }, '未配置', '尚无可用模型'],
+  ]) {
     const html = render(props);
-    assert.match(html.slice(html.indexOf('</details>') + 10), /role="(?:alert|status)"/u);
+    assert.match(html, new RegExp(`<summary[^>]*aria-label="[^"]+ · ${state}"`, 'u'));
+    assert.ok(html.slice(html.indexOf('</summary>'), html.indexOf('</details>')).includes(detail));
+    assert.doesNotMatch(html.slice(html.indexOf('</details>')), /role="(?:alert|status)"/u);
   }
 });
 

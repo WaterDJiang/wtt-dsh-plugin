@@ -1,5 +1,6 @@
 import { DialogFooter, DialogHeader, UiButton } from './ui/controls.jsx'
 import { UserError } from './user-feedback.jsx'
+import { ReferencePromptInput } from './reference-prompt-input.jsx'
 import React, { useEffect, useId, useRef, useState } from 'react'
 import './media-creation.css'
 
@@ -21,7 +22,7 @@ function Choice({ label, value, choices, onChange, disabled }) {
   return <label>{label}<select aria-label={label} value={value ?? ''} disabled={disabled} onChange={event => onChange(event.target.value)}>{entries.map(entry => <option key={entry} value={entry}>{entry}</option>)}</select></label>
 }
 
-export function MediaPrompt({ type, instruction, onChange, options, onOptionsChange, capabilities, loading, error, job, onRefresh, onOpenSettings, onResume, onPrepareNew, onSubmit, disabled }) {
+export function MediaPrompt({ type, instruction, onChange, options, onOptionsChange, capabilities, loading, error, job, onRefresh, onOpenSettings, onResume, onPrepareNew, onSubmit, disabled, mentionProps }) {
   const id = useId()
   const isVideo = type === 'video'
   const models = capabilities?.models?.filter(model => model.type === type) || []
@@ -29,8 +30,11 @@ export function MediaPrompt({ type, instruction, onChange, options, onOptionsCha
   const pending = mediaJobPending(job)
   const set = (key, value) => onOptionsChange?.({ ...options, [key]: value })
   return <div className="wcc-media-creation">
-    <div className="wcc-creation-instruction-caption"><label htmlFor={`${id}-prompt`}>创作提示词</label><UiButton variant="quiet" type="button" onClick={onOpenSettings}>即梦设置</UiButton></div>
-    <textarea id={`${id}-prompt`} aria-label="创作提示词" value={instruction} rows={4} maxLength={8000} disabled={disabled} onChange={event => onChange?.(event.target.value)} placeholder={isVideo ? '描述画面、动作、镜头与节奏…' : '描述主体、构图、风格与光线…'} onKeyDown={event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !event.nativeEvent?.isComposing) { event.preventDefault(); onSubmit?.() } }} />
+    <ReferencePromptInput id={`${id}-prompt`} aria-label="创作提示词" value={instruction} rows={2} disabled={disabled}
+      onValueChange={onChange} onSubmit={onSubmit} placeholder={isVideo ? '描述画面与动作，@ 引用资料' : '描述主体与风格，@ 引用资料'} {...mentionProps} />
+    <details className="wcc-media-parameters">
+    <summary aria-label="生成参数">{[selected?.name || options.model, options.ratio, options.resolution, isVideo && `${options.duration} 秒`].filter(Boolean).join(' · ')}</summary>
+    <div className="wcc-creation-instruction-caption"><span>生成参数</span><UiButton variant="quiet" type="button" onClick={onOpenSettings}>即梦设置</UiButton></div>
     <div className="wcc-media-options">
       <Choice label="生成模型" value={options.model} choices={models.map(model => model.id)} disabled={disabled} onChange={value => set('model', value)} />
       <Choice label="画面比例" value={options.ratio} choices={selected?.ratios || ['1:1', '4:3', '3:4', '16:9', '9:16']} disabled={disabled} onChange={value => set('ratio', value)} />
@@ -39,6 +43,7 @@ export function MediaPrompt({ type, instruction, onChange, options, onOptionsCha
     </div>
     <p className="wcc-media-hint">每次生成 1 {isVideo ? '段视频' : '张图片'}。参考图从「＋引用」添加；文字参考每份最多 2000 字符，合计 6000 字符。{selected?.requiresReference ? '此模型需要参考图片。' : ''}以上为请求参数，实际尺寸显示在成果卡上。</p>
     <div className="wcc-media-connection"><span className={capabilities?.healthy && capabilities?.credentialConfigured ? 'is-ready' : ''}>{loading ? '正在检测即梦服务…' : capabilities?.healthy ? capabilities.credentialConfigured ? '即梦已连接 · 认证已配置' : '即梦已连接 · 尚未配置认证' : '即梦服务未连接'}</span><UiButton variant="quiet" type="button" disabled={loading} onClick={() => void onRefresh?.()}>重新检测</UiButton></div>
+    </details>
     {error && <UserError className="wcc-creation-error" error={String(error)} />}
     {job && <div className={`wcc-media-job is-${job.status}`} role="status"><strong>{JOB_LABELS[job.status] || job.status}</strong>{pending && <span className="wcc-media-pulse" aria-hidden="true">···</span>}{job.error && <p>{job.error}</p>}{job.status === 'unknown' && <p>服务可能已受理。本次任务不会自动重发，请先在即梦核对生成记录。</p>}{job.canResume && <UiButton variant="quiet" type="button" disabled={disabled} onClick={onResume}>查询原任务／重新取回文件</UiButton>}{['unknown', 'download_failed', 'registration_failed'].includes(job.status) && onPrepareNew && <><UiButton variant="quiet" type="button" disabled={disabled} onClick={onPrepareNew}>已核对，准备新任务</UiButton><small>保留原任务记录；再次点击生成会另计积分。</small></>}{job.artifactId && <small>文件已保存到当前项目，可在画布与创作任务中查看。</small>}</div>}
   </div>

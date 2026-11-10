@@ -112,21 +112,27 @@ export class ArtifactStore {
   async register(input, { sessionId, deferSync = false, ...validationOptions } = {}) {
     if (this.store.closed) throw new Error('工作台已关闭');
     if (input?.primary !== undefined && typeof input.primary !== 'boolean') throw new Error('主产物标识必须是布尔值');
+    if (input?.presentation !== undefined && input.presentation !== 'attachment') throw new Error('文件展示方式无效');
+    if (input?.presentation === 'attachment' && input.primary === true) throw new Error('主成果不能标记为附件');
     const task = this.#task(input?.taskId, sessionId);
+    const separate = task.input.outputPresentation === 'cards';
     if (input.kind === 'pptx' && task.input.pptEngine === 'baoyu') throw new Error('宝玉课件请在右栏导出保存，必须绑定准确工程快照');
     if (task.input.workflow === 'ppt-edit') throw new Error('PPT 局部修改只能提交待确认方案，不能通过普通文件登记发布；请使用 course_propose_ppt_edit');
-    if (['image', 'video'].includes(input.kind)) throw new Error('生成媒体只能由受管媒体任务内部登记，不能通过原生会话工具登记');
+    if (!separate && ['image', 'video'].includes(input.kind)) throw new Error('生成媒体只能由受管媒体任务内部登记，不能通过原生会话工具登记');
     const operationId = id(input.operationId, '产物登记操作标识');
     if (typeof input.title !== 'string' || !input.title.trim() || Buffer.byteLength(input.title) > 600 || input.title.includes('\0')) throw new Error('请填写不超过 600 字节的产物标题');
     const kind = input.kind;
     const outputType = task.input.outputType || 'outline';
     const textDelivery = outputType === 'text' && ['text', 'script', 'exercise'].includes(kind);
-    if (kind !== 'support' && !(kind === 'storyboard' && outputType === 'pptx') && kind !== outputType && !textDelivery) throw new Error('正式产物类型必须匹配任务的输出类型；分镜仅用于 PPT 任务。附属资料请使用 kind=support、primary=false');
-    const relative = this.#relative(input.path, task.requirement_id, task.id, kind);
+    if (!separate && kind !== 'support' && !(kind === 'storyboard' && outputType === 'pptx') && kind !== outputType && !textDelivery) throw new Error('正式产物类型必须匹配任务的输出类型；分镜仅用于 PPT 任务。附属资料请使用 kind=support、primary=false');
+    const directoryKind = separate && kind === 'storyboard' && outputType === 'text'
+      && input.primary !== false && !input.presentation ? 'text' : kind;
+    const relative = this.#relative(input.path, task.requirement_id, task.id, directoryKind);
     artifactFormat(kind, relative);
     const title = input.title.trim();
     const fingerprint = sha(JSON.stringify({ taskId: task.id, kind, title, path: relative,
-      ...(input.primary === undefined ? {} : { primary: input.primary }) }));
+      ...(input.primary === undefined ? {} : { primary: input.primary }),
+      ...(input.presentation ? { presentation: input.presentation } : {}) }));
     const replay = () => {
       const previous = this.db.prepare('SELECT * FROM operations WHERE id=?').get(operationId);
       if (!previous) return null;
@@ -156,7 +162,9 @@ export class ArtifactStore {
         this.db.prepare('INSERT INTO task_files VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(artifactId, task.requirement_id, task.id, kind, title, relative,
           hash, bytes.length, mime, JSON.stringify(validation), JSON.stringify(sourceCardIds), now);
         this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(operationId, 'register-artifact', fingerprint, artifactId);
-        this.store.cards.recordOutput(task.id, `artifact:${artifactId}`, { primary: input.primary });
+        this.store.cards.recordOutput(task.id, `artifact:${artifactId}`, {
+          primary: input.presentation ? false : input.primary, separate: separate && !input.presentation,
+        });
         this.db.prepare("UPDATE course_tasks SET status='output',error=NULL,updated_at=? WHERE id=?").run(now, task.id);
       }
       this.db.exec('COMMIT');

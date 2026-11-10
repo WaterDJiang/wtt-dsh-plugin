@@ -26,6 +26,8 @@ git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation
 
 ## 已安装？如何检查更新
 
+当前版本为 **0.52.0**。[查看更新内容](plugins/dsh-creation-workbench/README.md#0520-的主要改进)。
+
 在 DSH 的 **插件 → 已安装 → WTT 创作工作台** 查看当前版本。用索引安装的用户，可以在「发现」刷新索引后查看可用版本。看到「可更新」时进入详情更新。也可以手动对照 [WTT 市场索引](market/index.json) 的版本与固定提交。
 
 [按原安装来源升级、验证和回退](plugins/dsh-creation-workbench/README.md#检查更新与升级)

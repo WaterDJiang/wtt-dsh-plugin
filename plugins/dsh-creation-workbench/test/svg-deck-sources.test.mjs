@@ -42,6 +42,19 @@ test('SVG ambiguous candidates require explicit selection; stale, linked and act
  await assert.rejects(service.svgDecks.open({scope,candidateId:candidate.id}),/符号链接/);
  await assert.rejects(service.svgDecks.discover({...scope,hash:hash('wrong')}),/不匹配|变化/);
 });
+test('SVG discovery keeps verified matches when an unrelated branch exceeds its depth budget',async t=>{
+ const f=await fixture(t),{root,project,service,scope}=f;
+ const outsideDepth=path.join(root,...Array.from({length:12},(_,index)=>`nested-${index}`),'工程');
+ mkdirSync(path.dirname(outsideDepth),{recursive:true});
+ cpSync(project,outsideDepth,{recursive:true});
+ const result=await service.svgDecks.discover(scope);
+ assert.equal(result.status,'matched');
+ assert.deepEqual(result.candidates.map(candidate=>candidate.path),['projects/课件']);
+ cpSync(project,path.join(root,'projects','另一个'),{recursive:true});
+ assert.equal((await service.svgDecks.discover(scope)).status,'choose');
+ rmSync(path.join(root,'projects'),{recursive:true});
+ await assert.rejects(service.svgDecks.discover(scope),/前12层/);
+});
 test('SVG single-page AI proposals stay pending, reject unrelated pages and publish only after confirmation',async t=>{
  const f=await fixture(t),found=await f.service.svgDecks.discover(f.scope),draft=await f.service.svgDecks.open({scope:f.scope,candidateId:found.candidates[0].id});
  const created=await f.service.deck.createAiTask({draftId:draft.id,revision:0,slideId:draft.document.slides[0].id,elementIds:[],instruction:'改标题',operationId:randomUUID()});

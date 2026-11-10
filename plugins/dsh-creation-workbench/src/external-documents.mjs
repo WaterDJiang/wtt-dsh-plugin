@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import { deliverableName } from './deliverable-files.mjs';
@@ -34,6 +34,46 @@ function launchMac(file,application,folder){
     child.on('error',cause=>{clearTimeout(timer);reject(cause)});
     child.on('close',code=>{clearTimeout(timer);code===0?resolve():reject(new Error(`打开本机应用失败（${code}）：${error}`))});
   });
+}
+
+// macOS「打开方式」列表：扫描应用目录里 Info.plist 声明能打开该扩展名的应用（CFBundleDocumentTypes），
+// 结果缓存 30 分钟；扫描失败只回退默认应用，不阻塞菜单。
+const OPEN_FOLDERS = ['/Applications', path.join(os.homedir(), 'Applications'), '/System/Applications'];
+const openWithCache = new Map();
+
+export function scanOpenWithApplications(extension, folders = OPEN_FOLDERS) {
+  const ext = String(extension || '').replace(/^\./, '').toLowerCase();
+  const results = [];
+  const seen = new Set();
+  for (const root of folders) {
+    let entries;
+    try { entries = readdirSync(root); } catch { continue; }
+    for (const name of entries.filter(item => item.endsWith('.app')).sort()) {
+      if (seen.has(name)) continue;
+      const bundle = path.join(root, name);
+      let declared = false;
+      try {
+        const info = JSON.parse(spawnSync('/usr/bin/plutil', ['-convert', 'json', '-o', '-', path.join(bundle, 'Contents', 'Info.plist')],
+          { encoding: 'utf8', timeout: 5000 }).stdout || '{}');
+        declared = (info.CFBundleDocumentTypes || []).some(type => (type.CFBundleTypeExtensions || [])
+          .some(candidate => String(candidate).replace(/^\./, '').toLowerCase() === ext));
+      } catch { continue; }
+      if (declared) { seen.add(name); results.push({ id: bundle, name: name.replace(/\.app$/i, '') }); }
+    }
+  }
+  return results;
+}
+
+export async function openWithApplications(extension, folders = OPEN_FOLDERS) {
+  const ext = String(extension || '').replace(/^\./, '').toLowerCase();
+  if (!ext || !/^[\w]{1,12}$/.test(ext)) throw new Error('文件格式无效');
+  const cached = openWithCache.get(ext);
+  if (cached && Date.now() - cached.ts < 1800000) return cached.apps;
+  let scanned = [];
+  try { scanned = scanOpenWithApplications(ext, folders); } catch { scanned = []; }
+  const apps = [{ id: 'default', name: '默认应用' }, ...scanned];
+  openWithCache.set(ext, { apps, ts: Date.now() });
+  return apps;
 }
 
 /** Local applications edit a managed working copy, never a registered version. */

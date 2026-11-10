@@ -181,7 +181,7 @@ test('an attachment before its primary has a real file but no fabricated success
   const task = service.createTask({ requirementId: requirement.id, outputType: 'text', instruction: '技术附件', selectedSkills: [], sourceRefs: [], selectedCardIds: [], generation: { mode: 'new' }, operationId: randomUUID() });
   const sessionId = `session:${task.task.id}`; service.tasks.bindSession({ taskId: task.task.id, sessionId });
   const relative = task.prepared.deliveryDirectory + '/attachment.md'; writeFileSync(path.join(root, relative), '真实附件');
-  const attachment = await service.tasks.files.register({ taskId: task.task.id, title: '先保存的附件', kind: 'text', path: relative, primary: false, operationId: randomUUID() }, { sessionId });
+  const attachment = await service.tasks.files.register({ taskId: task.task.id, title: '先保存的附件', kind: 'text', path: relative, presentation: 'attachment', operationId: randomUUID() }, { sessionId });
   const info = service.deliverables.info(`artifact:${attachment.id}`);
   assert.equal(info.status, 'ready'); assert.equal(info.version, 0); assert.match(info.path, /\/制作中\//u);
   assert.equal(service.canvas.getBoard(requirement.id).nodes.find(node => node.outputCard?.id === task.task.outputCardId).outputCard.versions.length, 0);

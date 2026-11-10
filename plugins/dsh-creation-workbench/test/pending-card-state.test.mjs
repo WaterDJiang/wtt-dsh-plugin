@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPendingContext, generationStateSignature, nativePendingState, pendingCardTitle, pendingLabel, pendingRetryAllowed } from '../src/pending-card-state.mjs';
+import { createPendingContext, generationStateSignature, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from '../src/pending-card-state.mjs';
 import { usableCreationSource } from '../src/creation-context.mjs';
 
 function fixture() {
@@ -60,7 +60,7 @@ test('only unsubmitted or failed dispatch can retry; an output attachment does n
 
 test('native waits require real interaction types and idle never becomes confirmation', () => {
   const pending = { status: 'accepted', phase: 'unknown', sessionId: 's' };
-  assert.equal(pendingLabel(nativePendingState(pending, { running: false })), '等待继续');
+  assert.equal(pendingLabel(nativePendingState(pending, { running: false })), '本轮已结束');
   assert.equal(pendingLabel(nativePendingState({ ...pending, status: 'unknown' }, { running: false })), '状态待核对');
   assert.equal(pendingLabel(nativePendingState(pending, { running: true })), '内容正在生成');
   assert.equal(pendingLabel(nativePendingState(pending, { pendingInteraction: { kind: 'approval' } })), '等待你授权');
@@ -68,10 +68,33 @@ test('native waits require real interaction types and idle never becomes confirm
   assert.equal(pendingLabel(nativePendingState(pending, { pendingInteraction: { kind: 'plan-review' } })), '等待你确认方案');
   assert.equal(pendingLabel(nativePendingState(pending, { pendingInteraction: { kind: 'unrecognized' } })), '状态待核对');
   assert.equal(nativePendingState(pending, undefined), pending);
-  const failed = { ...pending, phase: 'failed' };
+  const failed = { ...pending, status: 'failed', phase: 'failed' };
   assert.equal(nativePendingState(failed, { running: true }), failed);
   const media = { ...pending, mediaJob: { status: 'unknown' } };
   assert.equal(nativePendingState(media, { running: true }), media);
+});
+
+test('continue is available for a stopped accepted task and yields to live confirmations', () => {
+  const stopped = { status: 'accepted', phase: 'idle', sessionId: 's', message: '本轮执行已取消；文件与版本见任务记录' };
+  assert.equal(pendingLabel(stopped), '本轮已中断');
+  assert.equal(pendingContinueAllowed(stopped), true);
+  assert.equal(pendingContinueAllowed({ ...stopped, sessionId: null }), false);
+  assert.equal(pendingContinueAllowed({ ...stopped, status: 'unknown' }), false);
+  assert.equal(pendingContinueAllowed(nativePendingState(stopped, { running: true })), false);
+  assert.equal(pendingContinueAllowed(nativePendingState(stopped, { pendingInteraction: { kind: 'question' } })), false);
+  const failed = { ...stopped, phase: 'failed' };
+  assert.equal(pendingContinueAllowed(nativePendingState(failed, { running: false })), true);
+  assert.equal(pendingContinueAllowed(nativePendingState(failed, { running: true })), false);
+});
+
+test('published card execution can start or stop independently of its saved version', () => {
+  const task = { id: 'task', kind: 'ai', status: 'output', cardVersionId: 'v1', sessionId: 's', runtimeState: { phase: 'idle' } };
+  assert.equal(publishedTaskGeneration(task), undefined);
+  assert.equal(publishedTaskGeneration(task, { running: true }).phase, 'generating');
+  assert.equal(pendingLabel(publishedTaskGeneration(task, { running: true })), '任务仍在运行');
+  assert.equal(publishedTaskGeneration(task, { running: false, pendingInteraction: { kind: 'approval' } }).phase, 'awaiting-approval');
+  assert.equal(publishedTaskGeneration({ ...task, runtimeState: { phase: 'generating' } }, { running: false }), undefined);
+  assert.equal(publishedTaskGeneration({ ...task, cardVersionId: undefined }, { running: true }), undefined);
 });
 
 test('board refresh detects failed and waiting transitions before any successful artifact appears', () => {

@@ -16,6 +16,7 @@ const TYPES = {
 };
 const TEXT = new Set(['.markdown','.yaml','.yml','.html','.css','.js','.mjs','.py','.xml','.log','.txt', '.md', '.csv', '.json', '.jsonl']);
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+export const supportsMaterialImport = filename => Object.hasOwn(TYPES, path.extname(filename).toLowerCase());
 
 export function inspectMaterialImport({ filename, bytes }) {
   if (typeof filename !== 'string' || !filename.trim() || /[\/\\\u0000-\u001f\u007f]/.test(filename)

@@ -45,18 +45,30 @@ test('HTTP actions and existing Agent tool share exact task, excerpt and version
   assert.equal(accepted.status, 'accepted');
   const tool = tools.get('course_save_outline');
   assert.ok(tool.parameters.properties.taskId);
-  const version = JSON.parse(await tool.execute({ requirementId: requirement.id, taskId: task.id, markdown: '# 已保存大纲',
-    operationId: randomUUID(), sourceCardIds: [`material:${excerpt.material.id}`] }, {
+  const saveArgs = { requirementId: requirement.id, taskId: task.id, markdown: '# 已保存大纲',
+    operationId: randomUUID(), sourceCardIds: [`material:${excerpt.material.id}`] };
+  const execution = {
     signal: new AbortController().signal, agent: { id: 'native-session' },
-  }));
+  };
+  const version = JSON.parse(await tool.execute(saveArgs, execution));
+  assert.equal(task.input.contextVersion, 1);
+  assert.equal(Object.hasOwn(version, 'markdown'), false);
+  assert.deepEqual(JSON.parse(await tool.execute(saveArgs, execution)), version);
   const board = await get(`canvas=${requirement.id}`);
   assert.equal(board.tasks[0].status, 'output');
   assert.equal(board.tasks[0].artifacts[0].versionId, version.id);
-  assert.equal((await get(`version=${version.id}`)).markdown, '# 已保存大纲');
+  const saved = await get(`version=${version.id}`);
+  assert.equal(saved.markdown, saveArgs.markdown);
+  assert.equal(saved.hash, version.hash);
+  assert.equal(saved.markdownPath, version.markdownPath);
   const manual = await call('save-outline', { requirementId: requirement.id, baseVersionId: version.id,
     markdown: '# 人工修订后的大纲', operationId: randomUUID() });
   const manualTask = (await get(`tasks=${requirement.id}`)).find(value => value.kind === 'manual');
   assert.equal(manualTask.artifacts[0].versionId, manual.id);
+  const direct = JSON.parse(await tool.execute({
+    requirementId: requirement.id, markdown: '# 独立大纲', operationId: randomUUID(),
+  }, execution));
+  assert.equal(direct.markdown, '# 独立大纲');
   const failed = await endpoint.fetch(new Request('http://localhost/api/wtt-creation-workbench', { method: 'POST', body: JSON.stringify({
     action: 'set-task-dispatch', data: { taskId: randomUUID(), status: 'accepted' },
   }) }));

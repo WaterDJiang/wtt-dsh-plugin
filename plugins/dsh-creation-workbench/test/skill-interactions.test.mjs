@@ -88,6 +88,18 @@ test('订阅拒绝跨项目 cwd，不保留 foreign 会话；退出期间迟到�
   assert.deepEqual([...queuedQuestionCalls({ 'next-turn': [{ source: { kind: 'user-question-reply', callId: 'x' } }] })], ['x']);
 });
 
+test('后台恢复跳过缺失的历史会话，仍展示同项目的有效待办', async () => {
+  const fixture = context(), snapshots = [], errors = [];
+  const stop = watchCourseTaskSessions(fixture.ctx, { projectId: 'a', cwd: '/project-a',
+    sessionIds: ['deleted-session', 'session-a'] }, value => snapshots.push(value), error => errors.push(error));
+  await tick();
+  assert.deepEqual(errors, []);
+  assert.equal(snapshots.at(-1).has('deleted-session'), false);
+  assert.equal(snapshots.at(-1).get('session-a').pendingInteraction.callId, 'call');
+  stop();
+  assert.deepEqual(fixture.counts(), { retained: 1, released: 1, answered: 0 });
+});
+
 test('任务沟通契约保留硬门、超时停止及任务授权边界', () => {
   const prompt = SKILL_CONFIRMATION_INSTRUCTIONS.join('\n');
   assert.match(prompt, /ask_user_question/); assert.match(prompt, /立即结束当前轮次/); assert.match(prompt, /其他任务或历史对话授权不继承/);

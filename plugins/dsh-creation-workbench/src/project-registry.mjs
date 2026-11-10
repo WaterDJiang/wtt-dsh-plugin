@@ -188,7 +188,9 @@ export class ProjectRegistry {
 
   prepared(service, value) {
     const id = this.idOf(service);
-    return { ...value, projectId: id, prompt: `${value.prompt}\n\n当前项目 projectId：${id}\n当前项目目录：${service.workspaceRoot}\n调用创作工作台工具时，必须原样传入 projectId=${id}；不要因界面切换而改用其他项目。` };
+    const scope = value.contextVersion === 1 ? `工具项目：projectId=${id}`
+      : `当前项目 projectId：${id}\n当前项目目录：${service.workspaceRoot}\n调用创作工作台工具时，必须原样传入 projectId=${id}；不要因界面切换而改用其他项目。`;
+    return { ...value, projectId: id, prompt: `${value.prompt}\n\n${scope}` };
   }
 
   close() {

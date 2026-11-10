@@ -25,12 +25,17 @@ test('real registered task files download by exact project and cannot bypass the
     const result = await response(projectId ? { projectId } : {}, action, data);
     const value = await result.json(); assert.equal(result.status, 200, value.error); return value;
   };
-  const requirement = await call('create', { title: '逐字稿文件技术验收', operationId: randomUUID() });
+  const requirement = await call('create', { title: '逐字稿文件技术验收', background: '未选背景不发给模型', operationId: randomUUID() });
+  const original = '甲'.repeat(3999) + '😀' + '乙'.repeat(5000);
+  const { material } = await call('add-material', { requirementId: requirement.id, title: '长引用', content: original, operationId: randomUUID() });
+  const cardId = `material:${material.id}`;
   const created = await call('create-task', { requirementId: requirement.id,
-    selectedCardIds: [`requirement:${requirement.id}`], outputType: 'script', instruction: '协议验收，无模型调用', operationId: randomUUID() });
+    selectedCardIds: [cardId], outputType: 'script', instruction: '协议验收，无模型调用', operationId: randomUUID() });
   assert.deepEqual(created.task.input.selectedSkills, []);
   assert.deepEqual(created.task.input.skills, []);
   assert.doesNotMatch(created.prepared.prompt, /\/wtt-course-scriptwriter/);
+  assert.doesNotMatch(created.prepared.prompt, /未选背景不发给模型|甲{50}|capturedAt/);
+  assert.match(created.prepared.prompt, /course_read_task_source/);
   const projectId = created.prepared.projectId, taskId = created.task.id;
   await call('bind-task-session', { taskId, sessionId: 'trusted-session' }, projectId);
   await call('set-task-dispatch', { taskId, status: 'accepted' }, projectId);
@@ -40,6 +45,21 @@ test('real registered task files download by exact project and cannot bypass the
   const register = tools.get('course_register_artifact'); assert.ok(register);
   const args = { projectId, taskId, kind: 'script', title: '逐字稿（人工技术验收）', path: relative, operationId: randomUUID() };
   const execution = (cwd = root, id = 'trusted-session') => ({ signal: new AbortController().signal, agent: { id, session: { header: { cwd } } } });
+  const read = tools.get('course_read_task_source');
+  const sourceArgs = { projectId, taskId, cardId };
+  await assert.rejects(read.execute(sourceArgs, execution(root, 'other-session')), /绑定的主会话/);
+  await assert.rejects(read.execute({ ...sourceArgs, cardId: `requirement:${requirement.id}` }, execution()), /不在当前任务/);
+  writeFileSync(path.join(root, material.path), '任务发出后改过的原资料');
+  const pages = [];
+  let offset = 0;
+  do {
+    const page = JSON.parse(await read.execute({ ...sourceArgs, offset }, execution()));
+    assert.ok(page.text.length <= 4000);
+    pages.push(page.text);
+    offset = page.nextOffset;
+  } while (offset !== null);
+  assert.equal(pages[0].length, 3999);
+  assert.equal(pages.join(''), original);
   await assert.rejects(register.execute(args, execution(root, 'other-session')), /会话|绑定/);
   await assert.rejects(register.execute(args, { signal: new AbortController().signal }), /原生会话|会话/);
   const file = JSON.parse(await register.execute(args, execution()));
@@ -66,6 +86,7 @@ test('real registered task files download by exact project and cannot bypass the
   }
   const projectB = (await call('open-project', { path: other })).project;
   assert.equal((await response({ projectId: projectB.id, downloadArtifact: file.id })).status, 400);
+  await assert.rejects(read.execute({ ...sourceArgs, projectId: projectB.id }, execution()), /项目标识与当前会话目录不一致/);
   await assert.rejects(register.execute({ ...args, projectId: projectB.id }, execution()), /项目标识与当前会话目录不一致/);
   await assert.rejects(batch.execute({ ...batchInput, projectId: projectB.id }, execution()), /项目标识与当前会话目录不一致/);
   const direct = await response({ projectId }, 'register-artifact', args); assert.equal(direct.status, 400);

@@ -1,10 +1,15 @@
 const LABELS = {
   composing: '待填写', draft: '待发送', submitting: '提交中', generating: '内容正在生成',
   'awaiting-input': '等待你确认', 'awaiting-approval': '等待你授权',
-  idle: '等待继续', failed: '生成失败', unknown: '状态待核对', cancelled: '已取消',
+  idle: '本轮已结束', failed: '生成失败', unknown: '状态待核对', cancelled: '已取消',
 };
 
 export function pendingLabel(pending) {
+  if (pending?.published && pending.phase === 'generating') return '任务仍在运行';
+  if (pending?.phase === 'idle') {
+    if (pending.message?.startsWith('本轮执行已取消') || pending.message?.startsWith('本轮执行已停止')) return '本轮已中断';
+    if (pending.message?.startsWith('本轮达到输出上限')) return '已达输出上限';
+  }
   return pending?.nativeLabel || LABELS[pending?.phase] || '状态待核对';
 }
 
@@ -16,18 +21,34 @@ export function pendingCardTitle(card) {
 }
 
 export function nativePendingState(pending, status) {
-  if (!pending || !status || pending.mediaJob || pending.phase === 'failed') return pending;
+  if (!pending || !status || pending.mediaJob || (pending.phase === 'failed' && pendingRetryAllowed(pending))) return pending;
   const interaction = status.pendingInteraction?.kind;
   if (interaction === 'approval') return { ...pending, phase: 'awaiting-approval', nativeLabel: '等待你授权' };
   if (interaction === 'question') return { ...pending, phase: 'awaiting-input', nativeLabel: '等待你回答' };
   if (interaction === 'plan-review') return { ...pending, phase: 'awaiting-input', nativeLabel: '等待你确认方案' };
   if (status.running === true) return { ...pending, phase: 'generating' };
-  if (status.running === false && pending.status !== 'unknown' && !['draft', 'submitting'].includes(pending.phase)) return { ...pending, phase: 'idle' };
+  if (status.running === false && pending.status !== 'unknown' && !['draft', 'submitting', 'failed'].includes(pending.phase)) return { ...pending, phase: 'idle' };
   return pending;
 }
 
 export function pendingRetryAllowed(taskOrPending) {
   return ['draft', 'failed'].includes(taskOrPending?.dispatchStatus || taskOrPending?.status);
+}
+
+export function pendingContinueAllowed(pending) {
+  return Boolean(pending?.sessionId && !pending.mediaJob && ['accepted', 'output'].includes(pending.status)
+    && ['idle', 'failed'].includes(pending.phase));
+}
+
+export function isActiveTaskPhase(phase) {
+  return ['generating', 'awaiting-input', 'awaiting-approval'].includes(phase);
+}
+
+export function publishedTaskGeneration(task, status) {
+  if (task?.kind !== 'ai' || !task.cardVersionId || !task.sessionId) return;
+  const pending = nativePendingState({ taskId: task.id, sessionId: task.sessionId, status: task.dispatchStatus || task.status,
+    phase: task.runtimeState?.phase || 'unknown', message: task.runtimeState?.message, published: true }, status);
+  return isActiveTaskPhase(pending.phase) ? pending : undefined;
 }
 
 // The comparison includes real runtime events and failures, not only successful files.

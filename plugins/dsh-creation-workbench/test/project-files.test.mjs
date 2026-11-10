@@ -4,7 +4,10 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,existsSync,rmS
 function fixture(t){const root=mkdtempSync(path.join(tmpdir(),'cw37-')),service=new WorkbenchService({workspaceRoot:root}),req=service.store.createRequirement({background:'文件树验收',operationId:randomUUID()});t.after(()=>{service.close();rmSync(root,{recursive:true,force:true})});return {root,service,req,files:service.projectFiles}}
 test('project tree is lazy, directory-first and hides current control paths; visible links are not followed and create never overwrites',async t=>{
  const f=fixture(t);mkdirSync(path.join(f.root,'资料'));writeFileSync(path.join(f.root,'原件.md'),'原文');mkdirSync(path.join(f.root,'node_modules'));writeFileSync(path.join(f.root,'.secret'),'secret');symlinkSync(path.join(f.root,'资料'),path.join(f.root,'link'));
- assert.deepEqual(new Set(f.files.list().entries.map(x=>x.name)),new Set(['资料','node_modules','link','原件.md']));assert.equal(f.files.list().entries.find(x=>x.name==='link').symbolicLink,true);assert.deepEqual(f.files.list('node_modules').entries,[]);assert.deepEqual(f.files.list('资料').entries,[]);
+ mkdirSync(path.join(f.root,'courses','17f66d50','materials'),{recursive:true});writeFileSync(path.join(f.root,'courses','17f66d50','materials','素材.md'),'快照');
+ assert.deepEqual(new Set(f.files.list().entries.map(x=>x.name)),new Set(['资料','node_modules','link','原件.md']));
+ assert.equal(f.files.list().entries.some(x=>x.name==='courses'),false);
+ assert.deepEqual(new Set(f.files.list('courses/17f66d50/materials').entries.map(x=>x.name)),new Set(['素材.md']));assert.equal(f.files.list().entries.find(x=>x.name==='link').symbolicLink,true);assert.deepEqual(f.files.list('node_modules').entries,[]);assert.deepEqual(f.files.list('资料').entries,[]);
  assert.equal(f.files.create({parent:'资料',name:'课纲'}).path,'资料/课纲');assert.equal(statSync(path.join(f.root,'资料/课纲')).size,0);
  assert.throws(()=>f.files.create({name:'原件.md'}),/已存在/);assert.equal(readFileSync(path.join(f.root,'原件.md'),'utf8'),'原文');assert.equal(f.files.create({name:'空课件.pptx'}).name,'空课件.pptx');assert.equal(statSync(path.join(f.root,'空课件.pptx')).size,0);
  for(const p of ['../escape','/etc/passwd','.wtt-workbench','link'])assert.throws(()=>f.files.list(p));
@@ -18,6 +21,25 @@ test('drag references keep original path and bytes; repeat is deduplicated and c
  writeFileSync(path.join(f.root,p),'环节,分钟\n案例,30\n');await assert.rejects(f.files.reference({...input,operationId:randomUUID()}),/已变化/);n=f.service.canvas.getBoard(f.req.id).nodes.find(n=>n.projectFile);assert.equal(n.projectFile.status,'changed');assert.equal(f.service.canvas.readImportedFile(n.refId).bytes.toString(),before.toString());
  const next=await f.files.preview(p),r2=await f.files.reference({...input,hash:next.hash,operationId:randomUUID()});assert.notEqual(r.material.id,r2.material.id);assert.equal(f.service.canvas.getBoard(f.req.id).nodes.filter(n=>n.projectFile).length,2);
  const foreign=fixture(t);await assert.rejects(foreign.files.reference({...input,hash:next.hash,operationId:randomUUID()}));
+});
+
+test('mention search distinguishes nested files and snapshots only a selected visible project file', async t => {
+ const f=fixture(t);
+ for(const folder of ['A','B','courses','.hidden','node_modules']){
+  mkdirSync(path.join(f.root,folder),{recursive:true});
+  writeFileSync(path.join(f.root,folder,'课纲.md'),folder);
+ }
+ symlinkSync(path.join(f.root,'B'),path.join(f.root,'link'));
+ writeFileSync(path.join(f.root,'课纲.bin'),'unavailable');
+ assert.deepEqual(f.files.searchReferences('课纲').entries.map(entry=>entry.path),['A/课纲.md','B/课纲.md']);
+ assert.equal(f.service.canvas.getBoard(f.req.id).nodes.length,1);
+ const input={requirementId:f.req.id,path:'B/课纲.md',operationId:randomUUID()};
+ await assert.rejects(f.files.reference(input),/先读取/);
+ const selected=await f.files.reference({...input,useCurrentFile:true});
+ assert.equal(f.service.canvas.readImportedFile(selected.material.id).bytes.toString(),'B');
+ for(const path of ['courses/课纲.md','.hidden/课纲.md','link/课纲.md','../课纲.md']){
+  await assert.rejects(f.files.reference({...input,path,useCurrentFile:true,operationId:randomUUID()}));
+ }
 });
 test('file references reuse document working-copy versions and persist across restart',async t=>{
  const f=fixture(t);writeFileSync(path.join(f.root,'练习.csv'),'A,B\n1,2\n');const file=await f.files.preview('练习.csv'),r=await f.files.reference({requirementId:f.req.id,path:file.path,hash:file.hash,operationId:randomUUID()});const n=r.board.nodes.find(n=>n.refId===r.material.id),scope={requirementId:f.req.id,cardId:n.outputCard.id,versionId:n.outputCard.versionId,sourceRef:n.id,hash:n.importedFile.hash};let d=await f.service.documents.open(scope);d=await f.service.documents.saveDraft({draftId:d.id,revision:0,patch:{rows:[['A','B'],['修改','2']]}});const v=await f.service.externalDocuments.saveVersion({draftId:d.id,revision:d.revision,hash:(await f.service.documents.snapshot(d.id,d.revision)).hash,operationId:randomUUID()});assert.ok(v.artifactId);assert.equal(readFileSync(path.join(f.root,'练习.csv'),'utf8'),'A,B\n1,2\n');
@@ -49,4 +71,16 @@ test('IDE create preserves any suffix or no suffix, refuses content and keeps ne
  for(const content of ['正文',null,{},0]){assert.throws(()=>f.files.create({name:'不得写入.md',content}),/只创建空文件/);assert.equal(existsSync(path.join(f.root,'不得写入.md')),false)}
  writeFileSync(path.join(f.root,'第一层/第二层/课程.docx'),'original bytes');assert.throws(()=>f.files.create({parent:'第一层/第二层',name:'课程.docx'}),/已存在/);assert.equal(readFileSync(path.join(f.root,'第一层/第二层/课程.docx'),'utf8'),'original bytes');
  assert.throws(()=>f.files.create({parent:'第一层/../../',name:'越界.md'}));
+});
+test('project file cards expose reveal and default-app open with safe paths and text-only whitelist',async t=>{
+ const root=mkdtempSync(path.join(tmpdir(),'cw37-open-'));const calls=[];
+ const service=new WorkbenchService({workspaceRoot:root,projectFileLauncher:async(file,args)=>{calls.push([path.basename(file),...args])}});
+ t.after(()=>{service.close();rmSync(root,{recursive:true,force:true})});
+ const files=service.projectFiles;writeFileSync(path.join(root,'笔记.md'),'内容');writeFileSync(path.join(root,'报告.pdf'),'%PDF-fake');
+ await files.reveal({path:'笔记.md'});await files.openExternal({path:'笔记.md'});
+ assert.deepEqual(calls.map(call=>[path.basename(call[0]),...call.slice(1).map(arg=>arg.endsWith('笔记.md')?'笔记.md':arg)]),[['笔记.md','-R','笔记.md'],['笔记.md','笔记.md']]);
+ await assert.rejects(files.openExternal({path:'报告.pdf'}),/右栏预览/);
+ await assert.rejects(files.reveal({path:'../escape.md'}));
+ await assert.rejects(files.openExternal({path:'缺失.md'}));
+ assert.equal(calls.length,2);
 });

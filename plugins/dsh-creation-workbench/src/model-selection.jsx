@@ -58,19 +58,22 @@ export function ModelSelection({ catalog, selection, onChange, onRefresh, onOpen
   </>
   const modelLabel = loading ? '读取模型…' : model?.name || current?.model || '选择模型'
   const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : '默认'
+  const modelState = failure ? '加载失败' : !loading && !groups.length ? '未配置' : unavailable ? '不可用' : normalized?.failures.length ? '部分不可用' : ''
+  const diagnostics = <>
+    {failure && <UserError className="wcc-model-selection-error" error={failure} />}
+    {!loading && !failure && !groups.length && <p className="wcc-model-selection-error" role="status">尚无可用模型，请打开模型设置添加提供商。</p>}
+    {unavailable && (groups.length > 0 || !compact) && <p className="wcc-model-selection-error" role="status">这个模型目前不可用。请检查连接设置，或为新任务选择其他模型。</p>}
+    {normalized?.failures.map((item, index) => <p className="wcc-model-selection-error" key={`${item.id}-${index}`} role="status">{item.name}：{item.message}</p>)}
+  </>
   return <section className={`wcc-model-selection${compact ? ' is-compact' : ''}`} aria-label="创作模型" aria-busy={loading}>
     {compact ? <details className="wcc-model-selection-disclosure" onKeyDown={event => {
       if (event.key === 'Escape' && event.currentTarget.open) {
         event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false
         event.currentTarget.querySelector('summary')?.focus()
       }
-    }}><summary aria-label={`创作模型：${modelLabel} · ${effortLabel}`} title={[provider?.name || current?.provider, modelLabel, `推理：${effortLabel}`, !onChange && '原任务模型已锁定'].filter(Boolean).join(' · ')}>
-      <span className="wcc-model-selection-current">{modelLabel}</span><span className="wcc-model-selection-effort">· {effortLabel}</span>{unavailable && <span className="wcc-model-selection-state">不可用</span>}{!onChange && current && <span className="wcc-model-selection-state">已锁定</span>}<span className="wcc-model-selection-chevron" aria-hidden="true">⌄</span>
-    </summary><div className="wcc-model-selection-expanded">{fields}</div></details> : fields}
-    {failure && <UserError className="wcc-model-selection-error" error={failure} />}
-    {!loading && !failure && !groups.length && <p className="wcc-model-selection-error" role="status">尚无可用模型，请打开模型设置添加提供商。</p>}
-    {unavailable && <p className="wcc-model-selection-error" role="status">这个模型目前不可用。请检查连接设置，或为新任务选择其他模型。</p>}
-    {normalized?.failures.map((item, index) => <p className="wcc-model-selection-error" key={`${item.id}-${index}`} role="status">{item.name}：{item.message}</p>)}
+    }}><summary aria-label={[`创作模型：${modelLabel}`, effortLabel, modelState].filter(Boolean).join(' · ')} title={[provider?.name || current?.provider, modelLabel, `推理：${effortLabel}`, !onChange && '原任务模型已锁定'].filter(Boolean).join(' · ')}>
+      <span className="wcc-model-selection-current">{modelLabel}</span><span className="wcc-model-selection-effort">· {effortLabel}</span>{modelState && <span className="wcc-model-selection-state">{modelState}</span>}{!onChange && current && <span className="wcc-model-selection-state">已锁定</span>}<span className="wcc-model-selection-chevron" aria-hidden="true">⌄</span>
+    </summary><div className="wcc-model-selection-expanded">{fields}{diagnostics}</div></details> : <>{fields}{diagnostics}</>}
   </section>
 }
 

@@ -43,7 +43,7 @@ async function oldTask(f) {
   await f.service.slides.attach({ taskId: created.task.id, sessionId });
   const relative = `${created.prepared.deliveryDirectory}/新版课件.pptx`;
   ppt(path.join(f.root, relative));
-  const file = await f.service.tasks.files.register({ taskId: created.task.id, kind: 'support', primary: false,
+  const file = await f.service.tasks.files.register({ taskId: created.task.id, kind: 'support', presentation: 'attachment',
     title: 'Builder输出', path: relative, operationId: randomUUID() }, { sessionId });
   return { created, file, sessionId, scope: { requirementId: f.canvas.id, cardId: created.task.outputCardId } };
 }

@@ -155,7 +155,7 @@
 .wtt-course-canvas .wcc-card-composer button.wcc-creation-send { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex-shrink: 0; min-height: 33px; padding: 6px 10px; border: 1px solid var(--wtt-ui-accent-line, #6987bb); border-radius: 7px; color: var(--wtt-ui-on-accent, #fff); background: var(--wtt-ui-accent-fill, #6987bb); font-size:var(--wtt-text-xs); }
 .wtt-course-canvas .wcc-card-composer button.wcc-creation-send:hover:not(:disabled) { border-color: var(--wtt-ui-accent-line, #5978af); background: var(--wtt-ui-accent-hover, #5978af); }
 .wcc-card-composer .wcc-creation-conversation-heading { flex-shrink: 0; border-top: 1px solid var(--wtt-ui-line, #edf0f5); padding: 6px 10px; background: var(--wtt-ui-surface, #fcfdff); }
-.wtt-course-canvas .wcc-card-composer .wcc-creation-conversation-heading button { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 27px; padding: 4px 5px; border: 0; color: var(--wtt-ui-muted, #91a4c3); background: transparent; text-align: left; font-size:var(--wtt-text-xs); }
+.wtt-course-canvas .wcc-card-composer .wcc-creation-conversation-heading > button { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 27px; padding: 4px 5px; border: 0; color: var(--wtt-ui-muted, #91a4c3); background: transparent; text-align: left; font-size:var(--wtt-text-xs); }
 .wcc-card-composer .wcc-creation-conversation-heading button > svg:last-child { margin-left: auto; }
 .wcc-card-composer .wcc-creation-conversation-heading small { margin-left: auto; color: var(--wtt-ui-muted, #a2adc0); font-size:var(--wtt-text-xs); font-weight: 400; }
 .wcc-card-composer .wcc-creation-conversation-heading small + svg { margin-left: 0; }

@@ -47,6 +47,9 @@ test('task selection validates exact stored source and keeps excerpt annotation 
   assert.equal(result.task.input.sources[0].content, '课堂任务');
   assert.equal(result.task.input.selection.rangeLabel, '第 2 行');
   assert.doesNotMatch(result.prepared.prompt, /第三行/);
+  const compact = service.createTask({ ...input, selection, selectedSkills: [], operationId: randomUUID() });
+  assert.match(compact.prepared.prompt, /课堂任务/);
+  assert.doesNotMatch(compact.prepared.prompt, /第三行|用户原文|真实需求背景|course_read_task_source/);
   for (const invalid of [{ ...selection, quote: '伪造' }, { ...selection, sourceHash: '0'.repeat(64) }, { ...selection, start: start + 5, end: start + 6, quote: '\uDE00' }]) {
     assert.throws(() => service.createTask({ ...input, operationId: randomUUID(), selection: invalid }), /正文|范围|变化/);
   }
@@ -58,7 +61,7 @@ test('task selection validates exact stored source and keeps excerpt annotation 
     selection: { sourceCardId: `material:${excerpt.material.id}`, sourceHash: excerpt.material.hash, start: 0, end: 2, quote: '课堂' } });
   assert.equal(subSelection.task.input.sources[0].content, '课堂');
   assert.doesNotMatch(subSelection.prepared.prompt, /课堂任务/);
-  assert.equal(service.tasks.list(requirement.id).length, 3);
+  assert.equal(service.tasks.list(requirement.id).length, 4);
 });
 
 test('foreign and unavailable inputs fail before creating any task', t => {

@@ -3,6 +3,7 @@ export function userFacingError(error) {
   let summary;
   // An ambiguous send must never become a suggestion to send the same request again.
   if (/提交结果未知|结果待核对|发送结果.*(未知|不确定|未核实)|受理.*不确定/i.test(detail)) summary = '暂时无法确认是否提交成功。请先打开任务对话核对，不要重复发送。';
+  else if (detail.includes('所选分镜缺少可用的 PPT 交接文件')) summary = '这份分镜的交接包不完整。请回到原分镜任务补齐文件，再继续制作 PPT。';
   else if (/PPT 渲染命令|Rendered text checks failed|MuPDF|页面检查未通过/.test(detail)) summary = '课件的本机转换预览未通过检查，编辑草稿已保留。可关闭编辑器，改用“编辑源文件”，或通过“打开 PPT”使用本机应用。';
   else if (/session[/-]not-found|会话不存在|会话.*属于其他项目/i.test(detail)) summary = '找不到这次任务的对话。请到任务列表核对任务和所属项目。';
   else if (/401|unauthorized|认证.*(失败|失效)|凭据.*失效/i.test(detail)) summary = '服务认证未通过。请检查对应服务的登录或连接设置。';

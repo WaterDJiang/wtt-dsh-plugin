@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { sourceDigest, verifySourceRange } from './source-range.mjs';
 import { extractMaterialImport, inspectMaterialImport, IMPORT_MAX_BYTES } from './material-import.mjs';
 import { adjacentCreationPosition } from './creation-context.mjs';
-import { editableCardText } from './card-text.mjs';
+import { editableCardText, cardWriteBack } from './card-capabilities.mjs';
+import { extractSkillNames } from './skill-commands.mjs';
+import { deliverableName } from './deliverable-files.mjs';
 
 const MAX_BYTES = 1_048_576;
 const sha = (value) => createHash('sha256').update(value).digest('hex');
@@ -51,9 +53,15 @@ function coordinate(position) {
   return { x: position.x, y: position.y };
 }
 
-function directory(target) {
-  try { mkdirSync(target); } catch (error) { if (error.code !== 'EEXIST') throw error; }
+function directory(target) { try { mkdirSync(target); } catch (error) { if (error.code !== 'EEXIST') throw error; }
   if (lstatSync(target).isSymbolicLink() || !statSync(target).isDirectory()) throw new Error('素材目录不可用');
+}
+
+// 素材 markdown 文件名取自标题的安全字符（文件树直接可见）；导入卡标题自带 .md/.txt 时去尾避免双扩展名，极端情况退回素材 id
+function materialFileBase(title, materialId) {
+  const stem = title.normalize('NFC').replace(/\.(md|markdown|txt)$/i, '').replace(/[<>:"|?*/\\]/g, '_').replace(/[\u0000-\u001f]/g, ' ').trim();
+  const base = [...stem].slice(0, 80).join('').trim().replace(/[. ]+$/, '');
+  return base || materialId;
 }
 
 function materialValue(row) {
@@ -80,6 +88,7 @@ export class CanvasStore {
     this.store = store;
     this.db = store.db;
     this.workspaceRoot = store.workspaceRoot;
+    this.#pruneEmptyImportDirs();
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS canvas_boards (
         requirement_id TEXT PRIMARY KEY REFERENCES canvas_spaces(id), revision INTEGER NOT NULL,
@@ -90,6 +99,12 @@ export class CanvasStore {
         id TEXT PRIMARY KEY, requirement_id TEXT NOT NULL REFERENCES canvas_spaces(id),
         title TEXT NOT NULL, content TEXT NOT NULL, markdown_path TEXT NOT NULL UNIQUE,
         source_path TEXT, extracted INTEGER NOT NULL, hash TEXT NOT NULL, created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS canvas_material_versions (
+        id TEXT PRIMARY KEY, material_id TEXT NOT NULL REFERENCES canvas_materials(id),
+        number INTEGER NOT NULL, content TEXT NOT NULL, hash TEXT NOT NULL,
+        markdown_path TEXT NOT NULL, origin TEXT NOT NULL, created_at TEXT NOT NULL,
+        UNIQUE(material_id, number)
       );
       CREATE TABLE IF NOT EXISTS canvas_sessions (
         reqid TEXT PRIMARY KEY REFERENCES canvas_spaces(id), session_id TEXT NOT NULL
@@ -130,6 +145,13 @@ export class CanvasStore {
     if (!this.db.prepare('PRAGMA table_info(canvas_boards)').all().some((column) => column.name === 'elements_json')) {
       this.db.exec("ALTER TABLE canvas_boards ADD COLUMN elements_json TEXT NOT NULL DEFAULT '[]'");
     }
+    // 一次性回填：统一能力上线前创建的素材补录 V001 导入基线（新素材由 #addMaterial 直接写入）
+    this.db.exec(`INSERT INTO canvas_material_versions (id, material_id, number, content, hash, markdown_path, origin, created_at)
+      SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))),
+        m.id, 1, m.content, m.hash, m.markdown_path, 'import', m.created_at
+      FROM canvas_materials m
+      WHERE NOT EXISTS (SELECT 1 FROM canvas_material_versions v WHERE v.material_id = m.id)`);
   }
 
   #requirement(id) {
@@ -152,6 +174,22 @@ export class CanvasStore {
       .run(id, revision, JSON.stringify(layout.positions), JSON.stringify(layout.edges), JSON.stringify(layout.groups), JSON.stringify(layout.viewport), JSON.stringify(layout.elements || []), JSON.stringify(sizes));
   }
 
+  // 导入副本被外部删除后遗留的空操作目录，在启动时清理（目录非空一律不动）
+  #pruneEmptyImportDirs() {
+    try {
+      const importsRoot = path.join(this.workspaceRoot, 'courses');
+      for (const requirement of readdirSync(importsRoot)) {
+        const importsDir = path.join(importsRoot, requirement, 'imports');
+        let operations;
+        try { operations = readdirSync(importsDir); } catch { continue; }
+        for (const operation of operations) {
+          const dir = path.join(importsDir, operation);
+          try { if (readdirSync(dir).length === 0) rmdirSync(dir); } catch { /* 非空或占用则保留 */ }
+        }
+      }
+    } catch { /* courses 不存在或不可读时忽略 */ }
+  }
+
   #transaction(action) {
     if (this.store.closed) throw new Error('工作台已关闭');
     this.db.exec('BEGIN IMMEDIATE');
@@ -169,7 +207,98 @@ export class CanvasStore {
     } catch { return 'missing'; }
   }
 
-  resolveTextSource(requirementId, sourceCardId, verifyFile = true) {
+  // 素材版本历史：追加式（append-only），当前快照文件恒为最新版内容；调用方必须已在 #transaction 内
+  #appendMaterialVersion(materialId, markdownPath, content, hash, origin, now) {
+    const number = Number(this.db.prepare('SELECT COALESCE(MAX(number),0)+1 AS n FROM canvas_material_versions WHERE material_id=?').get(materialId).n);
+    this.db.prepare('INSERT INTO canvas_material_versions VALUES (?,?,?,?,?,?,?,?)')
+      .run(randomUUID(), materialId, number, content, hash, markdownPath, origin, now);
+  }
+
+  materialVersion({ requirementId, materialId, versionId }) {
+    if (!uuid(requirementId) || !uuid(materialId) || !uuid(versionId)) throw new Error('素材版本标识无效');
+    const row = this.db.prepare('SELECT id,title,requirement_id FROM canvas_materials WHERE id=?').get(materialId);
+    if (!row || row.requirement_id !== requirementId) throw new Error('素材版本不存在或不属于当前需求');
+    const version = this.db.prepare('SELECT id,number,content,hash,origin,created_at FROM canvas_material_versions WHERE id=? AND material_id=?').get(versionId, materialId);
+    if (!version) throw new Error('素材版本不存在');
+    return { materialId, versionId: version.id, number: version.number, content: version.content, hash: version.hash, origin: version.origin, createdAt: version.created_at, title: row.title };
+  }
+
+  // 源文件被外部删除后的恢复：从卡片快照内容重建项目源文件并恢复链接；位置已被占用或非文本格式时拒绝
+  restoreMaterialProjectFile({ requirementId, materialId }) {
+    if (!uuid(requirementId) || !uuid(materialId)) throw new Error('素材标识无效');
+    const row = this.db.prepare('SELECT * FROM canvas_materials WHERE id=? AND requirement_id=?').get(materialId, requirementId);
+    if (!row) throw new Error('素材卡不存在或不属于当前需求');
+    const reference = this.db.prepare('SELECT source_path,source_hash FROM canvas_project_references WHERE material_id=?').get(materialId);
+    if (!reference) throw new Error('此卡片没有绑定的项目源文件，请重新拖入文件');
+    if (!/\.(md|markdown|txt)$/i.test(reference.source_path)) throw new Error('此格式无法从卡片内容重建，请重新拖入文件');
+    const content = row.content;
+    if (!row.extracted || !String(content).trim() || /^已导入文件：/.test(String(content))) throw new Error('卡片没有可用正文，无法重建源文件，请重新拖入文件');
+    const file = path.resolve(this.workspaceRoot, reference.source_path);
+    if (file === this.workspaceRoot || !file.startsWith(this.workspaceRoot + path.sep)) throw new Error('引用文件路径越界');
+    if (existsSync(file)) throw new Error('源文件位置已存在文件，为避免覆盖请核对后重新拖入该文件');
+    mkdirSync(path.dirname(file), { recursive: true });
+    const nextHash = sha(Buffer.from(content, 'utf8'));
+    this.#transaction(() => {
+      const descriptor = openSync(file, 'wx', 0o600);
+      try { writeFileSync(descriptor, content, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
+      const copy = path.resolve(this.workspaceRoot, row.markdown_path);
+      if (copy !== file && copy.startsWith(this.workspaceRoot + path.sep)) {
+        const copyDescriptor = openSync(copy, 'w', 0o600);
+        try { writeFileSync(copyDescriptor, content, 'utf8'); fsyncSync(copyDescriptor); } finally { closeSync(copyDescriptor); }
+      }
+      this.db.prepare('UPDATE canvas_materials SET extracted=1 WHERE id=?').run(materialId);
+      this.db.prepare('UPDATE canvas_project_references SET source_hash=? WHERE material_id=?').run(nextHash, materialId);
+    });
+    return { restored: true, path: reference.source_path, fileName: path.basename(file) };
+  }
+
+  // 项目文件引用卡的卡内编辑直接写回原文件（IDE 式所见即所得）；外改核验失败时拒绝，不覆盖外部修改
+  #writeBackProjectReference(node, reference, content, operationId, fingerprint) {
+    const file = path.resolve(this.workspaceRoot, reference.source_path);
+    if (file === this.workspaceRoot || !file.startsWith(this.workspaceRoot + path.sep)) throw new Error('引用文件路径越界');
+    let stat;
+    try { stat = lstatSync(file); }
+    catch { throw new Error('源文件已被删除。可在卡片菜单选择「重新生成源文件」恢复，或重新拖入文件。'); }
+    if (stat.isSymbolicLink() || realpathSync(file) !== file || !stat.isFile()) throw new Error('引用文件已被移动或替换，请重新拖入后再编辑');
+    if (sha(readFileSync(file)) !== reference.source_hash) throw new Error('文件已被外部修改，请核对或重新拖入后再编辑，本次未写入');
+    const nextHash = sha(Buffer.from(content, 'utf8'));
+    this.#transaction(() => {
+      const descriptor = openSync(file, 'w', 0o600);
+      try { writeFileSync(descriptor, content, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
+      const copy = path.resolve(this.workspaceRoot, node.path);
+      if (copy === file || !copy.startsWith(this.workspaceRoot + path.sep)) throw new Error('素材快照路径越界');
+      const copyDescriptor = openSync(copy, 'w', 0o600);
+      try { writeFileSync(copyDescriptor, content, 'utf8'); fsyncSync(copyDescriptor); } finally { closeSync(copyDescriptor); }
+      this.db.prepare('UPDATE canvas_materials SET content=?, hash=?, extracted=1 WHERE id=?').run(content, nextHash, node.refId);
+      this.#appendMaterialVersion(node.refId, node.path, content, nextHash, 'card-edit', new Date().toISOString());
+      this.db.prepare('UPDATE canvas_project_references SET source_hash=? WHERE material_id=?').run(nextHash, node.refId);
+      this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(operationId, 'save-card-text', fingerprint, JSON.stringify({ nodeId: node.id, savedTo: path.basename(file) }));
+    });
+    return { nodeId: node.id, savedTo: path.basename(file) };
+  }
+
+  // 普通素材卡写回自身 markdown 快照；外部修改拒绝，快照被外部删除时以卡片内容自愈重建
+  #writeBackMaterialSnapshot(node, content, operationId, fingerprint) {
+    const file = path.resolve(this.workspaceRoot, node.path);
+    if (file === this.workspaceRoot || !file.startsWith(this.workspaceRoot + path.sep)) throw new Error('素材文件路径越界');
+    let stat = null;
+    try { stat = lstatSync(file); } catch { stat = null; }
+    if (stat) {
+      if (stat.isSymbolicLink() || realpathSync(file) !== file || !stat.isFile()) throw new Error('素材文件已被移动或替换，请核对后再编辑');
+      if (sha(readFileSync(file)) !== node.sourceHash) throw new Error('素材文件已被外部修改，请核对后再编辑，本次未写入');
+    }
+    const nextHash = sha(Buffer.from(content, 'utf8'));
+    this.#transaction(() => {
+      const descriptor = openSync(file, 'w', 0o600);
+      try { writeFileSync(descriptor, content, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
+      this.db.prepare('UPDATE canvas_materials SET content=?, hash=?, extracted=1 WHERE id=?').run(content, nextHash, node.refId);
+      this.#appendMaterialVersion(node.refId, node.path, content, nextHash, 'card-edit', new Date().toISOString());
+      this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(operationId, 'save-card-text', fingerprint, JSON.stringify({ nodeId: node.id, savedTo: path.basename(file) }));
+    });
+    return { nodeId: node.id, savedTo: path.basename(file) };
+  }
+
+  resolveTextSource(requirementId, sourceCardId, verifyFile = true, { allowUnextracted = false } = {}) {
     this.#requirement(requirementId);
     if (typeof sourceCardId !== 'string' || sourceCardId !== sourceCardId.toLowerCase()
       || !/^(material|outline|artifact):[0-9a-f-]+$/.test(sourceCardId) || !uuid(sourceCardId.split(':')[1])) throw new Error('请选择已提取文本的素材、脚本文件或已保存大纲作为来源');
@@ -188,7 +317,8 @@ export class CanvasStore {
     } else {
       const row = this.db.prepare('SELECT * FROM canvas_materials WHERE id=? AND requirement_id=?').get(id, requirementId);
       if (row) {
-        if (!row.extracted) throw new Error('该文件未提取正文，不能选段或保存摘录');
+        // 选段／摘录必须基于已提取正文；卡内文本编辑对纯文本文件放行空正文（editableCardText 已判定可编辑）
+        if (!row.extracted && !allowUnextracted) throw new Error('该文件未提取正文，不能选段或保存摘录');
         const excerpt = this.db.prepare('SELECT annotation FROM canvas_excerpts WHERE material_id=?').get(id);
         source = { cardId: sourceCardId, title: row.title, kind: excerpt ? 'excerpt' : 'material', content: row.content,
           hash: row.hash, path: row.markdown_path, ...(excerpt ? { annotation: excerpt.annotation } : {}) };
@@ -339,7 +469,9 @@ export class CanvasStore {
     const whiteboard = this.db.prepare('SELECT * FROM canvas_whiteboard_snapshots WHERE material_id=?').get(row.id);
     const media = this.db.prepare('SELECT media_json FROM canvas_import_media WHERE material_id=?').get(row.id);
     const association = this.db.prepare('SELECT * FROM canvas_material_associations WHERE material_id=?').get(row.id);
+    const versions = this.db.prepare('SELECT id,number,origin,created_at FROM canvas_material_versions WHERE material_id=? ORDER BY number').all(row.id);
     return { ...materialValue(row), ...(refs.length ? { sourceRefs: refs } : {}),
+      ...(versions.length ? { materialVersions: versions.map(version => ({ id: version.id, number: version.number, origin: version.origin, createdAt: version.created_at })), currentMaterialVersionId: versions.at(-1).id } : {}),
       ...(imported ? { importedFile: { name: imported.original_name, path: imported.file_path, hash: imported.file_hash,
         byteSize: imported.byte_size, mime: imported.mime, extractionStatus: imported.extraction_status,
         truncated: Boolean(imported.truncated), ...(imported.extraction_error ? { extractionError: imported.extraction_error } : {}),
@@ -539,11 +671,22 @@ export class CanvasStore {
     }
     const described = input.versionId ? this.store.cards.describe({ requirementId: requirement.id,
       cardId: input.cardId, versionId: input.versionId }) : null;
-    const node = described?.node || this.getBoard(requirement.id).nodes.find(node => node.id === input.cardId);
-    if (node && /^(missing|changed|modified|unavailable)$/.test(node.status || '')) throw new Error('来源文件不可用或已被外部修改，请保留草稿并核对原文件');
+    const draft = input.versionId === null && uuid(input.cardId)
+      ? this.store.cards.describeDraft({ requirementId: requirement.id, cardId: input.cardId }) : null;
+    const node = described?.node || draft?.node || this.getBoard(requirement.id).nodes.find(node => node.id === input.cardId);
+    const writeBack = cardWriteBack(node);
+    // 来源文件被外部删除时：普通素材快照可自愈重建放行；其余形态仍拦截
+    if (node && (/^(changed|modified|unavailable)$/.test(node.status || '')
+      || (node.status === 'missing' && !(node.kind === 'material' && writeBack.mode === 'snapshot')))) throw new Error('来源文件不可用或已被外部修改，请保留草稿并核对原文件');
     if (!node || editableCardText(node) === null || node.kind === 'whiteboard') throw new Error('此卡片不能直接编辑文本，请使用对应文件编辑器');
     if (node.sourceHash !== input.sourceHash) throw new Error('来源内容已变化，请保留草稿并重新加载');
-    if (node.kind !== 'requirement') this.resolveTextSource(requirement.id, node.sourceId || node.id);
+    if (!draft && node.kind !== 'requirement') this.resolveTextSource(requirement.id, node.sourceId || node.id, writeBack.mode !== 'snapshot', { allowUnextracted: editableCardText(node) !== null });
+    // 写回分发与客户端共用同一能力判定（cardWriteBack）：project-file→原文件、snapshot→素材快照；none 落到下方另存素材
+    if (writeBack.mode === 'project-file') {
+      const reference = this.db.prepare('SELECT source_path,source_hash FROM canvas_project_references WHERE material_id=?').get(node.refId);
+      return this.#writeBackProjectReference(node, reference, content, input.operationId, fingerprint);
+    }
+    if (writeBack.mode === 'snapshot') return this.#writeBackMaterialSnapshot(node, content, input.operationId, fingerprint);
     if (node.kind === 'outline') {
       const version = this.store.saveOutline({ requirementId: requirement.id, operationId: input.operationId,
         markdown: content, baseVersionId: node.refId, sourceCardIds: [node.sourceId || node.id],
@@ -565,42 +708,55 @@ export class CanvasStore {
       this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(input.operationId, 'save-card-text', fingerprint, JSON.stringify(result));
       return result;
     });
-    if (!described || described.card.type !== 'text') throw new Error('文本产物必须指定准确卡片及版本');
-    const plan = this.store.cards.prepare({ requirementId: requirement.id, outputType: 'text', instruction: '人工修订',
-      generation: { mode: 'revise', cardId: described.card.id, baseVersionId: described.version.id } });
+    const card = described?.card || draft?.card;
+    if (card?.type !== 'text') throw new Error('文本产物必须指定准确卡片及版本');
+    const title = draft ? content.trim().split(/\r?\n/,1)[0].replace(/^#{1,6}\s+/, '').trim().slice(0,80) || node.title : node.title;
+    const plan = this.store.cards.prepare({ requirementId: requirement.id, outputType: 'text', instruction: draft ? title : '人工修订',
+      generation: draft ? { mode: 'new', cardId: card.id } : { mode: 'revise', cardId: card.id, baseVersionId: described.version.id } });
+    const instruction = draft?.composition.instruction || described?.editor.instruction || '';
+    const sources = draft ? draft.composition.references.map(({id,sourceHash,...source}) => ({...source,cardId:id,hash:sourceHash})) : described.editor.references;
+    const sourceIds = draft ? sources.map(source => source.cardId) : [node.sourceId || node.id];
+    const label = draft ? '手写正文' : '人工修订';
     const taskId = randomUUID(), artifactId = randomUUID(), now = new Date().toISOString();
     const dirs = ['courses', `courses/${requirement.id}`, `courses/${requirement.id}/tasks`,
       `courses/${requirement.id}/tasks/${taskId}`, `courses/${requirement.id}/tasks/${taskId}/delivery`];
     for (const dir of dirs) directory(path.join(this.workspaceRoot, dir));
-    const relative = `${dirs.at(-1)}/正文${path.extname(node.path).toLowerCase()}`;
+    const filename = draft ? `${deliverableName(title)}.md` : path.posix.basename(node.path);
+    const relative = `${dirs.at(-1)}/${filename}`;
     const file = path.join(this.workspaceRoot, relative);
-    const descriptor = openSync(file, 'wx', 0o600);
-    try { writeFileSync(descriptor, content, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
-    let committed = false;
+    let committed = false, createdFile = false;
     try {
+      const descriptor = openSync(file, 'wx', 0o600);
+      createdFile = true;
+      try { writeFileSync(descriptor, content, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
       const result = this.#transaction(() => {
-        const editor = described.editor;
+        const editor = described?.editor;
         const snapshot = { requirement: Object.fromEntries(['id', 'title', 'customer', 'audience', 'background', 'objectives'].map(key => [key, requirement[key]])), workflow: 'text-edit', outputType: 'text',
-          instruction: editor.instruction || '', sources: editor.references || [], selectedSkills: editor.selectedSkills || [],
-          ...(editor.modelSelection ? { modelSelection: editor.modelSelection } : {}),
-          revision: { cardId: described.card.id, versionId: described.version.id }, manualEdit: true };
+          instruction, sources, selectedSkills: editor?.selectedSkills || extractSkillNames(instruction),
+          ...(editor?.modelSelection ? { modelSelection: editor.modelSelection } : {}),
+          ...(draft ? { outputPosition: node.position } : { revision: { cardId: card.id, versionId: described.version.id } }), manualEdit: true };
         this.db.prepare("INSERT INTO course_tasks VALUES (?,?,?,?,?,?,NULL,NULL,'output',NULL,?,?)")
-          .run(taskId, requirement.id, 'manual', `人工修订 · ${node.title}`, '卡内编辑', JSON.stringify(snapshot), now, now);
+          .run(taskId, requirement.id, 'manual', `${label} · ${title}`, '卡内编辑', JSON.stringify(snapshot), now, now);
         this.store.cards.attach(taskId, plan);
         this.db.prepare('INSERT INTO task_files VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(artifactId, requirement.id, taskId,
-          ['text', 'script', 'exercise'].includes(node.artifactKind) ? node.artifactKind : 'text', node.title, relative,
-          sha(content), Buffer.byteLength(content), path.extname(relative) === '.md' ? 'text/markdown' : 'text/plain',
-          JSON.stringify({ format: path.extname(relative).slice(1), manualEdit: true }), JSON.stringify([node.sourceId || node.id]), now);
+          ['text', 'script', 'exercise'].includes(node.artifactKind) ? node.artifactKind : 'text', title, relative,
+          sha(content), Buffer.byteLength(content), path.extname(filename).toLowerCase() === '.md' ? 'text/markdown' : 'text/plain',
+          JSON.stringify({ format: path.extname(filename).slice(1).toLowerCase(), manualEdit: true }), JSON.stringify(sourceIds), now);
         this.store.cards.recordOutput(taskId, `artifact:${artifactId}`, { primary: true });
         const versionId = this.store.cards.binding(taskId).cardVersionId;
-        const result = { nodeId: described.card.nodeId, cardId: described.card.id, versionId, sourceId: `artifact:${artifactId}` };
+        const result = { nodeId: card.nodeId, cardId: card.id, versionId, sourceId: `artifact:${artifactId}` };
         this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(input.operationId, 'save-card-text', fingerprint, JSON.stringify(result));
         return result;
       });
       committed = true;
       this.store.outputSaved?.(requirement.id);
       return result;
-    } finally { if (!committed) { try { unlinkSync(file); } catch {} } }
+    } finally {
+      if (!committed && createdFile) {
+        try { unlinkSync(file); } catch {}
+        for (const dir of dirs.slice(-2).reverse()) { try { rmdirSync(path.join(this.workspaceRoot, dir)); } catch {} }
+      }
+    }
   }
 
   addExcerpt(input) {
@@ -691,14 +847,31 @@ export class CanvasStore {
         }
         const targetDirectory = path.join(this.workspaceRoot, 'courses', requirement.id, 'materials');
         directory(targetDirectory);
-        const file = path.join(targetDirectory, `${materialId}.md`);
-        const descriptor = openSync(file, 'wx', 0o600);
-        createdFile = file;
-        try { writeFileSync(descriptor, storedContent, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
+        const base = materialFileBase(title, materialId);
+        let file = path.join(targetDirectory, `${base}.md`), written = false;
+        for (let attempt = 2; attempt <= 200 && !written; attempt += 1) {
+          try {
+            const descriptor = openSync(file, 'wx', 0o600);
+            createdFile = file;
+            try { writeFileSync(descriptor, storedContent, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
+            written = true;
+          } catch (cause) {
+            if (cause.code !== 'EEXIST') throw cause;
+            file = path.join(targetDirectory, `${base}-${attempt}.md`);
+          }
+        }
+        if (!written) {
+          file = path.join(targetDirectory, `${materialId}.md`);
+          const descriptor = openSync(file, 'wx', 0o600);
+          createdFile = file;
+          try { writeFileSync(descriptor, storedContent, 'utf8'); fsyncSync(descriptor); } finally { closeSync(descriptor); }
+        }
         const relative = path.relative(this.workspaceRoot, file).split(path.sep).join('/');
         const now = new Date().toISOString();
         this.db.prepare('INSERT INTO canvas_materials VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
           .run(materialId, requirement.id, title, storedContent, relative, normalizedSource, extracted ? 1 : 0, contentHash, now);
+        this.db.prepare('INSERT INTO canvas_material_versions VALUES (?,?,?,?,?,?,?,?)')
+          .run(randomUUID(), materialId, 1, storedContent, contentHash, relative, 'import', now);
         if (internal.importedFile) {
           const value = internal.importedFile;
           this.db.prepare('INSERT INTO canvas_imports VALUES (?,?,?,?,?,?,?,?,?,?)').run(materialId, operationId, value.name,

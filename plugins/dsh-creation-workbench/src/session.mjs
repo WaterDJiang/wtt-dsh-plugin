@@ -45,11 +45,15 @@ export function watchCourseTaskSessions(ctx, { sessionIds, cwd, projectId }, onC
     try {
       if (!projectId || !cwd?.startsWith('/')) throw new Error('缺少项目目录，无法恢复 Skill 待办。');
       const listing = valueOf(await ctx.remote.session.list({}));
-      const known = new Map((listing?.items || []).map(item => [item.sessionId, item]));
+      if (!Array.isArray(listing?.items)) throw new Error('无法读取原生会话目录。');
+      const known = new Map(listing.items.map(item => [item.sessionId, item]));
       for (const sessionId of [...new Set(sessionIds)]) {
         if (disposed) break;
+        const entry = known.get(sessionId);
+        // A workbench task can outlive its native chat.
+        if (!entry) continue;
         try {
-          if (known.get(sessionId)?.cwd !== cwd) throw new Error('会话不存在或属于其他项目，已阻止读取。');
+          if (entry.cwd !== cwd) throw new Error('会话属于其他项目，已阻止读取。');
           const reference = ctx.sessions.retain(sessionId, { source: 'wttCourseConfirmations' });
           references.push(reference);
           const binding = await reference.ready;

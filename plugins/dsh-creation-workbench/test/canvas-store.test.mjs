@@ -248,3 +248,24 @@ test('DSH session mappings survive restart, stay scoped and clear without changi
     assert.equal(restored.getBoard(req.id).revision, 0);
   } finally { reopened.close(); }
 });
+
+test('material markdown files use readable titles with sequence suffixes, sanitized characters and no overwrite', (t) => {
+  const { root, store, canvas } = fixture(t);
+  const req = requirement(store);
+  const first = canvas.addMaterial({ requirementId: req.id, title: '需求文档', content: '第一份', operationId: randomUUID() });
+  const second = canvas.addMaterial({ requirementId: req.id, title: '需求文档', content: '第二份', operationId: randomUUID() });
+  const weird = canvas.addMaterial({ requirementId: req.id, title: '白板 · a/b：c', content: '特殊字符', operationId: randomUUID() });
+  const imported = canvas.addMaterial({ requirementId: req.id, title: '课堂笔记.md', content: '导入标题带扩展名', operationId: randomUUID() });
+  assert.equal(first.material.path, `courses/${req.id}/materials/需求文档.md`);
+  assert.equal(second.material.path, `courses/${req.id}/materials/需求文档-2.md`);
+  assert.equal(weird.material.path, `courses/${req.id}/materials/白板 · a_b：c.md`);
+  assert.equal(imported.material.path, `courses/${req.id}/materials/课堂笔记.md`);
+  for (const item of [first, second, weird, imported]) {
+    assert.ok(existsSync(path.join(root, item.material.path)));
+    assert.equal(readFileSync(path.join(root, item.material.path), 'utf8'), item.material.content);
+  }
+  writeFileSync(path.join(root, `courses/${req.id}/materials/占位.md`), '外部占位');
+  const blocked = canvas.addMaterial({ requirementId: req.id, title: '占位', content: '不覆盖占位', operationId: randomUUID() });
+  assert.equal(blocked.material.path, `courses/${req.id}/materials/占位-2.md`);
+  assert.equal(readFileSync(path.join(root, `courses/${req.id}/materials/占位.md`), 'utf8'), '外部占位');
+});

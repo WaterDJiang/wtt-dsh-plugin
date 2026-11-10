@@ -32,3 +32,9 @@
 .wtt-project-workbench :is(.wtt-dialog,.wcc-material-dialog,.wcc-group-dialog):has(.wtt-ui-panel-header)>form{display:flex;flex-direction:column;gap:0;margin:0;padding:0}
 .wtt-project-workbench .wtt-ui-dialog-body{display:grid;gap:var(--wtt-space-3);padding:var(--wtt-space-3);min-width:0}
 .wtt-project-workbench .wtt-ui-dialog-body>.wtt-field{margin:0}
+
+/* 版本选择按钮：卡片头部／预览面板／资产看板共用，按页面布局自适应 */
+.wtt-version-select { max-width: 132px; padding: 2px 4px; border: 1px solid var(--wtt-ui-line, #dce5f2); border-radius: 5px; background: var(--wtt-ui-accent-paper, #f6f9fe); color: var(--wtt-ui-muted, #7b8faf); font-size: var(--wtt-text-xs, 12px); cursor: pointer; }
+.wtt-version-select.wtt-version-compact { max-width: 96px; margin-left: auto; }
+.wtt-card-open-divider, .wtt-version-divider { height: 1px; margin: 4px 0; background: var(--wtt-ui-line, #e4e8ef); }
+.wcc-card-open-status { margin: 2px 4px; color: var(--wtt-ui-muted, #7b8faf); font-size: var(--wtt-text-xs, 12px); }

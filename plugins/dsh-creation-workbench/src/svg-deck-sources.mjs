@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 const sha = value => createHash('sha256').update(value).digest('hex');
 const excluded = new Set(['node_modules','.git','.wtt-workbench','.Trash','回收站','backup','exports']);
 const MAX_BYTES = 209_715_200;
+const MAX_DISCOVERY_DEPTH = 12;
 export class SvgDeckSources {
   constructor(service) {
     this.service=service; this.root=realpathSync(service.workspaceRoot); this.db=service.store.db;
@@ -64,9 +65,8 @@ export class SvgDeckSources {
     this.service.deck.validateScope(scope);
     const bound=this.db.prepare('SELECT snapshot_id FROM svg_deck_bindings WHERE artifact_id=?').get(scope.artifactId);
     if(bound) {const row=this.row(bound.snapshot_id);return {status:'matched',candidates:[{id:`snapshot:${row.id}`,path:JSON.parse(row.origin_json).project||row.path,pageCount:JSON.parse(row.model_json).slides.length}]};}
-    const candidates=[];let count=0,hashed=0;
+    const candidates=[];let count=0,hashed=0,depthLimited=false;
     const walk=(dir,depth)=>{
-      if(depth>12)throw new Error('源工程查找超过12层，请将工程放在项目内较浅位置');
       const entries=readdirSync(dir,{withFileTypes:true});
       const hasSvg=entries.some(e=>e.isDirectory()&&['svg_final','svg_output'].includes(e.name));
       if(hasSvg) {
@@ -81,9 +81,11 @@ export class SvgDeckSources {
       for(const e of entries) {
         if(++count>30000)throw new Error('源工程查找超过30000项，请缩小项目范围');
         if(!e.isDirectory()||e.isSymbolicLink()||e.name.startsWith('.')||excluded.has(e.name)||['svg_final','svg_output','templates','images','notes'].includes(e.name))continue;
+        if(depth===MAX_DISCOVERY_DEPTH){depthLimited=true;continue;}
         walk(path.join(dir,e.name),depth+1);
       }
     };walk(this.root,0);
+    if(!candidates.length&&depthLimited)throw new Error('未在项目内前12层找到匹配的源工程；如果源稿在更深位置，请将工程放到较浅的目录');
     return {status:candidates.length===1?'matched':candidates.length?'choose':'none',candidates};
   }
   async resolve({scope,candidateId}) {

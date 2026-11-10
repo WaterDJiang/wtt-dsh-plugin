@@ -12,19 +12,22 @@ export function defaultOutcome(files, primaryRef) {
 /** Read-only association and format projection. It never promotes an attachment. */
 export class Outcomes {
   constructor(service) { this.service = service; this.db = service.store.db; }
-  files(taskId) {
+  files(taskId, primaryRef, cardId) {
     if (!taskId) return [];
-    const task = this.db.prepare('SELECT requirement_id FROM course_tasks WHERE id=?').get(taskId);
+    const task = this.db.prepare('SELECT requirement_id,input_json FROM course_tasks WHERE id=?').get(taskId);
     if (!task) throw new Error('成果任务不存在。');
-    return this.service.tasks.files.list(task.requirement_id, taskId).map(file => ({
+    const owned = cardId && JSON.parse(task.input_json).outputPresentation === 'cards'
+      ? new Set(this.db.prepare('SELECT source_ref FROM output_card_outputs WHERE task_id=? AND card_id=?').all(taskId, cardId).map(row => row.source_ref))
+      : null;
+    return this.service.tasks.files.list(task.requirement_id, taskId).filter(file => !owned || owned.has(`artifact:${file.id}`)).map(file => ({
       sourceRef: `artifact:${file.id}`, artifactId: file.id, name: path.basename(file.path), path: file.path,
       title: file.title, hash: file.hash, format: outcomeFormat(file.path), mime: file.mime, status: file.status,
-      role: file.kind === 'support' || file.kind === 'storyboard' ? 'attachment' : 'result', taskId,
+      role: `artifact:${file.id}` !== primaryRef && (file.kind === 'support' || file.kind === 'storyboard') ? 'attachment' : 'result', taskId,
     }));
   }
   annotate(node, version, task) {
     const taskId = version?.taskId || task?.id;
-    const files = this.files(taskId);
+    const files = this.files(taskId, version?.primaryRef, version?.cardId || task?.outputCardId);
     return files.length ? { ...node, outcomeFiles: files, defaultOutcome: defaultOutcome(files, version?.primaryRef) } : node;
   }
   manifest({ requirementId, cardId, versionId, sourceRef }) {
@@ -39,7 +42,7 @@ export class Outcomes {
     }
     const { node, card, version, task } = descriptor;
     const taskId = version?.taskId || task?.id;
-    const files = this.files(taskId);
+    const files = this.files(taskId, version?.primaryRef, card.id);
     if (version && !files.some(file => file.sourceRef === version.primaryRef)) {
       const raw = this.read({ requirementId, sourceRef: version.primaryRef });
       files.unshift({ ...raw, bytes: undefined, role: 'result' });

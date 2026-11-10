@@ -53,8 +53,8 @@ export function apply(ctx, config = {}) {
     const result = service.environment();
     let preset;
     try { preset = await ctx.get('agentPresets')?.resolve('wtt-course-economy'); }
-    catch (error) { result.checks.push({ name: '课程节省预设', available: false, message: error.message }); return result; }
-    result.checks.push({ name: '课程节省预设', available: Boolean(preset && !preset.broken), message: preset?.broken || (preset ? '官方预设已注册；自动压缩10%，近期保留20000，摘要8192' : '未找到官方课程预设，新任务请检查插件加载') });
+    catch (error) { result.checks.push({ name: '工作台节省预设', available: false, message: error.message }); return result; }
+    result.checks.push({ name: '工作台节省预设', available: Boolean(preset && !preset.broken), message: preset?.broken || (preset ? '预设已注册，按模型窗口压力整理历史' : '找不到工作台节省预设，请检查插件加载') });
     return result;
   };
   const documentsFor = service => { if (!documentPreviews.has(service)) documentPreviews.set(service, new DocumentPreview(service)); return documentPreviews.get(service); };
@@ -105,6 +105,7 @@ export function apply(ctx, config = {}) {
           if(url.searchParams.has('projectFilePage')){if(!projectId)throw new Error('文件预览必须指定项目');const file=await service.projectFiles.documentPreview.page(url.searchParams.get('projectFilePage'),url.searchParams.get('hash'),Number(url.searchParams.get('page')));return new Response(request.method==='HEAD'?null:file.bytes,{headers:{...headers,'Content-Type':file.mime}})}
           if(url.searchParams.has('recycleEntries')){if(!projectId)throw new Error('回收站必须指定项目');return Response.json({entries:service.recycle.list()},{headers})}
           if(url.searchParams.has('projectFiles')){if(!projectId)throw new Error('文件树必须指定项目');return Response.json(service.projectFiles.list(url.searchParams.get('projectFiles')),{headers})}
+          if(url.searchParams.has('projectReferenceSearch')){if(!projectId)throw new Error('搜索文件必须指定项目');return Response.json(service.projectFiles.searchReferences(url.searchParams.get('projectReferenceSearch')),{headers})}
           if(url.searchParams.has('projectFilePreview')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(await service.projectFiles.preview(url.searchParams.get('projectFilePreview')),{headers})}
           if(url.searchParams.has('projectFileText')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(service.projectFiles.text({relative:url.searchParams.get('projectFileText'),page:Number(url.searchParams.get('page')||1)}),{headers})}
           if(url.searchParams.has('projectFileStat')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(service.projectFiles.stat(url.searchParams.get('projectFileStat')),{headers})}
@@ -308,6 +309,12 @@ export function apply(ctx, config = {}) {
         else if(action==='project-file-delete')result=service.recycle.fileEntries.remove(data||{});
         else if (action === 'project-file-create') result = service.projectFiles.create(data || {});
         else if (action === 'project-file-reference') result = await service.projectFiles.reference(data || {});
+        else if (action === 'project-file-reveal') result = await service.projectFiles.reveal(data || {});
+        else if (action === 'project-file-open') result = await service.projectFiles.openExternal(data || {});
+        else if (action === 'card-open-applications') result = await service.openCardApplications(data || {});
+        else if (action === 'card-open-application') result = await service.openCardApplication(data || {});
+        else if (action === 'material-version') result = service.canvas.materialVersion(data || {});
+        else if (action === 'material-restore-project-file') result = service.canvas.restoreMaterialProjectFile(data || {});
         else if (action === 'sync-deliverables') result = service.deliverables.sync(data?.requirementId);
         else if (action === 'open-deliverable') result = await service.deliverables.open(data || {});
         else if (action === 'save-skill-settings') { result = await (await catalogReady).save(data, service.workspaceRoot); syncedServices = new WeakSet(); await syncServiceSkills(service); }
@@ -409,6 +416,24 @@ export function apply(ctx, config = {}) {
     render: (_args, value) => [{ type: 'text', text: value }],
   };
   const projectParameter = { type: 'string', description: '准备输入返回的 projectId；必须属于当前会话的原始项目目录' };
+  ctx.effect(() => ctx.tools.register(defineTool({
+    name: 'course_read_task_source',
+    description: '按需读取当前任务已选中的冻结正文、讲师注释或来源任务的配套文件路径与 hash。仅供该任务的主会话使用。',
+    parameters: {
+      projectId: projectParameter,
+      taskId: { type: 'string', required: true },
+      cardId: { type: 'string', required: true, description: '首条消息给出的引用 ID；修订基准用 revision' },
+      field: { type: 'string', enum: ['content', 'annotation', 'files'], description: '默认正文，files 返回已选成果的配套文件清单' },
+      offset: { type: 'number', description: '默认从开头读取；下一段使用返回的 nextOffset' },
+    },
+    output: textOutput,
+    isConcurrencySafe: true,
+    execute: async (args, execution) => {
+      execution.signal.throwIfAborted();
+      const service = projects.forExecution(args.projectId, execution);
+      return JSON.stringify(service.readTaskSource(args, execution.agent?.id));
+    },
+  })));
   ctx.effect(()=>ctx.tools.register(defineTool({name:'course_get_svg_edit_context',description:'读取当前原生课件编辑会话唯一待执行修改的冻结资料：指定页SVG、选中对象、图片引用和候选提交约定。只读，不生成文件、不代替用户确认。',parameters:{projectId:projectParameter},output:textOutput,isConcurrencySafe:true,execute:async(args,execution)=>{execution.signal.throwIfAborted();const service=projects.forExecution(args.projectId,execution);if(!execution.agent?.id)throw new Error('必须由课件绑定的原生会话读取');return JSON.stringify(service.svgEditor.contextForSession(execution.agent.id));}})));
   ctx.effect(() => ctx.tools.register(defineTool({
     name:'course_propose_svg_edit',description:'为绑定的SVG源文件迭代任务提交整页重绘、所选对象修改、引用图片、增删页或重排候选。只生成待预览方案，用户应用后更新源稿草稿，不直接导出或发布PPT。',
@@ -462,11 +487,12 @@ export function apply(ctx, config = {}) {
     parameters: {
       projectId: projectParameter,
       taskId: { type: 'string', required: true },
-      kind: { type: 'string', required: true, description: 'text、pptx、storyboard、exercise、script 或 support；模型SVG/HTML和图片式学员手册PPTX用support、primary=false，仅归档下载，不表示正式课件原生编辑性通过。普通文本用text，正式课件用pptx并保留原生编辑性验证。' },
+      kind: { type: 'string', required: true, description: '按实际类型选择 text、pptx、storyboard、exercise、script、image、video 或 support。正式课件用 pptx 并保留原生编辑性验证；图片式预览用 support。' },
       title: { type: 'string', required: true },
       path: { type: 'string', required: true, description: '本项目 courses/<需求ID>/tasks/<任务ID>/ 内的真实文件路径；正式产物在 delivery/ 下' },
       operationId: { type: 'string', required: true, description: '本次登记的 UUID，失败重试原样复用' },
-      primary: { type: 'boolean', description: '正式主产物可传 true；制作资料和附属文件传 false。同一任务只发布一个卡片版本，省略时以首个匹配类型的正式产物为主。' },
+      primary: { type: 'boolean', description: '主文件留在原卡。其他独立成果可传 false，各自生成卡片。' },
+      presentation: { type: 'string', enum: ['attachment'], description: '仅需跟随主卡的附件传 attachment；独立成果省略。' },
     },
     output: textOutput,
     isConcurrencySafe: false,
@@ -482,16 +508,17 @@ export function apply(ctx, config = {}) {
   })));
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_register_artifacts',
-    description: '一次登记同一主任务的 1–100 个真实文件，顺序逐项验证；成功项保留，失败可用各自原 operationId 重试，返回短回执。主文件放第一项，附属资料 primary=false；不能绕过宝玉导出、媒体或局部 AI 确认。',
+    description: '一次登记同一主任务的 1–100 个真实成果文件，独立成果各建卡。成功项保留，失败项用原 operationId 重试。保留宝玉导出和局部 AI 确认。',
     parameters: {
       projectId: projectParameter,
       taskId: { type: 'string', required: true },
       files: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
-        kind: { type: 'string', required: true, description: 'text、pptx、storyboard、exercise、script 或 support，沿用单文件格式规则' },
+        kind: { type: 'string', required: true, description: '按实际类型选择 text、pptx、storyboard、exercise、script、image、video 或 support' },
         title: { type: 'string', required: true },
         path: { type: 'string', required: true, description: '当前项目本任务内真实文件路径，正式交付在 delivery/' },
         operationId: { type: 'string', required: true, description: '该文件独立 UUID，失败重试复用原值' },
-        primary: { type: 'boolean', description: '主文件 true，附属文件 false；一个任务只发布一个同卡版本' },
+        primary: { type: 'boolean', description: '原卡的主文件为 true，其他独立成果可用 false' },
+        presentation: { type: 'string', enum: ['attachment'], description: '仅需跟随主卡的附件用 attachment；独立成果省略。' },
       } } },
     },
     output: textOutput, isConcurrencySafe: false,
@@ -508,7 +535,7 @@ export function apply(ctx, config = {}) {
   })));
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_list_requirements',
-    description: '查看当前会话所属项目的画布与已保存大纲版本；旧工具名保留兼容，画布不代表发生客户委托。前端切项目不会改变当前会话的项目。',
+    description: '盘点当前项目的画布与已保存大纲版本。仅在需要盘点项目时调用；创作任务使用已选冻结引用。前端切项目不会改变会话项目。',
     parameters: { projectId: projectParameter },
     output: textOutput,
     execute: async (args, execution) => {
@@ -530,7 +557,7 @@ export function apply(ctx, config = {}) {
   })));
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_save_outline',
-    description: '为当前工作文件夹内的画布保存一个完整 Markdown 大纲新版本。不会确认客户接受、发送文件或登记授课。相同 operationId 和内容重试不产生重复版本。',
+    description: '保存完整 Markdown 大纲为新版本。精简创作任务返回版本定位和 hash。相同 operationId 和内容重试不重复建版。保存不代表客户确认、发送或授课。',
     parameters: {
       projectId: projectParameter,
       requirementId: { type: 'string', required: true },
@@ -546,12 +573,17 @@ export function apply(ctx, config = {}) {
       execution.signal.throwIfAborted();
       const service = projects.forExecution(args.projectId, execution);
       await syncServiceSkills(service);
-      return JSON.stringify(service.store.saveOutline({ ...args, ...(execution.agent ? { executionSessionId: execution.agent.id } : {}) }));
+      const compactReceipt = args.taskId && execution.agent?.id &&
+        service.tasks.get(args.taskId).input.contextVersion === 1;
+      const version = service.store.saveOutline({ ...args, ...(execution.agent ? { executionSessionId: execution.agent.id } : {}) });
+      if (!compactReceipt) return JSON.stringify(version);
+      const { markdown: _markdown, ...receipt } = version;
+      return JSON.stringify(receipt);
     },
   })));
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_get_canvas',
-    description: '读取画布的真实素材、版本、Word 和来源关系；只返回当前工作目录内的记录。',
+    description: '盘点画布的全部素材、版本及来源关系。创作任务读取选中资料时用 course_read_task_source；仅需文件时按实际路径读取。',
     parameters: { projectId: projectParameter, requirementId: { type: 'string', required: true } },
     output: textOutput,
     execute: async ({ projectId, requirementId }, execution) => {
