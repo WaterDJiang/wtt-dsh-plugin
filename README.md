@@ -1,27 +1,41 @@
-# wtt-dsh-plugin
+# WTT 创作工作台
 
-WTT 面向 DeepSeek Harness（DSH）的插件合集，按 monorepo 组织。每个子插件独立构建、独立发包（npm scope `@wtt`）。
+WTT 创作工作台（`@wtt/dsh-creation-workbench`）是 DeepSeek Harness（DSH）的独立开源插件。它把本机文件、画布卡片、AI 任务和成果版本放在同一个项目中。你可以直接向模型提要求，也可以在卡旁用 `/` 调用自己的 Skill。
 
-| 子插件 | 定位 |
-| --- | --- |
-| [`dsh-creation-workbench`](plugins/dsh-creation-workbench) | 通用创作工作台：自由画布管理素材与文件，卡片化组织文本、PPT、图片、视频与文档，AI 创作流接入本机任意 Skill；课程制作为旗舰工作流 |
+## 使用案例：从一份课程需求做到可编辑 PPT
 
-- 运行依赖 DSH 宿主 `0.2.1-rc.5`
-- 许可证：MIT（整仓统一）
+**需求 → 课程大纲 → PPT 设计（逐页分镜）→ 可编辑 PPT → 修改与定稿**
+
+以虚构的 Excel 入门课为例。先把需求文档拖进画布，从需求卡生成大纲。确认教学顺序后，再从大纲卡做分镜，明确每页讲什么、怎么呈现。用确认版分镜制作 PPT 后，双击成果卡逐页查看。有匹配的源工程时，可以原位改字、补备注、把选中的页面对象交给 AI，再保存为新版本。
+
+- **从卡片继续。** 点卡边「＋」时，原卡会带入新任务。用 `@` 或「＋ 添加」补资料，发送前可以核对引用和版本。
+- **在成果旁边做决定。** 需要确认时回到原任务看方案和文件。课件右栏能切页，编辑器里可以边看页面边提修改，旧版本也能在卡片里回看。
+- **同一套操作可用在别的项目。** 比如把访谈接到营销方案和脚本，或把参考资料接到调研分析和简报。专业方法由你选择的模型和本机 Skill 提供。
+
+[查看完整案例与操作步骤](examples/course-workflow.md)
 
 ## 安装
 
-各子插件的完整安装说明见其目录内 README。最简单的方式是在 DSH 中依次进入 **插件 → 添加插件 → 安装第三方插件**，粘贴安装串后安装：
+在 DSH 中打开 **插件 → 添加插件 → 安装第三方插件**，粘贴以下安装串：
 
-```
+```text
 git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
 ```
 
-以创作工作台为例，npm 成品包两步安装（包内含已构建产物，无需本地构建）：
+也可以在「发现」添加 [WTT 插件索引](https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json)。需要兼容的 DSH 宿主，具体范围见[插件安装说明](plugins/dsh-creation-workbench/README.md#安装)。
 
-```sh
-npm pack @wtt/dsh-creation-workbench
-dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
-```
+## 已安装？如何检查更新
 
-源码构建、启动参数与运行前提见 [`plugins/dsh-creation-workbench/README.md`](plugins/dsh-creation-workbench/README.md)。
+在 DSH 的 **插件 → 已安装 → WTT 创作工作台** 查看当前版本。用索引安装的用户，可以在「发现」刷新索引后查看可用版本。看到「可更新」时进入详情更新。也可以手动对照 [WTT 市场索引](market/index.json) 的版本与固定提交。
+
+[按原安装来源升级、验证和回退](plugins/dsh-creation-workbench/README.md#检查更新与升级)
+
+## 项目文件
+
+| 项目 | 入口 |
+| --- | --- |
+| 插件源码、安装与运行说明 | [plugins/dsh-creation-workbench](plugins/dsh-creation-workbench) |
+| 制课案例与操作步骤 | [examples/course-workflow.md](examples/course-workflow.md) |
+| DSH 自定义插件索引 | [market/index.json](market/index.json) |
+
+许可证为 [MIT](LICENSE)。

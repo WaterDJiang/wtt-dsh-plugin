@@ -15,41 +15,52 @@
 - **成果管理**：正式文件按「需求／版本／任务」目录组织，同卡多版本、下载绑定具体文件与 SHA-256 校验，旧版本不覆盖
 - **Skill 发现**：自动读取本机常见技能目录（`~/.codex/skills`、`~/.agents/skills`、`~/.claude/skills`），常用技能点星收藏、中文改名
 
+## 从案例上手
+
+[从需求、大纲和分镜做到可编辑课件](../../examples/course-workflow.md)。案例也说明如何从卡片继续创作、核对引用，以及怎么在画布里审阅和修改课件。
+
 ## 安装
 
-前提：DSH 宿主 `0.2.1-rc.5` 或更新（含 `0.2.2-rc.x`，见 `package.json` 的 `engines.dsh`）；源码构建另需 Node ≥ 24。
+前提为兼容的 DSH 宿主。包的兼容范围是 `>=0.2.1-rc.5 || >=0.2.2-rc.0`，源码构建另需 Node ≥ 24。
 
-### 方式一：DSH 内安装第三方插件（最简单）
+### 在 DSH 中安装
 
-在 DSH 中依次进入：**插件 → 添加插件 → 安装第三方插件**，粘贴以下安装串后安装：
+打开 **插件 → 添加插件 → 安装第三方插件**，粘贴下面的 Git 安装串：
 
-```
+```text
 git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
 ```
 
-`#main` 跟随主分支最新版本；需要锁定版本时把 `#main` 换成 `#<提交sha>`（插件市场索引 [market/index.json](https://github.com/WaterDJiang/wtt-dsh-plugin/blob/main/market/index.json) 即按固定提交发布）。
+通过 Git 安装时，`#main` 解析为安装时的主分支提交。需要固定版本时，将 `main` 替换成 [WTT 插件索引](../../market/index.json) 对应版本的 `source.commit`。
 
-### 方式二：npm 成品包（无需本地构建）
+### 通过「发现」安装
 
-npm 包内含已构建的 `dist/` 前端与业务服务：
+在 DSH 的实验性插件中启用「自定义插件索引」（部分版本称「自定义插件市场」），进入「发现 → 添加索引源」，粘贴：
 
-```sh
-npm pack @wtt/dsh-creation-workbench
-dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
+```text
+https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json
 ```
 
-### 方式三：从源码构建
+搜索「WTT 创作工作台」，选择兼容版本安装。索引中的每个版本固定到一个 Git 提交。[DSH 官方插件索引说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/plugin-market.zh.md)
+
+### 在命令行安装或从源码打包
+
+如果使用 Web profile，可以直接安装：
+
+```sh
+dsh plugin --profile web add 'git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench'
+```
+
+需要修改源码时，可以自行构建安装：
 
 ```sh
 git clone https://github.com/WaterDJiang/wtt-dsh-plugin.git
 cd wtt-dsh-plugin/plugins/dsh-creation-workbench
-npm install
+npm ci
 npm run build
-npm pack
-dsh plugin --profile web add "$PWD/wtt-dsh-creation-workbench-0.51.0.tgz"
+package_file=$(npm pack --silent)
+dsh plugin --profile web add "$PWD/$package_file"
 ```
-
-Node ≥ 24 推荐按下文「构建与检查」先安装隔离运行时，避免污染系统 Node。
 
 ### 安装后启动
 
@@ -60,6 +71,15 @@ WTT_COURSE_WORKSPACE=/path/to/workspace dsh web
 进入 DSH 左侧「WTT 创作工作台」即可使用；之后可直接从工作目录运行 `dsh web`，工作区在前端切换并记忆。
 
 仓库还自带启动器 `./scripts/wtt-dsh --workspace /path/to/workspace`：使用项目内 Node 24 与 DSH，在隔离 profile 自动安装插件，首次安装后复用；停止用 `Ctrl+C`。
+
+## 检查更新与升级
+
+1. 在 **插件 → 已安装 → WTT 创作工作台** 看当前版本。如果使用 Web profile，也可运行 `dsh plugin --profile web list @wtt/dsh-creation-workbench --depth 0`。
+2. 从索引安装的用户，在 **插件 → 发现** 刷新 WTT 索引，查看兼容版本。DSH 显示「可更新」时，打开详情选择更新。如果详情没有更新按钮，在「发现」的插件版本列表选目标版本安装。也可以直接打开 [WTT 市场索引](../../market/index.json)，核对 `versions` 中的版本与 `source.commit`。
+3. 用 Git 安装串或固定提交安装的用户，确认想升级的版本后，可在原 profile 重新执行上面的 `dsh plugin --profile web add '…'`，并把 `main` 换成目标版本的提交 SHA。使用桌面版时优先用桌面端插件界面，或将命令中的 `web` 换成实际安装该插件的 profile。只有旧版界面要求重新安装且无法使用更新入口时，再在原 profile 移除旧插件并从目标来源安装。
+4. 等正在运行的任务结束再更新。根据 DSH 提示重新加载或重启，打开原来的项目目录，核对插件版本与现有画布。要回退时，可用上一版本的固定提交重新安装。更新或回退前可复制整个项目目录备份，包括隐藏的 `.wtt-workbench/`。
+
+判断是否需要升级，以兼容的插件版本和索引固定提交为准。README 的更新属于文档维护，当前索引版本为 **0.51.0**。
 
 ## 构建与检查
 
@@ -90,7 +110,7 @@ PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm test
 
 - Python 3 与文档／课件依赖（版本见 `resources/course-python-requirements.txt`；PPT 分页渲染需 LibreOffice）
 - MP4／WebM 视频预览需要本机 `ffprobe`；图片／视频生成需本机即梦 API 与账号
-- 本仓库**不包含**任何课程技能、私有知识库、企业品牌模板或账号凭据；模型账号在 DSH 界面配置
+- 课程技能、个人知识库、企业模板和模型账号由使用者配置
 
 ## 文件组织
 
@@ -113,13 +133,13 @@ PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm test
 
 需求、任务、布局、分组、连线、素材、版本来源与文件登记以 SQLite 为准，正式文件保存在同一项目目录。大纲和 Word 位于 `vNNN/`；通用文本、PPT、练习、逐字稿和生成媒体使用各自 `tasks/<任务 ID>/`，正式文件只放 `delivery/`。电脑原件复制到 `imports/<导入操作 ID>/`，正文或未解析说明另存 `materials/`；记录原名称、大小、格式、hash 和提取状态，用户原文件保留。旧版本与已登记文件不覆盖，同卡生成的新版本使用新任务和新路径。外部修改已登记文件后，导出／下载会拒绝沿用旧登记。备份前停止应用，再复制整个工作文件夹（包括隐藏元数据目录）。
 
-最近项目与最后选择保存在 `$DSH_HOME/wtt-course-workbench/projects.json`；额外 Skill 目录与常用名称保存到 `$DSH_HOME/wtt-course-workbench/skill-settings.json`，与各项目业务文件分开。插件不复制或修改 Skill 原件；目录适配复用官方 peer `@deepseek-ai/dsh-skill-filesystem@0.2.1-rc.5`。
+最近项目与最后选择保存在 `$DSH_HOME/wtt-creation-workbench/projects.json`；额外 Skill 目录与常用名称保存到 `$DSH_HOME/wtt-creation-workbench/skill-settings.json`，与各项目业务文件分开。插件不复制或修改 Skill 原件；目录适配复用官方 peer `@deepseek-ai/dsh-skill-filesystem@0.2.1-rc.5`。
 
 ## 开源使用须知
 
 - 本插件是面向 DSH 的独立第三方项目，与 DeepSeek 无隶属关系；运行依赖 DSH 宿主 `0.2.1-rc.5` 或更新（`engines.dsh: >=0.2.1-rc.5 || >=0.2.2-rc.0`）
 - 按许可证「按原样」提供，不含任何担保
-- 插件不收集、不上传任何数据；所有项目数据保存在用户本机工作目录
+- 项目文件保存在你选择的本机目录。发起 AI 任务时，提示词和引用资料会按任务设置交给所选模型或技能处理
 - 模型账号、本机技能、Python 依赖与外部工具需自行配置，插件对缺失能力如实报错，不伪装可用
 
 ## 许可证
