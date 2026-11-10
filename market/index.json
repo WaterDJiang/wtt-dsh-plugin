@@ -28,8 +28,8 @@
         "en": "WTT Creation Workbench"
       },
       "description": {
-        "zh": "自由创作画布：素材、文本、PPT、图片、视频与任意 Skill 工作流；课程制作为旗舰工作流。",
-        "en": "Free creation canvas for materials, text, PPT, images, video and any Skill workflow; course production is the flagship workflow."
+        "zh": "自由创作画布。管理素材、文本、PPT、图片和视频，接入本机 Skill 进行创作。",
+        "en": "A freeform canvas for managing materials, text, slides, images, and video, with locally installed Skills for creative work."
       },
       "author": "Wattter (WTT)",
       "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin",
@@ -54,6 +54,19 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.53.0",
+          "publishTimestamp": 1794333958,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+            "commit": "95f748130ca1e019931e5c3b61fccbafb65b55bb",
+            "path": "plugins/dsh-creation-workbench"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
+          }
+        },
         {
           "version": "0.52.1",
           "publishTimestamp": 1794298300,
