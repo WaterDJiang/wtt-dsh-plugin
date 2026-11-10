@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createEditorSessionAcquirer, acquireCourseConversation, promptCourseSession, restoreCourseConversation, startCourseSession } from '../src/session.mjs';
+import { createEditorSessionAcquirer, createPreviewSessionAcquirer, acquireCourseConversation, isMissingCourseSession, promptCourseSession, restoreCourseConversation, startCourseSession } from '../src/session.mjs';
 
 test('an explicit skill must exist at the frozen path in the actual native session before admission', async () => {
   for (const skills of [[], [{ name: 'local-check', path: '/preset/other/SKILL.md' }]]) {
@@ -60,9 +60,67 @@ test('missing or unreadable original session metadata releases the reference and
   ]) await t.test(label, async () => {
     const { ctx } = projectContext();
     ctx.remote.session.list = list;
-    await assert.rejects(restoreCourseConversation(ctx, { sessionId: 'existing-session', cwd: '/project-a', projectId: 'project-a' }), /无法核对原生会话/);
+    await assert.rejects(restoreCourseConversation(ctx, { sessionId: 'existing-session', cwd: '/project-a', projectId: 'project-a' }),
+      label === 'missing session' ? isMissingCourseSession : /无法核对原生会话/);
     assert.deepEqual(ctx.calls.map(call => call[0]), ['retain', 'ready', 'release']);
   });
+});
+
+test('a native catalog miss is suppressed only when the Host confirms that the saved conversation is missing', async () => {
+  const { ctx } = projectContext();
+  const scope = { sessionId: 'existing-session', cwd: '/project-a', projectId: 'project-a' };
+  const nativeError = new Error('sessions.retain: unknown session existing-session');
+  ctx.sessions.retain = () => { throw nativeError; };
+  ctx.sessions.refresh = async () => assert.fail('a missing Host session cannot be recovered by a catalog refresh');
+  ctx.remote.session.list = async () => ({ ok: true, value: { items: [] } });
+  await assert.rejects(restoreCourseConversation(ctx, scope),
+    error => isMissingCourseSession(error) && error.cause === nativeError && error.message.includes(nativeError.message));
+  ctx.remote.session.list = async () => { throw new Error('连接中断'); };
+  await assert.rejects(restoreCourseConversation(ctx, scope),
+    error => !isMissingCourseSession(error) && error.message.includes('连接中断'));
+  await assert.rejects(acquireCourseConversation(ctx, { ...scope, prompt: '续办' }, scope.sessionId), /连接中断/);
+  assert.deepEqual(ctx.calls, []);
+});
+
+test('a Host session missing from the Client catalog is retained after one refresh', async () => {
+  const { ctx, reference } = projectContext();
+  const retain = ctx.sessions.retain;
+  let refreshed = 0;
+  ctx.sessions.retain = (...args) => {
+    if (!refreshed) throw new Error('sessions.retain: unknown session existing-session');
+    return retain(...args);
+  };
+  ctx.sessions.refresh = async () => { refreshed++; };
+  assert.equal(await restoreCourseConversation(ctx, { sessionId: 'existing-session', cwd: '/project-a', projectId: 'project-a' }), reference);
+  assert.equal(refreshed, 1);
+  assert.deepEqual(ctx.calls.map(call => call[0]), ['metadata', 'retain', 'ready', 'metadata']);
+});
+
+test('file previews share a replacement for a missing session without sending or crossing projects', async () => {
+  const { ctx } = projectContext();
+  const sessions = new Map([['foreign', '/project-b']]);
+  let created = 0;
+  ctx.remote.session.list = async () => ({ ok: true, value: { items: [...sessions].map(([sessionId, cwd]) => ({ sessionId, cwd })) } });
+  ctx.remote.session.create = async () => {
+    const sessionId = `preview-${++created}`;
+    sessions.set(sessionId, '/project-a');
+    return { ok: true, value: { sessionId } };
+  };
+  ctx.sessions.retain = sessionId => {
+    if (!sessions.has(sessionId)) throw new Error(`sessions.retain: unknown session ${sessionId}`);
+    return { sessionId, ready: Promise.resolve(), release() {} };
+  };
+  ctx.remote.session.modelCatalog = async () => assert.fail('file previews do not need a model');
+  ctx.remote.session.prompt = async () => assert.fail('file previews do not send messages');
+  const acquire = createPreviewSessionAcquirer(ctx);
+  const project = { id: 'project-a', path: '/project-a' };
+  const initial = await Promise.all([acquire(project, 'missing'), acquire(project, 'missing')]);
+  assert.deepEqual(initial.map(reference => reference.sessionId), ['preview-1', 'preview-1']);
+  sessions.delete('preview-1');
+  const next = await Promise.all([acquire(project), acquire(project)]);
+  assert.deepEqual(next.map(reference => reference.sessionId), ['preview-2', 'preview-2']);
+  await assert.rejects(acquire(project, 'foreign'), /另一个项目目录/);
+  assert.equal(created, 2);
 });
 
 test('a resolved ready binding with a history-open error cannot be restored as successful', async () => {

@@ -1763,7 +1763,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       if (creationRef.current?.sessionId) restoredSession.current = true
       if (result.sessionId && !restoredSession.current && restoreRef.current) {
         restoredSession.current = true
-        Promise.resolve().then(() => restoreRef.current(result.sessionId)).catch(cause => {
+        Promise.resolve().then(() => restoreRef.current(result.sessionId, { automatic: true })).catch(cause => {
           if (mounted.current && epoch === epochRef.current) setError(messageOf(cause))
         })
       }

@@ -1,6 +1,6 @@
 {
   "name": "@wtt/dsh-creation-workbench",
-  "version": "0.52.0",
+  "version": "0.52.1",
   "description": "WTT 创作工作台：DSH 通用创作画布——自由画布管理素材、文本、PPT、图片、视频与任意 Skill 工作流；课程制作为旗舰工作流（大纲→分镜→课件→逐字稿）。",
   "keywords": [
     "dsh",

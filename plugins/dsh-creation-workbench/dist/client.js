@@ -250,7 +250,8 @@ function userFacingError(error) {
   if (/提交结果未知|结果待核对|发送结果.*(未知|不确定|未核实)|受理.*不确定/i.test(detail)) summary = "\u6682\u65F6\u65E0\u6CD5\u786E\u8BA4\u662F\u5426\u63D0\u4EA4\u6210\u529F\u3002\u8BF7\u5148\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u6838\u5BF9\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002";
   else if (detail.includes("\u6240\u9009\u5206\u955C\u7F3A\u5C11\u53EF\u7528\u7684 PPT \u4EA4\u63A5\u6587\u4EF6")) summary = "\u8FD9\u4EFD\u5206\u955C\u7684\u4EA4\u63A5\u5305\u4E0D\u5B8C\u6574\u3002\u8BF7\u56DE\u5230\u539F\u5206\u955C\u4EFB\u52A1\u8865\u9F50\u6587\u4EF6\uFF0C\u518D\u7EE7\u7EED\u5236\u4F5C PPT\u3002";
   else if (/PPT 渲染命令|Rendered text checks failed|MuPDF|页面检查未通过/.test(detail)) summary = "\u8BFE\u4EF6\u7684\u672C\u673A\u8F6C\u6362\u9884\u89C8\u672A\u901A\u8FC7\u68C0\u67E5\uFF0C\u7F16\u8F91\u8349\u7A3F\u5DF2\u4FDD\u7559\u3002\u53EF\u5173\u95ED\u7F16\u8F91\u5668\uFF0C\u6539\u7528\u201C\u7F16\u8F91\u6E90\u6587\u4EF6\u201D\uFF0C\u6216\u901A\u8FC7\u201C\u6253\u5F00 PPT\u201D\u4F7F\u7528\u672C\u673A\u5E94\u7528\u3002";
-  else if (/session[/-]not-found|会话不存在|会话.*属于其他项目/i.test(detail)) summary = "\u627E\u4E0D\u5230\u8FD9\u6B21\u4EFB\u52A1\u7684\u5BF9\u8BDD\u3002\u8BF7\u5230\u4EFB\u52A1\u5217\u8868\u6838\u5BF9\u4EFB\u52A1\u548C\u6240\u5C5E\u9879\u76EE\u3002";
+  else if (/session[/-]not-found|会话不存在/i.test(detail)) summary = "\u5F53\u524D DSH \u627E\u4E0D\u5230\u539F\u4EFB\u52A1\u7684\u5BF9\u8BDD\u3002\u5DF2\u4FDD\u5B58\u7684\u4EFB\u52A1\u8BB0\u5F55\u548C\u6210\u679C\u4ECD\u53EF\u67E5\u770B\u3002";
+  else if (/会话.*属于其他项目|会话.*属于另一个项目/i.test(detail)) summary = "\u8FD9\u6BB5\u5BF9\u8BDD\u5C5E\u4E8E\u5176\u4ED6\u9879\u76EE\u3002\u8BF7\u5728\u539F\u9879\u76EE\u6253\u5F00\u3002";
   else if (/401|unauthorized|认证.*(失败|失效)|凭据.*失效/i.test(detail)) summary = "\u670D\u52A1\u8BA4\u8BC1\u672A\u901A\u8FC7\u3002\u8BF7\u68C0\u67E5\u5BF9\u5E94\u670D\u52A1\u7684\u767B\u5F55\u6216\u8FDE\u63A5\u8BBE\u7F6E\u3002";
   else if (/429|quota|额度不足|余额不足|rate.?limit/i.test(detail)) summary = "\u6A21\u578B\u670D\u52A1\u6682\u65F6\u65E0\u6CD5\u7EE7\u7EED\u3002\u8BF7\u68C0\u67E5\u53EF\u7528\u989D\u5EA6\uFF0C\u6216\u7A0D\u540E\u518D\u8BD5\u3002";
   else if (/外部修改|来源.*变化|hash.*(不|错)|已被其他操作修改|版本.*过期/i.test(detail)) summary = "\u5185\u5BB9\u7248\u672C\u5DF2\u53D8\u5316\u3002\u8BF7\u4FDD\u7559\u5F53\u524D\u8349\u7A3F\uFF0C\u5237\u65B0\u540E\u91CD\u65B0\u9009\u62E9\u8D44\u6599\u6216\u7248\u672C\u3002";
@@ -475,7 +476,16 @@ function watchCourseTaskSessions(ctx, { sessionIds, cwd, projectId }, onChange, 
         if (!entry) continue;
         try {
           if (entry.cwd !== cwd) throw new Error("\u4F1A\u8BDD\u5C5E\u4E8E\u5176\u4ED6\u9879\u76EE\uFF0C\u5DF2\u963B\u6B62\u8BFB\u53D6\u3002");
-          const reference = ctx.sessions.retain(sessionId, { source: "wttCourseConfirmations" });
+          const reference = await retainCourseSession(
+            ctx,
+            sessionId,
+            "wttCourseConfirmations",
+            (cause) => verifySessionProject(ctx, { cwd, projectId }, sessionId, cause)
+          );
+          if (disposed) {
+            reference.release();
+            break;
+          }
           references.push(reference);
           const binding = await reference.ready;
           if (disposed) {
@@ -488,7 +498,7 @@ function watchCourseTaskSessions(ctx, { sessionIds, cwd, projectId }, onChange, 
           stops.push(binding.session.projections.faceOf("inbox").subscribe(publish));
           publish();
         } catch (error) {
-          if (!disposed) onError?.(`Skill \u5F85\u529E\u6062\u590D\u5931\u8D25\uFF08${sessionId}\uFF09\uFF1A${error.message || String(error)}`);
+          if (!disposed && !isMissingCourseSession(error)) onError?.(`Skill \u5F85\u529E\u6062\u590D\u5931\u8D25\uFF08${sessionId}\uFF09\uFF1A${error.message || String(error)}`);
         }
       }
       if (!disposed) {
@@ -523,7 +533,11 @@ async function availableSession(ctx, { cwd, agentPreset }, existingSessionId) {
   const { sessionId } = valueOf(await ctx.remote.session.create({ workspaceId, ...agentPreset ? { agentPreset } : {} }));
   return sessionId;
 }
-async function verifySessionProject(ctx, { cwd, projectId }, sessionId) {
+var MISSING_SESSION = "wtt/session-missing";
+function isMissingCourseSession(error) {
+  return error?.code === MISSING_SESSION;
+}
+async function verifySessionProject(ctx, { cwd, projectId }, sessionId, retainError) {
   if (projectId === void 0) return;
   if (typeof projectId !== "string" || !projectId.trim() || typeof cwd !== "string" || !cwd.startsWith("/")) {
     throw new Error("\u5F53\u524D\u9879\u76EE\u76EE\u5F55\u4FE1\u606F\u4E0D\u5B8C\u6574\uFF0C\u65E0\u6CD5\u6838\u5BF9\u539F\u751F\u4F1A\u8BDD\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u9879\u76EE\u3002");
@@ -536,6 +550,10 @@ async function verifySessionProject(ctx, { cwd, projectId }, sessionId) {
     throw new Error(`\u65E0\u6CD5\u6838\u5BF9\u539F\u751F\u4F1A\u8BDD\u7684\u9879\u76EE\u76EE\u5F55\uFF1A${cause.message || String(cause)}`, { cause });
   }
   const session = Array.isArray(listing?.items) ? listing.items.find((item) => item?.sessionId === sessionId) : null;
+  if (Array.isArray(listing?.items) && !session) {
+    const detail = retainError ? `\uFF1A${retainError.message}` : `\uFF08${sessionId}\uFF09`;
+    throw Object.assign(new Error(`\u539F\u751F\u4F1A\u8BDD\u4E0D\u5B58\u5728${detail}`, { cause: retainError }), { code: MISSING_SESSION });
+  }
   if (typeof session?.cwd !== "string" || !session.cwd.startsWith("/")) {
     throw new Error("\u65E0\u6CD5\u6838\u5BF9\u539F\u751F\u4F1A\u8BDD\u7684\u539F\u59CB\u9879\u76EE\u76EE\u5F55\uFF0C\u8BF7\u5728\u5F53\u524D\u9879\u76EE\u65B0\u5EFA\u4F1A\u8BDD\u3002");
   }
@@ -543,14 +561,31 @@ async function verifySessionProject(ctx, { cwd, projectId }, sessionId) {
     throw new Error("\u8BE5\u539F\u751F\u4F1A\u8BDD\u5C5E\u4E8E\u53E6\u4E00\u4E2A\u9879\u76EE\u76EE\u5F55\uFF0C\u5DF2\u963B\u6B62\u590D\u7528\u3002\u8BF7\u5728\u5F53\u524D\u9879\u76EE\u65B0\u5EFA\u4F1A\u8BDD\u3002");
   }
 }
+async function retainCourseSession(ctx, sessionId, source, verify) {
+  try {
+    return ctx.sessions.retain(sessionId, { source });
+  } catch (cause) {
+    if (!verify || cause?.message !== `sessions.retain: unknown session ${sessionId}`) throw cause;
+    await verify(cause);
+    if (typeof ctx.sessions.refresh !== "function") throw cause;
+  }
+  await ctx.sessions.refresh();
+  try {
+    return ctx.sessions.retain(sessionId, { source });
+  } catch (cause) {
+    if (cause?.message === `sessions.retain: unknown session ${sessionId}`) await verify(cause);
+    throw cause;
+  }
+}
 async function restoreCourseConversation(ctx, { sessionId, cwd, projectId }) {
   let reference;
+  const verify = (cause) => verifySessionProject(ctx, { cwd, projectId }, sessionId, cause);
   try {
-    reference = ctx.sessions.retain(sessionId, { source: "wttCourseCanvas" });
+    reference = await retainCourseSession(ctx, sessionId, "wttCourseCanvas", projectId === void 0 ? null : verify);
     const binding = await reference.ready;
     const snapshot = binding?.session?.getSnapshot?.();
     if (snapshot?.openState === "error") throw new Error(snapshot.openError?.message || "\u539F\u751F\u4F1A\u8BDD\u5386\u53F2\u52A0\u8F7D\u5931\u8D25");
-    await verifySessionProject(ctx, { cwd, projectId }, sessionId);
+    await verify();
     return reference;
   } catch (error) {
     reference?.release();
@@ -561,9 +596,25 @@ function createPreviewSessionAcquirer(ctx) {
   const projects = /* @__PURE__ */ new Map();
   return async (project, preferredSessionId) => {
     if (!project?.id || !project.path?.startsWith("/")) throw new Error("\u8BF7\u5148\u6253\u5F00\u9879\u76EE\u6587\u4EF6\u5939\u3002");
-    let sessionId = preferredSessionId;
-    if (!sessionId) {
-      if (!projects.has(project.id)) projects.set(project.id, (async () => {
+    const restore = (sessionId) => restoreCourseConversation(ctx, { sessionId, cwd: project.path, projectId: project.id });
+    if (preferredSessionId) {
+      try {
+        return await restore(preferredSessionId);
+      } catch (error) {
+        if (!isMissingCourseSession(error)) throw error;
+      }
+    }
+    const cached = projects.get(project.id);
+    if (cached) {
+      try {
+        return await restore(await cached);
+      } catch (error) {
+        if (!isMissingCourseSession(error)) throw error;
+        if (projects.get(project.id) === cached) projects.delete(project.id);
+      }
+    }
+    if (!projects.has(project.id)) {
+      projects.set(project.id, (async () => {
         const created = valueOf(await ctx.remote.workspace.create({ path: project.path }));
         const workspaceId = created?.workspace?.workspaceId;
         if (!workspaceId) throw new Error("DSH \u672A\u8FD4\u56DE\u9884\u89C8\u5DE5\u4F5C\u533A\u3002");
@@ -574,9 +625,8 @@ function createPreviewSessionAcquirer(ctx) {
         projects.delete(project.id);
         throw error;
       }));
-      sessionId = await projects.get(project.id);
     }
-    return restoreCourseConversation(ctx, { sessionId, cwd: project.path, projectId: project.id });
+    return restore(await projects.get(project.id));
   };
 }
 function submissionFailure(error, state) {
@@ -47455,7 +47505,7 @@ function CanvasContent({
       if (creationRef.current?.sessionId) restoredSession.current = true;
       if (result.sessionId && !restoredSession.current && restoreRef.current) {
         restoredSession.current = true;
-        Promise.resolve().then(() => restoreRef.current(result.sessionId)).catch((cause) => {
+        Promise.resolve().then(() => restoreRef.current(result.sessionId, { automatic: true })).catch((cause) => {
           if (mounted.current && epoch === epochRef.current) setError(messageOf7(cause));
         });
       }
@@ -49275,7 +49325,7 @@ function WorkbenchPage({
     window.addEventListener("beforeunload", warnBeforeReload);
     return () => window.removeEventListener("beforeunload", warnBeforeReload);
   }, []);
-  async function restoreCanvasSession(sessionId, requirementId) {
+  async function restoreCanvasSession(sessionId, requirementId, { automatic = false } = {}) {
     const generation = Symbol();
     sessionNavigation.current.set(requirementId, generation);
     if (canvasSessions.current.get(requirementId)?.sessionId === sessionId) {
@@ -49295,6 +49345,7 @@ function WorkbenchPage({
       setSessionErrors((previous) => ({ ...previous, [requirementId]: "" }));
       return { sessionId };
     } catch (cause) {
+      if (automatic && isMissingCourseSession(cause)) return;
       if (mounted.current && sessionNavigation.current.get(requirementId) === generation) setSessionErrors((previous) => ({ ...previous, [requirementId]: `\u6062\u590D AI \u5BF9\u8BDD\u5931\u8D25\uFF1A${messageOf8(cause)}` }));
       throw cause;
     }
@@ -49591,7 +49642,7 @@ function WorkbenchPage({
       conversation,
       conversationSessionId: reference?.sessionId,
       refreshSignal: canvasSignals[selected2.id] || 0,
-      onSessionRestore: (sessionId) => restoreCanvasSession(sessionId, selected2.id),
+      onSessionRestore: (sessionId, options) => restoreCanvasSession(sessionId, selected2.id, options),
       onPreviewProjectFile: previewProjectFile,
       onAssetNavigate: (requirementId, cardId, versionId2) => {
         const target = workspace.requirements.find((item) => item.id === requirementId);

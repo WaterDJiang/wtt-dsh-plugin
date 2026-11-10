@@ -17,7 +17,8 @@ test('ambiguous submissions retain the exact diagnosis and never recommend a dup
 
 test('source conflicts preserve drafts while missing tasks and permissions have different next steps', () => {
   assert.match(userFacingError('文件已被外部修改 hash mismatch').summary, /保留当前草稿/);
-  assert.match(userFacingError('session/not-found').summary, /所属项目/);
+  assert.match(userFacingError('session/not-found').summary, /任务记录和成果仍可查看/);
+  assert.match(userFacingError('该原生会话属于另一个项目目录').summary, /在原项目打开/);
   assert.match(userFacingError('EACCES /tmp/example').summary, /权限/);
   assert.match(userFacingError('401 unauthorized').summary, /连接设置/);
 });

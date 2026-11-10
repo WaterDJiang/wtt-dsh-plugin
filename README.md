@@ -26,9 +26,11 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本为 **0.52.0**。[查看更新内容](plugins/dsh-creation-workbench/README.md#0520-的主要改进)。
+当前版本为 **0.52.1**，修复旧任务对话缺失时打开画布弹错的问题。[查看更新内容](plugins/dsh-creation-workbench/README.md#0521-修复)。
 
-已安装社区市场 `dshmarket` 的用户可打开 **插件 → 插件市场 → 已安装**。WTT 显示「有新版本」时，点「立即更新」。如果旧版的代码来源写的是 `path:plugins/...`，先在原配置用上面的安装串覆盖安装一次，市场就能正确识别子包。
+使用社区市场 `dshmarket` 时，打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」就点 **立即更新**。如果旧版的「代码来源」写的是 `path:plugins/...`，在原 DSH 配置用上面的安装串覆盖安装一次，以后可以直接从市场更新。
+
+中国镜像的公共目录收录正在审核。收录后，新用户可以直接在社区市场搜索「WTT 创作工作台」。[查看收录进度](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13878)
 
 [按原安装来源升级、验证和回退](plugins/dsh-creation-workbench/README.md#检查更新与升级)
 

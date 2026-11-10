@@ -7,7 +7,7 @@ import { startCourseSession } from './session.mjs'
 import { acquireCourseConversation,createEditorSessionAcquirer } from './session.mjs'
 import {createNativeEditorBridge} from './native-editor-bridge.mjs'
 import {NativeEditorConversation,NativeEditorInputDock} from './native-editor-conversation.jsx'
-import { restoreCourseConversation, watchCourseTaskSessions, createPreviewSessionAcquirer } from './session.mjs'
+import { restoreCourseConversation, watchCourseTaskSessions, createPreviewSessionAcquirer, isMissingCourseSession } from './session.mjs'
 import { NATIVE_PREVIEW_CHILDREN, registerNativePreview, HostFilePreview } from './native-preview.jsx'
 import { CourseCanvas } from './canvas.jsx'
 import { ProjectRecycleDialog } from './canvas-recycle.jsx'
@@ -325,7 +325,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     return () => window.removeEventListener('beforeunload', warnBeforeReload)
   }, [])
 
-  async function restoreCanvasSession(sessionId, requirementId) {
+  async function restoreCanvasSession(sessionId, requirementId, { automatic = false } = {}) {
     const generation = Symbol()
     sessionNavigation.current.set(requirementId, generation)
     if (canvasSessions.current.get(requirementId)?.sessionId === sessionId) {
@@ -342,6 +342,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
       setSessionErrors(previous => ({ ...previous, [requirementId]: '' }))
       return { sessionId }
     } catch (cause) {
+      if (automatic && isMissingCourseSession(cause)) return
       if (mounted.current && sessionNavigation.current.get(requirementId) === generation) setSessionErrors(previous => ({ ...previous, [requirementId]: `恢复 AI 对话失败：${messageOf(cause)}` }))
       throw cause
     }
@@ -613,7 +614,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {loadError && <div className="wtt-feedback wtt-feedback-error" role="alert"><UserError error={loadError} announce={false} /><UiButton variant="quiet" className="wtt-button" onClick={() => load(!workspace)} disabled={loading}>重新读取</UiButton></div>}
     {modelError && <div className="wtt-feedback wtt-feedback-error wtt-model-feedback" role="alert"><UserError error={modelError} announce={false} /><UiButton variant="quiet" className="wtt-button" onClick={onRefreshModels} disabled={modelLoading}>刷新模型</UiButton></div>}
 
-    {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={sessionId => restoreCanvasSession(sessionId, selected.id)}
+    {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
       onPreviewProjectFile={previewProjectFile}
       onAssetNavigate={(requirementId, cardId, versionId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId }; selectRequirement(target) }}
       modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}

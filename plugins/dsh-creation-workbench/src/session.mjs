@@ -54,7 +54,9 @@ export function watchCourseTaskSessions(ctx, { sessionIds, cwd, projectId }, onC
         if (!entry) continue;
         try {
           if (entry.cwd !== cwd) throw new Error('会话属于其他项目，已阻止读取。');
-          const reference = ctx.sessions.retain(sessionId, { source: 'wttCourseConfirmations' });
+          const reference = await retainCourseSession(ctx, sessionId, 'wttCourseConfirmations',
+            cause => verifySessionProject(ctx, { cwd, projectId }, sessionId, cause));
+          if (disposed) { reference.release(); break; }
           references.push(reference);
           const binding = await reference.ready;
           if (disposed) { reference.release(); break; }
@@ -63,7 +65,9 @@ export function watchCourseTaskSessions(ctx, { sessionIds, cwd, projectId }, onC
           stops.push(binding.session.projections.faceOf('userQuestions').subscribe(publish));
           stops.push(binding.session.projections.faceOf('inbox').subscribe(publish));
           publish();
-        } catch (error) { if (!disposed) onError?.(`Skill 待办恢复失败（${sessionId}）：${error.message || String(error)}`); }
+        } catch (error) {
+          if (!disposed && !isMissingCourseSession(error)) onError?.(`Skill 待办恢复失败（${sessionId}）：${error.message || String(error)}`);
+        }
       }
       if (!disposed) { stops.push(ctx.uiSession.sessionStatus.subscribe(publish)); publish(); }
     } catch (error) { if (!disposed) onError?.(`Skill 待办恢复失败：${error.message || String(error)}`); }
@@ -91,7 +95,13 @@ async function availableSession(ctx, { cwd, agentPreset }, existingSessionId) {
   return sessionId;
 }
 
-async function verifySessionProject(ctx, { cwd, projectId }, sessionId) {
+const MISSING_SESSION = 'wtt/session-missing';
+
+export function isMissingCourseSession(error) {
+  return error?.code === MISSING_SESSION;
+}
+
+async function verifySessionProject(ctx, { cwd, projectId }, sessionId, retainError) {
   // Old callers have no project identity; their original session contract stays valid.
   if (projectId === undefined) return;
   if (typeof projectId !== 'string' || !projectId.trim() || typeof cwd !== 'string' || !cwd.startsWith('/')) {
@@ -106,6 +116,10 @@ async function verifySessionProject(ctx, { cwd, projectId }, sessionId) {
   }
   // The public Host summary projects immutable SessionHeader.cwd, not the UI's active workspace.
   const session = Array.isArray(listing?.items) ? listing.items.find(item => item?.sessionId === sessionId) : null;
+  if (Array.isArray(listing?.items) && !session) {
+    const detail = retainError ? `：${retainError.message}` : `（${sessionId}）`;
+    throw Object.assign(new Error(`原生会话不存在${detail}`, { cause: retainError }), { code: MISSING_SESSION });
+  }
   if (typeof session?.cwd !== 'string' || !session.cwd.startsWith('/')) {
     throw new Error('无法核对原生会话的原始项目目录，请在当前项目新建会话。');
   }
@@ -114,14 +128,33 @@ async function verifySessionProject(ctx, { cwd, projectId }, sessionId) {
   }
 }
 
+async function retainCourseSession(ctx, sessionId, source, verify) {
+  try {
+    return ctx.sessions.retain(sessionId, { source });
+  } catch (cause) {
+    // The client catalog can lag the host, particularly during startup or reconnect.
+    if (!verify || cause?.message !== `sessions.retain: unknown session ${sessionId}`) throw cause;
+    await verify(cause);
+    if (typeof ctx.sessions.refresh !== 'function') throw cause;
+  }
+  await ctx.sessions.refresh();
+  try {
+    return ctx.sessions.retain(sessionId, { source });
+  } catch (cause) {
+    if (cause?.message === `sessions.retain: unknown session ${sessionId}`) await verify(cause);
+    throw cause;
+  }
+}
+
 export async function restoreCourseConversation(ctx, { sessionId, cwd, projectId }) {
   let reference;
+  const verify = cause => verifySessionProject(ctx, { cwd, projectId }, sessionId, cause);
   try {
-    reference = ctx.sessions.retain(sessionId, { source: 'wttCourseCanvas' });
+    reference = await retainCourseSession(ctx, sessionId, 'wttCourseCanvas', projectId === undefined ? null : verify);
     const binding = await reference.ready;
     const snapshot = binding?.session?.getSnapshot?.();
     if (snapshot?.openState === 'error') throw new Error(snapshot.openError?.message || '原生会话历史加载失败');
-    await verifySessionProject(ctx, { cwd, projectId }, sessionId);
+    await verify();
     return reference;
   } catch (error) {
     reference?.release();
@@ -135,9 +168,21 @@ export function createPreviewSessionAcquirer(ctx) {
   const projects = new Map();
   return async (project, preferredSessionId) => {
     if (!project?.id || !project.path?.startsWith('/')) throw new Error('请先打开项目文件夹。');
-    let sessionId = preferredSessionId;
-    if (!sessionId) {
-      if (!projects.has(project.id)) projects.set(project.id, (async () => {
+    const restore = sessionId => restoreCourseConversation(ctx, { sessionId, cwd: project.path, projectId: project.id });
+    if (preferredSessionId) {
+      try { return await restore(preferredSessionId); }
+      catch (error) { if (!isMissingCourseSession(error)) throw error; }
+    }
+    const cached = projects.get(project.id);
+    if (cached) {
+      try { return await restore(await cached); }
+      catch (error) {
+        if (!isMissingCourseSession(error)) throw error;
+        if (projects.get(project.id) === cached) projects.delete(project.id);
+      }
+    }
+    if (!projects.has(project.id)) {
+      projects.set(project.id, (async () => {
         const created = valueOf(await ctx.remote.workspace.create({ path: project.path }));
         const workspaceId = created?.workspace?.workspaceId;
         if (!workspaceId) throw new Error('DSH 未返回预览工作区。');
@@ -145,9 +190,8 @@ export function createPreviewSessionAcquirer(ctx) {
         if (!result?.sessionId) throw new Error('DSH 未返回预览会话。');
         return result.sessionId;
       })().catch(error => { projects.delete(project.id); throw error; }));
-      sessionId = await projects.get(project.id);
     }
-    return restoreCourseConversation(ctx, { sessionId, cwd: project.path, projectId: project.id });
+    return restore(await projects.get(project.id));
   };
 }
 
