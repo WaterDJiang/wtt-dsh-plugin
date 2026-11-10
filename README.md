@@ -37,5 +37,6 @@ WTT 创作工作台已加入社区公共目录。各镜像的同步进度可能�
 | 插件源码、安装与运行说明 | [plugins/dsh-creation-workbench](plugins/dsh-creation-workbench) |
 | 可选流程示例（课程开发） | [examples/course-workflow.md](examples/course-workflow.md) |
 | DSH 自定义插件索引 | [market/index.json](market/index.json) |
+| 维护与发布 | [发布检查清单](RELEASING.md) |
 
 许可证为 [MIT](LICENSE)。
