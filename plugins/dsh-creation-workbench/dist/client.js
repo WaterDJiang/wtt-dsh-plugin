@@ -45815,6 +45815,7 @@ function flowFromBoard(board, selectedIds = []) {
       },
       dragHandle: ".wcc-group-title",
       selectable: true,
+      selected: selected2.has(group.id),
       deletable: false,
       zIndex: -1
     });
@@ -46053,6 +46054,7 @@ function CanvasContent({
   const nodesRef = (0, import_react46.useRef)([]);
   const edgesRef = (0, import_react46.useRef)([]);
   const boardRef = (0, import_react46.useRef)(null);
+  const boardRead = (0, import_react46.useRef)(null);
   const groupsRef = (0, import_react46.useRef)([]);
   const viewportRef = (0, import_react46.useRef)({ x: 0, y: 0, zoom: 1 });
   const gestureViewportActive = (0, import_react46.useRef)(false);
@@ -47076,11 +47078,12 @@ function CanvasContent({
       if (!stopped && finished) await refreshTasks().catch((cause) => {
         if (!stopped) setNotice(`\u4EFB\u52A1\u5217\u8868\u6682\u672A\u66F4\u65B0\uFF1A${messageOf7(cause)}`);
       });
-      if (!stopped && mediaBoardRefresh.current && boardRef.current && !conflictRef.current && !operationLock.current && !gestureBefore.current && !resizingRef.current && !pendingCount.current) {
+      if (!stopped && mediaBoardRefresh.current && boardRef.current && !boardRead.current && backgroundLayoutReady()) {
         try {
           await saveLayout();
           if (stopped) return;
-          if (!conflictRef.current && !operationLock.current && !gestureBefore.current && !resizingRef.current && !pendingCount.current && await loadBoard({ preserveViewport: true, requireStableLayout: true })) mediaBoardRefresh.current = false;
+          mediaBoardRefresh.current = false;
+          if (!await loadBoard({ preserveViewport: true, requireStableLayout: true })) mediaBoardRefresh.current = true;
         } catch (cause) {
           if (!stopped) setNotice(`\u751F\u6210\u6587\u4EF6\u5DF2\u4FDD\u5B58\uFF0C\u753B\u5E03\u66F4\u65B0\u5931\u8D25\uFF1A${messageOf7(cause)}`);
         }
@@ -47630,43 +47633,58 @@ function CanvasContent({
     void saveLayout();
   }
   finishPositionRef.current = finishPositionChange;
+  function backgroundLayoutReady() {
+    return !conflictRef.current && !operationLock.current && !nodeDragging.current && !gestureBefore.current && !resizingRef.current && !gestureViewportActive.current && !pendingCount.current;
+  }
   async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false } = {}) {
+    if (requireStableLayout && (!boardRef.current || boardRead.current || !backgroundLayoutReady())) return;
     const epoch = epochRef.current;
+    const read = Symbol();
+    boardRead.current = read;
+    const revision = boardRef.current?.revision;
     const previousLayout = requireStableLayout ? JSON.stringify(layoutSnapshot()) : null;
-    setLoading(true);
-    setLoadError("");
+    const isCurrent = () => mounted.current && epoch === epochRef.current && boardRead.current === read;
+    const canApply = () => isCurrent() && (!requireStableLayout || backgroundLayoutReady() && revision === boardRef.current?.revision && previousLayout === JSON.stringify(layoutSnapshot()));
+    if (!requireStableLayout) {
+      setLoading(true);
+      setLoadError("");
+    }
     try {
       const response = await fetch(endpoint2({ canvas: requirement.id }), { credentials: "same-origin" });
       let result = await response.json().catch(() => null);
       if (!response.ok || result?.ok === false || !result?.nodes) {
         throw new Error(result?.error?.message || result?.error || `\u753B\u5E03\u52A0\u8F7D\u5931\u8D25\uFF08${response.status}\uFF09`);
       }
-      if (!mounted.current || epoch !== epochRef.current) return;
-      if (requireStableLayout && (previousLayout !== JSON.stringify(layoutSnapshot()) || operationLock.current || gestureBefore.current || resizingRef.current || pendingCount.current || conflictRef.current)) return;
+      if (!canApply()) return;
       for (const node of result.nodes) {
         const view = node.outputCard && cache.current.versionViews.get(node.outputCard.id);
         if (!view) continue;
         const response2 = await fetch(endpoint2({ outputCard: node.outputCard.id, requirementId: requirement.id, cardVersion: view.versionId }), { credentials: "same-origin" });
         const descriptor = await response2.json();
         if (!response2.ok || !descriptor?.node) throw new Error(descriptor?.error || "\u6240\u9009\u5386\u53F2\u7248\u672C\u6838\u5BF9\u5931\u8D25");
-        if (!mounted.current || epoch !== epochRef.current) return;
+        if (!isCurrent()) return;
         if (cache.current.versionViews.get(node.outputCard.id) === view) cache.current.versionViews.set(node.outputCard.id, { versionId: view.versionId, node: descriptor.node, provenanceEdges: descriptor.provenanceEdges });
       }
-      if (requireStableLayout && (previousLayout !== JSON.stringify(layoutSnapshot()) || operationLock.current || gestureBefore.current || resizingRef.current || pendingCount.current || conflictRef.current)) return;
+      if (!canApply()) return;
       result = versionedBoard(result);
       const currentSelectIds = selectionIntent === void 0 || selectionIntent === creationIntent.current ? selectIds : void 0;
       const ids = currentSelectIds || (initial ? result.nodes.filter((node) => node.kind === "requirement").map((node) => node.id) : nodesRef.current.filter((node) => node.selected).map((node) => node.id));
       boardRef.current = result;
       groupsRef.current = result.groups || [];
       elementsRef.current = result.elements || [];
-      historyRef.current.reset();
-      setHistoryGeneration((value) => value + 1);
-      viewportRef.current = preserveViewport ? { ...viewportRef.current } : result.viewport || { x: 0, y: 0, zoom: 1 };
-      const nextViewport = { epoch, viewport: { ...viewportRef.current }, focusIds: preserveViewport ? void 0 : currentSelectIds };
-      viewportRequest.current = nextViewport;
-      setLoadedViewport(nextViewport);
+      if (!requireStableLayout || revision !== result.revision) {
+        historyRef.current.reset();
+        setHistoryGeneration((value) => value + 1);
+      }
+      if (!requireStableLayout) {
+        viewportRef.current = preserveViewport ? { ...viewportRef.current } : result.viewport || { x: 0, y: 0, zoom: 1 };
+        const nextViewport = { epoch, viewport: { ...viewportRef.current }, focusIds: preserveViewport ? void 0 : currentSelectIds };
+        viewportRequest.current = nextViewport;
+        setLoadedViewport(nextViewport);
+      }
+      const selectedEdges = requireStableLayout ? new Set(edgesRef.current.filter((edge) => edge.selected).map((edge) => edge.id)) : null;
       replaceNodes2(decorate(flowFromBoard(result, ids)));
-      replaceEdges(flowEdges(result.edges));
+      replaceEdges(flowEdges(result.edges).map((edge) => selectedEdges?.has(edge.id) ? { ...edge, selected: true } : edge));
       setBoard(result);
       tasksRef.current = result.tasks || [];
       setTasks(result.tasks || []);
@@ -47680,14 +47698,18 @@ function CanvasContent({
         });
       }
       setSelectionKey(ids.join("|"));
-      conflictRef.current = false;
-      chainRef.current = Promise.resolve();
-      pendingCount.current = 0;
+      if (!requireStableLayout) {
+        conflictRef.current = false;
+        chainRef.current = Promise.resolve();
+        pendingCount.current = 0;
+        setSaveStatus("saved");
+        setError("");
+      } else {
+        setNotice((previous) => previous.startsWith("\u753B\u5E03\u540E\u53F0\u66F4\u65B0\u5931\u8D25\uFF1A") ? "" : previous);
+      }
       const savedLayout = layoutSnapshot();
       queuedSignature.current = JSON.stringify(savedLayout);
       savedLayoutSignature.current = JSON.stringify({ ...savedLayout, viewport: void 0 });
-      setSaveStatus("saved");
-      setError("");
       if (creationRef.current?.sessionId) restoredSession.current = true;
       if (result.sessionId && !restoredSession.current && restoreRef.current) {
         restoredSession.current = true;
@@ -47698,15 +47720,22 @@ function CanvasContent({
       void followOutputResults(result);
       return result;
     } catch (cause) {
-      if (mounted.current && epoch === epochRef.current) setLoadError(messageOf7(cause));
+      if (isCurrent()) {
+        if (requireStableLayout) setNotice(`\u753B\u5E03\u540E\u53F0\u66F4\u65B0\u5931\u8D25\uFF1A${messageOf7(cause)}`);
+        else setLoadError(messageOf7(cause));
+      }
     } finally {
-      if (mounted.current && epoch === epochRef.current) setLoading(false);
+      if (isCurrent()) {
+        boardRead.current = null;
+        if (!requireStableLayout) setLoading(false);
+      }
     }
   }
   (0, import_react46.useEffect)(() => {
     mounted.current = true;
     epochRef.current += 1;
     boardRef.current = null;
+    boardRead.current = null;
     nodesRef.current = [];
     edgesRef.current = [];
     groupsRef.current = [];
@@ -47803,12 +47832,8 @@ function CanvasContent({
     void refreshTasks().catch((cause) => {
       if (mounted.current) setError(messageOf7(cause));
     });
-    const layoutPending = pendingCount.current > 0 || nodesRef.current.some((node) => node.dragging) || boardRef.current && JSON.stringify(layoutSnapshot()) !== queuedSignature.current;
-    if (loading || busy || operationLock.current || draftsRef.current.size || layoutPending || conflictRef.current || saveStatus === "failed") {
-      setNotice("\u8FD9\u8F6E\u521B\u4F5C\u5DF2\u7ED3\u675F\u3002\u5237\u65B0\u753B\u5E03\u53EF\u67E5\u770B\u65B0\u6587\u4EF6\uFF0C\u5F53\u524D\u8349\u7A3F\u548C\u5E03\u5C40\u4F1A\u4FDD\u7559\u3002");
-      return;
-    }
-    void refresh();
+    mediaBoardRefresh.current = true;
+    void onChanged?.();
   }, [refreshSignal]);
   (0, import_react46.useEffect)(() => {
     if (draftCache) return;

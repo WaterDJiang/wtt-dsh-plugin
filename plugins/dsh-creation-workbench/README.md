@@ -1,22 +1,28 @@
 # WTT 创作工作台
 
-**WTT 创作工作台**（`@wtt/dsh-creation-workbench`）是面向 DeepSeek Harness（DSH）的通用创作插件：用自由画布管理素材与文件，卡片化组织文本、PPT、图片、视频与文档，AI 创作流可接入本机任意 Skill。
+**WTT 创作工作台**（`@wtt/dsh-creation-workbench`）是 DeepSeek Harness（DSH）的开源 AI 创作画布。在同一个项目里整理资料、引用卡片与文件、调用本机 Skill，并管理文本、演示文稿、图片和视频的成果版本。
 
-适用于内容策划、营销方案、视频脚本与分镜、调研整理和课程制作。各场景可选择所需的本机 Skill。
+## 快速开始
+
+1. 选择一个本机文件夹，新建画布。把项目资料从文件树拖进去，也可以新建文本卡记录提纲。卡片多时用底部「排版」。
+2. 单击卡片正文或点卡片旁的「＋」，输入你想完成的任务。用 `@` 引用画布卡片或项目文件。输入 `/` 可以选择本机 Skill，常用 Skill 也可以从创作框底部展开。
+3. 双击卡片在右栏编辑文本或预览文件。审阅后保存成果，继续迭代时可在同一卡片保留新旧版本。
+
+| 场景 | 可以怎样组织 |
+| --- | --- |
+| 内容策划 | 把参考资料、提纲、初稿和改稿放在同一张画布 |
+| 视频创作 | 从创意简报推进到脚本和分镜，再归档图片和视频素材 |
+| 调研与汇报 | 整理访谈与文献，引用原始材料撰写简报并制作演示稿 |
 
 ## 功能总览
 
 - **自由画布**：一键排版、拖动、平移缩放、多选编组、连线、撤销重做、小地图；卡片按文本／PPT／图片／视频／文档分型展示，主题跟随 DSH 手动明暗设置
-- **AI 创作**：卡旁创作框选择 DSH 已配置的提供商、模型和推理等级；文本任务用 `/Skill名称` 调用本机任意 Skill，按所选 Skill 原有确认流程推进；图片／视频接本机即梦服务生成，真实格式与 hash 核验后成为产物卡
+- **AI 创作**。在卡旁选择 DSH 已配置的模型和推理等级，直接描述任务或调用本机 Skill。配置即梦服务后，也可生成图片或视频，验证文件后加入画布。
 - **文件与项目**：左侧文件树管理项目目录，支持行内新建、删除与回收站恢复；导入电脑资料自动提取正文（PDF／DOCX／PPTX），原件保留
 - **文档编辑**：文本卡双击打开右栏进行富文本编辑；Word／PDF／CSV 右栏预览并通过本机应用修改工作副本，保存新版本才归档
-- **PPT 编辑**：页内改字、讲师备注、整页／选段交 AI 出候选差异预览；SVG 源稿支持整页重绘、引用换图与分栏对话，确认后保存同卡新版本
+- **PPT 编辑**。在页面上修改文字和备注，或请 AI 对整页或选中内容提出修改。SVG 源稿支持整页重绘和引用换图，确认后保存到同一卡片的新版本。
 - **成果管理**：正式文件按「需求／版本／任务」目录组织，同卡多版本、下载绑定具体文件与 SHA-256 校验，旧版本不覆盖
 - **Skill 发现**：自动读取本机常见技能目录（`~/.codex/skills`、`~/.agents/skills`、`~/.claude/skills`），常用技能点星收藏、中文改名
-
-## 从案例上手
-
-[从需求、大纲和分镜做到可编辑课件](../../examples/course-workflow.md)。案例也说明如何从卡片继续创作、核对引用，以及怎么在画布里审阅和修改课件。
 
 ## 安装
 
@@ -67,19 +73,24 @@ dsh plugin --profile web add "$PWD/$package_file"
 WTT_COURSE_WORKSPACE=/path/to/workspace dsh web
 ```
 
-进入 DSH 左侧「WTT 创作工作台」即可使用；之后可直接从工作目录运行 `dsh web`，工作区在前端切换并记忆。
+进入 DSH 左侧「WTT 创作工作台」后，可以在界面切换工作目录。下次打开时会记住你的选择。
 
 仓库还自带启动器 `./scripts/wtt-dsh --workspace /path/to/workspace`：使用项目内 Node 24 与 DSH，在隔离 profile 自动安装插件，首次安装后复用；停止用 `Ctrl+C`。
 
 ## 检查更新与升级
 
-- **社区插件市场（`dshmarket`）**。打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」时点 **立即更新**，按 DSH 提示完成。已在隔离配置用这条路径验证 0.51.0 升到 0.52.0。
+- **社区插件市场（`dshmarket`）**。打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」时点 **立即更新**，按 DSH 提示完成。
 - **旧安装串迁移**。在 **插件 → 已安装** 打开工作台详情查看「代码来源」。如果子目录写成 `path:plugins/...`，在同一个配置中用本文开头的 `#path:/plugins/dsh-creation-workbench` 安装串覆盖安装一次。市场按带斜杠的子目录识别后续更新。
 - **DSH 自定义插件索引**。从「发现」刷新 WTT 索引，选择兼容的新版本安装。也可以对照 [WTT 市场索引](../../market/index.json) 的版本和固定提交。
 
 等待任务结束后再更新，按 DSH 提示重新加载或重启。打开原项目，核对版本和现有画布。回退可用旧版本的固定提交安装。备份时复制项目目录和其中隐藏的 `.wtt-workbench/`。
 
 WTT 创作工作台已加入社区公共目录。镜像尚未同步时，可使用上面的 Git 安装串。[查看收录记录](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13878)
+
+## 0.53.2 的主要改进
+
+- 已打开的画布在后台同步任务状态时保持可见，拖动卡片和保存布局时可继续操作。
+- 如果拖动期间收到旧布局，工作台会在保存后重新读取。后台刷新保留当前视角，同一布局的撤销和重做记录仍可使用。
 
 ## 0.53.1 的主要改进
 
@@ -109,36 +120,26 @@ WTT 创作工作台已加入社区公共目录。镜像尚未同步时，可使�
 
 ## 构建与检查
 
-本插件要求 Node ≥ 24。推荐先安装隔离运行时与 DSH 宿主（不污染系统 Node）：
+本插件的源码构建使用 Node ≥ 24。
 
 ```sh
-npm install --prefix .runtime/node node@24.11.0 --registry=https://registry.npmjs.org
-PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm ci --registry=https://registry.npmjs.org
-PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm install --prefix .runtime/host @deepseek-ai/dsh@0.2.1-rc.5 --registry=https://registry.npmjs.org   # 安装与你运行版本一致的 DSH 宿主
-PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm run build
-PATH="$PWD/.runtime/node/node_modules/node/bin:$PATH" npm test
+npm ci
+npm run build
+npm test
 ```
 
 `npm run build` 产出 `dist/` 前端与业务服务，并生成 `dist/third-party-notices.txt`（前端依赖许可声明）。`npm test` 覆盖画布与会话恢复、冻结引用、素材路径与状态、失败回滚、文件登记核验、PPT 原生可编辑性等离线检查；模型调用不在离线测试中模拟为真实成功。
 
-## 运行前提（自备）
+## 按需配置
 
-本仓库只包含插件本体（前端、Host 业务服务与内部工作台协议）。课程类等复杂创作工作流由你自己的本机 Skill 驱动，插件不附带任何课程技能；Skill 缺失或不可调用时界面如实提示，不伪装可用。
-
-建议把复杂创作拆成多个步骤，每步在文本／PPT 创作框中选择对应的本机 Skill 推进。以课程制作为例：
-
-1. **大纲**——导入资料与背景，用你的大纲类 Skill 生成课程大纲，确认后保存版本
-2. **分镜**——从大纲进入分镜类 Skill，逐段确认教学安排与页面设计
-3. **课件**——用课件类 Skill 生成可编辑 PPT；插件在登记时会重新验证真实 PPTX 与原生可编辑性
-4. **练习与逐字稿**——分别用练习类、逐字稿类 Skill 产出正式文件（PDF／CSV、Markdown／DOCX 等）
-
-环境依赖按需自备，缺失时如实提示：
-
-- Python 3 与文档／课件依赖（版本见 `resources/course-python-requirements.txt`；PPT 分页渲染需 LibreOffice）
-- MP4／WebM 视频预览需要本机 `ffprobe`；图片／视频生成需本机即梦 API 与账号
-- 课程技能、个人知识库、企业模板和模型账号由使用者配置
+- AI 创作使用你在 DSH 中配置的模型。可安装自己的 Skill，将复杂任务拆成多个步骤，每步选择对应的 Skill 并引用前一步的成果。
+- 文档处理使用 Python 3 和 [Python 依赖](resources/course-python-requirements.txt)，PPT 分页渲染需要 LibreOffice。
+- MP4／WebM 视频预览需要本机 `ffprobe`。使用即梦生成图片或视频需要配置相应服务和账号。
+- 课程开发是可选流程。可从「列表编辑 → 生成课程大纲」开始，搭配自己安装的 Skill。见[课程开发示例](../../examples/course-workflow.md)。
 
 ## 文件组织
+
+`courses/` 是为兼容已有项目保留的目录名，通用创作项目也沿用此存储结构。
 
 ```text
 所选工作文件夹/

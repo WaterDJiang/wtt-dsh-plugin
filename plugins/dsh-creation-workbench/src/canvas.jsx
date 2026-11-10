@@ -284,7 +284,7 @@ function flowFromBoard(board, selectedIds = []) {
         width: Math.max(...members.map(node => node.position.x + (node.width || CARD_WIDTH))) - minX + 48,
         height: Math.max(...members.map(node => node.position.y + (node.height || CARD_HEIGHT))) - minY + 66,
       },
-      dragHandle: '.wcc-group-title', selectable: true, deletable: false, zIndex: -1,
+      dragHandle: '.wcc-group-title', selectable: true, selected: selected.has(group.id), deletable: false, zIndex: -1,
     })
     for (const node of members) membership.set(node.id, { id: group.id, position })
   }
@@ -474,6 +474,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const nodesRef = useRef([])
   const edgesRef = useRef([])
   const boardRef = useRef(null)
+  const boardRead = useRef(null)
   const groupsRef = useRef([])
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
   const gestureViewportActive = useRef(false)
@@ -1310,12 +1311,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         }
       }
       if (!stopped && finished) await refreshTasks().catch(cause => { if (!stopped) setNotice(`任务列表暂未更新：${messageOf(cause)}`) })
-      if (!stopped && mediaBoardRefresh.current && boardRef.current && !conflictRef.current && !operationLock.current && !gestureBefore.current && !resizingRef.current && !pendingCount.current) {
+      if (!stopped && mediaBoardRefresh.current && boardRef.current && !boardRead.current && backgroundLayoutReady()) {
         try {
           await saveLayout()
           if (stopped) return
-          if (!conflictRef.current && !operationLock.current && !gestureBefore.current && !resizingRef.current && !pendingCount.current
-            && await loadBoard({ preserveViewport: true, requireStableLayout: true })) mediaBoardRefresh.current = false
+          mediaBoardRefresh.current = false
+          if (!await loadBoard({ preserveViewport: true, requireStableLayout: true })) mediaBoardRefresh.current = true
         }
         catch (cause) { if (!stopped) setNotice(`生成文件已保存，画布更新失败：${messageOf(cause)}`) }
       }
@@ -1775,43 +1776,58 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
   finishPositionRef.current = finishPositionChange
 
+  function backgroundLayoutReady() {
+    return !conflictRef.current && !operationLock.current && !nodeDragging.current && !gestureBefore.current
+      && !resizingRef.current && !gestureViewportActive.current && !pendingCount.current
+  }
+
   async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false } = {}) {
+    if (requireStableLayout && (!boardRef.current || boardRead.current || !backgroundLayoutReady())) return
     const epoch = epochRef.current
+    const read = Symbol()
+    boardRead.current = read
+    const revision = boardRef.current?.revision
     const previousLayout = requireStableLayout ? JSON.stringify(layoutSnapshot()) : null
-    setLoading(true)
-    setLoadError('')
+    const isCurrent = () => mounted.current && epoch === epochRef.current && boardRead.current === read
+    const canApply = () => isCurrent() && (!requireStableLayout || (
+      backgroundLayoutReady() && revision === boardRef.current?.revision && previousLayout === JSON.stringify(layoutSnapshot())))
+    if (!requireStableLayout) { setLoading(true); setLoadError('') }
     try {
       const response = await fetch(endpoint({ canvas: requirement.id }), { credentials: 'same-origin' })
       let result = await response.json().catch(() => null)
       if (!response.ok || result?.ok === false || !result?.nodes) {
         throw new Error(result?.error?.message || result?.error || `画布加载失败（${response.status}）`)
       }
-      if (!mounted.current || epoch !== epochRef.current) return
-      if (requireStableLayout && (previousLayout !== JSON.stringify(layoutSnapshot()) || operationLock.current || gestureBefore.current || resizingRef.current || pendingCount.current || conflictRef.current)) return
+      if (!canApply()) return
       for (const node of result.nodes) {
         const view = node.outputCard && cache.current.versionViews.get(node.outputCard.id)
         if (!view) continue
         const response = await fetch(endpoint({ outputCard: node.outputCard.id, requirementId: requirement.id, cardVersion: view.versionId }), { credentials: 'same-origin' })
         const descriptor = await response.json()
         if (!response.ok || !descriptor?.node) throw new Error(descriptor?.error || '所选历史版本核对失败')
-        if (!mounted.current || epoch !== epochRef.current) return
+        if (!isCurrent()) return
         if (cache.current.versionViews.get(node.outputCard.id) === view) cache.current.versionViews.set(node.outputCard.id, { versionId: view.versionId, node: descriptor.node, provenanceEdges: descriptor.provenanceEdges })
       }
-      if (requireStableLayout && (previousLayout !== JSON.stringify(layoutSnapshot()) || operationLock.current || gestureBefore.current || resizingRef.current || pendingCount.current || conflictRef.current)) return
+      if (!canApply()) return
       result = versionedBoard(result)
       const currentSelectIds = selectionIntent === undefined || selectionIntent === creationIntent.current ? selectIds : undefined
       const ids = currentSelectIds || (initial ? result.nodes.filter(node => node.kind === 'requirement').map(node => node.id) : nodesRef.current.filter(node => node.selected).map(node => node.id))
       boardRef.current = result
       groupsRef.current = result.groups || []
       elementsRef.current = result.elements || []
-      historyRef.current.reset()
-      setHistoryGeneration(value => value + 1)
-      viewportRef.current = preserveViewport ? { ...viewportRef.current } : result.viewport || { x: 0, y: 0, zoom: 1 }
-      const nextViewport = { epoch, viewport: { ...viewportRef.current }, focusIds: preserveViewport ? undefined : currentSelectIds }
-      viewportRequest.current = nextViewport
-      setLoadedViewport(nextViewport)
+      if (!requireStableLayout || revision !== result.revision) {
+        historyRef.current.reset()
+        setHistoryGeneration(value => value + 1)
+      }
+      if (!requireStableLayout) {
+        viewportRef.current = preserveViewport ? { ...viewportRef.current } : result.viewport || { x: 0, y: 0, zoom: 1 }
+        const nextViewport = { epoch, viewport: { ...viewportRef.current }, focusIds: preserveViewport ? undefined : currentSelectIds }
+        viewportRequest.current = nextViewport
+        setLoadedViewport(nextViewport)
+      }
+      const selectedEdges = requireStableLayout ? new Set(edgesRef.current.filter(edge => edge.selected).map(edge => edge.id)) : null
       replaceNodes(decorate(flowFromBoard(result, ids)))
-      replaceEdges(flowEdges(result.edges))
+      replaceEdges(flowEdges(result.edges).map(edge => selectedEdges?.has(edge.id) ? { ...edge, selected: true } : edge))
       setBoard(result)
       tasksRef.current = result.tasks || []
       setTasks(result.tasks || [])
@@ -1822,14 +1838,18 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           ...(pending.mediaJob ? { mediaJob: pending.mediaJob } : {}) })
       }
       setSelectionKey(ids.join('|'))
-      conflictRef.current = false
-      chainRef.current = Promise.resolve()
-      pendingCount.current = 0
+      if (!requireStableLayout) {
+        conflictRef.current = false
+        chainRef.current = Promise.resolve()
+        pendingCount.current = 0
+        setSaveStatus('saved')
+        setError('')
+      } else {
+        setNotice(previous => previous.startsWith('画布后台更新失败：') ? '' : previous)
+      }
       const savedLayout = layoutSnapshot()
       queuedSignature.current = JSON.stringify(savedLayout)
       savedLayoutSignature.current = JSON.stringify({ ...savedLayout, viewport: undefined })
-      setSaveStatus('saved')
-      setError('')
       if (creationRef.current?.sessionId) restoredSession.current = true
       if (result.sessionId && !restoredSession.current && restoreRef.current) {
         restoredSession.current = true
@@ -1840,9 +1860,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       void followOutputResults(result)
       return result
     } catch (cause) {
-      if (mounted.current && epoch === epochRef.current) setLoadError(messageOf(cause))
+      if (isCurrent()) {
+        if (requireStableLayout) setNotice(`画布后台更新失败：${messageOf(cause)}`)
+        else setLoadError(messageOf(cause))
+      }
     } finally {
-      if (mounted.current && epoch === epochRef.current) setLoading(false)
+      if (isCurrent()) {
+        boardRead.current = null
+        if (!requireStableLayout) setLoading(false)
+      }
     }
   }
 
@@ -1850,6 +1876,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     mounted.current = true
     epochRef.current += 1
     boardRef.current = null
+    boardRead.current = null
     nodesRef.current = []
     edgesRef.current = []
     groupsRef.current = []
@@ -1946,13 +1973,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     previousRefreshSignal.current = { initialized: true, value: refreshSignal }
     if (!previous.initialized || Object.is(previous.value, refreshSignal)) return
     void refreshTasks().catch(cause => { if (mounted.current) setError(messageOf(cause)) })
-    const layoutPending = pendingCount.current > 0 || nodesRef.current.some(node => node.dragging)
-      || (boardRef.current && JSON.stringify(layoutSnapshot()) !== queuedSignature.current)
-    if (loading || busy || operationLock.current || draftsRef.current.size || layoutPending || conflictRef.current || saveStatus === 'failed') {
-      setNotice('这轮创作已结束。刷新画布可查看新文件，当前草稿和布局会保留。')
-      return
-    }
-    void refresh()
+    mediaBoardRefresh.current = true
+    void onChanged?.()
   }, [refreshSignal])
 
   useEffect(() => {

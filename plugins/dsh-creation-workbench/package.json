@@ -1,7 +1,7 @@
 {
   "name": "@wtt/dsh-creation-workbench",
-  "version": "0.53.1",
-  "description": "WTT 创作工作台：DSH 通用创作画布。管理素材、文本、PPT、图片和视频，接入本机 Skill 进行创作。",
+  "version": "0.53.2",
+  "description": "DeepSeek Harness 的 AI 创作画布。在同一个项目里整理资料、引用卡片与文件、调用本机 Skill，并管理文本、演示文稿、图片和视频的成果版本。",
   "keywords": [
     "dsh",
     "deepseek",
@@ -9,11 +9,11 @@
     "plugin",
     "canvas",
     "creation-workbench",
-    "courseware",
+    "ai-workflow",
     "wtt-dsh-plugin",
     "创作画布",
-    "课程制作",
-    "课件",
+    "AI 创作",
+    "项目资料",
     "工作台"
   ],
   "type": "module",
