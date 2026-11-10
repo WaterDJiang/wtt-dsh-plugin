@@ -49,7 +49,7 @@ for (const type of ['text', 'pptx']) {
     assert.doesNotMatch(markup, /\bwcc-creation-send\b/u);
     assert.equal(retryButton(markup), undefined);
     assert.doesNotMatch(markup, /aria-label="创作要求"|class="wcc-model-selection/u);
-    assert.match(markup, /本次任务/u);
+    assert.match(markup, /创作详情/u);
     assert.doesNotMatch(markup, /请先核对已保存来源/u);
   });
 }
@@ -67,7 +67,7 @@ test('a new creation still respects an unavailable source menu', () => {
 
 test('saved output opens an explicit revision action instead of a second editable composer', () => {
   const markup = render('pptx', 'accepted', { pending: false, intent: 'revise' });
-  assert.match(markup, /修改生成新版/);
-  assert.match(markup, /已保存成果/);
+  assert.match(markup, /基于此版修改/);
+  assert.match(markup, /已保存/);
   assert.doesNotMatch(markup, /aria-label="创作要求"|class="wcc-model-selection|\bwcc-creation-send\b/u);
 });

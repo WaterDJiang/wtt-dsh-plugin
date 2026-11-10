@@ -233,9 +233,19 @@
 .wcc-creation-word-preview { color: var(--wtt-ui-text, #65738b); font-size:var(--wtt-text-sm); line-height: 1.8; }
 .wtt-course-canvas .wcc-card-versions { max-width: 132px; margin-left: auto; padding: 2px 4px; border: 1px solid var(--wtt-ui-line, #dce5f2); border-radius: 5px; background: var(--wtt-ui-accent-paper, #f6f9fe); color: var(--wtt-ui-muted, #7b8faf); font-size:var(--wtt-text-xs); cursor: pointer; }
 .wcc-card-open-wrap { position: relative; display: inline-flex; }
-.wtt-course-canvas .wcc-card-open-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; display: flex; flex-direction: column; align-items: stretch; min-width: 148px; padding: 4px; gap: 2px; border: 1px solid var(--wtt-ui-line, #dce2eb); border-radius: 9px; background: var(--wtt-ui-surface, #fff); box-shadow: 0 10px 28px var(--wtt-ui-shadow, #25344b1f); }
-.wtt-course-canvas .wcc-card-open-menu [data-ui-variant='custom'][role='menuitem'] { justify-content: flex-start; width: 100%; padding: 7px 10px; border-radius: 6px; font-size:var(--wtt-text-sm); text-align: left; }
-.wtt-course-canvas .wcc-card-open-menu [data-ui-variant='custom'][role='menuitem']:hover, .wtt-course-canvas .wcc-card-open-menu [data-ui-variant='custom'][role='menuitem']:focus-visible { background: var(--wtt-ui-accent-paper, #eef3ff); }
+/* React Flow sets a z-index on each node. Keep the open menu above adjacent cards. */
+.wtt-course-canvas .react-flow__node-content:has(.wcc-card-open-menu) { z-index: 1001 !important; }
+.wtt-course-canvas .wcc-card-open-menu { position: absolute; top: calc(100% + var(--wtt-space-1)); right: 0; z-index: 30; display: grid; min-width: 176px; max-width: 240px; padding: var(--wtt-space-1); border: 1px solid var(--wtt-ui-line); border-radius: var(--wtt-radius-panel); background: var(--wtt-ui-surface); box-shadow: 0 8px 24px var(--wtt-ui-shadow); }
+.wtt-course-canvas .wcc-card-open-menu button.wtt-ui-button[data-ui-size=compact] { justify-content: flex-start; width: 100%; white-space: normal; text-align: left; }
+.wcc-card-apps > summary { display: flex; align-items: center; gap: var(--wtt-space-1); min-height: var(--wtt-control-compact-h); padding-inline: var(--wtt-space-2); border: 1px solid transparent; border-radius: var(--wtt-radius-control); color: var(--wtt-ui-text); font-size: var(--wtt-text-sm); list-style: none; cursor: pointer; white-space: nowrap; }
+.wcc-card-apps > summary::-webkit-details-marker { display: none; }
+.wcc-card-apps > summary:hover { background: var(--wtt-ui-hover); }
+.wcc-card-apps > summary:focus-visible { outline: 2px solid var(--wtt-ui-accent); outline-offset: -2px; }
+.wcc-card-apps > summary > span { margin-left: auto; color: var(--wtt-ui-muted); }
+.wcc-card-apps[open] > summary > span { transform: rotate(180deg); }
+.wcc-card-app-list { max-height: min(190px, 36dvh); overflow: auto; overscroll-behavior: contain; margin-left: var(--wtt-space-3); padding-left: var(--wtt-space-1); border-left: 1px solid var(--wtt-ui-line); }
+.wcc-card-app-list > p { margin: var(--wtt-space-1); color: var(--wtt-ui-muted); font-size: var(--wtt-text-xs); overflow-wrap: anywhere; }
+@media(max-width:600px) { .wcc-card-apps > summary { min-height: var(--wtt-control-touch-h); } }
 .wtt-course-canvas .wtt-deck-preview { width: min(620px, calc(100% - 32px)); }
 .wtt-course-canvas .wcc-card-body .wtt-output-preview { max-height: 112px; overflow: hidden; }
 

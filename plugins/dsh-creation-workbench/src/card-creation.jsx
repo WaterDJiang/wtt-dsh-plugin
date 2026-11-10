@@ -92,7 +92,7 @@ function selectionLabel(context) {
   return first === last ? `第 ${first} 行` : `第 ${first}–${last} 行`
 }
 
-function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit, mentionProps }) {
+function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit, mentionProps, footer }) {
   const id = useId()
   const root = useRef(null)
   const textarea = useRef(null)
@@ -105,8 +105,10 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   const [localError, setLocalError] = useState('')
   const skills = [...new Map((catalog?.skills || []).map(skill => [skill.name, skill])).values()]
   const favoriteNames = new Set(catalog?.settings?.favorites || [])
-  const candidates = skills.filter(skill => skillSearchText(skill).includes((popup?.query || '').toLowerCase()))
-    .sort((a, b) => Number(Boolean(b.favorite || favoriteNames.has(b.name))) - Number(Boolean(a.favorite || favoriteNames.has(a.name))) || a.name.localeCompare(b.name))
+  const favorites = [...favoriteNames].map(name => skills.find(skill => skill.name === name)).filter(Boolean)
+  const favoritesOnly = popup?.mode === 'browse' && !popup.query && !popup.all && favorites.length > 0
+  const candidates = favoritesOnly ? favorites : skills.filter(skill => skillSearchText(skill).includes((popup?.query || '').toLowerCase()))
+    .sort((a, b) => Number(favoriteNames.has(b.name)) - Number(favoriteNames.has(a.name)) || a.name.localeCompare(b.name))
   const explicitSkills = extractSkillNames(instruction)
   const displayError = localError || (error ? referenceErrorMessage(error) : '')
 
@@ -116,7 +118,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
     document.addEventListener('pointerdown', dismiss, true)
     return () => document.removeEventListener('pointerdown', dismiss, true)
   }, [Boolean(popup)])
-  useEffect(() => { setActiveIndex(0) }, [popup?.query, catalog])
+  useEffect(() => { setActiveIndex(0) }, [popup?.query, popup?.all, catalog])
   useEffect(() => { if (disabled) setPopup(null) }, [disabled])
   useEffect(() => {
     const list = options.current
@@ -134,9 +136,18 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   }
   function openPicker() {
     if (disabled) return
+    if (popup?.mode === 'browse') { closePicker(); return }
     const query = skillQueryAtCursor(instruction, selection.current.start)
     setPopup({ ...(query || selection.current), query: '', mode: 'browse' })
     requestAnimationFrame(() => search.current?.focus({ preventScroll: true }))
+  }
+  function closePicker() {
+    const fromButton = popup?.mode === 'browse'
+    setPopup(null)
+    requestAnimationFrame(() => {
+      const target = fromButton ? root.current?.querySelector('.wcc-creation-skill-trigger') : textarea.current
+      target?.focus({ preventScroll: true })
+    })
   }
   function insertSkill(skill) {
     if (!skill || disabled) return
@@ -162,8 +173,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   function keyboard(event) {
     if (!popup || event.nativeEvent?.isComposing) return false
     if (event.key === 'Escape') {
-      event.preventDefault(); setPopup(null)
-      textarea.current?.focus({ preventScroll: true })
+      event.preventDefault(); closePicker()
       return true
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -171,7 +181,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
       if (candidates.length) setActiveIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + candidates.length) % candidates.length)
       return true
     }
-    if ((event.key === 'Enter' && !event.metaKey && !event.ctrlKey) || event.key === 'Tab') {
+    if ((event.key === 'Enter' && !event.metaKey && !event.ctrlKey) || (event.key === 'Tab' && popup.mode === 'inline' && !event.shiftKey)) {
       if (candidates[activeIndex]) { event.preventDefault(); insertSkill(candidates[activeIndex]); return true }
       if (event.key === 'Tab') setPopup(null)
     }
@@ -185,22 +195,21 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
     finally { setRefreshing(false) }
   }
 
-  return <div ref={root} className="wcc-creation-instruction" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPopup(null) }}>
-    <div className="wcc-creation-instruction-toolbar">
-      <UiButton variant="custom" type="button" className="wcc-creation-skill-trigger" disabled={disabled} aria-label="选择技能" aria-expanded={Boolean(popup)} title={explicitSkills.length ? `已指定 ${explicitSkills.length} 个技能：${explicitSkills.join('、')}` : '选择本机技能'} onMouseDown={event => event.preventDefault()} onClick={openPicker}>/ 技能{explicitSkills.length > 0 && <span>{explicitSkills.length}</span>}</UiButton>
-    <div className="wcc-user-favorites" aria-label="常用技能快捷按钮">
-      <div className="wcc-user-favorite-shortcuts">{(catalog?.settings?.favorites || []).map(name => skills.find(skill => skill.name === name)).filter(Boolean).map(skill => <UiButton variant="custom" key={skill.name} type="button" disabled={disabled} title={`/${skill.name}`} onMouseDown={event => event.preventDefault()} onClick={() => insertSkill(skill)}>{skillLabel(skill)}</UiButton>)}</div>
-      <UiButton variant="custom" type="button" className="wcc-manage-favorites" aria-label="设置常用技能" title="设置常用技能" disabled={disabled} onClick={onOpenSettings}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></UiButton>
-    </div>
-    </div>
+  return <div ref={root} className="wcc-creation-instruction" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPopup(null) }}
+    onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) keyboard(event) }}>
     <ReferencePromptInput textareaRef={textarea} id={`${id}-instruction`} aria-label="创作要求" value={instruction} disabled={disabled} rows={2}
       onValueChange={onChange} onCursor={updateQuery} onSelect={element => { remember(element); if (popup?.mode === 'inline') updateQuery(element) }}
       aria-autocomplete="list" aria-controls={popup ? `${id}-skills` : undefined} aria-activedescendant={popup && candidates[activeIndex] ? `${id}-skill-${activeIndex}` : undefined}
-      placeholder="描述创作要求，@ 引用资料，/ 调用技能" spellCheck={false} onKeyDown={keyboard} onSubmit={onSubmit} {...mentionProps} />
-    {popup && <div className="wcc-creation-skill-picker"><div className="wcc-creation-skill-picker-heading">{popup.mode === 'browse' ? <input ref={search} role="combobox" aria-label="搜索技能" aria-expanded="true" aria-controls={`${id}-skills`} aria-activedescendant={candidates[activeIndex] ? `${id}-skill-${activeIndex}` : undefined} value={popup.query} onChange={event => setPopup(current => ({ ...current, query: event.target.value }))} onKeyDown={keyboard} placeholder="搜索技能 名称或说明" /> : <span>/{popup.query || '…'} · 选择技能</span>}<UiButton variant="custom" type="button" disabled={refreshing || loading || !onRefresh} onClick={() => void refresh()}>{refreshing || loading ? '读取中…' : '刷新'}</UiButton><UiButton variant="custom" type="button" aria-label="设置常用技能" onClick={() => { setPopup(null); onOpenSettings?.() }}>设置常用</UiButton></div>
-      <div ref={options} id={`${id}-skills`} className="wcc-creation-skill-options" role="listbox" aria-label="可选技能">{candidates.map((skill, index) => <UiButton variant="custom" id={`${id}-skill-${index}`} key={skill.name} data-skill-index={index} type="button" role="option" title={`/${skill.name}`} tabIndex={-1} aria-selected={index === activeIndex} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => insertSkill(skill)}><strong>{skillLabel(skill)}{(skill.favorite || favoriteNames.has(skill.name)) && <small>常用</small>}</strong><span>{skill.description || '暂无说明'}</span></UiButton>)}{!candidates.length && <p>{loading ? '正在读取技能列表…' : '没找到相关技能，换个关键词或刷新列表。'}</p>}</div>
+      placeholder="想创作什么？@ 加引用，/ 选技能" spellCheck={false} onKeyDown={keyboard} onSubmit={onSubmit} {...mentionProps} />
+    <div className="wcc-creation-instruction-toolbar">
+      <UiButton variant="ghost" size="compact" className="wcc-creation-skill-trigger" disabled={disabled} aria-label="选择技能" aria-expanded={popup?.mode === 'browse'} aria-controls={popup?.mode === 'browse' ? `${id}-skill-picker` : undefined} title={explicitSkills.length ? explicitSkills.join('、') : '选择常用技能或搜索全部技能'} onMouseDown={event => event.preventDefault()} onClick={openPicker}>技能{explicitSkills.length > 0 && <span>{explicitSkills.length}</span>}<CreationIcon type={popup?.mode === 'browse' ? 'collapse' : 'expand'} size={13} /></UiButton>
+      {footer}
+    </div>
+    {popup && <div id={`${id}-skill-picker`} className="wcc-creation-skill-picker">
+      <div className="wcc-creation-skill-picker-heading">{popup.mode === 'browse' ? <input ref={search} role="combobox" aria-label="搜索技能" aria-expanded="true" aria-controls={`${id}-skills`} aria-activedescendant={candidates[activeIndex] ? `${id}-skill-${activeIndex}` : undefined} value={popup.query} onChange={event => setPopup(current => ({ ...current, query: event.target.value }))} onKeyDown={keyboard} placeholder="搜索全部技能" /> : <span>/{popup.query || '…'}</span>}<UiButton variant="ghost" size="compact" disabled={refreshing || loading || !onRefresh} onClick={() => void refresh()}>{refreshing || loading ? '读取中…' : '刷新'}</UiButton><UiButton variant="ghost" size="compact" aria-label="设置常用技能" onClick={() => { setPopup(null); onOpenSettings?.() }}>管理常用</UiButton></div>
+      {popup.mode === 'browse' && !popup.query && favorites.length > 0 && <div className="wcc-creation-skill-picker-heading"><span>{favoritesOnly ? '常用技能' : '全部技能'}</span><UiButton variant="ghost" size="compact" onClick={() => setPopup(current => ({ ...current, all: !current.all }))}>{favoritesOnly ? '查看全部' : '只看常用'}</UiButton></div>}
+      <div ref={options} id={`${id}-skills`} className={`wcc-creation-skill-options${favoritesOnly ? ' is-favorites' : ''}`} role="listbox" aria-label={favoritesOnly ? '常用技能' : '可选技能'}>{candidates.map((skill, index) => <UiButton variant="custom" id={`${id}-skill-${index}`} key={skill.name} data-skill-index={index} type="button" role="option" title={`/${skill.name}`} tabIndex={-1} aria-selected={index === activeIndex} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => insertSkill(skill)}><strong>{skillLabel(skill)}{!favoritesOnly && favoriteNames.has(skill.name) && <small>常用</small>}</strong>{!favoritesOnly && skill.description && <span>{skill.description}</span>}</UiButton>)}{!candidates.length && <p>{loading ? '正在读取技能列表…' : '未找到技能，试试其他关键词。'}</p>}</div>
       {!!catalog?.warnings?.length && <p className="wcc-creation-preview-note">有 {catalog.warnings.length} 项技能来源提示，可在设置中查看。</p>}
-      <p className="wcc-creation-skill-keyboard">↑↓ 选择 · Enter / Tab 插入 · Esc 关闭</p>
     </div>}
     {displayError && <UserError className="wcc-creation-error" error={displayError} />}
   </div>
@@ -258,10 +267,10 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [],
 
   return <div ref={menu} className="wcc-node-create-menu nodrag nopan nowheel" style={{ left: position.x, top: position.y }} role="menu" aria-label={caption || "从卡片创建内容"} tabIndex={-1}
     onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={keyboard}>
-    <p className="wcc-create-menu-caption">{caption || "从此卡片继续创作"}</p>
+    <p className="wcc-create-menu-caption">{caption || '用这张卡创作'}</p>
     {items.map(item => <UiButton variant="custom" key={item.id} type="button" role="menuitem" disabled={item.disabled} title={(item.disabled && item.reason) || item.description || item.label}
       onClick={() => { onAction?.(item.id); onClose?.() }}>
-      <span className={`wcc-create-menu-icon is-${item.id}`}><CreationIcon type={item.id} /></span><span><strong>{item.label || KIND_LABELS[item.id] || item.id}</strong>{(item.reason || item.description) && <small>{(item.disabled && item.reason) || item.description}</small>}</span><span className="wcc-create-menu-chevron" aria-hidden="true">›</span>
+      <span className={`wcc-create-menu-icon is-${item.id}`}><CreationIcon type={item.id} size={15} /></span><span><strong>{item.label || KIND_LABELS[item.id] || item.id}</strong>{item.disabled && item.reason && <small>{item.reason}</small>}</span>
     </UiButton>)}
   </div>
 }
@@ -318,6 +327,7 @@ export function CardComposer({
   const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation)
   const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing
   const showInitialInput = !taskMode && !reviewingResult
+  const stageStatus = taskMode ? pendingLabel(context.pendingGeneration) : reviewingResult ? '已保存' : ''
   const mediaOptions = mediaOptionsFor(outputType, mediaCapabilities, context?.mediaOptions)
   const mediaModel = mediaCapabilities?.models?.find(model => model.type === outputType && model.id === mediaOptions.model)
   const mediaPending = mediaJobPending(context?.mediaJob)
@@ -336,6 +346,8 @@ export function CardComposer({
   // Original tasks resume their frozen input; the placeholder is not a new source.
   const selectedType = inputLocked ? { id: outputType, label: KIND_LABELS[outputType] || '创作任务', available: true } : creationTypes.find(type => type.id === outputType)
   const isAction = ACTION_TYPES.has(outputType)
+  const heading = stageStatus || collapsed ? headingCard?.defaultOutcome?.name || cardTitle(headingCard) : isAction ? selectedType?.label || KIND_LABELS[outputType] : revising ? '修改此版本' : 'AI 创作'
+  const headingDetail = stageStatus || (!isAction && !revising ? KIND_LABELS[outputType] : '')
   const generation = context?.generation
   const allowsEmptyReferences = generation?.mode === 'new' || generation?.mode === 'revise' && Boolean(generation.cardId && generation.baseVersionId)
   const sourcesAvailable = inputLocked || isAction || references.length > 0 || allowsEmptyReferences
@@ -400,7 +412,7 @@ export function CardComposer({
       const form = root.querySelector('.wcc-creation-action-content') || root.querySelector('.wcc-creation-instruction')
       const editable = [...(form?.querySelectorAll('input:not([disabled]):not([readonly]):not([type="hidden"]), textarea:not([disabled]):not([readonly])') || [])]
         .find(element => !element.closest('[hidden]') && element.getClientRects().length > 0)
-      const target = editable || root.querySelector('.wcc-task-stage-header .wcc-creation-window-actions button:last-child') || root.querySelector('.wcc-creation-window-actions button:last-child')
+      const target = editable || root.querySelector('.wcc-creation-window-actions button:last-child')
       target?.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(frame)
@@ -612,17 +624,13 @@ export function CardComposer({
       if (event.key === 'Escape' && referencesOpen) { event.preventDefault(); setReferencesOpen(false); addButton.current?.focus() }
       else if(event.key==='Escape'&&previewOpen){event.preventDefault();setPreviewOpen(false);previewTrigger.current?.focus()}
     }}>
-    <header className="wcc-creation-heading" hidden={!collapsed}>
-      <div className="wcc-creation-heading-copy" title={[context?.projectName, context?.requirementTitle].filter(Boolean).join(' / ')}><span className="wcc-creation-heading-icon"><CreationIcon type={outputType} /></span><div><div className="wcc-creation-title-row"><h3 id={`${id}-title`} title={cardTitle(headingCard)}>{cardTitle(headingCard)}</h3><span className="wcc-creation-current-type" aria-label="当前操作" title={selectedType?.message || selectedType?.label || KIND_LABELS[outputType]}>{revising ? '版本修订' : selectedType?.label || KIND_LABELS[outputType] || '创作任务'}</span></div></div></div>
-      <div className="wcc-creation-window-actions">{headingCard?.kind === 'outline' && onAction && <UiButton variant="custom" type="button" className="wcc-creation-edit" aria-label="专注编辑当前大纲" disabled={busy} onClick={() => onAction('edit')}>编辑</UiButton>}<UiButton variant="custom" type="button" aria-label={collapsed ? '展开卡片创作框' : '收起卡片创作框'} aria-expanded={!collapsed} onClick={() => { setCollapsed(value => !value); setReferencesOpen(false) }}><CreationIcon type={collapsed ? 'expand' : 'collapse'} size={15} /></UiButton><UiButton variant="custom" type="button" aria-label="关闭卡片创作框" onClick={onClose}><CreationIcon type="close" size={15} /></UiButton></div>
+    <header className="wcc-creation-heading">
+      <div className="wcc-creation-title-row"><h3 id={`${id}-title`} title={heading}>{heading}</h3>{headingDetail && <span className="wcc-creation-current-type" title={headingDetail} role={stageStatus ? 'status' : undefined}>{headingDetail}</span>}</div>
+      <div className="wcc-creation-window-actions">{collapsed && headingCard?.kind === 'outline' && onAction && <UiButton variant="custom" className="wcc-creation-edit" aria-label="专注编辑当前大纲" disabled={busy} onClick={() => onAction('edit')}>编辑</UiButton>}<UiButton variant="custom" aria-label={collapsed ? '展开卡片创作框' : '收起卡片创作框'} aria-expanded={!collapsed} aria-controls={`${id}-body`} onClick={() => { setCollapsed(value => !value); setReferencesOpen(false) }}><CreationIcon type={collapsed ? 'expand' : 'collapse'} size={15} /></UiButton><UiButton variant="custom" aria-label="关闭卡片创作框" onClick={onClose}><CreationIcon type="close" size={15} /></UiButton></div>
     </header>
-    <div ref={scrollBody} className="wcc-creation-scroll-body" hidden={collapsed}>
+    <div ref={scrollBody} id={`${id}-body`} className="wcc-creation-scroll-body" hidden={collapsed}>
     {(taskMode || reviewingResult) && <>
-      <header className="wcc-task-stage-header"><strong role="status">{taskMode ? pendingLabel(context.pendingGeneration) : '已保存成果'}</strong><div className="wcc-creation-window-actions">
-        <UiButton variant="custom" type="button" aria-label="收起卡片创作框" onClick={() => setCollapsed(true)}><CreationIcon type="collapse" size={15} /></UiButton>
-        <UiButton variant="custom" type="button" aria-label="关闭卡片创作框" onClick={onClose}><CreationIcon type="close" size={15} /></UiButton>
-      </div></header>
-      <TaskInputSummary instruction={instruction} references={references} skills={context?.selectedSkills || chosenSkills} model={modelSelection} engine={engineSummary}
+      <TaskInputSummary instruction={instruction} references={references} skills={(context?.selectedSkills || chosenSkills).map(name => skillLabel(skillCatalog?.skills?.find(skill => skill.name === name) || { name }))} model={context?.modelSelection || (taskMode ? modelSelection : undefined)} engine={engineSummary}
         renderFile={getReferenceFileHref ? reference => (reference.importedFile || reference.generatedFile) && <ImportedReferenceFile card={reference} getHref={getReferenceFileHref} /> : undefined} />
       {context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={context.pendingGeneration.error} />}
       {displayError && displayError !== context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={displayError} />}
@@ -631,22 +639,19 @@ export function CardComposer({
       {taskMode && pendingRetryAllowed(context.pendingGeneration) && <div className="wcc-task-stage-actions"><UiButton variant="primary" disabled={!ready} onClick={submit}>重试原任务</UiButton></div>}
       {taskMode && pendingRetryAllowed(context.pendingGeneration) && reason && <p className="wcc-creation-disabled-reason" role="status">{reason}</p>}
       {taskMode && !context?.sessionId && <p className="wcc-creation-execution-note" role="status">{context?.pendingGeneration?.status === 'unknown' ? '提交结果待核对，请从创作任务查看；不要重复发送。' : '尚未连接原任务对话。'}</p>}
-      {reviewingResult && <div className="wcc-task-stage-actions"><UiButton variant="primary" onClick={() => { setConversationOpen(false); setRevisionEditing(true) }}>修改生成新版</UiButton></div>}
     </>}
     {showInitialInput && <>
     <div id={`${id}-setup`} className="wcc-creation-main" hidden={collapsed}>
       {context?.recorded === false && <p className="wcc-creation-history-note" role="status">这份历史文件没有保存提示词。填写修改要求，可生成新版本。</p>}
       {referenceNotes.map(note => <p key={note} className="wcc-creation-history-note" role="status">{note}</p>)}
       {context?.selection && <div className="wcc-creation-selection-scope" role="status"><span>仅引用所选片段 · {selectionLabel(context)} · {Array.from(context.selection.quote || '').length} 个字符</span><UiButton variant="custom" type="button" disabled={busy || inputLocked || !onAction} onClick={() => onAction('whole-source')}>使用整份原文</UiButton></div>}
-      <div className="wcc-creation-compact-actions"><UiButton variant="custom" type="button" aria-label="收起卡片创作框" onClick={() => setCollapsed(true)}>⌄</UiButton><UiButton variant="custom" type="button" aria-label="关闭卡片创作框" onClick={onClose}>×</UiButton></div>
       <section className={`wcc-creation-reference-area${references.length ? '' : ' is-empty'}`} aria-label="引用资料">
-        {!!references.length && <div className="wcc-creation-reference-caption"><span>引用</span><small aria-live="polite">{references.length}份</small></div>}
+        {!!references.length && <UiButton variant="ghost" size="compact" className="wcc-reference-preview-toggle" aria-label="查看本次引用内容" aria-expanded={previewOpen} aria-controls={`${id}-reference-preview`} onClick={event=>{previewTrigger.current=event.currentTarget;setPreviewOpen(value=>!value);setReferencesOpen(false)}}>{references.length} 份引用<CreationIcon type={previewOpen ? 'collapse' : 'expand'} size={13} /></UiButton>}
         <div className="wcc-creation-reference-chips">{references.map(card => <span key={card.id} className={`wcc-creation-reference-chip${unavailableReason(card) ? ' is-unavailable' : ''}`} title={`${cardTitle(card)}${unavailableReason(card) || card.referenceNote ? ` · ${unavailableReason(card) || card.referenceNote}` : ''}`}>
           <span className="wcc-reference-format">{referenceFormat(card)}</span><UiButton variant="custom" className="wcc-reference-name" type="button" aria-label={`查看引用 ${cardTitle(card)}`} aria-expanded={previewOpen} aria-controls={`${id}-reference-preview`} onClick={event=>{previewTrigger.current=event.currentTarget;setPreviewOpen(true);setReferencesOpen(false);const detail=referenceDetails.current.get(card.id);if(detail)detail.open=true}}>{cardTitle(card)}</UiButton>
-          {isPinned(card) ? <span className="wcc-creation-reference-lock" title={inputLocked ? '本次任务使用的资料版本' : '以来源卡片为创作依据'} aria-label={inputLocked ? '本次使用的资料版本' : '来源卡片，保留为引用'}>{inputLocked?<CreationIcon type="lock" size={11}/>: '来源'}</span> : <UiButton variant="custom" type="button" className="wcc-reference-remove" disabled={referencesBusy} aria-label={`移除引用 ${cardTitle(card)}`} onClick={() => removeReference(card)}><CreationIcon type="close" size={12} /></UiButton>}
+          {isPinned(card) ? <span className="wcc-creation-reference-lock" title="已关联到来源卡片" role="img" aria-label="已关联到来源卡片"><CreationIcon type="lock" size={11} /></span> : <UiButton variant="custom" type="button" className="wcc-reference-remove" disabled={referencesBusy} aria-label={`移除引用 ${cardTitle(card)}`} onClick={() => removeReference(card)}><CreationIcon type="close" size={12} /></UiButton>}
         </span>)}</div>
-        <UiButton variant="custom" ref={addButton} type="button" className="wcc-creation-add-reference" aria-label="添加引用资料" aria-expanded={referencesOpen} aria-controls={`${id}-references`} disabled={referencesBusy} onClick={() => { setReferencesOpen(value => !value); setReferenceSource(null);setPreviewOpen(false) }}><CreationIcon type="plus" size={14} /><span>添加</span></UiButton>
-        {!!references.length&&<UiButton variant="custom" type="button" className="wcc-reference-preview-toggle" aria-label="查看本次引用内容" aria-expanded={previewOpen} aria-controls={`${id}-reference-preview`} onClick={event=>{previewTrigger.current=event.currentTarget;setPreviewOpen(value=>!value);setReferencesOpen(false)}}>{previewOpen?'收起':'查看'}</UiButton>}
+        <UiButton variant="ghost" size="compact" ref={addButton} className="wcc-creation-add-reference" aria-label="添加引用资料" aria-expanded={referencesOpen} aria-controls={`${id}-references`} disabled={referencesBusy} onClick={() => { setReferencesOpen(value => !value); setReferenceSource(null);setPreviewOpen(false) }}><CreationIcon type="plus" size={14} />加引用</UiButton>
         <input ref={fileInput} type="file" hidden multiple accept={acceptedFiles || undefined} aria-label="选择电脑素材文件" onChange={event => void importFiles(event)} />
         <div ref={picker} id={`${id}-references`} hidden={!referencesOpen} className="wcc-creation-reference-picker" aria-label="选择引用资料">
           <div className="wcc-creation-reference-sources" hidden={referenceSource === 'board'}>
@@ -676,20 +681,21 @@ export function CardComposer({
       </section>
       {inputLocked && <div className={`wcc-creation-pending-state is-${context?.pendingGeneration?.phase || 'unknown'}`} role="status"><strong>{pendingLabel(context?.pendingGeneration)}</strong><p>{context?.pendingGeneration?.error || context?.pendingGeneration?.message || '成果文件保存后会原位更新卡片。'}</p><small>任务已提交。需要补充要求或确认时，请打开「任务对话」。</small></div>}
       {isMedia && inputLocked ? <div className="wcc-creation-frozen-media"><label>原提示词<textarea value={instruction} readOnly rows={4} /></label><p>{[context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} 秒`].filter(Boolean).join(' · ')}</p>{context?.mediaJob?.error && <p className="wcc-creation-error">{context.mediaJob.error}</p>}{context?.mediaJob?.canResume && <UiButton variant="custom" type="button" disabled={busy} onClick={onResumeMedia}>查看进度或取回文件</UiButton>}{['unknown', 'download_failed', 'registration_failed'].includes(context?.mediaJob?.status) && <UiButton variant="custom" type="button" disabled={busy} onClick={onNewMedia}>确认后重新生成</UiButton>}</div>
-        : isMedia ? <MediaPrompt key={context?.key} type={outputType} instruction={instruction} onChange={onInstructionChange} options={mediaOptions} onOptionsChange={onMediaOptionsChange} capabilities={mediaCapabilities} loading={mediaLoading} error={mediaError} job={context?.mediaJob} onRefresh={onRefreshMedia} onOpenSettings={() => setMediaSettingsOpen(true)} onResume={onResumeMedia} onPrepareNew={onNewMedia} onSubmit={submit} disabled={referencesBusy} mentionProps={mentionProps} /> : isAction ? (actionContent != null ? <div className="wcc-creation-action-content">{actionContent}</div> : <label className="wcc-creation-instruction"><span>处理说明</span><textarea value={instruction} onChange={event => onInstructionChange?.(event.target.value)} disabled={busy} rows={4} maxLength={8000} /></label>) : <SkillCommandInput key={context?.key} instruction={instruction} onChange={onInstructionChange} disabled={busy || inputLocked} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onOpenSettings={() => setSkillSettingsOpen(true)} onSubmit={submit} mentionProps={mentionProps} />}
+        : isMedia ? <MediaPrompt key={context?.key} type={outputType} instruction={instruction} onChange={onInstructionChange} options={mediaOptions} onOptionsChange={onMediaOptionsChange} capabilities={mediaCapabilities} loading={mediaLoading} error={mediaError} job={context?.mediaJob} onRefresh={onRefreshMedia} onOpenSettings={() => setMediaSettingsOpen(true)} onResume={onResumeMedia} onPrepareNew={onNewMedia} onSubmit={submit} disabled={referencesBusy} mentionProps={mentionProps} /> : isAction ? (actionContent != null ? <div className="wcc-creation-action-content">{actionContent}</div> : <label className="wcc-creation-instruction"><span>处理说明</span><textarea value={instruction} onChange={event => onInstructionChange?.(event.target.value)} disabled={busy} rows={4} maxLength={8000} /></label>) : <SkillCommandInput key={context?.key} instruction={instruction} onChange={onInstructionChange} disabled={busy || inputLocked} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onOpenSettings={() => setSkillSettingsOpen(true)} onSubmit={submit} mentionProps={mentionProps} footer={submitFooter} />}
 
       {reason && <p className="wcc-creation-disabled-reason" role="status">{reason}</p>}
       {displayError && <UserError className="wcc-creation-error" error={displayError} />}
     </div>
-    {!collapsed && submitFooter}
+    {(isMedia || isAction) && submitFooter}
     </>}
-    <div className="wcc-creation-conversation-heading" hidden={collapsed || !hasExecution || (revisionEditing && !taskMode)}>
-      <UiButton variant="custom" type="button" aria-expanded={conversationOpen} aria-controls={`${id}-conversation`} disabled={conversationOpening === conversationScope} onClick={() => void toggleConversation()}><CreationIcon type="spark" size={13} /><span>{reviewingResult ? '查看原任务对话' : '任务对话'}</span><small>{conversationOpening === conversationScope ? '正在恢复…' : conversationOpen ? '收起' : taskMode ? '继续当前任务' : '查看'}</small><CreationIcon type={conversationOpen ? 'collapse' : 'expand'} size={13} /></UiButton>
+    <div className="wcc-creation-conversation-heading" hidden={(!hasExecution && !reviewingResult) || (revisionEditing && !taskMode)}>
+      {reviewingResult && <UiButton variant="quiet" size="compact" onClick={() => { setConversationOpen(false); setRevisionEditing(true); requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus({ preventScroll: true })) }}>基于此版修改</UiButton>}
+      {hasExecution && <UiButton variant="ghost" size="compact" aria-expanded={conversationOpen} aria-controls={`${id}-conversation`} disabled={conversationOpening === conversationScope} onClick={() => void toggleConversation()}>{conversationOpening === conversationScope ? '正在打开…' : reviewingResult ? '原对话' : '任务对话'}<CreationIcon type={conversationOpen ? 'collapse' : 'expand'} size={13} /></UiButton>}
       {executionExpanded && <div className="wcc-review-jumps">
         {onOpenReviewDraft && reviewDraft && <UiButton variant="quiet" size="compact"
           title={reviewDraft.name} onClick={openReviewDraft}>查看待审稿</UiButton>}
-        <UiButton variant="quiet" size="compact" onClick={() => jumpToReview(true)}>看过程</UiButton>
-        <UiButton variant="quiet" size="compact" onClick={() => jumpToReview(false)}>看审核</UiButton>
+        <UiButton variant="quiet" size="compact" onClick={() => jumpToReview(true)}>查看过程</UiButton>
+        <UiButton variant="quiet" size="compact" onClick={() => jumpToReview(false)}>前往确认</UiButton>
       </div>}
     </div>
     {!collapsed && conversationError?.scope === conversationScope && <UserError className="wcc-creation-error wcc-creation-task-error" error={conversationError.message} />}

@@ -1,11 +1,6 @@
-.wcc-card-composer.is-task-stage .wcc-task-stage-header{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:var(--wtt-space-3);padding:var(--wtt-space-2) var(--wtt-space-3);border-bottom:1px solid var(--wtt-ui-line)}
-.wcc-task-stage-header>strong{min-width:0;font-size:var(--wtt-text-md);font-weight:550;color:var(--wtt-ui-ink);overflow-wrap:anywhere}
-.wcc-task-stage-header .wcc-creation-window-actions{gap:var(--wtt-space-2)}
 .wcc-task-stage-actions{display:flex;flex:0 0 auto;gap:var(--wtt-space-2);padding:var(--wtt-space-2) var(--wtt-space-3)}
 .wcc-card-composer.is-task-stage.is-conversation-open{height:min(560px,calc(100% - var(--wcc-creation-y,16px) - 14px))}
-.wcc-card-composer.is-task-stage .wcc-creation-conversation-heading{border-top:0}
 .wcc-card-composer.is-task-stage .wcc-creation-error,.wcc-card-composer.is-task-stage .wcc-creation-disabled-reason{flex:0 0 auto;margin:var(--wtt-space-2) var(--wtt-space-3)}
-@media(max-width:600px){.wtt-course-canvas .wcc-card-composer.is-task-stage .wcc-creation-window-actions button{width:44px;min-height:44px}.wcc-task-stage-header{padding-top:var(--wtt-space-1);padding-bottom:var(--wtt-space-1)}}
 
 /* Keep the native question in the conversation flow so the history stays reachable. */
 .wtt-course-canvas .wcc-card-composer.is-conversation-open:has(.wcc-creation-conversation [data-question-scroll]) .wcc-creation-scroll-body {
@@ -29,7 +24,7 @@
 }
 .wcc-card-composer.is-conversation-open:has(.wcc-creation-conversation [data-question-scroll]) .wcc-review-jumps {
   display: flex;
-  flex: none;
+  flex-wrap: wrap;
   gap: var(--wtt-space-1);
 }
 .wcc-card-composer .wcc-creation-conversation [data-conversation-scroll]:has([data-question-scroll]) {

@@ -272,6 +272,7 @@ function UserError({ error, className = "", announce = true }) {
 var import_react48 = __toESM(require("react"), 1);
 
 // src/model-selection.mjs
+var EFFORT_LABELS = { off: "\u5173\u95ED", minimal: "\u6781\u4F4E", low: "\u4F4E", medium: "\u4E2D", high: "\u9AD8", xhigh: "\u66F4\u9AD8", max: "\u6700\u9AD8" };
 function identifier(value, label2, maxLength = 256) {
   if (typeof value !== "string" || !value.trim() || value.trim().length > maxLength || /[\u0000-\u001f\u007f]/u.test(value)) {
     throw new Error(`\u6A21\u578B\u9009\u62E9\u7684${label2}\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u6A21\u578B\u3002`);
@@ -42242,7 +42243,6 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
 
 // src/model-selection.jsx
 var import_react31 = __toESM(require("react"), 1);
-var EFFORT_LABELS = { off: "\u5173\u95ED", minimal: "\u6781\u4F4E", low: "\u4F4E", medium: "\u4E2D", high: "\u9AD8", xhigh: "\u66F4\u9AD8", max: "\u6700\u9AD8" };
 function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false }) {
   const id2 = (0, import_react31.useId)();
   let normalized = null;
@@ -42293,7 +42293,8 @@ function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, o
 // src/task-input-summary.jsx
 var import_react32 = __toESM(require("react"), 1);
 function TaskInputSummary({ instruction, references, skills, model, engine, renderFile }) {
-  return /* @__PURE__ */ import_react32.default.createElement("details", { className: "wcc-task-input-summary" }, /* @__PURE__ */ import_react32.default.createElement("summary", null, /* @__PURE__ */ import_react32.default.createElement("span", null, "\u672C\u6B21\u4EFB\u52A1"), /* @__PURE__ */ import_react32.default.createElement("small", null, references.length, " \u4EFD\u5F15\u7528", engine ? ` \xB7 ${engine}` : "")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-input-body" }, /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-input-label" }, "\u539F\u59CB\u8981\u6C42"), /* @__PURE__ */ import_react32.default.createElement("pre", null, instruction || "\u6B64\u5386\u53F2\u4EFB\u52A1\u672A\u8BB0\u5F55\u539F\u59CB\u8981\u6C42"), !!skills?.length && /* @__PURE__ */ import_react32.default.createElement("p", null, skills.join(" \xB7 ")), model?.model && /* @__PURE__ */ import_react32.default.createElement("p", null, "\u4EFB\u52A1\u6A21\u578B\uFF1A", model.model, model.reasoningEffort ? ` \xB7 ${model.reasoningEffort}` : ""), references.map((reference) => /* @__PURE__ */ import_react32.default.createElement("details", { key: reference.id }, /* @__PURE__ */ import_react32.default.createElement("summary", null, reference.title || reference.name || "\u5F15\u7528\u8D44\u6599"), (reference.referenceNote || reference.unavailable || ["missing", "modified", "changed"].includes(reference.status)) && /* @__PURE__ */ import_react32.default.createElement("p", { role: "status" }, reference.referenceNote || (reference.status === "missing" ? "\u6587\u4EF6\u5DF2\u7F3A\u5931\uFF0C\u672C\u6B21\u51BB\u7ED3\u5185\u5BB9\u4FDD\u7559" : reference.status === "modified" ? "\u6587\u4EF6\u5DF2\u5728\u5916\u90E8\u4FEE\u6539\uFF0C\u672C\u6B21\u51BB\u7ED3\u5185\u5BB9\u4FDD\u7559" : "\u6765\u6E90\u5DF2\u53D8\u5316\uFF0C\u672C\u6B21\u51BB\u7ED3\u5185\u5BB9\u4FDD\u7559")), renderFile?.(reference), reference.truncated && /* @__PURE__ */ import_react32.default.createElement("p", null, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(reference.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${reference.fullLength} \u5B57\u7B26` : "", "\u3002"), /* @__PURE__ */ import_react32.default.createElement("pre", null, reference.previewText ?? reference.content ?? "\u6B64\u683C\u5F0F\u672A\u63D0\u53D6\u6B63\u6587")))));
+  const effort = model?.reasoningEffort;
+  return /* @__PURE__ */ import_react32.default.createElement("details", { className: "wcc-task-input-summary" }, /* @__PURE__ */ import_react32.default.createElement("summary", null, /* @__PURE__ */ import_react32.default.createElement("span", null, "\u521B\u4F5C\u8BE6\u60C5"), references.length > 0 && /* @__PURE__ */ import_react32.default.createElement("small", null, references.length, " \u4EFD\u5F15\u7528")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-input-body" }, /* @__PURE__ */ import_react32.default.createElement("pre", null, instruction || "\u8FD9\u6B21\u521B\u4F5C\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002"), (skills?.length > 0 || model?.model || engine) && /* @__PURE__ */ import_react32.default.createElement("dl", { className: "wcc-task-input-meta" }, !!skills?.length && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u4F7F\u7528\u6280\u80FD"), /* @__PURE__ */ import_react32.default.createElement("dd", null, skills.join("\u3001"))), model?.model && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u4F7F\u7528\u6A21\u578B"), /* @__PURE__ */ import_react32.default.createElement("dd", null, model.model, effort ? ` \xB7 \u63A8\u7406\u7B49\u7EA7 ${EFFORT_LABELS[effort] || effort}` : "")), engine && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u5236\u4F5C\u65B9\u5F0F"), /* @__PURE__ */ import_react32.default.createElement("dd", null, engine))), references.map((reference) => /* @__PURE__ */ import_react32.default.createElement("details", { key: reference.id }, /* @__PURE__ */ import_react32.default.createElement("summary", null, reference.displayTitle || reference.title || reference.name || "\u5F15\u7528\u8D44\u6599"), (reference.referenceNote || reference.unavailable || ["missing", "modified", "changed"].includes(reference.status)) && /* @__PURE__ */ import_react32.default.createElement("p", { role: "status" }, reference.referenceNote || (reference.status === "missing" ? "\u6587\u4EF6\u5DF2\u7F3A\u5931\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002" : reference.status === "modified" ? "\u6587\u4EF6\u5DF2\u5728\u5916\u90E8\u4FEE\u6539\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002" : "\u6765\u6E90\u5DF2\u53D8\u5316\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002")), renderFile?.(reference), reference.truncated && /* @__PURE__ */ import_react32.default.createElement("p", null, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(reference.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${reference.fullLength} \u5B57\u7B26` : "", "\u3002"), /* @__PURE__ */ import_react32.default.createElement("pre", null, reference.previewText ?? reference.content ?? "\u6B64\u683C\u5F0F\u672A\u63D0\u53D6\u6B63\u6587")))));
 }
 
 // src/pending-card-state.mjs
@@ -42518,7 +42519,7 @@ function selectionLabel(context) {
   const last = content.slice(0, selection2.end - 1).split("\n").length;
   return first2 === last ? `\u7B2C ${first2} \u884C` : `\u7B2C ${first2}\u2013${last} \u884C`;
 }
-function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit, mentionProps }) {
+function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit, mentionProps, footer }) {
   const id2 = (0, import_react33.useId)();
   const root2 = (0, import_react33.useRef)(null);
   const textarea = (0, import_react33.useRef)(null);
@@ -42531,7 +42532,9 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   const [localError, setLocalError] = (0, import_react33.useState)("");
   const skills = [...new Map((catalog?.skills || []).map((skill) => [skill.name, skill])).values()];
   const favoriteNames = new Set(catalog?.settings?.favorites || []);
-  const candidates = skills.filter((skill) => skillSearchText(skill).includes((popup?.query || "").toLowerCase())).sort((a, b2) => Number(Boolean(b2.favorite || favoriteNames.has(b2.name))) - Number(Boolean(a.favorite || favoriteNames.has(a.name))) || a.name.localeCompare(b2.name));
+  const favorites = [...favoriteNames].map((name2) => skills.find((skill) => skill.name === name2)).filter(Boolean);
+  const favoritesOnly = popup?.mode === "browse" && !popup.query && !popup.all && favorites.length > 0;
+  const candidates = favoritesOnly ? favorites : skills.filter((skill) => skillSearchText(skill).includes((popup?.query || "").toLowerCase())).sort((a, b2) => Number(favoriteNames.has(b2.name)) - Number(favoriteNames.has(a.name)) || a.name.localeCompare(b2.name));
   const explicitSkills = extractSkillNames(instruction);
   const displayError = localError || (error ? referenceErrorMessage(error) : "");
   (0, import_react33.useEffect)(() => {
@@ -42544,7 +42547,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   }, [Boolean(popup)]);
   (0, import_react33.useEffect)(() => {
     setActiveIndex(0);
-  }, [popup?.query, catalog]);
+  }, [popup?.query, popup?.all, catalog]);
   (0, import_react33.useEffect)(() => {
     if (disabled) setPopup(null);
   }, [disabled]);
@@ -42565,9 +42568,21 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   }
   function openPicker() {
     if (disabled) return;
+    if (popup?.mode === "browse") {
+      closePicker();
+      return;
+    }
     const query = skillQueryAtCursor(instruction, selection2.current.start);
     setPopup({ ...query || selection2.current, query: "", mode: "browse" });
     requestAnimationFrame(() => search.current?.focus({ preventScroll: true }));
+  }
+  function closePicker() {
+    const fromButton = popup?.mode === "browse";
+    setPopup(null);
+    requestAnimationFrame(() => {
+      const target = fromButton ? root2.current?.querySelector(".wcc-creation-skill-trigger") : textarea.current;
+      target?.focus({ preventScroll: true });
+    });
   }
   function insertSkill(skill) {
     if (!skill || disabled) return;
@@ -42597,8 +42612,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
     if (!popup || event.nativeEvent?.isComposing) return false;
     if (event.key === "Escape") {
       event.preventDefault();
-      setPopup(null);
-      textarea.current?.focus({ preventScroll: true });
+      closePicker();
       return true;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -42606,7 +42620,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
       if (candidates.length) setActiveIndex((index2) => (index2 + (event.key === "ArrowDown" ? 1 : -1) + candidates.length) % candidates.length);
       return true;
     }
-    if (event.key === "Enter" && !event.metaKey && !event.ctrlKey || event.key === "Tab") {
+    if (event.key === "Enter" && !event.metaKey && !event.ctrlKey || event.key === "Tab" && popup.mode === "inline" && !event.shiftKey) {
       if (candidates[activeIndex]) {
         event.preventDefault();
         insertSkill(candidates[activeIndex]);
@@ -42628,36 +42642,50 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
       setRefreshing(false);
     }
   }
-  return /* @__PURE__ */ import_react33.default.createElement("div", { ref: root2, className: "wcc-creation-instruction", onBlur: (event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) setPopup(null);
-  } }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-instruction-toolbar" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-skill-trigger", disabled, "aria-label": "\u9009\u62E9\u6280\u80FD", "aria-expanded": Boolean(popup), title: explicitSkills.length ? `\u5DF2\u6307\u5B9A ${explicitSkills.length} \u4E2A\u6280\u80FD\uFF1A${explicitSkills.join("\u3001")}` : "\u9009\u62E9\u672C\u673A\u6280\u80FD", onMouseDown: (event) => event.preventDefault(), onClick: openPicker }, "/ \u6280\u80FD", explicitSkills.length > 0 && /* @__PURE__ */ import_react33.default.createElement("span", null, explicitSkills.length)), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-user-favorites", "aria-label": "\u5E38\u7528\u6280\u80FD\u5FEB\u6377\u6309\u94AE" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-user-favorite-shortcuts" }, (catalog?.settings?.favorites || []).map((name2) => skills.find((skill) => skill.name === name2)).filter(Boolean).map((skill) => /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", key: skill.name, type: "button", disabled, title: `/${skill.name}`, onMouseDown: (event) => event.preventDefault(), onClick: () => insertSkill(skill) }, skillLabel(skill)))), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-manage-favorites", "aria-label": "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", title: "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", disabled, onClick: onOpenSettings }, /* @__PURE__ */ import_react33.default.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", "aria-hidden": "true", fill: "currentColor" }, /* @__PURE__ */ import_react33.default.createElement("circle", { cx: "5", cy: "12", r: "1.4" }), /* @__PURE__ */ import_react33.default.createElement("circle", { cx: "12", cy: "12", r: "1.4" }), /* @__PURE__ */ import_react33.default.createElement("circle", { cx: "19", cy: "12", r: "1.4" }))))), /* @__PURE__ */ import_react33.default.createElement(
-    ReferencePromptInput,
+  return /* @__PURE__ */ import_react33.default.createElement(
+    "div",
     {
-      textareaRef: textarea,
-      id: `${id2}-instruction`,
-      "aria-label": "\u521B\u4F5C\u8981\u6C42",
-      value: instruction,
-      disabled,
-      rows: 2,
-      onValueChange: onChange,
-      onCursor: updateQuery,
-      onSelect: (element) => {
-        remember(element);
-        if (popup?.mode === "inline") updateQuery(element);
+      ref: root2,
+      className: "wcc-creation-instruction",
+      onBlur: (event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setPopup(null);
       },
-      "aria-autocomplete": "list",
-      "aria-controls": popup ? `${id2}-skills` : void 0,
-      "aria-activedescendant": popup && candidates[activeIndex] ? `${id2}-skill-${activeIndex}` : void 0,
-      placeholder: "\u63CF\u8FF0\u521B\u4F5C\u8981\u6C42\uFF0C@ \u5F15\u7528\u8D44\u6599\uFF0C/ \u8C03\u7528\u6280\u80FD",
-      spellCheck: false,
-      onKeyDown: keyboard,
-      onSubmit,
-      ...mentionProps
-    }
-  ), popup && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-skill-picker" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, popup.mode === "browse" ? /* @__PURE__ */ import_react33.default.createElement("input", { ref: search, role: "combobox", "aria-label": "\u641C\u7D22\u6280\u80FD", "aria-expanded": "true", "aria-controls": `${id2}-skills`, "aria-activedescendant": candidates[activeIndex] ? `${id2}-skill-${activeIndex}` : void 0, value: popup.query, onChange: (event) => setPopup((current) => ({ ...current, query: event.target.value })), onKeyDown: keyboard, placeholder: "\u641C\u7D22\u6280\u80FD \u540D\u79F0\u6216\u8BF4\u660E" }) : /* @__PURE__ */ import_react33.default.createElement("span", null, "/", popup.query || "\u2026", " \xB7 \u9009\u62E9\u6280\u80FD"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: refreshing || loading || !onRefresh, onClick: () => void refresh() }, refreshing || loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", onClick: () => {
-    setPopup(null);
-    onOpenSettings?.();
-  } }, "\u8BBE\u7F6E\u5E38\u7528")), /* @__PURE__ */ import_react33.default.createElement("div", { ref: options, id: `${id2}-skills`, className: "wcc-creation-skill-options", role: "listbox", "aria-label": "\u53EF\u9009\u6280\u80FD" }, candidates.map((skill, index2) => /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", id: `${id2}-skill-${index2}`, key: skill.name, "data-skill-index": index2, type: "button", role: "option", title: `/${skill.name}`, tabIndex: -1, "aria-selected": index2 === activeIndex, onMouseDown: (event) => event.preventDefault(), onMouseEnter: () => setActiveIndex(index2), onClick: () => insertSkill(skill) }, /* @__PURE__ */ import_react33.default.createElement("strong", null, skillLabel(skill), (skill.favorite || favoriteNames.has(skill.name)) && /* @__PURE__ */ import_react33.default.createElement("small", null, "\u5E38\u7528")), /* @__PURE__ */ import_react33.default.createElement("span", null, skill.description || "\u6682\u65E0\u8BF4\u660E"))), !candidates.length && /* @__PURE__ */ import_react33.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u6280\u80FD\u5217\u8868\u2026" : "\u6CA1\u627E\u5230\u76F8\u5173\u6280\u80FD\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u6216\u5237\u65B0\u5217\u8868\u3002")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6709 ", catalog.warnings.length, " \u9879\u6280\u80FD\u6765\u6E90\u63D0\u793A\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u67E5\u770B\u3002"), /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-skill-keyboard" }, "\u2191\u2193 \u9009\u62E9 \xB7 Enter / Tab \u63D2\u5165 \xB7 Esc \u5173\u95ED")), displayError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error", error: displayError }));
+      onKeyDown: (event) => {
+        if (event.key === "Escape" && !event.defaultPrevented) keyboard(event);
+      }
+    },
+    /* @__PURE__ */ import_react33.default.createElement(
+      ReferencePromptInput,
+      {
+        textareaRef: textarea,
+        id: `${id2}-instruction`,
+        "aria-label": "\u521B\u4F5C\u8981\u6C42",
+        value: instruction,
+        disabled,
+        rows: 2,
+        onValueChange: onChange,
+        onCursor: updateQuery,
+        onSelect: (element) => {
+          remember(element);
+          if (popup?.mode === "inline") updateQuery(element);
+        },
+        "aria-autocomplete": "list",
+        "aria-controls": popup ? `${id2}-skills` : void 0,
+        "aria-activedescendant": popup && candidates[activeIndex] ? `${id2}-skill-${activeIndex}` : void 0,
+        placeholder: "\u60F3\u521B\u4F5C\u4EC0\u4E48\uFF1F@ \u52A0\u5F15\u7528\uFF0C/ \u9009\u6280\u80FD",
+        spellCheck: false,
+        onKeyDown: keyboard,
+        onSubmit,
+        ...mentionProps
+      }
+    ),
+    /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-instruction-toolbar" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", className: "wcc-creation-skill-trigger", disabled, "aria-label": "\u9009\u62E9\u6280\u80FD", "aria-expanded": popup?.mode === "browse", "aria-controls": popup?.mode === "browse" ? `${id2}-skill-picker` : void 0, title: explicitSkills.length ? explicitSkills.join("\u3001") : "\u9009\u62E9\u5E38\u7528\u6280\u80FD\u6216\u641C\u7D22\u5168\u90E8\u6280\u80FD", onMouseDown: (event) => event.preventDefault(), onClick: openPicker }, "\u6280\u80FD", explicitSkills.length > 0 && /* @__PURE__ */ import_react33.default.createElement("span", null, explicitSkills.length), /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: popup?.mode === "browse" ? "collapse" : "expand", size: 13 })), footer),
+    popup && /* @__PURE__ */ import_react33.default.createElement("div", { id: `${id2}-skill-picker`, className: "wcc-creation-skill-picker" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, popup.mode === "browse" ? /* @__PURE__ */ import_react33.default.createElement("input", { ref: search, role: "combobox", "aria-label": "\u641C\u7D22\u6280\u80FD", "aria-expanded": "true", "aria-controls": `${id2}-skills`, "aria-activedescendant": candidates[activeIndex] ? `${id2}-skill-${activeIndex}` : void 0, value: popup.query, onChange: (event) => setPopup((current) => ({ ...current, query: event.target.value })), onKeyDown: keyboard, placeholder: "\u641C\u7D22\u5168\u90E8\u6280\u80FD" }) : /* @__PURE__ */ import_react33.default.createElement("span", null, "/", popup.query || "\u2026"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: refreshing || loading || !onRefresh, onClick: () => void refresh() }, refreshing || loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-label": "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", onClick: () => {
+      setPopup(null);
+      onOpenSettings?.();
+    } }, "\u7BA1\u7406\u5E38\u7528")), popup.mode === "browse" && !popup.query && favorites.length > 0 && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, /* @__PURE__ */ import_react33.default.createElement("span", null, favoritesOnly ? "\u5E38\u7528\u6280\u80FD" : "\u5168\u90E8\u6280\u80FD"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setPopup((current) => ({ ...current, all: !current.all })) }, favoritesOnly ? "\u67E5\u770B\u5168\u90E8" : "\u53EA\u770B\u5E38\u7528")), /* @__PURE__ */ import_react33.default.createElement("div", { ref: options, id: `${id2}-skills`, className: `wcc-creation-skill-options${favoritesOnly ? " is-favorites" : ""}`, role: "listbox", "aria-label": favoritesOnly ? "\u5E38\u7528\u6280\u80FD" : "\u53EF\u9009\u6280\u80FD" }, candidates.map((skill, index2) => /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", id: `${id2}-skill-${index2}`, key: skill.name, "data-skill-index": index2, type: "button", role: "option", title: `/${skill.name}`, tabIndex: -1, "aria-selected": index2 === activeIndex, onMouseDown: (event) => event.preventDefault(), onMouseEnter: () => setActiveIndex(index2), onClick: () => insertSkill(skill) }, /* @__PURE__ */ import_react33.default.createElement("strong", null, skillLabel(skill), !favoritesOnly && favoriteNames.has(skill.name) && /* @__PURE__ */ import_react33.default.createElement("small", null, "\u5E38\u7528")), !favoritesOnly && skill.description && /* @__PURE__ */ import_react33.default.createElement("span", null, skill.description))), !candidates.length && /* @__PURE__ */ import_react33.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u6280\u80FD\u5217\u8868\u2026" : "\u672A\u627E\u5230\u6280\u80FD\uFF0C\u8BD5\u8BD5\u5176\u4ED6\u5173\u952E\u8BCD\u3002")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6709 ", catalog.warnings.length, " \u9879\u6280\u80FD\u6765\u6E90\u63D0\u793A\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u67E5\u770B\u3002")),
+    displayError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })
+  );
 }
 function ImportedReferenceFile({ card, getHref }) {
   const [videoError, setVideoError] = (0, import_react33.useState)(false);
@@ -42721,7 +42749,7 @@ function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onActi
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: keyboard
     },
-    /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-create-menu-caption" }, caption || "\u4ECE\u6B64\u5361\u7247\u7EE7\u7EED\u521B\u4F5C"),
+    /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-create-menu-caption" }, caption || "\u7528\u8FD9\u5F20\u5361\u521B\u4F5C"),
     items.map((item) => /* @__PURE__ */ import_react33.default.createElement(
       UiButton,
       {
@@ -42736,9 +42764,8 @@ function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onActi
           onClose?.();
         }
       },
-      /* @__PURE__ */ import_react33.default.createElement("span", { className: `wcc-create-menu-icon is-${item.id}` }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: item.id })),
-      /* @__PURE__ */ import_react33.default.createElement("span", null, /* @__PURE__ */ import_react33.default.createElement("strong", null, item.label || KIND_LABELS[item.id] || item.id), (item.reason || item.description) && /* @__PURE__ */ import_react33.default.createElement("small", null, item.disabled && item.reason || item.description)),
-      /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-create-menu-chevron", "aria-hidden": "true" }, "\u203A")
+      /* @__PURE__ */ import_react33.default.createElement("span", { className: `wcc-create-menu-icon is-${item.id}` }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: item.id, size: 15 })),
+      /* @__PURE__ */ import_react33.default.createElement("span", null, /* @__PURE__ */ import_react33.default.createElement("strong", null, item.label || KIND_LABELS[item.id] || item.id), item.disabled && item.reason && /* @__PURE__ */ import_react33.default.createElement("small", null, item.reason))
     ))
   );
 }
@@ -42840,6 +42867,7 @@ function CardComposer({
   const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation);
   const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing;
   const showInitialInput = !taskMode && !reviewingResult;
+  const stageStatus = taskMode ? pendingLabel(context.pendingGeneration) : reviewingResult ? "\u5DF2\u4FDD\u5B58" : "";
   const mediaOptions = mediaOptionsFor(outputType, mediaCapabilities, context?.mediaOptions);
   const mediaModel = mediaCapabilities?.models?.find((model) => model.type === outputType && model.id === mediaOptions.model);
   const mediaPending = mediaJobPending(context?.mediaJob);
@@ -42856,6 +42884,8 @@ function CardComposer({
   const displayError = error || referenceErrors.get(context?.key) || "";
   const selectedType = inputLocked ? { id: outputType, label: KIND_LABELS[outputType] || "\u521B\u4F5C\u4EFB\u52A1", available: true } : creationTypes.find((type) => type.id === outputType);
   const isAction = ACTION_TYPES.has(outputType);
+  const heading = stageStatus || collapsed ? headingCard?.defaultOutcome?.name || cardTitle(headingCard) : isAction ? selectedType?.label || KIND_LABELS[outputType] : revising ? "\u4FEE\u6539\u6B64\u7248\u672C" : "AI \u521B\u4F5C";
+  const headingDetail = stageStatus || (!isAction && !revising ? KIND_LABELS[outputType] : "");
   const generation = context?.generation;
   const allowsEmptyReferences = generation?.mode === "new" || generation?.mode === "revise" && Boolean(generation.cardId && generation.baseVersionId);
   const sourcesAvailable = inputLocked || isAction || references.length > 0 || allowsEmptyReferences;
@@ -42927,7 +42957,7 @@ function CardComposer({
       if (!root2) return;
       const form = root2.querySelector(".wcc-creation-action-content") || root2.querySelector(".wcc-creation-instruction");
       const editable2 = [...form?.querySelectorAll('input:not([disabled]):not([readonly]):not([type="hidden"]), textarea:not([disabled]):not([readonly])') || []].find((element) => !element.closest("[hidden]") && element.getClientRects().length > 0);
-      const target = editable2 || root2.querySelector(".wcc-task-stage-header .wcc-creation-window-actions button:last-child") || root2.querySelector(".wcc-creation-window-actions button:last-child");
+      const target = editable2 || root2.querySelector(".wcc-creation-window-actions button:last-child");
       target?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame2);
@@ -43156,17 +43186,17 @@ function CardComposer({
         }
       }
     },
-    /* @__PURE__ */ import_react33.default.createElement("header", { className: "wcc-creation-heading", hidden: !collapsed }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-heading-copy", title: [context?.projectName, context?.requirementTitle].filter(Boolean).join(" / ") }, /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-heading-icon" }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: outputType })), /* @__PURE__ */ import_react33.default.createElement("div", null, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-title-row" }, /* @__PURE__ */ import_react33.default.createElement("h3", { id: `${id2}-title`, title: cardTitle(headingCard) }, cardTitle(headingCard)), /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-current-type", "aria-label": "\u5F53\u524D\u64CD\u4F5C", title: selectedType?.message || selectedType?.label || KIND_LABELS[outputType] }, revising ? "\u7248\u672C\u4FEE\u8BA2" : selectedType?.label || KIND_LABELS[outputType] || "\u521B\u4F5C\u4EFB\u52A1")))), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-window-actions" }, headingCard?.kind === "outline" && onAction && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-edit", "aria-label": "\u4E13\u6CE8\u7F16\u8F91\u5F53\u524D\u5927\u7EB2", disabled: busy, onClick: () => onAction("edit") }, "\u7F16\u8F91"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": collapsed ? "\u5C55\u5F00\u5361\u7247\u521B\u4F5C\u6846" : "\u6536\u8D77\u5361\u7247\u521B\u4F5C\u6846", "aria-expanded": !collapsed, onClick: () => {
+    /* @__PURE__ */ import_react33.default.createElement("header", { className: "wcc-creation-heading" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-title-row" }, /* @__PURE__ */ import_react33.default.createElement("h3", { id: `${id2}-title`, title: heading }, heading), headingDetail && /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-current-type", title: headingDetail, role: stageStatus ? "status" : void 0 }, headingDetail)), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-window-actions" }, collapsed && headingCard?.kind === "outline" && onAction && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", className: "wcc-creation-edit", "aria-label": "\u4E13\u6CE8\u7F16\u8F91\u5F53\u524D\u5927\u7EB2", disabled: busy, onClick: () => onAction("edit") }, "\u7F16\u8F91"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", "aria-label": collapsed ? "\u5C55\u5F00\u5361\u7247\u521B\u4F5C\u6846" : "\u6536\u8D77\u5361\u7247\u521B\u4F5C\u6846", "aria-expanded": !collapsed, "aria-controls": `${id2}-body`, onClick: () => {
       setCollapsed((value) => !value);
       setReferencesOpen(false);
-    } }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: collapsed ? "expand" : "collapse", size: 15 })), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u5173\u95ED\u5361\u7247\u521B\u4F5C\u6846", onClick: onClose }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "close", size: 15 })))),
-    /* @__PURE__ */ import_react33.default.createElement("div", { ref: scrollBody, className: "wcc-creation-scroll-body", hidden: collapsed }, (taskMode || reviewingResult) && /* @__PURE__ */ import_react33.default.createElement(import_react33.default.Fragment, null, /* @__PURE__ */ import_react33.default.createElement("header", { className: "wcc-task-stage-header" }, /* @__PURE__ */ import_react33.default.createElement("strong", { role: "status" }, taskMode ? pendingLabel(context.pendingGeneration) : "\u5DF2\u4FDD\u5B58\u6210\u679C"), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-window-actions" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u6536\u8D77\u5361\u7247\u521B\u4F5C\u6846", onClick: () => setCollapsed(true) }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "collapse", size: 15 })), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u5173\u95ED\u5361\u7247\u521B\u4F5C\u6846", onClick: onClose }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "close", size: 15 })))), /* @__PURE__ */ import_react33.default.createElement(
+    } }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: collapsed ? "expand" : "collapse", size: 15 })), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", "aria-label": "\u5173\u95ED\u5361\u7247\u521B\u4F5C\u6846", onClick: onClose }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "close", size: 15 })))),
+    /* @__PURE__ */ import_react33.default.createElement("div", { ref: scrollBody, id: `${id2}-body`, className: "wcc-creation-scroll-body", hidden: collapsed }, (taskMode || reviewingResult) && /* @__PURE__ */ import_react33.default.createElement(import_react33.default.Fragment, null, /* @__PURE__ */ import_react33.default.createElement(
       TaskInputSummary,
       {
         instruction,
         references,
-        skills: context?.selectedSkills || chosenSkills,
-        model: modelSelection,
+        skills: (context?.selectedSkills || chosenSkills).map((name2) => skillLabel(skillCatalog?.skills?.find((skill) => skill.name === name2) || { name: name2 })),
+        model: context?.modelSelection || (taskMode ? modelSelection : void 0),
         engine: engineSummary,
         renderFile: getReferenceFileHref ? (reference) => (reference.importedFile || reference.generatedFile) && /* @__PURE__ */ import_react33.default.createElement(ImportedReferenceFile, { card: reference, getHref: getReferenceFileHref }) : void 0
       }
@@ -43179,24 +43209,21 @@ function CardComposer({
         onClick: () => void toggleConversation(true, true)
       },
       "\u7EE7\u7EED\u4EFB\u52A1"
-    )), taskMode && pendingRetryAllowed(context.pendingGeneration) && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "primary", disabled: !ready, onClick: submit }, "\u91CD\u8BD5\u539F\u4EFB\u52A1")), taskMode && pendingRetryAllowed(context.pendingGeneration) && reason && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), taskMode && !context?.sessionId && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, context?.pendingGeneration?.status === "unknown" ? "\u63D0\u4EA4\u7ED3\u679C\u5F85\u6838\u5BF9\uFF0C\u8BF7\u4ECE\u521B\u4F5C\u4EFB\u52A1\u67E5\u770B\uFF1B\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002" : "\u5C1A\u672A\u8FDE\u63A5\u539F\u4EFB\u52A1\u5BF9\u8BDD\u3002"), reviewingResult && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "primary", onClick: () => {
-      setConversationOpen(false);
-      setRevisionEditing(true);
-    } }, "\u4FEE\u6539\u751F\u6210\u65B0\u7248"))), showInitialInput && /* @__PURE__ */ import_react33.default.createElement(import_react33.default.Fragment, null, /* @__PURE__ */ import_react33.default.createElement("div", { id: `${id2}-setup`, className: "wcc-creation-main", hidden: collapsed }, context?.recorded === false && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-history-note", role: "status" }, "\u8FD9\u4EFD\u5386\u53F2\u6587\u4EF6\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002\u586B\u5199\u4FEE\u6539\u8981\u6C42\uFF0C\u53EF\u751F\u6210\u65B0\u7248\u672C\u3002"), referenceNotes.map((note) => /* @__PURE__ */ import_react33.default.createElement("p", { key: note, className: "wcc-creation-history-note", role: "status" }, note)), context?.selection && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-selection-scope", role: "status" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u4EC5\u5F15\u7528\u6240\u9009\u7247\u6BB5 \xB7 ", selectionLabel(context), " \xB7 ", Array.from(context.selection.quote || "").length, " \u4E2A\u5B57\u7B26"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy || inputLocked || !onAction, onClick: () => onAction("whole-source") }, "\u4F7F\u7528\u6574\u4EFD\u539F\u6587")), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-compact-actions" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u6536\u8D77\u5361\u7247\u521B\u4F5C\u6846", onClick: () => setCollapsed(true) }, "\u2304"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u5173\u95ED\u5361\u7247\u521B\u4F5C\u6846", onClick: onClose }, "\xD7")), /* @__PURE__ */ import_react33.default.createElement("section", { className: `wcc-creation-reference-area${references.length ? "" : " is-empty"}`, "aria-label": "\u5F15\u7528\u8D44\u6599" }, !!references.length && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-caption" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u5F15\u7528"), /* @__PURE__ */ import_react33.default.createElement("small", { "aria-live": "polite" }, references.length, "\u4EFD")), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-chips" }, references.map((card) => /* @__PURE__ */ import_react33.default.createElement("span", { key: card.id, className: `wcc-creation-reference-chip${unavailableReason(card) ? " is-unavailable" : ""}`, title: `${cardTitle(card)}${unavailableReason(card) || card.referenceNote ? ` \xB7 ${unavailableReason(card) || card.referenceNote}` : ""}` }, /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-reference-format" }, referenceFormat(card)), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", className: "wcc-reference-name", type: "button", "aria-label": `\u67E5\u770B\u5F15\u7528 ${cardTitle(card)}`, "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
+    )), taskMode && pendingRetryAllowed(context.pendingGeneration) && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "primary", disabled: !ready, onClick: submit }, "\u91CD\u8BD5\u539F\u4EFB\u52A1")), taskMode && pendingRetryAllowed(context.pendingGeneration) && reason && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), taskMode && !context?.sessionId && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, context?.pendingGeneration?.status === "unknown" ? "\u63D0\u4EA4\u7ED3\u679C\u5F85\u6838\u5BF9\uFF0C\u8BF7\u4ECE\u521B\u4F5C\u4EFB\u52A1\u67E5\u770B\uFF1B\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002" : "\u5C1A\u672A\u8FDE\u63A5\u539F\u4EFB\u52A1\u5BF9\u8BDD\u3002")), showInitialInput && /* @__PURE__ */ import_react33.default.createElement(import_react33.default.Fragment, null, /* @__PURE__ */ import_react33.default.createElement("div", { id: `${id2}-setup`, className: "wcc-creation-main", hidden: collapsed }, context?.recorded === false && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-history-note", role: "status" }, "\u8FD9\u4EFD\u5386\u53F2\u6587\u4EF6\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002\u586B\u5199\u4FEE\u6539\u8981\u6C42\uFF0C\u53EF\u751F\u6210\u65B0\u7248\u672C\u3002"), referenceNotes.map((note) => /* @__PURE__ */ import_react33.default.createElement("p", { key: note, className: "wcc-creation-history-note", role: "status" }, note)), context?.selection && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-selection-scope", role: "status" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u4EC5\u5F15\u7528\u6240\u9009\u7247\u6BB5 \xB7 ", selectionLabel(context), " \xB7 ", Array.from(context.selection.quote || "").length, " \u4E2A\u5B57\u7B26"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy || inputLocked || !onAction, onClick: () => onAction("whole-source") }, "\u4F7F\u7528\u6574\u4EFD\u539F\u6587")), /* @__PURE__ */ import_react33.default.createElement("section", { className: `wcc-creation-reference-area${references.length ? "" : " is-empty"}`, "aria-label": "\u5F15\u7528\u8D44\u6599" }, !!references.length && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", className: "wcc-reference-preview-toggle", "aria-label": "\u67E5\u770B\u672C\u6B21\u5F15\u7528\u5185\u5BB9", "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
+      previewTrigger.current = event.currentTarget;
+      setPreviewOpen((value) => !value);
+      setReferencesOpen(false);
+    } }, references.length, " \u4EFD\u5F15\u7528", /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: previewOpen ? "collapse" : "expand", size: 13 })), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-chips" }, references.map((card) => /* @__PURE__ */ import_react33.default.createElement("span", { key: card.id, className: `wcc-creation-reference-chip${unavailableReason(card) ? " is-unavailable" : ""}`, title: `${cardTitle(card)}${unavailableReason(card) || card.referenceNote ? ` \xB7 ${unavailableReason(card) || card.referenceNote}` : ""}` }, /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-reference-format" }, referenceFormat(card)), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", className: "wcc-reference-name", type: "button", "aria-label": `\u67E5\u770B\u5F15\u7528 ${cardTitle(card)}`, "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
       previewTrigger.current = event.currentTarget;
       setPreviewOpen(true);
       setReferencesOpen(false);
       const detail = referenceDetails.current.get(card.id);
       if (detail) detail.open = true;
-    } }, cardTitle(card)), isPinned(card) ? /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-reference-lock", title: inputLocked ? "\u672C\u6B21\u4EFB\u52A1\u4F7F\u7528\u7684\u8D44\u6599\u7248\u672C" : "\u4EE5\u6765\u6E90\u5361\u7247\u4E3A\u521B\u4F5C\u4F9D\u636E", "aria-label": inputLocked ? "\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599\u7248\u672C" : "\u6765\u6E90\u5361\u7247\uFF0C\u4FDD\u7559\u4E3A\u5F15\u7528" }, inputLocked ? /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "lock", size: 11 }) : "\u6765\u6E90") : /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-reference-remove", disabled: referencesBusy, "aria-label": `\u79FB\u9664\u5F15\u7528 ${cardTitle(card)}`, onClick: () => removeReference(card) }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "close", size: 12 }))))), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", ref: addButton, type: "button", className: "wcc-creation-add-reference", "aria-label": "\u6DFB\u52A0\u5F15\u7528\u8D44\u6599", "aria-expanded": referencesOpen, "aria-controls": `${id2}-references`, disabled: referencesBusy, onClick: () => {
+    } }, cardTitle(card)), isPinned(card) ? /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-reference-lock", title: "\u5DF2\u5173\u8054\u5230\u6765\u6E90\u5361\u7247", role: "img", "aria-label": "\u5DF2\u5173\u8054\u5230\u6765\u6E90\u5361\u7247" }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "lock", size: 11 })) : /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-reference-remove", disabled: referencesBusy, "aria-label": `\u79FB\u9664\u5F15\u7528 ${cardTitle(card)}`, onClick: () => removeReference(card) }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "close", size: 12 }))))), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", ref: addButton, className: "wcc-creation-add-reference", "aria-label": "\u6DFB\u52A0\u5F15\u7528\u8D44\u6599", "aria-expanded": referencesOpen, "aria-controls": `${id2}-references`, disabled: referencesBusy, onClick: () => {
       setReferencesOpen((value) => !value);
       setReferenceSource(null);
       setPreviewOpen(false);
-    } }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "plus", size: 14 }), /* @__PURE__ */ import_react33.default.createElement("span", null, "\u6DFB\u52A0")), !!references.length && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-reference-preview-toggle", "aria-label": "\u67E5\u770B\u672C\u6B21\u5F15\u7528\u5185\u5BB9", "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
-      previewTrigger.current = event.currentTarget;
-      setPreviewOpen((value) => !value);
-      setReferencesOpen(false);
-    } }, previewOpen ? "\u6536\u8D77" : "\u67E5\u770B"), /* @__PURE__ */ import_react33.default.createElement("input", { ref: fileInput, type: "file", hidden: true, multiple: true, accept: acceptedFiles || void 0, "aria-label": "\u9009\u62E9\u7535\u8111\u7D20\u6750\u6587\u4EF6", onChange: (event) => void importFiles(event) }), /* @__PURE__ */ import_react33.default.createElement("div", { ref: picker, id: `${id2}-references`, hidden: !referencesOpen, className: "wcc-creation-reference-picker", "aria-label": "\u9009\u62E9\u5F15\u7528\u8D44\u6599" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-sources", hidden: referenceSource === "board" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", ref: boardSourceButton, type: "button", disabled: referencesBusy, onClick: () => {
+    } }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "plus", size: 14 }), "\u52A0\u5F15\u7528"), /* @__PURE__ */ import_react33.default.createElement("input", { ref: fileInput, type: "file", hidden: true, multiple: true, accept: acceptedFiles || void 0, "aria-label": "\u9009\u62E9\u7535\u8111\u7D20\u6750\u6587\u4EF6", onChange: (event) => void importFiles(event) }), /* @__PURE__ */ import_react33.default.createElement("div", { ref: picker, id: `${id2}-references`, hidden: !referencesOpen, className: "wcc-creation-reference-picker", "aria-label": "\u9009\u62E9\u5F15\u7528\u8D44\u6599" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-sources", hidden: referenceSource === "board" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", ref: boardSourceButton, type: "button", disabled: referencesBusy, onClick: () => {
       setReferenceSource("board");
       setSearch("");
     } }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "whiteboard", size: 16 }), /* @__PURE__ */ import_react33.default.createElement("span", null, "\u4ECE\u753B\u5E03\u9009\u62E9"), /* @__PURE__ */ import_react33.default.createElement("span", { "aria-hidden": "true" }, "\u203A")), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: referencesBusy || !onImportFiles, title: !onImportFiles ? "\u7535\u8111\u7D20\u6750\u5BFC\u5165\u5C1A\u672A\u5C31\u7EEA" : "\u6DFB\u52A0\u672C\u673A\u8D44\u6599", onClick: () => fileInput.current?.click() }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "computer", size: 16 }), /* @__PURE__ */ import_react33.default.createElement("span", null, "\u4ECE\u7535\u8111\u6DFB\u52A0"), /* @__PURE__ */ import_react33.default.createElement("span", { "aria-hidden": "true" }, "\u203A"))), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-board-picker", hidden: referenceSource !== "board" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-picker-heading" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u8FD4\u56DE\u5F15\u7528\u6765\u6E90", disabled: referencesBusy, onClick: () => setReferenceSource(null) }, "\u2039"), /* @__PURE__ */ import_react33.default.createElement("span", null, "\u4ECE\u753B\u5E03\u9009\u62E9")), /* @__PURE__ */ import_react33.default.createElement("input", { ref: boardSearch, "aria-label": "\u641C\u7D22\u5F15\u7528\u8D44\u6599", value: search, disabled: referencesBusy, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u5F53\u524D\u753B\u5E03\u5185\u7684\u8D44\u6599", spellCheck: false }), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-options" }, candidates.map((card) => {
@@ -43205,7 +43232,11 @@ function CardComposer({
     }), !candidates.length && /* @__PURE__ */ import_react33.default.createElement("p", null, search ? "\u6CA1\u6709\u5339\u914D\u7684\u5F15\u7528\u8D44\u6599\u3002" : "\u5F53\u524D\u753B\u5E03\u6CA1\u6709\u53EF\u6DFB\u52A0\u7684\u8D44\u6599\u3002")), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-reference-done", onClick: () => {
       setReferencesOpen(false);
       addButton.current?.focus();
-    } }, "\u5B8C\u6210\u9009\u62E9"))), referencePending && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-reference-pending", role: "status" }, activeReferenceWork.kind === "import" ? `\u6B63\u5728\u6DFB\u52A0 ${activeReferenceWork.count} \u4EFD\u7535\u8111\u8D44\u6599\u2026` : activeReferenceWork.kind === "media" ? `\u6B63\u5728\u5BFC\u5165 ${activeReferenceWork.count} \u4EFD${KIND_LABELS[outputType]}\u6587\u4EF6\u2026` : "\u6B63\u5728\u66F4\u65B0\u5F15\u7528\u2026"), !!references.length && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-preview", id: `${id2}-reference-preview`, hidden: !previewOpen }, /* @__PURE__ */ import_react33.default.createElement("div", null, references.map((card) => /* @__PURE__ */ import_react33.default.createElement("details", { key: card.id, ref: (element) => element ? referenceDetails.current.set(card.id, element) : referenceDetails.current.delete(card.id) }, /* @__PURE__ */ import_react33.default.createElement("summary", null, /* @__PURE__ */ import_react33.default.createElement("span", null, referenceFormat(card)), cardTitle(card)), card.truncated && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(card.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${card.fullLength} \u5B57\u7B26` : "", "\u3002"), card.kind === "word" && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6B63\u6587\u6765\u81EA\u6B64 Word \u7ED1\u5B9A\u7684\u5927\u7EB2\u7248\u672C\u3002"), card.referenceNote && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, card.referenceNote), (card.importedFile || card.generatedFile) && getReferenceFileHref && /* @__PURE__ */ import_react33.default.createElement(ImportedReferenceFile, { card, getHref: getReferenceFileHref }), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.previewText ?? card.content ?? "\u672C\u6B21\u672A\u63D0\u4F9B\u6B63\u6587\u9884\u89C8\u3002"), (card.excerptInfo?.annotation || card.annotation) && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-preview-annotation" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u6CE8\u91CA"), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.excerptInfo?.annotation || card.annotation))))))), inputLocked && /* @__PURE__ */ import_react33.default.createElement("div", { className: `wcc-creation-pending-state is-${context?.pendingGeneration?.phase || "unknown"}`, role: "status" }, /* @__PURE__ */ import_react33.default.createElement("strong", null, pendingLabel(context?.pendingGeneration)), /* @__PURE__ */ import_react33.default.createElement("p", null, context?.pendingGeneration?.error || context?.pendingGeneration?.message || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u4F1A\u539F\u4F4D\u66F4\u65B0\u5361\u7247\u3002"), /* @__PURE__ */ import_react33.default.createElement("small", null, "\u4EFB\u52A1\u5DF2\u63D0\u4EA4\u3002\u9700\u8981\u8865\u5145\u8981\u6C42\u6216\u786E\u8BA4\u65F6\uFF0C\u8BF7\u6253\u5F00\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u3002")), isMedia && inputLocked ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-frozen-media" }, /* @__PURE__ */ import_react33.default.createElement("label", null, "\u539F\u63D0\u793A\u8BCD", /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, readOnly: true, rows: 4 })), /* @__PURE__ */ import_react33.default.createElement("p", null, [context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), context?.mediaJob?.error && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-error" }, context.mediaJob.error), context?.mediaJob?.canResume && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onResumeMedia }, "\u67E5\u770B\u8FDB\u5EA6\u6216\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(context?.mediaJob?.status) && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onNewMedia }, "\u786E\u8BA4\u540E\u91CD\u65B0\u751F\u6210")) : isMedia ? /* @__PURE__ */ import_react33.default.createElement(MediaPrompt, { key: context?.key, type: outputType, instruction, onChange: onInstructionChange, options: mediaOptions, onOptionsChange: onMediaOptionsChange, capabilities: mediaCapabilities, loading: mediaLoading, error: mediaError, job: context?.mediaJob, onRefresh: onRefreshMedia, onOpenSettings: () => setMediaSettingsOpen(true), onResume: onResumeMedia, onPrepareNew: onNewMedia, onSubmit: submit, disabled: referencesBusy, mentionProps }) : isAction ? actionContent != null ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-action-content" }, actionContent) : /* @__PURE__ */ import_react33.default.createElement("label", { className: "wcc-creation-instruction" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u5904\u7406\u8BF4\u660E"), /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, onChange: (event) => onInstructionChange?.(event.target.value), disabled: busy, rows: 4, maxLength: 8e3 })) : /* @__PURE__ */ import_react33.default.createElement(SkillCommandInput, { key: context?.key, instruction, onChange: onInstructionChange, disabled: busy || inputLocked, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onOpenSettings: () => setSkillSettingsOpen(true), onSubmit: submit, mentionProps }), reason && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), displayError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })), !collapsed && submitFooter), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-conversation-heading", hidden: collapsed || !hasExecution || revisionEditing && !taskMode }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", "aria-expanded": conversationOpen, "aria-controls": `${id2}-conversation`, disabled: conversationOpening === conversationScope, onClick: () => void toggleConversation() }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "spark", size: 13 }), /* @__PURE__ */ import_react33.default.createElement("span", null, reviewingResult ? "\u67E5\u770B\u539F\u4EFB\u52A1\u5BF9\u8BDD" : "\u4EFB\u52A1\u5BF9\u8BDD"), /* @__PURE__ */ import_react33.default.createElement("small", null, conversationOpening === conversationScope ? "\u6B63\u5728\u6062\u590D\u2026" : conversationOpen ? "\u6536\u8D77" : taskMode ? "\u7EE7\u7EED\u5F53\u524D\u4EFB\u52A1" : "\u67E5\u770B"), /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: conversationOpen ? "collapse" : "expand", size: 13 })), executionExpanded && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-review-jumps" }, onOpenReviewDraft && reviewDraft && /* @__PURE__ */ import_react33.default.createElement(
+    } }, "\u5B8C\u6210\u9009\u62E9"))), referencePending && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-reference-pending", role: "status" }, activeReferenceWork.kind === "import" ? `\u6B63\u5728\u6DFB\u52A0 ${activeReferenceWork.count} \u4EFD\u7535\u8111\u8D44\u6599\u2026` : activeReferenceWork.kind === "media" ? `\u6B63\u5728\u5BFC\u5165 ${activeReferenceWork.count} \u4EFD${KIND_LABELS[outputType]}\u6587\u4EF6\u2026` : "\u6B63\u5728\u66F4\u65B0\u5F15\u7528\u2026"), !!references.length && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-preview", id: `${id2}-reference-preview`, hidden: !previewOpen }, /* @__PURE__ */ import_react33.default.createElement("div", null, references.map((card) => /* @__PURE__ */ import_react33.default.createElement("details", { key: card.id, ref: (element) => element ? referenceDetails.current.set(card.id, element) : referenceDetails.current.delete(card.id) }, /* @__PURE__ */ import_react33.default.createElement("summary", null, /* @__PURE__ */ import_react33.default.createElement("span", null, referenceFormat(card)), cardTitle(card)), card.truncated && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(card.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${card.fullLength} \u5B57\u7B26` : "", "\u3002"), card.kind === "word" && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6B63\u6587\u6765\u81EA\u6B64 Word \u7ED1\u5B9A\u7684\u5927\u7EB2\u7248\u672C\u3002"), card.referenceNote && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, card.referenceNote), (card.importedFile || card.generatedFile) && getReferenceFileHref && /* @__PURE__ */ import_react33.default.createElement(ImportedReferenceFile, { card, getHref: getReferenceFileHref }), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.previewText ?? card.content ?? "\u672C\u6B21\u672A\u63D0\u4F9B\u6B63\u6587\u9884\u89C8\u3002"), (card.excerptInfo?.annotation || card.annotation) && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-preview-annotation" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u6CE8\u91CA"), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.excerptInfo?.annotation || card.annotation))))))), inputLocked && /* @__PURE__ */ import_react33.default.createElement("div", { className: `wcc-creation-pending-state is-${context?.pendingGeneration?.phase || "unknown"}`, role: "status" }, /* @__PURE__ */ import_react33.default.createElement("strong", null, pendingLabel(context?.pendingGeneration)), /* @__PURE__ */ import_react33.default.createElement("p", null, context?.pendingGeneration?.error || context?.pendingGeneration?.message || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u4F1A\u539F\u4F4D\u66F4\u65B0\u5361\u7247\u3002"), /* @__PURE__ */ import_react33.default.createElement("small", null, "\u4EFB\u52A1\u5DF2\u63D0\u4EA4\u3002\u9700\u8981\u8865\u5145\u8981\u6C42\u6216\u786E\u8BA4\u65F6\uFF0C\u8BF7\u6253\u5F00\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u3002")), isMedia && inputLocked ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-frozen-media" }, /* @__PURE__ */ import_react33.default.createElement("label", null, "\u539F\u63D0\u793A\u8BCD", /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, readOnly: true, rows: 4 })), /* @__PURE__ */ import_react33.default.createElement("p", null, [context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), context?.mediaJob?.error && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-error" }, context.mediaJob.error), context?.mediaJob?.canResume && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onResumeMedia }, "\u67E5\u770B\u8FDB\u5EA6\u6216\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(context?.mediaJob?.status) && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onNewMedia }, "\u786E\u8BA4\u540E\u91CD\u65B0\u751F\u6210")) : isMedia ? /* @__PURE__ */ import_react33.default.createElement(MediaPrompt, { key: context?.key, type: outputType, instruction, onChange: onInstructionChange, options: mediaOptions, onOptionsChange: onMediaOptionsChange, capabilities: mediaCapabilities, loading: mediaLoading, error: mediaError, job: context?.mediaJob, onRefresh: onRefreshMedia, onOpenSettings: () => setMediaSettingsOpen(true), onResume: onResumeMedia, onPrepareNew: onNewMedia, onSubmit: submit, disabled: referencesBusy, mentionProps }) : isAction ? actionContent != null ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-action-content" }, actionContent) : /* @__PURE__ */ import_react33.default.createElement("label", { className: "wcc-creation-instruction" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u5904\u7406\u8BF4\u660E"), /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, onChange: (event) => onInstructionChange?.(event.target.value), disabled: busy, rows: 4, maxLength: 8e3 })) : /* @__PURE__ */ import_react33.default.createElement(SkillCommandInput, { key: context?.key, instruction, onChange: onInstructionChange, disabled: busy || inputLocked, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onOpenSettings: () => setSkillSettingsOpen(true), onSubmit: submit, mentionProps, footer: submitFooter }), reason && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), displayError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })), (isMedia || isAction) && submitFooter), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-conversation-heading", hidden: !hasExecution && !reviewingResult || revisionEditing && !taskMode }, reviewingResult && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => {
+      setConversationOpen(false);
+      setRevisionEditing(true);
+      requestAnimationFrame(() => composer.current?.querySelector("textarea")?.focus({ preventScroll: true }));
+    } }, "\u57FA\u4E8E\u6B64\u7248\u4FEE\u6539"), hasExecution && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-expanded": conversationOpen, "aria-controls": `${id2}-conversation`, disabled: conversationOpening === conversationScope, onClick: () => void toggleConversation() }, conversationOpening === conversationScope ? "\u6B63\u5728\u6253\u5F00\u2026" : reviewingResult ? "\u539F\u5BF9\u8BDD" : "\u4EFB\u52A1\u5BF9\u8BDD", /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: conversationOpen ? "collapse" : "expand", size: 13 })), executionExpanded && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-review-jumps" }, onOpenReviewDraft && reviewDraft && /* @__PURE__ */ import_react33.default.createElement(
       UiButton,
       {
         variant: "quiet",
@@ -43214,7 +43245,7 @@ function CardComposer({
         onClick: openReviewDraft
       },
       "\u67E5\u770B\u5F85\u5BA1\u7A3F"
-    ), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u770B\u5BA1\u6838"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), /* @__PURE__ */ import_react33.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
+    ), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u67E5\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u524D\u5F80\u786E\u8BA4"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), /* @__PURE__ */ import_react33.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
     /* @__PURE__ */ import_react33.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) }),
     /* @__PURE__ */ import_react33.default.createElement(MediaSettings, { open: visible && mediaSettingsOpen, capabilities: mediaCapabilities, options: mediaOptions, type: outputType, onSave: onSaveMediaSettings, onClose: () => setMediaSettingsOpen(false) })
   );
@@ -45539,8 +45570,8 @@ var ContentCard = (0, import_react46.memo)(function ContentCard2({ id: id2, data
   const [videoError, setVideoError] = (0, import_react46.useState)(false);
   const [openMenu, setOpenMenu] = (0, import_react46.useState)(false);
   const [openApps, setOpenApps] = (0, import_react46.useState)(null);
+  const openMenuId = (0, import_react46.useId)();
   const openMenuRef = (0, import_react46.useRef)(null);
-  const officeDraft = (0, import_react46.useRef)(null);
   const caps = cardCapabilities(data);
   const textDraft = caps.writeBack.mode === "draft";
   const openTarget = caps.openWith ? {
@@ -45549,28 +45580,30 @@ var ContentCard = (0, import_react46.memo)(function ContentCard2({ id: id2, data
     ...data.refId && !caps.openWith.sourceRef && ["material", "artifact", "word", "outline"].includes(data.kind) ? { sourceRef: `${data.kind}:${data.refId}` } : {},
     ...data.outputCard ? { cardId: data.outputCard.id, versionId: data.outputCard.versionId } : {}
   } : null;
+  const openPath = openTarget?.path;
+  const openVersion = openTarget?.versionId;
+  (0, import_react46.useEffect)(() => {
+    setOpenMenu(false);
+    setOpenApps(null);
+  }, [openPath, openVersion, data.sourceHash]);
   (0, import_react46.useEffect)(() => {
     if (!openMenu) return;
     const close2 = (event) => {
       if (!openMenuRef.current?.contains(event.target)) setOpenMenu(false);
     };
-    const key = (event) => {
-      if (event.key === "Escape") setOpenMenu(false);
-    };
     document.addEventListener("pointerdown", close2);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("pointerdown", close2);
-      document.removeEventListener("keydown", key);
-    };
+    return () => document.removeEventListener("pointerdown", close2);
   }, [openMenu]);
-  function loadOpenApps() {
-    if (!openTarget || openApps) return;
-    setOpenApps("loading");
-    data.onLoadOpenApps?.(openTarget).then((result) => {
-      officeDraft.current = result.mode === "office" ? { draftId: result.draftId } : null;
-      setOpenApps(result.applications || []);
-    }).catch(() => setOpenApps([]));
+  async function loadOpenApps() {
+    if (!openTarget || !data.onLoadOpenApps || openApps && !openApps.error) return;
+    const loading = { loading: true };
+    setOpenApps(loading);
+    try {
+      const result = await data.onLoadOpenApps(openTarget);
+      setOpenApps((current) => current === loading ? { applications: result.applications || [], draftId: result.mode === "office" ? result.draftId : void 0 } : current);
+    } catch (cause) {
+      setOpenApps((current) => current === loading ? { error: messageOf7(cause) } : current);
+    }
   }
   const documentExtension = (data.importedFile?.name || data.path || "").match(/\.(csv|docx|pdf)$/i)?.[1]?.toUpperCase();
   const execution = data.publishedGeneration || nativePendingState(data.pendingGeneration, data.nativeSessionStatus);
@@ -45608,43 +45641,47 @@ var ContentCard = (0, import_react46.memo)(function ContentCard2({ id: id2, data
       value: data.outputCard?.versionId || data.currentMaterialVersionId,
       onChange: (value) => data.outputCard ? data.onVersionChange?.(value) : data.onMaterialVersionView?.(value)
     }
-  ), !caps.versioned && data.number != null && /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-version" }, "v", String(data.number).padStart(3, "0")), openTarget && /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-card-open-wrap", ref: openMenuRef }, /* @__PURE__ */ import_react46.default.createElement(
+  ), !caps.versioned && data.number != null && /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-version" }, "v", String(data.number).padStart(3, "0")), openTarget && /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-open-wrap", ref: openMenuRef, onKeyDown: (event) => {
+    if (!openMenu) return;
+    event.stopPropagation();
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    setOpenMenu(false);
+    requestAnimationFrame(() => openMenuRef.current?.querySelector(":scope > button")?.focus({ preventScroll: true }));
+  } }, /* @__PURE__ */ import_react46.default.createElement(
     UiButton,
     {
       variant: "ghost",
       size: "compact",
       iconOnly: true,
-      type: "button",
       className: "nodrag nopan",
-      "aria-label": `\u6253\u5F00\u65B9\u5F0F\uFF1A${data.title}`,
-      title: "\u6253\u5F00\u65B9\u5F0F",
-      "aria-haspopup": "menu",
-      "aria-expanded": openMenu || void 0,
+      "aria-label": `\u5361\u7247\u64CD\u4F5C\uFF1A${title}`,
+      title: "\u5361\u7247\u64CD\u4F5C",
+      "aria-expanded": openMenu,
+      "aria-controls": openMenu ? openMenuId : void 0,
       onPointerDown: (event) => event.stopPropagation(),
       onDoubleClick: (event) => event.stopPropagation(),
       onClick: (event) => {
         event.stopPropagation();
-        setOpenMenu((value) => {
-          const next = !value;
-          if (next) loadOpenApps();
-          return next;
-        });
+        setOpenMenu((value) => !value);
       }
     },
     /* @__PURE__ */ import_react46.default.createElement(UiIcon, { name: "more" })
-  ), openMenu && /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-open-menu nodrag nopan", role: "menu", "aria-label": `\u6253\u5F00\u65B9\u5F0F\uFF1A${data.title}`, onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+  ), openMenu && /* @__PURE__ */ import_react46.default.createElement("div", { id: openMenuId, className: "wcc-card-open-menu nodrag nopan nowheel", role: "group", "aria-label": "\u5361\u7247\u64CD\u4F5C", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => {
     setOpenMenu(false);
     data.onOpenInspect?.();
-  } }, "\u67E5\u770B\u5185\u5BB9"), data.projectFile?.status === "missing" && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+  } }, /* @__PURE__ */ import_react46.default.createElement(UiIcon, { name: "file", size: 14 }), "\u5728\u4FA7\u680F\u67E5\u770B"), data.projectFile?.status === "missing" && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => {
     setOpenMenu(false);
     data.onRestoreFile?.();
-  } }, "\u91CD\u65B0\u751F\u6210\u6E90\u6587\u4EF6"), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-open-divider", role: "separator" }), openApps === "loading" && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-card-open-status", role: "status" }, "\u6B63\u5728\u83B7\u53D6\u5E94\u7528\u5217\u8868\u2026"), Array.isArray(openApps) && openApps.map((app) => /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", key: app.id, onClick: () => {
+  } }, /* @__PURE__ */ import_react46.default.createElement(UiIcon, { name: "refresh", size: 14 }), "\u6062\u590D\u6E90\u6587\u4EF6"), /* @__PURE__ */ import_react46.default.createElement("details", { className: "wcc-card-apps", onToggle: (event) => {
+    if (event.currentTarget.open) void loadOpenApps();
+  } }, /* @__PURE__ */ import_react46.default.createElement("summary", null, /* @__PURE__ */ import_react46.default.createElement(UiIcon, { name: "expand", size: 14 }), "\u7528\u672C\u673A\u5E94\u7528\u6253\u5F00", /* @__PURE__ */ import_react46.default.createElement("span", { "aria-hidden": "true" }, "\u2304")), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-app-list" }, openApps?.loading && /* @__PURE__ */ import_react46.default.createElement("p", { role: "status" }, "\u6B63\u5728\u67E5\u627E\u5E94\u7528\u2026"), openApps?.error && /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, /* @__PURE__ */ import_react46.default.createElement(UserError, { error: openApps.error }), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void loadOpenApps() }, "\u91CD\u8BD5")), openApps?.applications?.map((app) => /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", key: app.id, onClick: () => {
     setOpenMenu(false);
-    data.onOpenWithApp?.(openTarget, app.id, officeDraft.current?.draftId);
-  } }, app.name)), Array.isArray(openApps) && !openApps.length && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-card-open-status" }, "\u672A\u68C0\u6D4B\u5230\u5176\u4ED6\u672C\u673A\u5E94\u7528\u3002"), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-open-divider", role: "separator" }), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+    data.onOpenWithApp?.(openTarget, app.id, openApps.draftId);
+  } }, app.id === "default" ? "\u4F7F\u7528\u7CFB\u7EDF\u9ED8\u8BA4\u5E94\u7528" : app.name)), openApps?.applications?.length === 0 && /* @__PURE__ */ import_react46.default.createElement("p", { role: "status" }, "\u672A\u627E\u5230\u53EF\u7528\u7684\u672C\u673A\u5E94\u7528\u3002"))), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => {
     setOpenMenu(false);
     data.onRevealFile?.(openTarget);
-  } }, "\u6253\u5F00\u6240\u5728\u6587\u4EF6\u5939"))), /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-grip", "aria-hidden": "true" }, "\u283F"))), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-body" }, data.projectFile?.status === "missing" && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-card-missing", role: "status" }, "\u6E90\u6587\u4EF6\u5DF2\u88AB\u5220\u9664\uFF0C\u53EF\u5728\u300C\u6253\u5F00\u65B9\u5F0F\u300D\u83DC\u5355\u91CD\u65B0\u751F\u6210\u3002"), data.skillTodo && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-skill-todo nodrag nopan", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => {
+  } }, /* @__PURE__ */ import_react46.default.createElement(UiIcon, { name: "folder", size: 14 }), "\u663E\u793A\u6240\u5728\u6587\u4EF6\u5939"))), /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-grip", "aria-hidden": "true" }, "\u283F"))), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-body" }, data.projectFile?.status === "missing" && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-card-missing", role: "status" }, "\u6E90\u6587\u4EF6\u5DF2\u88AB\u5220\u9664\uFF0C\u53EF\u4ECE\u5361\u7247\u83DC\u5355\u6062\u590D\u3002"), data.skillTodo && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-skill-todo nodrag nopan", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => {
     event.stopPropagation();
     data.onOpenSkillTodo?.();
   } }, /* @__PURE__ */ import_react46.default.createElement("strong", null, "\u5F85\u529E \xB7 ", interactionLabel(data.skillTodo.interaction)), /* @__PURE__ */ import_react46.default.createElement("span", null, data.skillTodo.interaction.questions?.[0]?.question || "\u6838\u5BF9\u6267\u884C\u6743\u9650", " \u2192")), textDraft && /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-text-draft-actions nodrag nopan", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", size: "compact", type: "button", onClick: (event) => {
@@ -45694,10 +45731,10 @@ var ContentCard = (0, import_react46.memo)(function ContentCard2({ id: id2, data
   } }, "\u67E5\u770B PPTX", fileDeck.role === "attachment" ? " \xB7 \u9644\u4EF6" : ""), data.slideProject && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: (e) => {
     e.stopPropagation();
     data.onOpenWeb?.();
-  }, title: fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? "\u540C\u4EFB\u52A1\u7684\u5176\u4ED6\u7F51\u9875\u5DE5\u7A0B\uFF0C\u672A\u5173\u8054\u5F53\u524DPPTX" : void 0 }, fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? "\u5176\u4ED6\u7F51\u9875\u5DE5\u7A0B" : "\u7F16\u8F91\u7F51\u9875\u8BFE\u4EF6")), /* @__PURE__ */ import_react46.default.createElement("footer", { hidden: data.kind === "generation" && Boolean(data.slideProject), className: warning ? "wcc-card-footer is-warning" : "wcc-card-footer", title: data.projectFile?.path || data.sourcePath || data.path || "" }, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-state-dot" }), ["artifact", "outline", "word"].includes(data.kind) ? /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-card-file nodrag nopan", "aria-label": `\u6253\u5F00\u6240\u5728\u6587\u4EF6\u5939\uFF1A${data.delivery?.fileName || data.title}`, title: data.delivery?.error || data.delivery?.path || "\u5C06\u6B64\u7248\u672C\u6574\u7406\u4E3A\u540C\u540D\u6587\u4EF6\u5E76\u5728 Finder \u4E2D\u663E\u793A", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => {
+  }, title: fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? "\u540C\u4EFB\u52A1\u7684\u5176\u4ED6\u7F51\u9875\u5DE5\u7A0B\uFF0C\u672A\u5173\u8054\u5F53\u524DPPTX" : void 0 }, fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? "\u5176\u4ED6\u7F51\u9875\u5DE5\u7A0B" : "\u7F16\u8F91\u7F51\u9875\u8BFE\u4EF6")), /* @__PURE__ */ import_react46.default.createElement("footer", { hidden: data.kind === "generation" && Boolean(data.slideProject), className: warning ? "wcc-card-footer is-warning" : "wcc-card-footer", title: data.projectFile?.path || data.sourcePath || data.path || "" }, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-state-dot" }), ["artifact", "outline", "word"].includes(data.kind) ? /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-card-file nodrag nopan", "aria-label": `\u663E\u793A\u6240\u5728\u6587\u4EF6\u5939\uFF1A${data.delivery?.fileName || data.title}`, title: data.delivery?.error || data.delivery?.path || "\u5728\u6587\u4EF6\u5939\u4E2D\u663E\u793A\u6B64\u7248\u672C", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => {
     event.stopPropagation();
     data.onOpenFile?.();
-  } }, /* @__PURE__ */ import_react46.default.createElement("span", null, data.delivery?.fileName || "\u6574\u7406\u5E76\u5B9A\u4F4D\u6587\u4EF6"), /* @__PURE__ */ import_react46.default.createElement("small", null, data.delivery?.version === 0 ? "\u5236\u4F5C\u8D44\u6599" : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, "0")}`), /* @__PURE__ */ import_react46.default.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react46.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" }))) : data.projectFile ? /* @__PURE__ */ import_react46.default.createElement("span", null, data.projectFile.status === "ready" ? "\u6587\u4EF6\u5F15\u7528" : "\u539F\u6587\u4EF6\u5DF2\u53D8\u5316 \xB7 \u5F15\u7528\u4FDD\u7559") : stateLabel({ ...data, pendingGeneration: pending })), /* @__PURE__ */ import_react46.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable, "aria-label": `\u4ECE ${data.title} \u8FDE\u7EBF` }), /* @__PURE__ */ import_react46.default.createElement(NodeToolbar, { isVisible: selected2 && data.kind !== "generation", position: Position.Right, offset: 12 }, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", className: "wcc-card-create nodrag nopan", "aria-label": `\u4ECE ${data.title} \u65B0\u5EFA\u5173\u8054\u5185\u5BB9`, title: "\u65B0\u589E\u5173\u8054\u5185\u5BB9", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => {
+  } }, /* @__PURE__ */ import_react46.default.createElement("span", null, data.delivery?.fileName || "\u6574\u7406\u5E76\u5B9A\u4F4D\u6587\u4EF6"), /* @__PURE__ */ import_react46.default.createElement("small", null, data.delivery?.version === 0 ? "\u5236\u4F5C\u8D44\u6599" : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, "0")}`), /* @__PURE__ */ import_react46.default.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react46.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" }))) : data.projectFile ? /* @__PURE__ */ import_react46.default.createElement("span", null, data.projectFile.status === "ready" ? "\u6587\u4EF6\u5F15\u7528" : "\u539F\u6587\u4EF6\u5DF2\u53D8\u5316 \xB7 \u5F15\u7528\u4FDD\u7559") : stateLabel({ ...data, pendingGeneration: pending })), /* @__PURE__ */ import_react46.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable, "aria-label": `\u4ECE ${data.title} \u8FDE\u7EBF` }), /* @__PURE__ */ import_react46.default.createElement(NodeToolbar, { isVisible: selected2 && data.kind !== "generation", position: Position.Right, offset: 12 }, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", className: "wcc-card-create nodrag nopan", "aria-label": `\u7528 ${title} \u7EE7\u7EED\u521B\u4F5C`, title: "\u7528\u8FD9\u5F20\u5361\u521B\u4F5C", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => {
     event.stopPropagation();
     data.onCreate?.(id2);
   } }, "\uFF0B")));
@@ -46146,7 +46183,6 @@ function CanvasContent({
     if (position.y < sourceScreen.bottom + 14) {
       if (sourceScreen.right + width + 26 <= availableWidth) position.x = sourceScreen.right + 14;
       else if (sourceScreen.left - width - 14 >= 12) position.x = sourceScreen.left - width - 14;
-      else position.y = Math.max(position.y, Math.min(sourceScreen.top + 44, canvasSize.height - 120));
     }
     position.x = Math.max(12, Math.min(availableWidth - width - 12, position.x));
     return position;
@@ -46912,7 +46948,7 @@ function CanvasContent({
     const size = canvasSizeRef.current;
     setCreationMenu({ anchor: { ...node.data }, position: {
       x: Math.max(12, Math.min(size.width - 272, (point.x + nodeSize2(node).width) * viewport.zoom + viewport.x + 30)),
-      y: Math.max(76, Math.min(size.height - 390, (point.y + 30) * viewport.zoom + viewport.y))
+      y: Math.max(76, Math.min(size.height - 260, (point.y + 30) * viewport.zoom + viewport.y))
     } });
   }
   function creationMenuItems(card) {
@@ -47284,6 +47320,7 @@ function CanvasContent({
         onOpenSkillTodo: () => openSkillReview(interactionsRef.current.find((entry) => entry.task.outputCardId && entry.task.outputCardId === node.data.outputCard?.id || node.data.outputCard?.versions?.some((version2) => version2.taskId === entry.task.id))),
         onOpenPending: () => publishedGeneration || node.data.pendingGeneration?.published ? void openOutputCard(node.data, card.latestVersionId, { showDeck: false }) : void openPendingCard(node.data, { showDeck: false }),
         onOpenInspect: () => {
+          selectCard(node.id);
           closeCreation();
           setSidebar(true);
           setTab("inspect");
@@ -47294,7 +47331,7 @@ function CanvasContent({
         onOpenWithApp: (entry, application, draftId) => request(
           draftId ? "document-open-application" : "card-open-application",
           draftId ? { draftId, application } : { ...entry, application, requirementId: requirement.id }
-        ),
+        ).catch((cause) => setError(messageOf7(cause))),
         onLoadMaterialVersion: (versionId) => request("material-version", { requirementId: requirement.id, materialId: node.data.refId, versionId }),
         onMaterialVersionView: (versionId) => void viewMaterialVersion(node.data, versionId),
         onRestoreFile: () => void restoreMaterialFile(node.data),
@@ -47416,8 +47453,8 @@ function CanvasContent({
     const selected2 = nodesRef.current.filter((node) => isObject(node) && node.selected);
     if (!selected2.length || busy) return;
     const epoch = epochRef.current, selection2 = selected2.map((n) => n.id).sort().join("|");
-    if (editingTextCard) {
-      setError("\u8BF7\u5148\u4FDD\u5B58\u6216\u53D6\u6D88\u6B63\u5728\u7F16\u8F91\u7684\u6587\u5B57\uFF0C\u518D\u5220\u9664\u8282\u70B9\u3002");
+    if (textEditorOpen || editingNodeId) {
+      setError("\u8BF7\u5148\u9000\u51FA\u6587\u5B57\u7F16\u8F91\uFF0C\u518D\u5220\u9664\u8282\u70B9\u3002");
       return;
     }
     try {

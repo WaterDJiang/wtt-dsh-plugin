@@ -1,3 +1,5 @@
+export const EFFORT_LABELS = { off: '关闭', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '更高', max: '最高' };
+
 function identifier(value, label, maxLength = 256) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > maxLength || /[\u0000-\u001f\u007f]/u.test(value)) {
     throw new Error(`模型选择的${label}无效，请重新选择模型。`);

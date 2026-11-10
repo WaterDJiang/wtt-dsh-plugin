@@ -99,27 +99,32 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const [videoError, setVideoError] = useState(false)
   const [openMenu, setOpenMenu] = useState(false)
   const [openApps, setOpenApps] = useState(null)
+  const openMenuId = useId()
   const openMenuRef = useRef(null)
-  const officeDraft = useRef(null)
   const caps = cardCapabilities(data)
   const textDraft = caps.writeBack.mode === 'draft'
   const openTarget = caps.openWith ? { ...caps.openWith, hash: data.sourceHash,
     ...(data.refId && !caps.openWith.sourceRef && ['material', 'artifact', 'word', 'outline'].includes(data.kind) ? { sourceRef: `${data.kind}:${data.refId}` } : {}),
     ...(data.outputCard ? { cardId: data.outputCard.id, versionId: data.outputCard.versionId } : {}) } : null
+  const openPath = openTarget?.path
+  const openVersion = openTarget?.versionId
+  useEffect(() => { setOpenMenu(false); setOpenApps(null) }, [openPath, openVersion, data.sourceHash])
   useEffect(() => {
     if (!openMenu) return
     const close = event => { if (!openMenuRef.current?.contains(event.target)) setOpenMenu(false) }
-    const key = event => { if (event.key === 'Escape') setOpenMenu(false) }
-    document.addEventListener('pointerdown', close); document.addEventListener('keydown', key)
-    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
   }, [openMenu])
-  function loadOpenApps() {
-    if (!openTarget || openApps) return
-    setOpenApps('loading')
-    data.onLoadOpenApps?.(openTarget).then(result => {
-      officeDraft.current = result.mode === 'office' ? { draftId: result.draftId } : null
-      setOpenApps(result.applications || [])
-    }).catch(() => setOpenApps([]))
+  async function loadOpenApps() {
+    if (!openTarget || !data.onLoadOpenApps || (openApps && !openApps.error)) return
+    const loading = { loading: true }
+    setOpenApps(loading)
+    try {
+      const result = await data.onLoadOpenApps(openTarget)
+      setOpenApps(current => current === loading ? { applications: result.applications || [], draftId: result.mode === 'office' ? result.draftId : undefined } : current)
+    } catch (cause) {
+      setOpenApps(current => current === loading ? { error: messageOf(cause) } : current)
+    }
   }
   const documentExtension = (data.importedFile?.name || data.path || '').match(/\.(csv|docx|pdf)$/i)?.[1]?.toUpperCase()
   const execution = data.publishedGeneration || nativePendingState(data.pendingGeneration, data.nativeSessionStatus)
@@ -143,24 +148,34 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         value={data.outputCard?.versionId || data.currentMaterialVersionId}
         onChange={value => data.outputCard ? data.onVersionChange?.(value) : data.onMaterialVersionView?.(value)} />}
         {!caps.versioned && data.number != null && <span className="wcc-version">v{String(data.number).padStart(3, '0')}</span>}
-      {openTarget && <span className="wcc-card-open-wrap" ref={openMenuRef}>
-        <UiButton variant="ghost" size="compact" iconOnly type="button" className="nodrag nopan" aria-label={`打开方式：${data.title}`} title="打开方式" aria-haspopup="menu" aria-expanded={openMenu || undefined}
-          onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setOpenMenu(value => { const next = !value; if (next) loadOpenApps(); return next }) }}><UiIcon name="more" /></UiButton>
-        {openMenu && <div className="wcc-card-open-menu nodrag nopan" role="menu" aria-label={`打开方式：${data.title}`} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-          <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setOpenMenu(false); data.onOpenInspect?.() }}>查看内容</UiButton>
-          {data.projectFile?.status === 'missing' && <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setOpenMenu(false); data.onRestoreFile?.() }}>重新生成源文件</UiButton>}
-          <div className="wcc-card-open-divider" role="separator" />
-          {openApps === 'loading' && <p className="wcc-card-open-status" role="status">正在获取应用列表…</p>}
-          {Array.isArray(openApps) && openApps.map(app => <UiButton variant="custom" type="button" role="menuitem" key={app.id} onClick={() => { setOpenMenu(false); data.onOpenWithApp?.(openTarget, app.id, officeDraft.current?.draftId) }}>{app.name}</UiButton>)}
-          {Array.isArray(openApps) && !openApps.length && <p className="wcc-card-open-status">未检测到其他本机应用。</p>}
-          <div className="wcc-card-open-divider" role="separator" />
-          <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setOpenMenu(false); data.onRevealFile?.(openTarget) }}>打开所在文件夹</UiButton>
+      {openTarget && <div className="wcc-card-open-wrap" ref={openMenuRef} onKeyDown={event => {
+        if (!openMenu) return
+        event.stopPropagation()
+        if (event.key !== 'Escape') return
+        event.preventDefault(); setOpenMenu(false)
+        requestAnimationFrame(() => openMenuRef.current?.querySelector(':scope > button')?.focus({ preventScroll: true }))
+      }}>
+        <UiButton variant="ghost" size="compact" iconOnly className="nodrag nopan" aria-label={`卡片操作：${title}`} title="卡片操作" aria-expanded={openMenu} aria-controls={openMenu ? openMenuId : undefined}
+          onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setOpenMenu(value => !value) }}><UiIcon name="more" /></UiButton>
+        {openMenu && <div id={openMenuId} className="wcc-card-open-menu nodrag nopan nowheel" role="group" aria-label="卡片操作" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+          <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onOpenInspect?.() }}><UiIcon name="file" size={14} />在侧栏查看</UiButton>
+          {data.projectFile?.status === 'missing' && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRestoreFile?.() }}><UiIcon name="refresh" size={14} />恢复源文件</UiButton>}
+          <details className="wcc-card-apps" onToggle={event => { if (event.currentTarget.open) void loadOpenApps() }}>
+            <summary><UiIcon name="expand" size={14} />用本机应用打开<span aria-hidden="true">⌄</span></summary>
+            <div className="wcc-card-app-list">
+              {openApps?.loading && <p role="status">正在查找应用…</p>}
+              {openApps?.error && <><UserError error={openApps.error} /><UiButton variant="ghost" size="compact" onClick={() => void loadOpenApps()}>重试</UiButton></>}
+              {openApps?.applications?.map(app => <UiButton variant="ghost" size="compact" key={app.id} onClick={() => { setOpenMenu(false); data.onOpenWithApp?.(openTarget, app.id, openApps.draftId) }}>{app.id === 'default' ? '使用系统默认应用' : app.name}</UiButton>)}
+              {openApps?.applications?.length === 0 && <p role="status">未找到可用的本机应用。</p>}
+            </div>
+          </details>
+          <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRevealFile?.(openTarget) }}><UiIcon name="folder" size={14} />显示所在文件夹</UiButton>
         </div>}
-      </span>}
+      </div>}
       <span className="wcc-grip" aria-hidden="true">⠿</span></div>
     </header>
     <div className="wcc-card-body">
-      {data.projectFile?.status === 'missing' && <p className="wcc-card-missing" role="status">源文件已被删除，可在「打开方式」菜单重新生成。</p>}
+      {data.projectFile?.status === 'missing' && <p className="wcc-card-missing" role="status">源文件已被删除，可从卡片菜单恢复。</p>}
       {data.skillTodo && <UiButton variant="custom" type="button" className="wcc-skill-todo nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenSkillTodo?.() }}><strong>待办 · {interactionLabel(data.skillTodo.interaction)}</strong><span>{data.skillTodo.interaction.questions?.[0]?.question || '核对执行权限'} →</span></UiButton>}
       {textDraft && <div className="wcc-text-draft-actions nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
         <UiButton variant="quiet" size="compact" type="button" onClick={event => { event.stopPropagation(); data.onEditText?.() }}>编辑正文</UiButton>
@@ -181,13 +196,13 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
       {data.slideProject && <UiButton variant="quiet" size="compact" onClick={e=>{e.stopPropagation();data.onOpenWeb?.()}} title={fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? '同任务的其他网页工程，未关联当前PPTX' : undefined}>{fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? '其他网页工程' : '编辑网页课件'}</UiButton>}
     </div>}
     <footer hidden={data.kind === 'generation' && Boolean(data.slideProject)} className={warning ? 'wcc-card-footer is-warning' : 'wcc-card-footer'} title={data.projectFile?.path || data.sourcePath || data.path || ''}>
-      <span className="wcc-state-dot" />{['artifact', 'outline', 'word'].includes(data.kind) ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan" aria-label={`打开所在文件夹：${data.delivery?.fileName || data.title}`} title={data.delivery?.error || data.delivery?.path || '将此版本整理为同名文件并在 Finder 中显示'} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenFile?.() }}>
+      <span className="wcc-state-dot" />{['artifact', 'outline', 'word'].includes(data.kind) ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan" aria-label={`显示所在文件夹：${data.delivery?.fileName || data.title}`} title={data.delivery?.error || data.delivery?.path || '在文件夹中显示此版本'} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenFile?.() }}>
         <span>{data.delivery?.fileName || '整理并定位文件'}</span><small>{data.delivery?.version === 0 ? '制作资料' : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, '0')}`}</small><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z" /></svg>
       </UiButton> : data.projectFile ? <span>{data.projectFile.status==='ready'?'文件引用':'原文件已变化 · 引用保留'}</span> : stateLabel({ ...data, pendingGeneration: pending })}
     </footer>
     <Handle type="source" position={Position.Right} isConnectable={isConnectable} aria-label={`从 ${data.title} 连线`} />
     <NodeToolbar isVisible={selected && data.kind !== 'generation'} position={Position.Right} offset={12}>
-      <UiButton variant="custom" className="wcc-card-create nodrag nopan" aria-label={`从 ${data.title} 新建关联内容`} title="新增关联内容" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onCreate?.(id) }}>＋</UiButton>
+      <UiButton variant="custom" className="wcc-card-create nodrag nopan" aria-label={`用 ${title} 继续创作`} title="用这张卡创作" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onCreate?.(id) }}>＋</UiButton>
     </NodeToolbar>
   </article>
 })
@@ -567,7 +582,6 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (position.y < sourceScreen.bottom + 14) {
       if (sourceScreen.right + width + 26 <= availableWidth) position.x = sourceScreen.right + 14
       else if (sourceScreen.left - width - 14 >= 12) position.x = sourceScreen.left - width - 14
-      else position.y = Math.max(position.y, Math.min(sourceScreen.top + 44, canvasSize.height - 120))
     }
     position.x = Math.max(12, Math.min(availableWidth - width - 12, position.x))
     return position
@@ -1187,7 +1201,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const size = canvasSizeRef.current
     setCreationMenu({ anchor: { ...node.data }, position: {
       x: Math.max(12, Math.min(size.width - 272, (point.x + nodeSize(node).width) * viewport.zoom + viewport.x + 30)),
-      y: Math.max(76, Math.min(size.height - 390, (point.y + 30) * viewport.zoom + viewport.y)),
+      y: Math.max(76, Math.min(size.height - 260, (point.y + 30) * viewport.zoom + viewport.y)),
     } })
   }
 
@@ -1497,12 +1511,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onOpenSkillTodo: () => openSkillReview(interactionsRef.current.find(entry => (entry.task.outputCardId && entry.task.outputCardId === node.data.outputCard?.id) || node.data.outputCard?.versions?.some(version => version.taskId === entry.task.id))),
       onOpenPending: () => publishedGeneration || node.data.pendingGeneration?.published
         ? void openOutputCard(node.data, card.latestVersionId, { showDeck: false }) : void openPendingCard(node.data, { showDeck: false }),
-      onOpenInspect: () => { closeCreation(); setSidebar(true); setTab('inspect') },
+      onOpenInspect: () => { selectCard(node.id); closeCreation(); setSidebar(true); setTab('inspect') },
       onRevealFile: entry => void openProjectFileAction('project-file-reveal', entry),
       onOpenExternal: entry => void openProjectFileAction('project-file-open', entry),
       onLoadOpenApps: entry => request('card-open-applications', { ...entry, requirementId: requirement.id }),
       onOpenWithApp: (entry, application, draftId) => request(draftId ? 'document-open-application' : 'card-open-application',
-        draftId ? { draftId, application } : { ...entry, application, requirementId: requirement.id }),
+        draftId ? { draftId, application } : { ...entry, application, requirementId: requirement.id }).catch(cause => setError(messageOf(cause))),
       onLoadMaterialVersion: versionId => request('material-version', { requirementId: requirement.id, materialId: node.data.refId, versionId }),
       onMaterialVersionView: versionId => void viewMaterialVersion(node.data, versionId),
       onRestoreFile: () => void restoreMaterialFile(node.data),
@@ -1614,7 +1628,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const selected = nodesRef.current.filter(node => isObject(node) && node.selected)
     if(!selected.length||busy)return
     const epoch=epochRef.current,selection=selected.map(n=>n.id).sort().join('|')
-    if(editingTextCard){setError('请先保存或取消正在编辑的文字，再删除节点。');return}
+    if (textEditorOpen || editingNodeId) { setError('请先退出文字编辑，再删除节点。'); return }
     try{
       await saveLayout()
       if(conflictRef.current)throw new Error('画布发生冲突，请先刷新后再删除')

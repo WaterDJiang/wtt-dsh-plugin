@@ -1,10 +1,8 @@
 import { UiButton } from './ui/controls.jsx'
 import { UserError } from './user-feedback.jsx'
 import React, { useId } from 'react'
-import { normalizeModelCatalog } from './model-selection.mjs'
+import { EFFORT_LABELS, normalizeModelCatalog } from './model-selection.mjs'
 import './model-selection.css'
-
-const EFFORT_LABELS = { off: '关闭', minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '更高', max: '最高' }
 
 export function ModelSelection({ catalog, selection, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false }) {
   const id = useId()

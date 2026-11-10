@@ -52,11 +52,6 @@
 .wcc-skill-folders small { color:var(--wtt-ui-muted); }
 .wcc-skill-quick-settings footer { display:flex;align-items:center;justify-content:space-between;gap:12px; }
 .wcc-skill-quick-settings footer>span { color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm); }
-.wtt-course-canvas .wcc-user-favorites { display:flex;gap:6px;align-items:center;white-space:nowrap;padding:0 0 7px;max-width:100%; }
-.wtt-course-canvas .wcc-user-favorites button { flex:0 0 auto;max-width:180px;overflow:hidden;text-overflow:ellipsis;min-height:28px;padding:4px 8px;font-size:var(--wtt-text-sm);border:1px solid var(--wtt-ui-line);border-radius:6px;background:var(--wtt-ui-subtle);color:var(--wtt-ui-text); }
-.wtt-course-canvas .wcc-user-favorites>.wcc-manage-favorites { background:transparent;border-style:dashed; }
 .wtt-project-picker.is-skill-picker .wtt-pp-body { display:block; }
 .wtt-project-picker.is-skill-picker .wtt-pp-recent { display:none; }
-@media(max-width:600px) { .wtt-course-canvas .wcc-skill-star { min-width:42px;min-height:42px; }.wcc-skill-quick-settings .wcc-skill-settings-body { padding:10px 12px; }.wtt-course-canvas .wcc-user-favorites button { min-height:34px; } }
-
-.wcc-user-favorite-shortcuts { display:flex;flex:1;gap:6px;min-width:0;overflow-x:auto; }.wcc-user-favorite-shortcuts:empty { display:none; }
+@media(max-width:600px) { .wtt-course-canvas .wcc-skill-star { min-width:42px;min-height:42px; }.wcc-skill-quick-settings .wcc-skill-settings-body { padding:10px 12px; }}
