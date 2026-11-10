@@ -19,7 +19,7 @@ WTT 创作工作台（`@wtt/dsh-creation-workbench`）是 DeepSeek Harness（DSH
 在 DSH 中打开 **插件 → 添加插件 → 安装第三方插件**，粘贴以下安装串：
 
 ```text
-git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
+github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 ```
 
 也可以在「发现」添加 [WTT 插件索引](https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json)。需要兼容的 DSH 宿主，具体范围见[插件安装说明](plugins/dsh-creation-workbench/README.md#安装)。
@@ -28,7 +28,7 @@ git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation
 
 当前版本为 **0.52.0**。[查看更新内容](plugins/dsh-creation-workbench/README.md#0520-的主要改进)。
 
-在 DSH 的 **插件 → 已安装 → WTT 创作工作台** 查看当前版本。用索引安装的用户，可以在「发现」刷新索引后查看可用版本。看到「可更新」时进入详情更新。也可以手动对照 [WTT 市场索引](market/index.json) 的版本与固定提交。
+已安装社区市场 `dshmarket` 的用户可打开 **插件 → 插件市场 → 已安装**。WTT 显示「有新版本」时，点「立即更新」。如果旧版的代码来源写的是 `path:plugins/...`，先在原配置用上面的安装串覆盖安装一次，市场就能正确识别子包。
 
 [按原安装来源升级、验证和回退](plugins/dsh-creation-workbench/README.md#检查更新与升级)
 

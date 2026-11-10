@@ -28,10 +28,10 @@
 打开 **插件 → 添加插件 → 安装第三方插件**，粘贴下面的 Git 安装串：
 
 ```text
-git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench
+github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 ```
 
-通过 Git 安装时，`#main` 解析为安装时的主分支提交。需要固定版本时，将 `main` 替换成 [WTT 插件索引](../../market/index.json) 对应版本的 `source.commit`。
+安装串使用 GitHub 默认分支和插件子目录。要安装指定版本，在 `#` 后加上 [WTT 插件索引](../../market/index.json) 对应版本的 `source.commit`，再加 `&path:/plugins/dsh-creation-workbench`。
 
 ### 通过「发现」安装
 
@@ -48,7 +48,7 @@ https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.j
 如果使用 Web profile，可以直接安装：
 
 ```sh
-dsh plugin --profile web add 'git+https://github.com/WaterDJiang/wtt-dsh-plugin#main&path:plugins/dsh-creation-workbench'
+dsh plugin --profile web add 'github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench'
 ```
 
 需要修改源码时，可以自行构建安装：
@@ -74,12 +74,11 @@ WTT_COURSE_WORKSPACE=/path/to/workspace dsh web
 
 ## 检查更新与升级
 
-1. 在 **插件 → 已安装 → WTT 创作工作台** 看当前版本。如果使用 Web profile，也可运行 `dsh plugin --profile web list @wtt/dsh-creation-workbench --depth 0`。
-2. 从索引安装的用户，在 **插件 → 发现** 刷新 WTT 索引，查看兼容版本。DSH 显示「可更新」时，打开详情选择更新。如果详情没有更新按钮，在「发现」的插件版本列表选目标版本安装。也可以直接打开 [WTT 市场索引](../../market/index.json)，核对 `versions` 中的版本与 `source.commit`。
-3. 用 Git 安装串或固定提交安装的用户，确认想升级的版本后，可在原 profile 重新执行上面的 `dsh plugin --profile web add '…'`，并把 `main` 换成目标版本的提交 SHA。使用桌面版时优先用桌面端插件界面，或将命令中的 `web` 换成实际安装该插件的 profile。只有旧版界面要求重新安装且无法使用更新入口时，再在原 profile 移除旧插件并从目标来源安装。
-4. 等正在运行的任务结束再更新。根据 DSH 提示重新加载或重启，打开原来的项目目录，核对插件版本与现有画布。要回退时，可用上一版本的固定提交重新安装。更新或回退前可复制整个项目目录备份，包括隐藏的 `.wtt-workbench/`。
+- **社区插件市场（`dshmarket`）**。打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」时点「立即更新」，按 DSH 提示完成。市场根据 GitHub 发布源检查这个插件的版本。
+- **旧安装串迁移**。在 **插件 → 已安装** 打开工作台详情查看「代码来源」。如果子目录写成 `path:plugins/...`，在同一个配置中用本文开头的 `#path:/plugins/dsh-creation-workbench` 安装串覆盖安装一次。市场按带斜杠的子目录识别后续更新。
+- **DSH 自定义插件索引**。从「发现」刷新 WTT 索引，选择兼容的新版本安装。也可以对照 [WTT 市场索引](../../market/index.json) 的版本和固定提交。
 
-判断是否需要升级，以兼容的插件版本和索引固定提交为准。当前公开版本为 **0.52.0**。
+等待任务结束后再更新，按 DSH 提示重新加载或重启。打开原项目，核对版本和现有画布。回退可用旧版本的固定提交安装。备份时复制项目目录和其中隐藏的 `.wtt-workbench/`。
 
 ## 0.52.0 的主要改进
 
