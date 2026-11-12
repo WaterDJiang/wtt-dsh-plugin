@@ -101,7 +101,16 @@ export class TaskStore {
       if (!['outline', 'pptx', 'exercise', 'script', 'text', 'image', 'video'].includes(input.outputType)) throw new Error('任务输出类型无效');
       additional.outputType = input.outputType;
     }
-    if (['image', 'video'].includes(input.outputType)) {
+    if (input.generationMethod !== undefined) {
+      if (!['image', 'video'].includes(input.outputType) || !['skill', 'api'].includes(input.generationMethod)) throw new Error('媒体生成方式无效');
+      additional.generationMethod = input.generationMethod;
+    }
+    if (input.providerId !== undefined) {
+      if (input.generationMethod !== 'api' || typeof input.providerId !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.providerId)) throw new Error('媒体 API 提供商无效');
+      additional.providerId = input.providerId;
+    }
+    if (['image', 'video'].includes(input.outputType) && (input.media !== undefined || input.generationMethod === 'api')) {
+      if (input.generationMethod === 'skill') throw new Error('Skill 任务不接收媒体模型参数');
       const media = input.media;
       if (!media || typeof media.model !== 'string' || typeof media.ratio !== 'string' || typeof media.resolution !== 'string'
         || (input.outputType === 'video' && !Number.isInteger(media.duration))) throw new Error('媒体模型参数无效');

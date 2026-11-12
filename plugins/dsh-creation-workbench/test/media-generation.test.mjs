@@ -62,7 +62,7 @@ test('image generation persists a separate task, one real validated delivery, im
   assert.match(first.task.input.effectivePrompt, /画一张简洁/);
   const repeated = await service.media.create(args);
   assert.equal(repeated.task.id, first.task.id);
-  assert.throws(() => service.createTask({ ...args, media: { model: 'jimeng-5.0', ratio: '4:3', resolution: '2k' } }), /媒体类型.*生成入口/);
+  assert.throws(() => service.createTask({ ...args, media: { model: 'jimeng-5.0', ratio: '4:3', resolution: '2k' } }), /媒体.*生成入口/);
   const completed = await until(service, first.task.id);
   assert.equal(fake.calls.submit.length, 1);
   assert.equal(completed.task.status, 'output');
@@ -290,4 +290,69 @@ test('permanently missing provider video stops querying, retains its id and rele
   service.media.resume(first.task.id);
   assert.equal(fake.calls.submit.length, 2);
   assert.equal(fake.calls.query.length, 1);
+});
+
+
+test('API providers are explicit, do not expose private capabilities, and can append to a Skill card', async t => {
+  const api = provider({ label: '合成 API', capabilities: async () => ({ endpoint: 'https://api.example.test', healthy: true, credentialConfigured: true,
+    apiKey: 'do-not-expose', modelDefaults: { image: { model: 'synthetic-image', ratio: '4:3', resolution: '2k', secret: 'do-not-expose' } },
+    models: [{ id: 'synthetic-image', type: 'image', maxReferences: 10, requiresReference: false, ratios: ['4:3'], resolutions: ['2k'], secret: 'do-not-expose' }] }) });
+  const { service, input, root, requirement, fake } = fixture(t, undefined, { mediaApiProviders: { synthetic: api } });
+  const caps = await service.media.apiCapabilities();
+  assert.equal(caps.providers.length, 1);
+  assert.equal(caps.providers[0].id, 'synthetic');
+  assert.ok(!JSON.stringify(caps).includes('do-not-expose'));
+  const first = service.createTask(input({ selectedSkills: [], generation: { mode: 'new' } }));
+  const relative = `${first.prepared.deliveryDirectory}/skill.png`;
+  writeFileSync(path.join(root, relative), png);
+  service.tasks.bindSession({ taskId: first.task.id, sessionId: 'skill-session' });
+  const file = await service.tasks.files.register({ taskId: first.task.id, operationId: randomUUID(), path: relative, kind: 'image', title: 'Skill 图片' }, { sessionId: 'skill-session' });
+  const descriptor = service.cards.describe({ requirementId: requirement.id, cardId: first.task.outputCardId });
+  const args = input({ generationMethod: 'api', providerId: 'synthetic', generation: { mode: 'revise', cardId: descriptor.card.id, baseVersionId: descriptor.version.id } });
+  const created = await service.media.create(args);
+  await until(service, created.task.id);
+  assert.equal(api.calls.submit.length, 1);
+  assert.equal(fake.calls.submit.length, 0);
+  assert.equal(created.task.input.providerId, 'synthetic');
+  assert.equal(created.task.input.generationMethod, 'api');
+  assert.equal(service.cards.describe({ requirementId: requirement.id, cardId: descriptor.card.id }).card.versions.length, 2);
+  assert.equal(sha(readFileSync(path.join(root, file.path))), file.hash);
+  assert.equal((await service.media.create(args)).task.id, created.task.id);
+  assert.equal(api.calls.submit.length, 1);
+  await assert.rejects(service.media.create(input({ generationMethod: 'api', providerId: 'missing' })), /尚未接入/);
+  await assert.rejects(service.media.create(input({ generationMethod: 'api', providerId: 'synthetic', instruction: '/custom-skill 不执行' })), /不执行 Skill/);
+});
+
+test('empty API registry never detects or submits through the legacy provider', async t => {
+  const fake = provider({ capabilities() { assert.fail('legacy capabilities must not run'); } });
+  const { service, input } = fixture(t, fake);
+  assert.deepEqual((await service.media.apiCapabilities()).providers, []);
+  await assert.rejects(service.media.create(input({ generationMethod: 'api', providerId: 'missing' })), /尚未接入/);
+  assert.equal(fake.calls.submit.length, 0);
+});
+
+
+test('API recovery retains its provider across restart and missing adapters never query legacy', async t => {
+  let queryCount = 0;
+  const api = provider({ onSubmit: () => ({ providerTaskId: 'frozen-api-task' }), onQuery: () => { queryCount++; return new Promise(() => {}); } });
+  const { service, input, root } = fixture(t, undefined, { mediaApiProviders: { synthetic: api } });
+  const created = await service.media.create(input({ generationMethod: 'api', providerId: 'synthetic' }));
+  await until(service, created.task.id, value => value.job.status === 'processing' && queryCount > 0);
+  service.close();
+  const legacy = provider({ capabilities() { assert.fail('recovery cannot detect legacy'); }, query() { assert.fail('recovery cannot query legacy'); } });
+  const reopened = new WorkbenchService({ workspaceRoot: root, mediaProvider: legacy, mediaPollIntervalMs: 5 });
+  try {
+    const failed = await until(reopened, created.task.id, value => value.job.errorCode === 'provider_unavailable');
+    assert.equal(failed.job.providerTaskId, 'frozen-api-task');
+    assert.equal(failed.task.input.providerId, 'synthetic');
+    assert.equal(api.calls.submit.length, 1);
+  } finally { reopened.close(); }
+  api.onQuery = () => ({ status: 'succeeded', resultURL: 'https://media.example.test/result.png' });
+  const restored = new WorkbenchService({ workspaceRoot: root, mediaProvider: legacy, mediaApiProviders: { synthetic: api }, mediaPollIntervalMs: 5 });
+  try {
+    const completed = await until(restored, created.task.id);
+    assert.equal(completed.job.status, 'succeeded');
+    assert.equal(api.calls.submit.length, 1);
+    assert.ok(api.calls.query.every(id => id === 'frozen-api-task'));
+  } finally { restored.close(); }
 });

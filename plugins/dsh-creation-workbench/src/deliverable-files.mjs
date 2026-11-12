@@ -64,7 +64,7 @@ export class DeliverableFiles {
   }
 
   #sources(requirementId) {
-    const requirements = this.store.listRequirements();
+    const requirements = this.db.prepare('SELECT id,title FROM requirements ORDER BY updated_at DESC,id').all();
     if (requirementId && !requirements.some(item => item.id === requirementId)) throw new Error('需求不存在');
     const result = [];
     for (const requirement of requirements.filter(item => !requirementId || item.id === requirementId)) {

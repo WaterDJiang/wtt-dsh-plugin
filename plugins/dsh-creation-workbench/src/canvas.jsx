@@ -376,6 +376,13 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const [creationVisible, setCreationVisible] = useState(() => cache.current.visible)
   const [creationMenu, setCreationMenu] = useState(null)
   const [deletePlan,setDeletePlan]=useState(null)
+  const deleteRequest = useRef(null)
+  useEffect(() => {
+    if (!active && deleteRequest.current) {
+      deleteRequest.current = null
+      setDeletePlan(null)
+    }
+  }, [active])
   const [recycleOpen,setRecycleOpen]=useState(false)
   useEffect(()=>{if(recycleRequest&&active)setRecycleOpen(true)},[recycleRequest,active])
   const [deckPreview, setDeckPreviewState] = useState(null)
@@ -923,7 +930,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         hash: descriptor.node.importedFile?.hash || descriptor.node.sourceHash, requirementId: requirement.id,
         cardId: descriptor.card.id, versionId: descriptor.version.id, title: descriptor.node.title,
         downloadHref: endpoint(documentRef.startsWith('material:') ? { materialFile: descriptor.node.refId } : documentRef.startsWith('word:') ? { download: descriptor.node.refId } : { downloadArtifact: descriptor.node.refId }).href } : null)
-      if (['image', 'video'].includes(next.outputType)) void restoreMediaCreation(next)
+      if (next.generationMethod === 'api' && next.mediaJob) void restoreMediaCreation(next)
       return descriptor
     } catch (cause) {
       if (mounted.current && epoch === epochRef.current && intent === creationIntent.current) setError(`读取成果文件版本失败：${messageOf(cause)}`)
@@ -1006,7 +1013,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       if(creationIntent.current!==intent||!activeRef.current)return;
       if (blank && outputType === 'text') { openTextEditor(result.node); return }
       openComposition(result);
-      if(seed)updateCreation(creationRef.current.key,{instruction:seed.instruction,mediaOptions:seed.mediaOptions,selectedSkills:seed.selectedSkills||[]});
+      if(seed)updateCreation(creationRef.current.key,{instruction:seed.instruction,generationMethod:seed.generationMethod==='api'?'api':'skill',providerId:seed.providerId,mediaOptions:seed.mediaOptions,selectedSkills:seed.selectedSkills||[]});
     }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}
     finally{if(mounted.current&&epoch===epochRef.current)setBusy('')}
   }
@@ -1067,7 +1074,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       setFocusOpen(false)
       setDeckPreview(null)
       setOutcomeView(null);setDocumentView(null)
-      if (['image', 'video'].includes(next.outputType)) void restoreMediaCreation(next)
+      if (next.generationMethod === 'api' && next.mediaJob) void restoreMediaCreation(next)
     } catch (cause) { setError(messageOf(cause)) }
   }
 
@@ -1083,7 +1090,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   function frameSignature(frame) {
     return JSON.stringify({ instruction: frame.instruction, generation: frame.generation,
       references: frame.references.map(source => [source.id, source.sourceHash]),
-      ...(['image', 'video'].includes(frame.outputType) ? { media: frame.mediaOptions } : {}) })
+      ...(['image', 'video'].includes(frame.outputType) ? { generationMethod: frame.generationMethod || 'skill', ...(frame.generationMethod === 'api' ? { providerId: frame.providerId, media: frame.mediaOptions } : {}) } : {}) })
   }
 
   function trackOutput(task, frame, intent) {
@@ -1244,24 +1251,19 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   async function refreshMediaCapabilities() {
     setMediaLoading(true)
     try {
-      const response = await fetch(endpoint({ mediaCapabilities: '1' }), { credentials: 'same-origin' })
+      const response = await fetch(endpoint({ mediaApiCapabilities: '1' }), { credentials: 'same-origin' })
       const result = await response.json()
-      if (!response.ok || !Array.isArray(result?.models)) throw new Error(result?.error || '即梦服务检测失败')
+      if (!response.ok || !Array.isArray(result?.providers)) throw new Error(result?.error || 'API 服务检测失败')
       if (mounted.current) { setMediaCapabilities(result); setMediaError(result.error || '') }
       return result
     } catch (cause) { if (mounted.current) setMediaError(messageOf(cause)); return null }
     finally { if (mounted.current) setMediaLoading(false) }
   }
 
-  async function saveMediaSettings(settings) {
-    const result = await request('save-media-settings', settings)
-    if (mounted.current) { setMediaCapabilities(result); setMediaError(result.error || '') }
-    return result
-  }
 
   useEffect(() => {
-    if (creationVisible && ['image', 'video'].includes(creation?.outputType)) void refreshMediaCapabilities()
-  }, [projectId, creationVisible, creation?.outputType])
+    if (creationVisible && creation?.generationMethod === 'api') void refreshMediaCapabilities()
+  }, [projectId, creationVisible, creation?.generationMethod])
 
   useEffect(() => {
     let stopped = false
@@ -1627,17 +1629,25 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   async function removeElements() {
     const selected = nodesRef.current.filter(node => isObject(node) && node.selected)
-    if(!selected.length||busy)return
+    if(!selected.length||busy||deleteRequest.current)return
     const epoch=epochRef.current,selection=selected.map(n=>n.id).sort().join('|')
     if (textEditorOpen || editingNodeId) { setError('请先退出文字编辑，再删除节点。'); return }
+    const token = Symbol()
+    deleteRequest.current = token
+    closeCreation()
+    setContextMenu(null)
+    setDeletePlan({ loading: true, nodes: selected.map(node => ({ nodeId: node.id, title: contentCardTitle(node.data) })), files: [] })
     try{
       await saveLayout()
+      if (deleteRequest.current !== token || !mounted.current || epoch !== epochRef.current) return
       if(conflictRef.current)throw new Error('画布发生冲突，请先刷新后再删除')
       const selections=selected.map(n=>({nodeId:n.id,...(n.data.outputCard?.versionId?{versionId:n.data.outputCard.versionId}:{})}))
       const plan=await request('canvas-recycle-plan',{requirementId:requirement.id,selections})
-      if(!mounted.current||!activeRef.current||epoch!==epochRef.current||nodesRef.current.filter(n=>isObject(n)&&n.selected).map(n=>n.id).sort().join('|')!==selection)return
-      closeCreation();setContextMenu(null);setDeletePlan(plan)
-    }catch(cause){if(mounted.current)setError(messageOf(cause))}
+      if(deleteRequest.current!==token||!mounted.current||!activeRef.current||epoch!==epochRef.current)return
+      if(nodesRef.current.filter(n=>isObject(n)&&n.selected).map(n=>n.id).sort().join('|')!==selection){setDeletePlan(null);return}
+      setDeletePlan(plan)
+    }catch(cause){if(mounted.current&&epoch===epochRef.current&&deleteRequest.current===token){setDeletePlan(null);setError(messageOf(cause))}}
+    finally { if (deleteRequest.current === token) deleteRequest.current = null }
   }
   const lastFileRecycle=useRef(null)
   useEffect(()=>{
@@ -1646,9 +1656,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     closeCreation()
     void recycledChanged().catch(cause=>setError(messageOf(cause)))
   },[fileRecycleSignal,active])
-  async function recycledChanged(){
-    setDeletePlan(null);setOutcomeView(null);setDocumentView(null);setDeckPreview(null);setSidebar(false);onCloseProjectFile?.();
-    await loadBoard({preserveViewport:true});onFilesChanged?.()
+  async function recycledChanged({ keepVisible = false } = {}){
+    const epoch = epochRef.current
+    if (!keepVisible) setDeletePlan(null)
+    setOutcomeView(null);setDocumentView(null);setDeckPreview(null);setSidebar(false);onCloseProjectFile?.();
+    const result = await loadBoard({preserveViewport:true,keepVisible})
+    if (!mounted.current || epoch !== epochRef.current) return
+    if (keepVisible && !result) throw new Error('节点已处理，但画布刷新失败，请重试刷新。')
+    setDeletePlan(null)
+    onFilesChanged?.()
   }
 
   function alignSelection(direction) {
@@ -1781,7 +1797,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       && !resizingRef.current && !gestureViewportActive.current && !pendingCount.current
   }
 
-  async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false } = {}) {
+  async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false, keepVisible = false } = {}) {
     if (requireStableLayout && (!boardRef.current || boardRead.current || !backgroundLayoutReady())) return
     const epoch = epochRef.current
     const read = Symbol()
@@ -1791,7 +1807,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const isCurrent = () => mounted.current && epoch === epochRef.current && boardRead.current === read
     const canApply = () => isCurrent() && (!requireStableLayout || (
       backgroundLayoutReady() && revision === boardRef.current?.revision && previousLayout === JSON.stringify(layoutSnapshot())))
-    if (!requireStableLayout) { setLoading(true); setLoadError('') }
+    if (!requireStableLayout) { if (!keepVisible) setLoading(true); setLoadError('') }
     try {
       const response = await fetch(endpoint({ canvas: requirement.id }), { credentials: 'same-origin' })
       let result = await response.json().catch(() => null)
@@ -1901,6 +1917,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     operationLock.current = false
     restoredSession.current = false
     setBoard(null)
+    deleteRequest.current = null
+    setDeletePlan(null)
     setError('')
     setNotice('')
     setBusy('')
@@ -1918,6 +1936,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     return () => {
       cancelCardOpen()
       mounted.current = false
+      deleteRequest.current = null
       epochRef.current += 1
       for (const key of mediaRestores.current.keys()) {
         if (cache.current.drafts.get(key)?.mediaRestoring) updateCreation(key, { mediaRestoring: false })
@@ -2296,7 +2315,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const intent = context.generation?.mode === 'revise' ? 'revise' : 'new'
     cache.current.attempts.delete(context.key)
     mediaRestores.current.delete(context.key)
-    updateCreation(context.key, { taskId: null, pendingTaskId: null, pendingGeneration: null, intent, anchor, ...(intent === 'new' ? { targetCard: undefined } : {}), mediaJob: null, mediaRestoring: false, mediaRecoveryError: false,
+    updateCreation(context.key, { taskId: null, pendingTaskId: null, pendingGeneration: null, generationMethod: context.generationMethod === 'api' ? 'api' : 'skill', intent, anchor, ...(intent === 'new' ? { targetCard: undefined } : {}), mediaJob: null, mediaRestoring: false, mediaRecoveryError: false,
       dismissedMediaTaskIds: [...new Set([...(context.dismissedMediaTaskIds || []), context.mediaJob.taskId])],
       outputPosition: nextMediaPosition({ ...context, intent }), error: '', mediaPollError: '' })
     setNotice('新草稿已准备好。原任务记录保留，点击生成才会提交新任务。')
@@ -2307,13 +2326,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (!['image', 'video'].includes(context?.outputType) || context.pendingTaskId || !context.instruction.trim() || context.mediaRestoring || context.mediaRecoveryError || mediaJobPending(context.mediaJob) || mediaNeedsDecision(context.mediaJob)) return
     if (!cache.current.attempts.has(context.key)) cache.current.attempts.set(context.key, { current: null })
     const attempt = cache.current.attempts.get(context.key)
-    const options = mediaOptionsFor(context.outputType, mediaCapabilities, context.mediaOptions)
+    const provider = mediaCapabilities?.providers?.find(item => item.id === context.providerId)
+    if (context.generationMethod !== 'api' || !provider) return
+    const options = mediaOptionsFor(context.outputType, provider, context.mediaOptions)
     const target=nodesRef.current.find(node=>node.id===context.composerNodeId)
     const { selectedSkills: _skills, ...input } = creationTaskInput({...context,...(target?{outputPosition:absolutePosition(target,nodesRef.current)}:{})})
-    const data = { ...input, media: options }
+    const data = { ...input, generationMethod: 'api', providerId: context.providerId, media: options }
     const submittedIntent = ++creationIntent.current
     void perform('media', async epoch => {
-      const result = await request('generate-media', { ...data, operationId: stableOperation(attempt, data) })
+      const result = await request('generate-media-api', { ...data, operationId: stableOperation(attempt, data) })
       if (!mounted.current || epoch !== epochRef.current) return
       trackOutput(result.task, { ...context, mediaOptions: options }, submittedIntent)
       rememberMediaTask(result)
@@ -2694,7 +2715,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}`}>
-    {deletePlan&&<DeleteNodesDialog plan={deletePlan} request={request} onClose={()=>setDeletePlan(null)} onDone={recycledChanged}/>}
+    {deletePlan&&<DeleteNodesDialog plan={deletePlan} request={request} onClose={()=>{deleteRequest.current=null;setDeletePlan(null)}} onDone={()=>recycledChanged({keepVisible:true})}/>}
     {materialVersionView && <dialog className="wcc-version-view-dialog" open aria-labelledby="wcc-version-view-title">
       <DialogHeader title={`${materialVersionView.title} · V${materialVersionView.number}`} titleId="wcc-version-view-title" onClose={() => setMaterialVersionView(null)} />
       <DialogBody><pre className="wcc-version-view-body">{materialVersionView.content}</pre></DialogBody>
@@ -2783,8 +2804,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onRefreshSkills={refreshSkillCatalog} onSaveSkillSettings={saveSkillSettings} onUpdateSkillPreference={updateSkillPreference}
       modelCatalog={modelCatalog} modelSelection={creation?.pendingTaskId ? creation.modelSelection : modelSelection}
       onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError}
+      onGenerationMethodChange={method => { if (creation && !creation.pendingTaskId) updateCreation(creation.key, { generationMethod: method, mediaJob: null, error: '', mediaRecoveryError: false, mediaRestoring: false }) }}
+      onMediaProviderChange={providerId => { if (creation && !creation.pendingTaskId) updateCreation(creation.key, { providerId, mediaOptions: {}, error: '' }) }}
       mediaCapabilities={mediaCapabilities} mediaLoading={mediaLoading} mediaError={creation?.mediaPollError || mediaError}
-      onRefreshMedia={refreshMediaCapabilities} onSaveMediaSettings={saveMediaSettings}
+      onRefreshMedia={refreshMediaCapabilities}
       onMediaOptionsChange={value => creation && updateCreation(creation.key, { mediaOptions: value, error: '' })}
       onGenerateMedia={generateMedia} onNewMedia={newMediaTask} onResumeMedia={() => creation?.mediaJob && void resumeMediaTask(creation.mediaJob.taskId, creation.key).catch(cause => updateCreation(creation.key, { error: messageOf(cause) }))}
       instruction={creation?.instruction || ''} onInstructionChange={value => creation && updateCreation(creation.key, { instruction: value, error: '' })}
@@ -2796,7 +2819,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onClose={closeCreation} onSend={sendToAI} onAction={creationAction}
       busy={!!busy || loading || !!creation?.mediaRestoring} error={creation?.error}
       sendLabel={creation?.outputType === 'material' ? '保存关联素材' : creation?.outputType === 'word' ? '导出当前版本 Word' : `开始创作 ${OUTPUT_LABELS[creation?.outputType] || ''}`}
-      canSend={!!creation && !creation.mediaRecoveryError && (creation.pendingTaskId ? pendingRetryAllowed(creation.pendingGeneration) && !['image', 'video'].includes(creation.outputType) : creation.outputType === 'material' ? !!creation.materialTitle?.trim() && !!creation.materialContent?.trim() : creation.outputType === 'word' ? ['outline', 'word'].includes(creation.anchor.kind) : !!creation.instruction.trim() && (!!creation.generation || creation.references.length > 0) && creation.references.length <= 24)}
+      canSend={!!creation && !creation.mediaRecoveryError && (creation.pendingTaskId ? pendingRetryAllowed(creation.pendingGeneration) && creation.generationMethod !== 'api' : creation.outputType === 'material' ? !!creation.materialTitle?.trim() && !!creation.materialContent?.trim() : creation.outputType === 'word' ? ['outline', 'word'].includes(creation.anchor.kind) : !!creation.instruction.trim() && (!!creation.generation || creation.references.length > 0) && creation.references.length <= 24)}
       hideSubmit={creation?.outputType === 'excerpt'} conversation={pptOwnsConversation ? null : conversation} conversationVisible={Boolean(creation?.sessionId && creation.sessionId === conversationSessionId)} onOpenConversation={openCreationConversation} onPrepareContinuation={onPrepareContinuation}
       actionContent={creation?.outputType === 'material' ? <div className="wcc-creation-material-fields">
         <label>素材名称<input aria-label="关联素材名称" disabled={!!busy} maxLength={200} value={creation.materialTitle || ''} onChange={event => updateCreation(creation.key, { materialTitle: event.target.value, error: '' })} /></label>

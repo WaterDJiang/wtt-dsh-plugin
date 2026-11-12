@@ -9,8 +9,7 @@ import { IMPORT_MAX_BYTES } from './material-import.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const terminal = new Set(['succeeded', 'failed', 'unknown']);
 const resumable = new Set(['processing', 'downloading', 'registering', 'download_failed', 'registration_failed']);
-// The Skill requires each generation and its result to finish before another is submitted,
-// including work queued by a different project controller in this Host.
+// Serialize accepted generation jobs across projects; recovery never resubmits a job.
 let serial = Promise.resolve();
 const serially = work => { const next = serial.then(work, work); serial = next.catch(() => {}); return next; };
 const fail = (message, code) => Object.assign(new Error(message), { code });
@@ -35,6 +34,10 @@ export class MediaGenerationController {
     this.store = service.store;
     this.db = this.store.db;
     this.provider = config.mediaProvider || createMediaProvider(config);
+    this.apiProviders = new Map(Object.entries(config.mediaApiProviders || {}));
+    for (const [id, provider] of this.apiProviders) {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) || !provider || ['capabilities', 'submit', 'query', 'download'].some(method => typeof provider[method] !== 'function')) throw new Error('媒体 API 适配器必须有稳定名称与完整接口');
+    }
     this.pollInterval = config.mediaPollIntervalMs ?? 3000;
     this.active = new Set();
     this.closed = false;
@@ -83,12 +86,41 @@ export class MediaGenerationController {
   capabilities() { this.#check(); return this.provider.capabilities(); }
   updateSettings(data) { this.#check(); return this.provider.updateSettings(data); }
 
+  async apiCapabilities() {
+    this.#check();
+    const providers = await Promise.all([...this.apiProviders].map(async ([id, provider]) => {
+      try {
+        const caps = await provider.capabilities();
+        return { id, label: provider.label || id, endpoint: caps.endpoint,
+          healthy: caps.healthy === true, credentialConfigured: caps.credentialConfigured === true,
+          modelDefaults: Object.fromEntries(['image', 'video'].filter(type => caps.modelDefaults?.[type]).map(type => {
+            const value = caps.modelDefaults[type];
+            return [type, typeof value === 'string' ? { model: value } : Object.fromEntries(['model', 'ratio', 'resolution', 'duration'].filter(key => value[key] !== undefined).map(key => [key, value[key]]))];
+          })),
+          models: (caps.models || []).map(model => Object.fromEntries(['id', 'name', 'type', 'requiresReference', 'maxReferences', 'ratios', 'resolutions', 'durations'].filter(key => model[key] !== undefined).map(key => [key, model[key]]))) };
+      } catch { return { id, label: provider.label || id, healthy: false, credentialConfigured: false, models: [], modelDefaults: {}, error: 'API 服务检测失败，请核对提供商配置' }; }
+    }));
+    return { providers, models: [], modelDefaults: {} };
+  }
+
+  #providerForTask(taskId) {
+    const input = this.service.tasks.get(taskId).input;
+    if (input.generationMethod !== 'api') return this.provider;
+    const provider = this.apiProviders.get(input.providerId);
+    if (!provider) throw fail('原任务的 API 适配器未安装；不会切换到其他提供商', 'provider_unavailable');
+    return provider;
+  }
+
   async create(input) {
     this.#check();
     if (!['image', 'video'].includes(input?.outputType)) throw new Error('媒体生成类型必须是 image 或 video');
     if (input.selection) throw new Error('媒体生成暂不接受文本选段，请引用已保存资料');
-    if (input.selectedSkills?.length) throw new Error('媒体生成直接使用即梦模型参数；斜杠 Skill 请在文本创作中调用');
-    const caps = await this.provider.capabilities();
+    if (input.generationMethod === 'skill') throw new Error('Skill 任务请使用原生会话入口');
+    if (input.generationMethod !== undefined && input.generationMethod !== 'api') throw new Error('媒体生成方式无效');
+    if (input.selectedSkills?.length || input.generationMethod === 'api' && /(?:^|\s)\/[a-z0-9]+(?:-[a-z0-9]+)*/.test(input.instruction || '')) throw new Error('API 生成不执行 Skill，请切换到 Skill 生成');
+    const provider = input.generationMethod === 'api' ? this.apiProviders.get(input.providerId) : this.provider;
+    if (!provider) throw fail('尚未接入所选 API 服务；不会自动使用即梦', 'provider_unavailable');
+    const caps = await provider.capabilities();
     this.#check();
     const type = input.outputType;
     const defaults = typeof caps.modelDefaults[type] === 'string' ? { model: caps.modelDefaults[type] } : caps.modelDefaults[type];
@@ -106,8 +138,8 @@ export class MediaGenerationController {
       if (replay.kind !== 'media') throw new Error('操作标识已用于原生创作任务');
       return this.get(replay.id);
     }
-    if (!caps.credentialConfigured) throw fail('尚未配置即梦账号认证，请在媒体设置中填写', 'credential_missing');
-    if (!caps.healthy) throw fail(caps.error || '本机即梦服务未运行，请检查媒体设置中的端点', 'service_unavailable');
+    if (!caps.credentialConfigured) throw fail('尚未配置媒体服务认证，请核对提供商设置', 'credential_missing');
+    if (!caps.healthy) throw fail(caps.error || '媒体服务不可用，请核对提供商配置', 'service_unavailable');
     const cardPlan = this.service.cards.prepare(normalized);
     const prepared = this.service.prepareCanvas(normalized, { allowEmpty: Boolean(cardPlan) });
     const refs = this.service.canvas.validateSourceRefs(input.requirementId, input.sourceRefs
@@ -140,6 +172,7 @@ export class MediaGenerationController {
     const snapshot = { requirement: { id: requirement.id, title: requirement.title, customer: requirement.customer,
       audience: requirement.audience, background: requirement.background, objectives: requirement.objectives, origin: requirement.origin },
       canvasId: requirement.id, sources: prepared.context, sourceRefs: refs, selection: null, instruction: input.instruction.trim(), outputType: type,
+      ...(input.generationMethod === 'api' ? { generationMethod: 'api', providerId: input.providerId } : {}),
       media, mediaReferences: references, effectivePrompt: providerPrompt, skill: null, skills: [], selectedSkills: [],
       ...(input.outputPosition ? { outputPosition: input.outputPosition } : {}) };
     const task = this.service.tasks.create(normalized, snapshot, { kind: 'media', cardPlan, onCreate: taskId => {
@@ -210,6 +243,9 @@ export class MediaGenerationController {
   async #run(taskId, maySubmit) {
     let row = this.#row(taskId);
     if (terminal.has(row.status)) return;
+    let provider;
+    try { provider = this.#providerForTask(taskId); }
+    catch (error) { this.#update(taskId, { status: 'download_failed', error: error.message, error_code: error.code }); return; }
     if (row.status === 'queued') {
       if (!maySubmit) return;
       const task = this.service.tasks.get(taskId), references = [];
@@ -225,7 +261,7 @@ export class MediaGenerationController {
       } catch (error) { this.#update(taskId, { status: 'failed', error: error.message, error_code: 'reference_changed' }); return; }
       this.#update(taskId, { status: 'submitting', error: null, error_code: null });
       try {
-        const result = await this.provider.submit({ type: row.output_type, ...JSON.parse(row.params_json), prompt: task.input.effectivePrompt,
+        const result = await provider.submit({ type: row.output_type, ...JSON.parse(row.params_json), prompt: task.input.effectivePrompt,
           references, expectedEndpoint: row.provider_endpoint });
         if (this.closed) return;
         if (result.providerTaskId) this.#update(taskId, { status: 'processing', provider_task_id: result.providerTaskId });
@@ -247,9 +283,9 @@ export class MediaGenerationController {
       if (row.provider_task_id && !row.result_url && !row.result_base64 && !row.downloaded_path) {
         let result;
         try {
-          result = await this.provider.query(row.provider_task_id, { expectedEndpoint: row.provider_endpoint });
+          result = await provider.query(row.provider_task_id, { expectedEndpoint: row.provider_endpoint });
           if (this.closed) return;
-          if (result.status === 'failed') { this.#update(taskId, { status: 'failed', error: result.error || '即梦视频生成失败', error_code: 'provider_failed' }); return; }
+          if (result.status === 'failed') { this.#update(taskId, { status: 'failed', error: result.error || '媒体生成失败', error_code: 'provider_failed' }); return; }
           if (result.status === 'succeeded') {
             if (!result.resultURL) throw new Error('已完成的视频任务缺少结果地址');
             this.#update(taskId, { status: 'downloading', result_url: result.resultURL, error: null, error_code: null });
@@ -273,7 +309,7 @@ export class MediaGenerationController {
         if (!row.result_url && !row.result_base64) return;
         this.#update(taskId, { status: 'downloading', error: null, error_code: null });
         try {
-          const downloaded = row.result_base64 ? { bytes: Buffer.from(row.result_base64, 'base64') } : await this.provider.download(row.result_url, { maxBytes: GENERATED_MEDIA_MAX_BYTES });
+          const downloaded = row.result_base64 ? { bytes: Buffer.from(row.result_base64, 'base64') } : await provider.download(row.result_url, { maxBytes: GENERATED_MEDIA_MAX_BYTES });
           if (this.closed) return;
           if (!(downloaded.bytes instanceof Uint8Array) || !downloaded.bytes.byteLength || downloaded.bytes.byteLength > GENERATED_MEDIA_MAX_BYTES) throw new Error('生成结果必须非空且不超过 200 MiB');
           const bytes = Buffer.isBuffer(downloaded.bytes) ? downloaded.bytes : Buffer.from(downloaded.bytes);
@@ -316,6 +352,6 @@ export class MediaGenerationController {
     this.closed = true;
     this.abort.abort();
     this.resolveClosed();
-    void Promise.resolve(this.provider.close?.()).catch(() => {});
+    for (const provider of new Set([this.provider, ...this.apiProviders.values()])) void Promise.resolve(provider.close?.()).catch(() => {});
   }
 }

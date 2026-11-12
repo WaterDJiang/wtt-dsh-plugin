@@ -75,6 +75,8 @@ export function createPendingContext({ projectId, projectName, projectPath, requ
     selectedSkills: [...(input.selectedSkills || [])], modelSelection: input.modelSelection || null,
     generation: input.generation, outputPosition: { ...node.position },
     ...(input.selection ? { selection: input.selection } : {}),
+    generationMethod: input.generationMethod || (task.kind === 'media' ? 'legacy' : 'skill'),
+    ...(input.providerId ? { providerId: input.providerId } : {}),
     ...(input.media ? { mediaOptions: input.media } : {}),
     ...(task.mediaJob ? { mediaJob: task.mediaJob } : {}),
     originalInput: { instruction: input.instruction || task.instruction || '', references: JSON.parse(JSON.stringify(references)), taskId: task.id, sessionId: task.sessionId || null },

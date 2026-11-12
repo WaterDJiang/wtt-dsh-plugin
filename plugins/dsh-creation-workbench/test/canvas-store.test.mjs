@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WorkbenchStore } from '../src/store.mjs';
@@ -17,6 +17,44 @@ function fixture(t) {
 const requirement = (store, title = '课程需求') => store.createRequirement({ title, customer: '客户甲', background: '真实背景', operationId: randomUUID() });
 const outline = (store, requirementId, extra = {}) => store.saveOutline({ requirementId, markdown: '# 不可变大纲\n\n第一章', operationId: randomUUID(), ...extra });
 const material = (canvas, requirementId, extra = {}) => canvas.addMaterial({ requirementId, title: '客户反馈', content: '需要增加课堂实操', operationId: randomUUID(), ...extra });
+
+test('warm file-state cache detects same-size edits with restored mtime, missing files and links', async t => {
+  const { root, store, canvas } = fixture(t), req = requirement(store);
+  const { material: item } = material(canvas, req.id, { content: 'original' });
+  const file = path.join(root, item.path);
+  const state = () => canvas.getRawBoard(req.id).nodes.find(node => node.refId === item.id).status;
+  assert.equal(state(), 'ready');
+  const before = statSync(file);
+  await new Promise(resolve => setTimeout(resolve, 12));
+  writeFileSync(file, 'modified');
+  utimesSync(file, before.atime, before.mtime);
+  assert.equal(state(), 'changed');
+  unlinkSync(file);
+  assert.equal(state(), 'missing');
+  writeFileSync(file, 'original');
+  assert.equal(state(), 'ready');
+  unlinkSync(file);
+  const target = path.join(root, 'replacement.md');
+  writeFileSync(target, 'original');
+  symlinkSync(target, file);
+  assert.equal(state(), 'unavailable');
+});
+
+test('material metadata queries do not grow once per card', t => {
+  const { store, canvas } = fixture(t), req = requirement(store);
+  const prepare = store.db.prepare.bind(store.db);
+  let queries = 0;
+  store.db.prepare = (...args) => { queries++; return prepare(...args); };
+  material(canvas, req.id);
+  queries = 0;
+  canvas.getRawBoard(req.id);
+  const small = queries;
+  for (let index = 0; index < 29; index++) material(canvas, req.id);
+  queries = 0;
+  const board = canvas.getRawBoard(req.id);
+  assert.equal(board.nodes.filter(node => node.kind === 'material').length, 30);
+  assert(queries <= small + 4, `metadata queries grew from ${small} to ${queries}`);
+});
 
 test('CW-01 database migration keeps historical operation replay and canonical artifacts', (t) => {
   const root = mkdtempSync(path.join(tmpdir(), 'wtt-canvas-old-'));

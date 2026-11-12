@@ -6496,6 +6496,24 @@ svg.react-flow__connectionline {
   border-color: var(--wtt-ui-accent-line, #536fd4);
   color: var(--wtt-ui-on-accent, #fff);
 }
+.wcc-media-method {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wcc-media-method [aria-pressed=true] {
+  color: var(--wtt-ui-accent);
+  background: var(--wtt-ui-accent-paper);
+}
+.wtt-course-canvas .wcc-card-composer.is-api-media .wcc-creation-scroll-body {
+  overflow: hidden;
+}
+.wtt-course-canvas .wcc-card-composer.is-api-media .wcc-creation-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
 
 /* src/project-picker.css */
 .wtt-project-picker,

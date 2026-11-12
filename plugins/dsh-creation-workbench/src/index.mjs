@@ -167,6 +167,7 @@ export function apply(ctx, config = {}) {
             const catalog = await (await catalogReady).list(service.workspaceRoot);
             return Response.json(catalog, { headers });
           }
+          if (url.searchParams.has('mediaApiCapabilities')) return Response.json(await service.media.apiCapabilities(), { headers });
           if (url.searchParams.has('mediaCapabilities')) return Response.json(await service.media.capabilities(), { headers });
           if (url.searchParams.has('mediaJob')) return Response.json(service.media.get(url.searchParams.get('mediaJob')), { headers });
           if (url.searchParams.has('tasks')) return Response.json(service.tasks.list(url.searchParams.get('tasks')), { headers });
@@ -320,6 +321,10 @@ export function apply(ctx, config = {}) {
         else if (action === 'save-skill-settings') { result = await (await catalogReady).save(data, service.workspaceRoot); syncedServices = new WeakSet(); await syncServiceSkills(service); }
         else if (action === 'update-skill-preference') result = await (await catalogReady).updatePreference(data, service.workspaceRoot);
         else if (action === 'save-media-settings') result = await service.media.updateSettings(data);
+        else if (action === 'generate-media-api') {
+          if (data?.generationMethod !== 'api') throw new Error('API 生成方式无效');
+          result = await service.media.create(data);
+        }
         else if (action === 'generate-media') result = await service.media.create(data);
         else if (action === 'resume-media') result = service.media.resume(data.taskId);
         else if (['create-output-draft','save-output-draft'].includes(action)) {

@@ -27,3 +27,9 @@
 .wtt-course-canvas .wcc-media-settings footer { display:flex; flex-shrink:0; justify-content:flex-end; gap:10px; padding:14px 22px; border-top:1px solid var(--wtt-ui-line, #edf0f5); }
 .wcc-media-settings footer button { padding:8px 16px; border:1px solid var(--wtt-ui-line, #dae2f0); border-radius:7px; background:var(--wtt-ui-surface, #fff); color:var(--wtt-ui-text, #607499); cursor:pointer; }
 .wcc-media-settings footer button[type=submit] { background:var(--wtt-ui-accent-fill, #536fd4); border-color:var(--wtt-ui-accent-line, #536fd4); color:var(--wtt-ui-on-accent, #fff); }
+
+.wcc-media-method { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.wcc-media-method [aria-pressed="true"] { color:var(--wtt-ui-accent); background:var(--wtt-ui-accent-paper); }
+
+.wtt-course-canvas .wcc-card-composer.is-api-media .wcc-creation-scroll-body { overflow:hidden; }
+.wtt-course-canvas .wcc-card-composer.is-api-media .wcc-creation-main { flex:1 1 auto; min-height:0; overflow:auto; }

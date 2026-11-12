@@ -53,10 +53,10 @@ test('safe capabilities intersect verified models without exposing credentials o
   assert.equal((await provider.capabilities()).endpoint, endpoint);
 });
 
-test('settings persist all default parameters with private credentials, preserve blank inputs and permanently clear fallback', async t => {
+test('settings persist private credentials without reading a personal Skill configuration', async t => {
   const setup = await fixture(t, undefined, { mediaSessionId: undefined });
   writeFileSync(setup.skillConfigPath, JSON.stringify({ session_id: 'synthetic-global-fallback' }));
-  assert.equal((await setup.provider.capabilities()).credentialConfigured, true);
+  assert.equal((await setup.provider.capabilities()).credentialConfigured, false);
   const defaults = { image: { model: 'jimeng-4.6', ratio: '4:3', resolution: '4k' }, video: { model: 'seedance-2.0-mini', ratio: '1:1', resolution: '720p', duration: 5 } };
   const saved = await setup.provider.updateSettings({ sessionId: 'synthetic-new-secret', modelDefaults: defaults });
   assert.deepEqual(saved.modelDefaults, defaults);

@@ -55,6 +55,7 @@ export function createRevisionContext({ projectId, projectName, projectPath, req
   const references = JSON.parse(JSON.stringify(editor?.references || []));
   const originalInput = { instruction: editor?.instruction || '', references: JSON.parse(JSON.stringify(references)),
     taskId: editor?.taskId || version.taskId || null, sessionId: editor?.sessionId || null,
+    generationMethod: editor?.generationMethod || 'skill',
     ...(editor?.media ? { mediaOptions: { ...editor.media } } : {}),
     ...(editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {}),
   };
@@ -69,6 +70,7 @@ export function createRevisionContext({ projectId, projectName, projectPath, req
     generation: { mode: 'revise', cardId: card.id, baseVersionId: version.id },
     outputPosition: { ...node.position },
     taskId: editor?.taskId || version.taskId || null, sessionId: editor?.sessionId || null,
+    generationMethod: 'skill',
     ...(editor?.media ? { mediaOptions: { ...editor.media } } : {}),
     ...(editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {}),
     recorded: editor?.recorded !== false, referenceNotes: JSON.parse(JSON.stringify(editor?.referenceNotes || [])),
@@ -97,6 +99,7 @@ export function creationTaskInput(context) {
     sourceRefs: context.references.map(card => ({ cardId: card.id, hash: card.sourceHash })),
     instruction: context.instruction.trim(), outputType: context.outputType, ...(context.pptEngine ? { pptEngine: context.pptEngine } : {}), outputPosition: { ...context.outputPosition },
     selectedSkills: extractSkillNames(context.instruction),
+    ...(['image', 'video'].includes(context.outputType) ? { generationMethod: context.generationMethod || 'skill' } : {}),
     ...(context.selection ? { selection: { ...context.selection } } : {}),
     ...(context.generation ? { generation: { ...context.generation } } : {}) };
 }

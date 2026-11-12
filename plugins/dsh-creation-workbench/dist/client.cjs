@@ -57,7 +57,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
             "The result of getSnapshot should be cached to avoid an infinite loop"
           ), didWarnUncachedGetSnapshot = true);
         }
-        cachedValue = useState36({
+        cachedValue = useState35({
           inst: { value, getSnapshot }
         });
         var inst = cachedValue[0].inst, forceUpdate = cachedValue[1];
@@ -69,7 +69,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
           },
           [subscribe, value, getSnapshot]
         );
-        useEffect38(
+        useEffect37(
           function() {
             checkIfSnapshotChanged(inst) && forceUpdate({ inst });
             return subscribe(function() {
@@ -95,7 +95,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
         return getSnapshot();
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React41 = require("react"), objectIs = "function" === typeof Object.is ? Object.is : is, useState36 = React41.useState, useEffect38 = React41.useEffect, useLayoutEffect5 = React41.useLayoutEffect, useDebugValue3 = React41.useDebugValue, didWarnOld18Alpha = false, didWarnUncachedGetSnapshot = false, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
+      var React41 = require("react"), objectIs = "function" === typeof Object.is ? Object.is : is, useState35 = React41.useState, useEffect37 = React41.useEffect, useLayoutEffect5 = React41.useLayoutEffect, useDebugValue3 = React41.useDebugValue, didWarnOld18Alpha = false, didWarnUncachedGetSnapshot = false, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
       exports.useSyncExternalStore = void 0 !== React41.useSyncExternalStore ? React41.useSyncExternalStore : shim;
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
     })();
@@ -132,9 +132,9 @@ var require_with_selector_development = __commonJS({
         return x2 === y2 && (0 !== x2 || 1 / x2 === 1 / y2) || x2 !== x2 && y2 !== y2;
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React41 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore4 = shim.useSyncExternalStore, useRef34 = React41.useRef, useEffect38 = React41.useEffect, useMemo7 = React41.useMemo, useDebugValue3 = React41.useDebugValue;
+      var React41 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore4 = shim.useSyncExternalStore, useRef33 = React41.useRef, useEffect37 = React41.useEffect, useMemo7 = React41.useMemo, useDebugValue3 = React41.useDebugValue;
       exports.useSyncExternalStoreWithSelector = function(subscribe, getSnapshot, getServerSnapshot, selector2, isEqual) {
-        var instRef = useRef34(null);
+        var instRef = useRef33(null);
         if (null === instRef.current) {
           var inst = { hasValue: false, value: null };
           instRef.current = inst;
@@ -175,7 +175,7 @@ var require_with_selector_development = __commonJS({
           [getSnapshot, getServerSnapshot, selector2, isEqual]
         );
         var value = useSyncExternalStore4(subscribe, instRef[0], instRef[1]);
-        useEffect38(
+        useEffect37(
           function() {
             inst.hasValue = true;
             inst.value = value;
@@ -1081,28 +1081,79 @@ function DeleteProjectFilesDialog({ plan, request, onClose, onDone }) {
   } }, /* @__PURE__ */ import_react6.default.createElement("form", { onSubmit: submit }, /* @__PURE__ */ import_react6.default.createElement(DialogHeader, { title: "\u79FB\u5230\u56DE\u6536\u7AD9", titleId: "wtt-file-delete-title", onClose, closeLabel: "\u5173\u95ED\u6587\u4EF6\u5220\u9664\u786E\u8BA4", busy }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react6.default.createElement("strong", null, plan.target.name), plan.target.path !== plan.target.name && /* @__PURE__ */ import_react6.default.createElement("code", null, plan.target.path), /* @__PURE__ */ import_react6.default.createElement("p", null, [plan.files.length && `${plan.files.length} \u4E2A\u6587\u4EF6`, plan.directories.length && `${plan.directories.length} \u4E2A\u6587\u4EF6\u5939`, plan.links?.length && `${plan.links.length} \u4E2A\u7B26\u53F7\u94FE\u63A5`, plan.nodes.length && `${plan.nodes.length} \u5F20\u5173\u8054\u5361\u7247`].filter(Boolean).join(" \xB7 ")), /* @__PURE__ */ import_react6.default.createElement("details", { open: true, hidden: !plan.target.directory && !plan.target.symbolicLink }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u5305\u542B\u7684\u5185\u5BB9"), plan.files.length === 0 && !plan.links?.length && plan.directories.length === 1 && /* @__PURE__ */ import_react6.default.createElement("p", null, "\u6587\u4EF6\u5939\u4E3A\u7A7A"), /* @__PURE__ */ import_react6.default.createElement(RecycleContents, { items: [...plan.directories.filter((d) => d.path !== plan.target.path).map((d) => ({ ...d, label: "\u6587\u4EF6\u5939" })), ...plan.files, ...(plan.links || []).map((l) => ({ ...l, label: "\u7B26\u53F7\u94FE\u63A5 \xB7 \u53EA\u5220\u9664\u94FE\u63A5\uFF0C\u76EE\u6807\u4FDD\u7559" }))] })), plan.nodes.length > 0 && /* @__PURE__ */ import_react6.default.createElement("details", { open: true }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u540C\u65F6\u79FB\u9664\u7684\u753B\u5E03\u5361\u7247"), /* @__PURE__ */ import_react6.default.createElement("ul", { className: "wtt-delete-files" }, plan.nodes.map((n) => /* @__PURE__ */ import_react6.default.createElement("li", { key: `${n.requirementId}:${n.nodeId}` }, /* @__PURE__ */ import_react6.default.createElement("strong", null, n.title), /* @__PURE__ */ import_react6.default.createElement("small", null, n.course))))), /* @__PURE__ */ import_react6.default.createElement("p", null, plan.nodes.length ? "\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u4E00\u8D77\u6062\u590D\u6587\u4EF6\u548C\u5361\u7247\u3002" : "\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u3002"), error && /* @__PURE__ */ import_react6.default.createElement(UserError, { error }), " ", removed && /* @__PURE__ */ import_react6.default.createElement("p", { role: "status" }, "\u6587\u4EF6\u5DF2\u79FB\u5165\u56DE\u6536\u7AD9\u3002")), /* @__PURE__ */ import_react6.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react6.default.createElement(UiButton, { "data-file-delete-cancel": true, disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react6.default.createElement(UiButton, { variant: removed ? "primary" : "danger", type: "submit", disabled: busy }, busy ? "\u6B63\u5728\u5904\u7406\u2026" : removed ? "\u5237\u65B0\u5217\u8868" : "\u79FB\u5230\u56DE\u6536\u7AD9"))));
 }
 function DeleteNodesDialog({ plan, request, onClose, onDone }) {
-  const dialog = (0, import_react6.useRef)(null), [deleteFiles, setDeleteFiles] = (0, import_react6.useState)(false), [busy, setBusy] = (0, import_react6.useState)(false), [error, setError] = (0, import_react6.useState)("");
+  const dialog = (0, import_react6.useRef)(null);
+  const [deleteFiles, setDeleteFiles] = (0, import_react6.useState)(false);
+  const [busy, setBusy] = (0, import_react6.useState)(false);
+  const [error, setError] = (0, import_react6.useState)("");
+  const planning = Boolean(plan.loading);
+  const unavailable = plan.files.some((file) => file.error);
   (0, import_react6.useEffect)(() => {
     dialog.current?.showModal();
   }, []);
-  const unavailable = plan.files.some((f) => f.error);
-  async function remove2(e) {
-    e.preventDefault();
+  async function remove2(event) {
+    event.preventDefault();
+    if (busy || planning) return;
     setBusy(true);
     setError("");
     try {
       await request("canvas-recycle-remove", { planId: plan.id, deleteFiles });
       await onDone();
-    } catch (e2) {
-      setError(e2.message);
+    } catch (cause) {
+      setError(cause.message);
     } finally {
       setBusy(false);
     }
   }
-  return /* @__PURE__ */ import_react6.default.createElement("dialog", { className: "wtt-recycle-dialog", ref: dialog, "aria-labelledby": "wtt-delete-heading", onCancel: (e) => {
-    e.preventDefault();
-    if (!busy) onClose();
-  } }, /* @__PURE__ */ import_react6.default.createElement("form", { onSubmit: remove2 }, /* @__PURE__ */ import_react6.default.createElement(DialogHeader, { title: `\u5220\u9664${plan.nodes.length > 1 ? ` ${plan.nodes.length} \u4E2A\u8282\u70B9` : "\u8282\u70B9"}`, titleId: "wtt-delete-heading", onClose, closeLabel: "\u5173\u95ED\u5220\u9664\u786E\u8BA4", busy }), /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react6.default.createElement("ul", { className: "wtt-delete-names" }, plan.nodes.map((n) => /* @__PURE__ */ import_react6.default.createElement("li", { key: n.nodeId }, n.title))), /* @__PURE__ */ import_react6.default.createElement("fieldset", null, /* @__PURE__ */ import_react6.default.createElement("legend", { className: "wtt-visually-hidden" }, "\u5220\u9664\u8303\u56F4"), /* @__PURE__ */ import_react6.default.createElement("label", null, /* @__PURE__ */ import_react6.default.createElement("input", { type: "radio", name: "delete-scope", checked: !deleteFiles, disabled: busy, onChange: () => setDeleteFiles(false) }), /* @__PURE__ */ import_react6.default.createElement("span", null, "\u53EA\u79FB\u9664\u753B\u5E03\u8282\u70B9")), plan.files.length > 0 && /* @__PURE__ */ import_react6.default.createElement("label", null, /* @__PURE__ */ import_react6.default.createElement("input", { type: "radio", name: "delete-scope", checked: deleteFiles, disabled: busy || unavailable, onChange: () => setDeleteFiles(true) }), /* @__PURE__ */ import_react6.default.createElement("span", null, "\u540C\u65F6\u5C06\u6E90\u6587\u4EF6\u79FB\u5230\u9879\u76EE\u56DE\u6536\u7AD9"))), /* @__PURE__ */ import_react6.default.createElement("p", null, deleteFiles ? "\u4EC5\u56DE\u6536\u4E0B\u9762\u5217\u51FA\u7684\u5F53\u524D\u6587\u4EF6\uFF0C\u5176\u4ED6\u7248\u672C\u4FDD\u7559\u3002" : "\u6587\u4EF6\u548C\u7248\u672C\u4FDD\u7559\uFF0C\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u8282\u70B9\u3002"), plan.files.length > 0 && /* @__PURE__ */ import_react6.default.createElement("details", { open: deleteFiles || unavailable }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u6D89\u53CA\u6587\u4EF6 \xB7 ", plan.files.length), /* @__PURE__ */ import_react6.default.createElement("ul", { className: "wtt-delete-files" }, plan.files.map((f) => /* @__PURE__ */ import_react6.default.createElement("li", { key: f.path }, /* @__PURE__ */ import_react6.default.createElement("code", null, f.path), /* @__PURE__ */ import_react6.default.createElement("small", null, f.role), f.error && /* @__PURE__ */ import_react6.default.createElement("p", { role: "alert" }, f.error), f.references.length > 0 && /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-recycle-shared" }, "\u8FD8\u6709 ", f.references.length, " \u5F20\u5361\u7247\u5F15\u7528\u6B64\u6587\u4EF6", /* @__PURE__ */ import_react6.default.createElement("ul", null, f.references.map((r) => /* @__PURE__ */ import_react6.default.createElement("li", { key: `${r.requirementId}:${r.nodeId}` }, r.course, " \xB7 ", r.title)))))))), error && /* @__PURE__ */ import_react6.default.createElement(UserError, { error })), /* @__PURE__ */ import_react6.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react6.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react6.default.createElement(UiButton, { variant: deleteFiles ? "danger" : "primary", type: "submit", className: deleteFiles ? "is-danger" : "", disabled: busy }, busy ? "\u6B63\u5728\u5220\u9664\u2026" : deleteFiles ? "\u56DE\u6536\u6587\u4EF6\u5E76\u79FB\u9664\u8282\u70B9" : "\u79FB\u9664\u8282\u70B9"))));
+  return /* @__PURE__ */ import_react6.default.createElement(
+    "dialog",
+    {
+      className: "wtt-recycle-dialog",
+      ref: dialog,
+      "aria-labelledby": "wtt-delete-heading",
+      "aria-busy": planning || busy,
+      onCancel: (event) => {
+        event.preventDefault();
+        if (!busy) onClose();
+      }
+    },
+    /* @__PURE__ */ import_react6.default.createElement("form", { onSubmit: remove2 }, /* @__PURE__ */ import_react6.default.createElement(
+      DialogHeader,
+      {
+        title: plan.nodes.length > 1 ? "\u5220\u9664 " + plan.nodes.length + " \u4E2A\u8282\u70B9" : "\u5220\u9664\u8282\u70B9",
+        titleId: "wtt-delete-heading",
+        onClose,
+        closeLabel: "\u5173\u95ED\u5220\u9664\u786E\u8BA4",
+        busy
+      }
+    ), /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react6.default.createElement("ul", { className: "wtt-delete-names" }, plan.nodes.map((node) => /* @__PURE__ */ import_react6.default.createElement("li", { key: node.nodeId }, node.title))), planning ? /* @__PURE__ */ import_react6.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u5220\u9664\u8303\u56F4\u2026") : /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement("fieldset", null, /* @__PURE__ */ import_react6.default.createElement("legend", { className: "wtt-visually-hidden" }, "\u5220\u9664\u8303\u56F4"), /* @__PURE__ */ import_react6.default.createElement("label", null, /* @__PURE__ */ import_react6.default.createElement(
+      "input",
+      {
+        type: "radio",
+        name: "delete-scope",
+        checked: !deleteFiles,
+        disabled: busy,
+        onChange: () => setDeleteFiles(false)
+      }
+    ), /* @__PURE__ */ import_react6.default.createElement("span", null, "\u53EA\u79FB\u9664\u753B\u5E03\u8282\u70B9")), plan.files.length > 0 && /* @__PURE__ */ import_react6.default.createElement("label", null, /* @__PURE__ */ import_react6.default.createElement(
+      "input",
+      {
+        type: "radio",
+        name: "delete-scope",
+        checked: deleteFiles,
+        disabled: busy || unavailable,
+        onChange: () => setDeleteFiles(true)
+      }
+    ), /* @__PURE__ */ import_react6.default.createElement("span", null, "\u540C\u65F6\u5C06\u6E90\u6587\u4EF6\u79FB\u5230\u9879\u76EE\u56DE\u6536\u7AD9"))), /* @__PURE__ */ import_react6.default.createElement("p", null, deleteFiles ? "\u4EC5\u56DE\u6536\u4E0B\u9762\u5217\u51FA\u7684\u5F53\u524D\u6587\u4EF6\uFF0C\u5176\u4ED6\u7248\u672C\u4FDD\u7559\u3002" : "\u6587\u4EF6\u548C\u7248\u672C\u4FDD\u7559\uFF0C\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u8282\u70B9\u3002"), plan.files.length > 0 && /* @__PURE__ */ import_react6.default.createElement("details", { open: deleteFiles || unavailable }, /* @__PURE__ */ import_react6.default.createElement("summary", null, "\u6D89\u53CA\u6587\u4EF6 \xB7 ", plan.files.length), /* @__PURE__ */ import_react6.default.createElement("ul", { className: "wtt-delete-files" }, plan.files.map((file) => /* @__PURE__ */ import_react6.default.createElement("li", { key: file.path }, /* @__PURE__ */ import_react6.default.createElement("code", null, file.path), /* @__PURE__ */ import_react6.default.createElement("small", null, file.role), file.error && /* @__PURE__ */ import_react6.default.createElement("p", { role: "alert" }, file.error), file.references.length > 0 && /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-recycle-shared" }, "\u8FD8\u6709 ", file.references.length, " \u5F20\u5361\u7247\u5F15\u7528\u6B64\u6587\u4EF6", /* @__PURE__ */ import_react6.default.createElement("ul", null, file.references.map((reference) => /* @__PURE__ */ import_react6.default.createElement("li", { key: reference.requirementId + ":" + reference.nodeId }, reference.course, " \xB7 ", reference.title))))))))), error && /* @__PURE__ */ import_react6.default.createElement(UserError, { error })), /* @__PURE__ */ import_react6.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react6.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react6.default.createElement(
+      UiButton,
+      {
+        variant: deleteFiles ? "danger" : "primary",
+        type: "submit",
+        className: deleteFiles ? "is-danger" : "",
+        disabled: busy || planning
+      },
+      planning ? "\u6B63\u5728\u6838\u5BF9\u2026" : busy ? "\u6B63\u5728\u5220\u9664\u2026" : deleteFiles ? "\u56DE\u6536\u6587\u4EF6\u5E76\u79FB\u9664\u8282\u70B9" : "\u79FB\u9664\u8282\u70B9"
+    )))
+  );
 }
 function ProjectRecycleDialog({ request, endpoint: endpoint2, onClose, onChanged }) {
   const dialog = (0, import_react6.useRef)(null), mounted = (0, import_react6.useRef)(false);
@@ -41765,16 +41816,12 @@ function ReferencePromptInput({
 
 // src/media-creation.jsx
 var import_react27 = __toESM(require("react"), 1);
-var DEFAULT_MEDIA_OPTIONS = {
-  image: { model: "jimeng-5.0", ratio: "4:3", resolution: "2k" },
-  video: { model: "jimeng-video-3.0", ratio: "4:3", resolution: "720p", duration: 5 }
-};
-var JOB_LABELS = { queued: "\u6392\u961F\u4E2D", submitting: "\u6B63\u5728\u63D0\u4EA4", processing: "\u751F\u6210\u4E2D", downloading: "\u4FDD\u5B58\u6587\u4EF6\u4E2D", registering: "\u6838\u9A8C\u6587\u4EF6\u4E2D", succeeded: "\u5DF2\u751F\u6210\u5E76\u4FDD\u5B58", failed: "\u751F\u6210\u5931\u8D25", unknown: "\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5", download_failed: "\u6587\u4EF6\u4E0B\u8F7D\u5931\u8D25", registration_failed: "\u6587\u4EF6\u6838\u9A8C\u5931\u8D25" };
 function mediaJobPending(job) {
   return ["queued", "submitting", "processing", "downloading", "registering"].includes(job?.status);
 }
 function mediaOptionsFor(type, capabilities, options) {
-  return { ...DEFAULT_MEDIA_OPTIONS[type], ...capabilities?.modelDefaults?.[type], ...options };
+  const defaults2 = capabilities?.modelDefaults?.[type];
+  return { ...typeof defaults2 === "string" ? { model: defaults2 } : defaults2, ...options };
 }
 function mediaSizeLabel(file) {
   const media = file?.media || file?.validation?.media;
@@ -41785,64 +41832,14 @@ function Choice({ label: label2, value, choices, onChange, disabled }) {
   const entries = [.../* @__PURE__ */ new Set([...choices || [], ...value === void 0 ? [] : [value]])];
   return /* @__PURE__ */ import_react27.default.createElement("label", null, label2, /* @__PURE__ */ import_react27.default.createElement("select", { "aria-label": label2, value: value ?? "", disabled, onChange: (event) => onChange(event.target.value) }, entries.map((entry) => /* @__PURE__ */ import_react27.default.createElement("option", { key: entry, value: entry }, entry))));
 }
-function MediaPrompt({ type, instruction, onChange, options, onOptionsChange, capabilities, loading, error, job, onRefresh, onOpenSettings, onResume, onPrepareNew, onSubmit, disabled, mentionProps }) {
-  const id2 = (0, import_react27.useId)();
-  const isVideo = type === "video";
+function ApiMediaPrompt({ type, instruction, onChange, options, onOptionsChange, providers, providerId, onProviderChange, capabilities, loading, error, onRefresh, onSubmit, disabled, mentionProps }) {
   const models = capabilities?.models?.filter((model) => model.type === type) || [];
   const selected2 = models.find((model) => model.id === options.model);
-  const pending = mediaJobPending(job);
   const set3 = (key, value) => onOptionsChange?.({ ...options, [key]: value });
-  return /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-media-creation" }, /* @__PURE__ */ import_react27.default.createElement(
-    ReferencePromptInput,
-    {
-      id: `${id2}-prompt`,
-      "aria-label": "\u521B\u4F5C\u63D0\u793A\u8BCD",
-      value: instruction,
-      rows: 2,
-      disabled,
-      onValueChange: onChange,
-      onSubmit,
-      placeholder: isVideo ? "\u63CF\u8FF0\u753B\u9762\u4E0E\u52A8\u4F5C\uFF0C@ \u5F15\u7528\u8D44\u6599" : "\u63CF\u8FF0\u4E3B\u4F53\u4E0E\u98CE\u683C\uFF0C@ \u5F15\u7528\u8D44\u6599",
-      ...mentionProps
-    }
-  ), /* @__PURE__ */ import_react27.default.createElement("details", { className: "wcc-media-parameters" }, /* @__PURE__ */ import_react27.default.createElement("summary", { "aria-label": "\u751F\u6210\u53C2\u6570" }, [selected2?.name || options.model, options.ratio, options.resolution, isVideo && `${options.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-creation-instruction-caption" }, /* @__PURE__ */ import_react27.default.createElement("span", null, "\u751F\u6210\u53C2\u6570"), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenSettings }, "\u5373\u68A6\u8BBE\u7F6E")), /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-media-options" }, /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u751F\u6210\u6A21\u578B", value: options.model, choices: models.map((model) => model.id), disabled, onChange: (value) => set3("model", value) }), /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u753B\u9762\u6BD4\u4F8B", value: options.ratio, choices: selected2?.ratios || ["1:1", "4:3", "3:4", "16:9", "9:16"], disabled, onChange: (value) => set3("ratio", value) }), /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u5206\u8FA8\u7387", value: options.resolution, choices: selected2?.resolutions || (isVideo ? ["720p", "1080p"] : ["1k", "2k", "4k"]), disabled, onChange: (value) => set3("resolution", value) }), isVideo && /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u89C6\u9891\u65F6\u957F\uFF08\u79D2\uFF09", value: options.duration, choices: selected2?.durations || [5, 10], disabled, onChange: (value) => set3("duration", Number(value)) })), /* @__PURE__ */ import_react27.default.createElement("p", { className: "wcc-media-hint" }, "\u6BCF\u6B21\u751F\u6210 1 ", isVideo ? "\u6BB5\u89C6\u9891" : "\u5F20\u56FE\u7247", "\u3002\u53C2\u8003\u56FE\u4ECE\u300C\uFF0B\u5F15\u7528\u300D\u6DFB\u52A0\uFF1B\u6587\u5B57\u53C2\u8003\u6BCF\u4EFD\u6700\u591A 2000 \u5B57\u7B26\uFF0C\u5408\u8BA1 6000 \u5B57\u7B26\u3002", selected2?.requiresReference ? "\u6B64\u6A21\u578B\u9700\u8981\u53C2\u8003\u56FE\u7247\u3002" : "", "\u4EE5\u4E0A\u4E3A\u8BF7\u6C42\u53C2\u6570\uFF0C\u5B9E\u9645\u5C3A\u5BF8\u663E\u793A\u5728\u6210\u679C\u5361\u4E0A\u3002"), /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-media-connection" }, /* @__PURE__ */ import_react27.default.createElement("span", { className: capabilities?.healthy && capabilities?.credentialConfigured ? "is-ready" : "" }, loading ? "\u6B63\u5728\u68C0\u6D4B\u5373\u68A6\u670D\u52A1\u2026" : capabilities?.healthy ? capabilities.credentialConfigured ? "\u5373\u68A6\u5DF2\u8FDE\u63A5 \xB7 \u8BA4\u8BC1\u5DF2\u914D\u7F6E" : "\u5373\u68A6\u5DF2\u8FDE\u63A5 \xB7 \u5C1A\u672A\u914D\u7F6E\u8BA4\u8BC1" : "\u5373\u68A6\u670D\u52A1\u672A\u8FDE\u63A5"), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: loading, onClick: () => void onRefresh?.() }, "\u91CD\u65B0\u68C0\u6D4B"))), error && /* @__PURE__ */ import_react27.default.createElement(UserError, { className: "wcc-creation-error", error: String(error) }), job && /* @__PURE__ */ import_react27.default.createElement("div", { className: `wcc-media-job is-${job.status}`, role: "status" }, /* @__PURE__ */ import_react27.default.createElement("strong", null, JOB_LABELS[job.status] || job.status), pending && /* @__PURE__ */ import_react27.default.createElement("span", { className: "wcc-media-pulse", "aria-hidden": "true" }, "\xB7\xB7\xB7"), job.error && /* @__PURE__ */ import_react27.default.createElement("p", null, job.error), job.status === "unknown" && /* @__PURE__ */ import_react27.default.createElement("p", null, "\u670D\u52A1\u53EF\u80FD\u5DF2\u53D7\u7406\u3002\u672C\u6B21\u4EFB\u52A1\u4E0D\u4F1A\u81EA\u52A8\u91CD\u53D1\uFF0C\u8BF7\u5148\u5728\u5373\u68A6\u6838\u5BF9\u751F\u6210\u8BB0\u5F55\u3002"), job.canResume && /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", type: "button", disabled, onClick: onResume }, "\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0F\u91CD\u65B0\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(job.status) && onPrepareNew && /* @__PURE__ */ import_react27.default.createElement(import_react27.default.Fragment, null, /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", type: "button", disabled, onClick: onPrepareNew }, "\u5DF2\u6838\u5BF9\uFF0C\u51C6\u5907\u65B0\u4EFB\u52A1"), /* @__PURE__ */ import_react27.default.createElement("small", null, "\u4FDD\u7559\u539F\u4EFB\u52A1\u8BB0\u5F55\uFF1B\u518D\u6B21\u70B9\u51FB\u751F\u6210\u4F1A\u53E6\u8BA1\u79EF\u5206\u3002")), job.artifactId && /* @__PURE__ */ import_react27.default.createElement("small", null, "\u6587\u4EF6\u5DF2\u4FDD\u5B58\u5230\u5F53\u524D\u9879\u76EE\uFF0C\u53EF\u5728\u753B\u5E03\u4E0E\u521B\u4F5C\u4EFB\u52A1\u4E2D\u67E5\u770B\u3002")));
-}
-function MediaSettings({ open, capabilities, options, type, onSave, onClose }) {
-  const id2 = (0, import_react27.useId)();
-  const dialog = (0, import_react27.useRef)(null);
-  const [endpoint2, setEndpoint] = (0, import_react27.useState)("");
-  const [sessionId, setSessionId] = (0, import_react27.useState)("");
-  const [saveDefaults, setSaveDefaults] = (0, import_react27.useState)(true);
-  const [saving, setSaving] = (0, import_react27.useState)(false);
-  const [error, setError] = (0, import_react27.useState)("");
-  (0, import_react27.useEffect)(() => {
-    if (open) {
-      setEndpoint(capabilities?.endpoint || "http://127.0.0.1:8000");
-      setSessionId("");
-      setError("");
-      setSaveDefaults(true);
-      dialog.current?.showModal();
-    } else dialog.current?.close();
-  }, [open]);
-  async function save(event) {
-    event.preventDefault();
-    if (saving || !onSave) return;
-    setSaving(true);
-    setError("");
-    try {
-      await onSave({ endpoint: endpoint2.trim(), ...sessionId.trim() ? { sessionId: sessionId.trim() } : {}, ...saveDefaults ? { modelDefaults: { ...capabilities?.modelDefaults, [type]: options } } : {} });
-      setSessionId("");
-      onClose?.();
-    } catch (cause) {
-      setError(cause?.message || String(cause));
-    } finally {
-      setSaving(false);
-    }
-  }
-  return /* @__PURE__ */ import_react27.default.createElement("dialog", { ref: dialog, className: "wcc-media-settings", "aria-labelledby": `${id2}-title`, onCancel: (event) => {
-    event.preventDefault();
-    if (!saving) onClose?.();
-  }, onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react27.default.createElement("form", { onSubmit: (event) => void save(event) }, /* @__PURE__ */ import_react27.default.createElement(DialogHeader, { title: "\u5373\u68A6\u751F\u6210\u8BBE\u7F6E", titleId: `${id2}-title`, description: "\u8FDE\u63A5\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u5373\u68A6\u670D\u52A1\u3002", onClose, closeLabel: "\u5173\u95ED\u5373\u68A6\u8BBE\u7F6E", busy: saving }), /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-media-settings-body" }, /* @__PURE__ */ import_react27.default.createElement("label", null, "\u670D\u52A1\u5730\u5740", /* @__PURE__ */ import_react27.default.createElement("input", { "aria-label": "\u5373\u68A6\u670D\u52A1\u5730\u5740", value: endpoint2, disabled: saving, onChange: (event) => setEndpoint(event.target.value), placeholder: "http://127.0.0.1:8000", spellCheck: false })), /* @__PURE__ */ import_react27.default.createElement("label", null, "\u5373\u68A6\u767B\u5F55\u51ED\u636E\uFF08Session ID\uFF09", /* @__PURE__ */ import_react27.default.createElement("input", { "aria-label": "\u5373\u68A6\u767B\u5F55\u51ED\u636E\uFF08Session ID\uFF09", type: "password", autoComplete: "off", value: sessionId, disabled: saving, onChange: (event) => setSessionId(event.target.value), placeholder: capabilities?.credentialConfigured ? "\u5DF2\u914D\u7F6E\uFF1B\u7559\u7A7A\u4FDD\u7559" : "\u7559\u7A7A\u65F6\u6CBF\u7528\u672C\u673A\u5373\u68A6\u6280\u80FD \u914D\u7F6E" })), /* @__PURE__ */ import_react27.default.createElement("p", null, capabilities?.credentialConfigured ? "\u5DF2\u627E\u5230\u8BA4\u8BC1\u914D\u7F6E\uFF0C\u5DF2\u6709\u503C\u4E0D\u4F1A\u56DE\u663E\u3002" : "\u5373\u68A6\u8D26\u53F7\u4E0E DeepSeek \u767B\u5F55\u72EC\u7ACB\uFF0C\u53EF\u6CBF\u7528\u672C\u673A\u5373\u68A6\u6280\u80FD \u7684\u8BA4\u8BC1\u3002"), /* @__PURE__ */ import_react27.default.createElement("label", { className: "wcc-media-default-check" }, /* @__PURE__ */ import_react27.default.createElement("input", { type: "checkbox", checked: saveDefaults, disabled: saving, onChange: (event) => setSaveDefaults(event.target.checked) }), "\u5C06\u5F53\u524D", type === "video" ? "\u89C6\u9891" : "\u56FE\u7247", "\u53C2\u6570\u4FDD\u5B58\u4E3A\u9ED8\u8BA4"), saveDefaults && /* @__PURE__ */ import_react27.default.createElement("code", null, options.model, " \xB7 ", options.ratio, " \xB7 ", options.resolution, type === "video" ? ` \xB7 ${options.duration} \u79D2` : ""), error && /* @__PURE__ */ import_react27.default.createElement(UserError, { className: "wcc-creation-error", error })), /* @__PURE__ */ import_react27.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: saving, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", type: "submit", disabled: saving || !onSave }, saving ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58\u8BBE\u7F6E"))));
+  return /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-media-creation" }, /* @__PURE__ */ import_react27.default.createElement(ReferencePromptInput, { "aria-label": "\u521B\u4F5C\u63D0\u793A\u8BCD", value: instruction, rows: 2, disabled, onValueChange: onChange, onSubmit, placeholder: "\u63CF\u8FF0\u5185\u5BB9\uFF0C@ \u5F15\u7528\u8D44\u6599", ...mentionProps }), providers.length > 0 && /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-media-options" }, /* @__PURE__ */ import_react27.default.createElement("label", null, "API \u670D\u52A1", /* @__PURE__ */ import_react27.default.createElement("select", { "aria-label": "API \u670D\u52A1", value: providerId || "", disabled, onChange: (event) => onProviderChange?.(event.target.value) }, /* @__PURE__ */ import_react27.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u670D\u52A1"), providers.map((provider) => /* @__PURE__ */ import_react27.default.createElement("option", { key: provider.id, value: provider.id }, provider.label)))), /* @__PURE__ */ import_react27.default.createElement("label", null, "\u751F\u6210\u6A21\u578B", /* @__PURE__ */ import_react27.default.createElement("select", { "aria-label": "\u751F\u6210\u6A21\u578B", value: options.model || "", disabled: disabled || !models.length, onChange: (event) => {
+    const model = models.find((item) => item.id === event.target.value);
+    onOptionsChange?.({ model: model.id, ratio: model.ratios?.[0], resolution: model.resolutions?.[0], ...type === "video" ? { duration: model.durations?.[0] } : {} });
+  } }, /* @__PURE__ */ import_react27.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u6A21\u578B"), models.map((model) => /* @__PURE__ */ import_react27.default.createElement("option", { key: model.id, value: model.id }, model.name || model.id)))), selected2?.ratios?.length > 0 && /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u753B\u9762\u6BD4\u4F8B", value: options.ratio, choices: selected2.ratios, disabled, onChange: (value) => set3("ratio", value) }), selected2?.resolutions?.length > 0 && /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u5206\u8FA8\u7387", value: options.resolution, choices: selected2.resolutions, disabled, onChange: (value) => set3("resolution", value) }), type === "video" && selected2?.durations?.length > 0 && /* @__PURE__ */ import_react27.default.createElement(Choice, { label: "\u89C6\u9891\u65F6\u957F\uFF08\u79D2\uFF09", value: options.duration, choices: selected2.durations, disabled, onChange: (value) => set3("duration", Number(value)) })), error && /* @__PURE__ */ import_react27.default.createElement(UserError, { className: "wcc-creation-error", error }), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: loading || disabled, onClick: () => void onRefresh?.() }, loading ? "\u68C0\u6D4B\u4E2D\u2026" : "\u5237\u65B0 API \u670D\u52A1"));
 }
 
 // src/course-tasks.jsx
@@ -42403,6 +42400,8 @@ function createPendingContext({ projectId, projectName: projectName2, projectPat
     generation: input.generation,
     outputPosition: { ...node.position },
     ...input.selection ? { selection: input.selection } : {},
+    generationMethod: input.generationMethod || (task.kind === "media" ? "legacy" : "skill"),
+    ...input.providerId ? { providerId: input.providerId } : {},
     ...input.media ? { mediaOptions: input.media } : {},
     ...task.mediaJob ? { mediaJob: task.mediaJob } : {},
     originalInput: { instruction: input.instruction || task.instruction || "", references: JSON.parse(JSON.stringify(references)), taskId: task.id, sessionId: task.sessionId || null }
@@ -42894,8 +42893,9 @@ function CardComposer({
   mediaLoading = false,
   mediaError,
   onRefreshMedia,
-  onSaveMediaSettings,
   onMediaOptionsChange,
+  onGenerationMethodChange,
+  onMediaProviderChange,
   onGenerateMedia,
   onResumeMedia,
   onNewMedia,
@@ -42930,7 +42930,6 @@ function CardComposer({
   const [search, setSearch] = (0, import_react33.useState)("");
   const [collapsed, setCollapsed] = (0, import_react33.useState)(false);
   const [skillSettingsOpen, setSkillSettingsOpen] = (0, import_react33.useState)(false);
-  const [mediaSettingsOpen, setMediaSettingsOpen] = (0, import_react33.useState)(false);
   const [conversationOpen, setConversationOpen] = (0, import_react33.useState)(false);
   const [conversationOpening, setConversationOpening] = (0, import_react33.useState)(null);
   const [conversationError, setConversationError] = (0, import_react33.useState)(null);
@@ -42945,16 +42944,20 @@ function CardComposer({
   const headingCard = context?.targetCard || context?.anchor;
   const revising = context?.intent === "revise";
   const inputLocked = Boolean(context?.pendingTaskId);
-  const isMedia = outputType === "image" || outputType === "video";
+  const mediaCard = outputType === "image" || outputType === "video";
+  const legacyMedia = mediaCard && Boolean(context?.mediaJob) && context?.generationMethod !== "api" && Boolean(context?.pendingTaskId);
+  const isMedia = mediaCard && (context?.generationMethod === "api" || legacyMedia);
+  const apiProvider = mediaCapabilities?.providers?.find((provider) => provider.id === context?.providerId);
+  const activeMediaCapabilities = legacyMedia ? mediaCapabilities : apiProvider;
   const taskMode = (inputLocked || context?.pendingGeneration?.published) && !isMedia;
   const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation);
   const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing;
   const showInitialInput = !taskMode && !reviewingResult;
   const stageStatus = taskMode ? pendingLabel(context.pendingGeneration) : reviewingResult ? "\u5DF2\u4FDD\u5B58" : "";
-  const mediaOptions = mediaOptionsFor(outputType, mediaCapabilities, context?.mediaOptions);
-  const mediaModel = mediaCapabilities?.models?.find((model) => model.type === outputType && model.id === mediaOptions.model);
-  const mediaPending = mediaJobPending(context?.mediaJob);
-  const recoveringMedia = Boolean(context?.mediaJob?.canResume && ["download_failed", "registration_failed"].includes(context.mediaJob.status));
+  const mediaOptions = mediaOptionsFor(outputType, activeMediaCapabilities, context?.mediaOptions);
+  const mediaModel = activeMediaCapabilities?.models?.find((model) => model.type === outputType && model.id === mediaOptions.model);
+  const mediaPending = isMedia && mediaJobPending(context?.mediaJob);
+  const recoveringMedia = Boolean(isMedia && context?.mediaJob?.canResume && ["download_failed", "registration_failed"].includes(context.mediaJob.status));
   const hasConversation = !isMedia && Boolean(conversation) && conversationVisible;
   const hasExecution = !isMedia && (hasConversation || Boolean(context?.sessionId));
   const executionExpanded = hasConversation && conversationOpen && !collapsed;
@@ -42987,7 +42990,7 @@ function CardComposer({
   const referenceNotes = [...new Set((context?.referenceNotes || []).map((note) => typeof note === "string" ? note : note?.message || note?.note || "").filter(Boolean))];
   const imageReferences = references.filter((card) => (card.importedFile || card.generatedFile)?.mime?.startsWith("image/"));
   const hasVideoReference = references.some((card) => (card.importedFile || card.generatedFile)?.mime?.startsWith("video/"));
-  const mediaReason = !mediaCapabilities?.healthy ? "\u8BF7\u542F\u52A8\u5373\u68A6\u670D\u52A1\uFF0C\u6216\u5728\u201C\u5373\u68A6\u8BBE\u7F6E\u201D\u4E2D\u6838\u5BF9\u670D\u52A1\u5730\u5740\u3002" : !mediaCapabilities?.credentialConfigured ? "\u8BF7\u5728\u201C\u5373\u68A6\u8BBE\u7F6E\u201D\u4E2D\u914D\u7F6E\u8BA4\u8BC1\uFF0C\u6216\u6CBF\u7528\u672C\u673A\u5373\u68A6\u6280\u80FD \u914D\u7F6E\u3002" : !mediaModel ? "\u6B64\u6A21\u578B\u4E0D\u5728\u5F53\u524D\u670D\u52A1\u7684\u53EF\u7528\u5217\u8868\u4E2D\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002" : hasVideoReference ? "\u672C\u8F6E\u751F\u6210\u53EA\u652F\u6301\u6587\u5B57\u4E0E\u56FE\u7247\u53C2\u8003\uFF0C\u8BF7\u79FB\u9664\u89C6\u9891\u5F15\u7528\uFF1B\u5F53\u524D\u5361\u7247\u662F\u89C6\u9891\u65F6\uFF0C\u4ECE\u6587\u672C\u6216\u56FE\u7247\u5361\u53D1\u8D77\u3002" : mediaModel.requiresReference && !imageReferences.length ? "\u6B64\u6A21\u578B\u9700\u8981\u53C2\u8003\u56FE\u7247\uFF0C\u8BF7\u901A\u8FC7\u201C\uFF0B\u5F15\u7528\u201D\u6DFB\u52A0\u3002" : imageReferences.length > mediaModel.maxReferences ? `\u6B64\u6A21\u578B\u6700\u591A\u652F\u6301 ${mediaModel.maxReferences} \u5F20\u53C2\u8003\u56FE\u7247\u3002` : mediaModel.ratios?.length && !mediaModel.ratios.includes(mediaOptions.ratio) ? "\u8BF7\u4E3A\u5F53\u524D\u6A21\u578B\u91CD\u65B0\u9009\u62E9\u753B\u9762\u6BD4\u4F8B\u3002" : mediaModel.resolutions?.length && !mediaModel.resolutions.includes(mediaOptions.resolution) ? "\u8BF7\u4E3A\u5F53\u524D\u6A21\u578B\u91CD\u65B0\u9009\u62E9\u5206\u8FA8\u7387\u3002" : outputType === "video" && mediaModel.durations?.length && !mediaModel.durations.includes(Number(mediaOptions.duration)) ? "\u8BF7\u4E3A\u5F53\u524D\u6A21\u578B\u91CD\u65B0\u9009\u62E9\u89C6\u9891\u65F6\u957F\u3002" : context?.mediaJob?.status === "unknown" ? "\u672C\u6B21\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5\uFF0C\u8BF7\u5148\u6838\u5BF9\u5373\u68A6\u751F\u6210\u8BB0\u5F55\u3002" : "";
+  const mediaReason = chosenSkills.length && !legacyMedia ? "API \u751F\u6210\u4E0D\u6267\u884C Skill\uFF0C\u8BF7\u79FB\u9664\u6280\u80FD\u6307\u4EE4\u6216\u5207\u6362 Skill \u751F\u6210" : !legacyMedia && !mediaCapabilities?.providers?.length ? "\u5C1A\u672A\u63A5\u5165 API \u670D\u52A1" : !activeMediaCapabilities ? "\u8BF7\u9009\u62E9 API \u670D\u52A1" : !activeMediaCapabilities.healthy ? "API \u670D\u52A1\u672A\u8FDE\u63A5\uFF0C\u8BF7\u6838\u5BF9\u63D0\u4F9B\u5546\u914D\u7F6E" : !activeMediaCapabilities.credentialConfigured ? "\u5C1A\u672A\u914D\u7F6E\u670D\u52A1\u8BA4\u8BC1" : !mediaModel ? "\u8BF7\u9009\u62E9\u53EF\u7528\u6A21\u578B" : hasVideoReference ? "\u6B64 API \u63A5\u53E3\u6682\u4E0D\u652F\u6301\u89C6\u9891\u53C2\u8003\uFF0C\u8BF7\u5207\u6362 Skill \u751F\u6210\u6216\u79FB\u9664\u89C6\u9891\u5F15\u7528" : mediaModel.requiresReference && !imageReferences.length ? "\u6B64\u6A21\u578B\u9700\u8981\u53C2\u8003\u56FE\u7247" : imageReferences.length > (mediaModel.maxReferences || 0) ? `\u6B64\u6A21\u578B\u6700\u591A\u652F\u6301 ${mediaModel.maxReferences || 0} \u5F20\u53C2\u8003\u56FE\u7247` : mediaModel.ratios?.length && !mediaModel.ratios.includes(mediaOptions.ratio) ? "\u8BF7\u9009\u62E9\u753B\u9762\u6BD4\u4F8B" : mediaModel.resolutions?.length && !mediaModel.resolutions.includes(mediaOptions.resolution) ? "\u8BF7\u9009\u62E9\u5206\u8FA8\u7387" : outputType === "video" && mediaModel.durations?.length && !mediaModel.durations.includes(Number(mediaOptions.duration)) ? "\u8BF7\u9009\u62E9\u89C6\u9891\u65F6\u957F" : context?.mediaJob?.status === "unknown" ? "\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5\uFF0C\u8BF7\u5148\u6838\u5BF9\u539F\u4EFB\u52A1" : "";
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || !mediaReason && !mediaPending && !mediaLoading);
   const reason = recoveringMedia ? "" : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || "\u8BE5\u521B\u4F5C\u80FD\u529B\u6682\u4E0D\u53EF\u7528\u3002" : ""));
   const isChosen = (candidate) => references.some((reference) => sameReference(reference, candidate));
@@ -43017,7 +43020,7 @@ function CardComposer({
   };
   const label2 = recoveringMedia ? "\u53D6\u56DE\u751F\u6210\u7ED3\u679C" : inputLocked ? pendingRetryAllowed(context?.pendingGeneration) && !isMedia ? "\u91CD\u8BD5\u539F\u4EFB\u52A1" : pendingLabel(context?.pendingGeneration) : isAction ? sendLabel || { material: "\u6DFB\u52A0\u7D20\u6750", excerpt: "\u9009\u62E9\u539F\u6587\u6458\u5F55", word: "\u5BFC\u51FA Word" }[outputType] : revising ? "\u751F\u6210\u65B0\u7248\u672C" : `\u751F\u6210${["outline", "exercise", "script"].includes(outputType) ? "\u6587\u672C" : KIND_LABELS[outputType] || "\u6587\u672C"}`;
   const acceptedFiles = Array.isArray(acceptedFileTypes) ? acceptedFileTypes.join(",") : acceptedFileTypes;
-  const submitFooter = !hideSubmit && showInitialInput && /* @__PURE__ */ import_react33.default.createElement("footer", { className: `wcc-creation-submit${isMedia ? " is-media" : ""}` }, isMedia ? /* @__PURE__ */ import_react33.default.createElement("p", null, recoveringMedia ? "\u53D6\u56DE\u539F\u7ED3\u679C\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3002" : "\u4F7F\u7528\u5373\u68A6\u8D26\u53F7\u79EF\u5206\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559\u3002") : /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-footer-model" }, !isAction && (inputLocked && !modelSelection ? /* @__PURE__ */ import_react33.default.createElement("span", { title: "\u7EE7\u7EED\u6CBF\u7528\u539F\u4EFB\u52A1\u4F1A\u8BDD" }, "\u539F\u4EFB\u52A1\u6A21\u578B") : /* @__PURE__ */ import_react33.default.createElement(ModelSelection, { key: `model:${context?.key}`, compact: true, catalog: modelCatalog, selection: modelSelection, onChange: busy || inputLocked ? void 0 : onModelChange, onRefresh: onRefreshModels, onOpenSettings: onOpenModelSettings, loading: modelLoading, error: modelError })), engineSummary && /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-engine-summary", "aria-label": `PPT\u5236\u4F5C\u65B9\u5F0F\uFF1A${engineSummary}`, title: engineDetail }, engineSummary)), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-send", disabled: !ready, "aria-label": busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2, "aria-busy": busy, title: `${busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2} \xB7 \u2318 / Ctrl + Enter`, onClick: submit }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "send", size: 18 }), /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-send-label" }, busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2)));
+  const submitFooter = !hideSubmit && showInitialInput && /* @__PURE__ */ import_react33.default.createElement("footer", { className: `wcc-creation-submit${isMedia ? " is-media" : ""}` }, isMedia ? recoveringMedia ? /* @__PURE__ */ import_react33.default.createElement("p", null, "\u53D6\u56DE\u539F\u7ED3\u679C\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3002") : /* @__PURE__ */ import_react33.default.createElement("span", null) : /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-footer-model" }, !isAction && (inputLocked && !modelSelection ? /* @__PURE__ */ import_react33.default.createElement("span", { title: "\u7EE7\u7EED\u6CBF\u7528\u539F\u4EFB\u52A1\u4F1A\u8BDD" }, "\u539F\u4EFB\u52A1\u6A21\u578B") : /* @__PURE__ */ import_react33.default.createElement(ModelSelection, { key: `model:${context?.key}`, compact: true, catalog: modelCatalog, selection: modelSelection, onChange: busy || inputLocked ? void 0 : onModelChange, onRefresh: onRefreshModels, onOpenSettings: onOpenModelSettings, loading: modelLoading, error: modelError })), engineSummary && /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-creation-engine-summary", "aria-label": `PPT\u5236\u4F5C\u65B9\u5F0F\uFF1A${engineSummary}`, title: engineDetail }, engineSummary)), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-send", disabled: !ready, "aria-label": busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2, "aria-busy": busy, title: `${busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2} \xB7 \u2318 / Ctrl + Enter`, onClick: submit }, /* @__PURE__ */ import_react33.default.createElement(CreationIcon, { type: "send", size: 18 }), /* @__PURE__ */ import_react33.default.createElement("span", { className: "wcc-send-label" }, busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2)));
   (0, import_react33.useEffect)(() => {
     mounted.current = true;
     return () => {
@@ -43029,7 +43032,6 @@ function CardComposer({
     else {
       setReferencesOpen(false);
       setSkillSettingsOpen(false);
-      setMediaSettingsOpen(false);
     }
   }, [visible]);
   (0, import_react33.useEffect)(() => {
@@ -43052,7 +43054,6 @@ function CardComposer({
     setSearch("");
     setCollapsed(false);
     setSkillSettingsOpen(false);
-    setMediaSettingsOpen(false);
   }, [context?.key]);
   (0, import_react33.useEffect)(() => {
     setConversationOpen(false);
@@ -43249,7 +43250,7 @@ function CardComposer({
     "section",
     {
       ref: composer,
-      className: `wcc-card-composer nodrag nopan nowheel${taskMode || reviewingResult ? " is-task-stage" : ""}${collapsed ? " is-collapsed" : ""}${hasConversation ? " has-task-conversation" : ""}${executionExpanded ? " is-conversation-open" : ""}`,
+      className: `wcc-card-composer nodrag nopan nowheel${isMedia && !legacyMedia && !inputLocked ? " is-api-media" : ""}${taskMode || reviewingResult ? " is-task-stage" : ""}${collapsed ? " is-collapsed" : ""}${hasConversation ? " has-task-conversation" : ""}${executionExpanded ? " is-conversation-open" : ""}`,
       hidden: !visible || suspended,
       style: { left: position.x, top: frameTop, ...Number.isFinite(position.width) && position.width > 0 ? { width: `min(${Math.max(240, position.width)}px, calc(100% - 24px))` } : {}, "--wcc-creation-y": `${Math.max(0, frameTop)}px`, "--wcc-native-conversation-min": `${Math.max(360, nativeComposerHeight + 96)}px` },
       "aria-labelledby": `${id2}-title`,
@@ -43315,7 +43316,7 @@ function CardComposer({
     }), !candidates.length && /* @__PURE__ */ import_react33.default.createElement("p", null, search ? "\u6CA1\u6709\u5339\u914D\u7684\u5F15\u7528\u8D44\u6599\u3002" : "\u5F53\u524D\u753B\u5E03\u6CA1\u6709\u53EF\u6DFB\u52A0\u7684\u8D44\u6599\u3002")), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-reference-done", onClick: () => {
       setReferencesOpen(false);
       addButton.current?.focus();
-    } }, "\u5B8C\u6210\u9009\u62E9"))), referencePending && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-reference-pending", role: "status" }, activeReferenceWork.kind === "import" ? `\u6B63\u5728\u6DFB\u52A0 ${activeReferenceWork.count} \u4EFD\u7535\u8111\u8D44\u6599\u2026` : activeReferenceWork.kind === "media" ? `\u6B63\u5728\u5BFC\u5165 ${activeReferenceWork.count} \u4EFD${KIND_LABELS[outputType]}\u6587\u4EF6\u2026` : "\u6B63\u5728\u66F4\u65B0\u5F15\u7528\u2026"), !!references.length && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-preview", id: `${id2}-reference-preview`, hidden: !previewOpen }, /* @__PURE__ */ import_react33.default.createElement("div", null, references.map((card) => /* @__PURE__ */ import_react33.default.createElement("details", { key: card.id, ref: (element) => element ? referenceDetails.current.set(card.id, element) : referenceDetails.current.delete(card.id) }, /* @__PURE__ */ import_react33.default.createElement("summary", null, /* @__PURE__ */ import_react33.default.createElement("span", null, referenceFormat(card)), cardTitle(card)), card.truncated && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(card.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${card.fullLength} \u5B57\u7B26` : "", "\u3002"), card.kind === "word" && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6B63\u6587\u6765\u81EA\u6B64 Word \u7ED1\u5B9A\u7684\u5927\u7EB2\u7248\u672C\u3002"), card.referenceNote && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, card.referenceNote), (card.importedFile || card.generatedFile) && getReferenceFileHref && /* @__PURE__ */ import_react33.default.createElement(ImportedReferenceFile, { card, getHref: getReferenceFileHref }), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.previewText ?? card.content ?? "\u672C\u6B21\u672A\u63D0\u4F9B\u6B63\u6587\u9884\u89C8\u3002"), (card.excerptInfo?.annotation || card.annotation) && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-preview-annotation" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u6CE8\u91CA"), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.excerptInfo?.annotation || card.annotation))))))), inputLocked && /* @__PURE__ */ import_react33.default.createElement("div", { className: `wcc-creation-pending-state is-${context?.pendingGeneration?.phase || "unknown"}`, role: "status" }, /* @__PURE__ */ import_react33.default.createElement("strong", null, pendingLabel(context?.pendingGeneration)), /* @__PURE__ */ import_react33.default.createElement("p", null, context?.pendingGeneration?.error || context?.pendingGeneration?.message || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u4F1A\u539F\u4F4D\u66F4\u65B0\u5361\u7247\u3002"), /* @__PURE__ */ import_react33.default.createElement("small", null, "\u4EFB\u52A1\u5DF2\u63D0\u4EA4\u3002\u9700\u8981\u8865\u5145\u8981\u6C42\u6216\u786E\u8BA4\u65F6\uFF0C\u8BF7\u6253\u5F00\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u3002")), isMedia && inputLocked ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-frozen-media" }, /* @__PURE__ */ import_react33.default.createElement("label", null, "\u539F\u63D0\u793A\u8BCD", /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, readOnly: true, rows: 4 })), /* @__PURE__ */ import_react33.default.createElement("p", null, [context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), context?.mediaJob?.error && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-error" }, context.mediaJob.error), context?.mediaJob?.canResume && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onResumeMedia }, "\u67E5\u770B\u8FDB\u5EA6\u6216\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(context?.mediaJob?.status) && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onNewMedia }, "\u786E\u8BA4\u540E\u91CD\u65B0\u751F\u6210")) : isMedia ? /* @__PURE__ */ import_react33.default.createElement(MediaPrompt, { key: context?.key, type: outputType, instruction, onChange: onInstructionChange, options: mediaOptions, onOptionsChange: onMediaOptionsChange, capabilities: mediaCapabilities, loading: mediaLoading, error: mediaError, job: context?.mediaJob, onRefresh: onRefreshMedia, onOpenSettings: () => setMediaSettingsOpen(true), onResume: onResumeMedia, onPrepareNew: onNewMedia, onSubmit: submit, disabled: referencesBusy, mentionProps }) : isAction ? actionContent != null ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-action-content" }, actionContent) : /* @__PURE__ */ import_react33.default.createElement("label", { className: "wcc-creation-instruction" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u5904\u7406\u8BF4\u660E"), /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, onChange: (event) => onInstructionChange?.(event.target.value), disabled: busy, rows: 4, maxLength: 8e3 })) : /* @__PURE__ */ import_react33.default.createElement(SkillCommandInput, { key: context?.key, instruction, onChange: onInstructionChange, disabled: busy || inputLocked, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onOpenSettings: () => setSkillSettingsOpen(true), onSubmit: submit, mentionProps, footer: submitFooter }), reason && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), displayError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })), (isMedia || isAction) && submitFooter), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-conversation-heading", hidden: !hasExecution && !reviewingResult || revisionEditing && !taskMode }, reviewingResult && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => {
+    } }, "\u5B8C\u6210\u9009\u62E9"))), referencePending && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-reference-pending", role: "status" }, activeReferenceWork.kind === "import" ? `\u6B63\u5728\u6DFB\u52A0 ${activeReferenceWork.count} \u4EFD\u7535\u8111\u8D44\u6599\u2026` : activeReferenceWork.kind === "media" ? `\u6B63\u5728\u5BFC\u5165 ${activeReferenceWork.count} \u4EFD${KIND_LABELS[outputType]}\u6587\u4EF6\u2026` : "\u6B63\u5728\u66F4\u65B0\u5F15\u7528\u2026"), !!references.length && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-reference-preview", id: `${id2}-reference-preview`, hidden: !previewOpen }, /* @__PURE__ */ import_react33.default.createElement("div", null, references.map((card) => /* @__PURE__ */ import_react33.default.createElement("details", { key: card.id, ref: (element) => element ? referenceDetails.current.set(card.id, element) : referenceDetails.current.delete(card.id) }, /* @__PURE__ */ import_react33.default.createElement("summary", null, /* @__PURE__ */ import_react33.default.createElement("span", null, referenceFormat(card)), cardTitle(card)), card.truncated && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(card.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${card.fullLength} \u5B57\u7B26` : "", "\u3002"), card.kind === "word" && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6B63\u6587\u6765\u81EA\u6B64 Word \u7ED1\u5B9A\u7684\u5927\u7EB2\u7248\u672C\u3002"), card.referenceNote && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-preview-note" }, card.referenceNote), (card.importedFile || card.generatedFile) && getReferenceFileHref && /* @__PURE__ */ import_react33.default.createElement(ImportedReferenceFile, { card, getHref: getReferenceFileHref }), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.previewText ?? card.content ?? "\u672C\u6B21\u672A\u63D0\u4F9B\u6B63\u6587\u9884\u89C8\u3002"), (card.excerptInfo?.annotation || card.annotation) && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-preview-annotation" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u6CE8\u91CA"), /* @__PURE__ */ import_react33.default.createElement("pre", null, card.excerptInfo?.annotation || card.annotation))))))), inputLocked && /* @__PURE__ */ import_react33.default.createElement("div", { className: `wcc-creation-pending-state is-${context?.pendingGeneration?.phase || "unknown"}`, role: "status" }, /* @__PURE__ */ import_react33.default.createElement("strong", null, pendingLabel(context?.pendingGeneration)), /* @__PURE__ */ import_react33.default.createElement("p", null, context?.pendingGeneration?.error || context?.pendingGeneration?.message || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u4F1A\u539F\u4F4D\u66F4\u65B0\u5361\u7247\u3002"), /* @__PURE__ */ import_react33.default.createElement("small", null, "\u4EFB\u52A1\u5DF2\u63D0\u4EA4\u3002\u9700\u8981\u8865\u5145\u8981\u6C42\u6216\u786E\u8BA4\u65F6\uFF0C\u8BF7\u6253\u5F00\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u3002")), mediaCard && !inputLocked && !reviewingResult && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-media-method", role: "group", "aria-label": "\u751F\u6210\u65B9\u5F0F" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": !isMedia, disabled: busy, onClick: () => onGenerationMethodChange?.("skill") }, "Skill \u751F\u6210"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": isMedia, disabled: busy, onClick: () => onGenerationMethodChange?.("api") }, "API \u751F\u6210")), isMedia && inputLocked ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-frozen-media" }, /* @__PURE__ */ import_react33.default.createElement("label", null, "\u539F\u63D0\u793A\u8BCD", /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, readOnly: true, rows: 4 })), /* @__PURE__ */ import_react33.default.createElement("p", null, [context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), context?.mediaJob?.error && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-error" }, context.mediaJob.error), context?.mediaJob?.canResume && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onResumeMedia }, "\u67E5\u770B\u8FDB\u5EA6\u6216\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(context?.mediaJob?.status) && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onNewMedia }, "\u786E\u8BA4\u540E\u91CD\u65B0\u751F\u6210")) : isMedia && !legacyMedia ? /* @__PURE__ */ import_react33.default.createElement(ApiMediaPrompt, { type: outputType, instruction, onChange: onInstructionChange, options: mediaOptions, onOptionsChange: onMediaOptionsChange, providers: mediaCapabilities?.providers || [], providerId: context?.providerId, onProviderChange: onMediaProviderChange, capabilities: activeMediaCapabilities, loading: mediaLoading, error: mediaError, onRefresh: onRefreshMedia, onSubmit: submit, disabled: referencesBusy, mentionProps }) : isAction ? actionContent != null ? /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-action-content" }, actionContent) : /* @__PURE__ */ import_react33.default.createElement("label", { className: "wcc-creation-instruction" }, /* @__PURE__ */ import_react33.default.createElement("span", null, "\u5904\u7406\u8BF4\u660E"), /* @__PURE__ */ import_react33.default.createElement("textarea", { value: instruction, onChange: (event) => onInstructionChange?.(event.target.value), disabled: busy, rows: 4, maxLength: 8e3 })) : /* @__PURE__ */ import_react33.default.createElement(SkillCommandInput, { key: context?.key, instruction, onChange: onInstructionChange, disabled: busy || inputLocked, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onOpenSettings: () => setSkillSettingsOpen(true), onSubmit: submit, mentionProps, footer: submitFooter }), reason && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), displayError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })), (isMedia || isAction) && submitFooter), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-creation-conversation-heading", hidden: !hasExecution && !reviewingResult || revisionEditing && !taskMode }, reviewingResult && /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => {
       setConversationOpen(false);
       setRevisionEditing(true);
       requestAnimationFrame(() => composer.current?.querySelector("textarea")?.focus({ preventScroll: true }));
@@ -43329,8 +43330,7 @@ function CardComposer({
       },
       "\u67E5\u770B\u5F85\u5BA1\u7A3F"
     ), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u67E5\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u524D\u5F80\u786E\u8BA4"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), /* @__PURE__ */ import_react33.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
-    /* @__PURE__ */ import_react33.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) }),
-    /* @__PURE__ */ import_react33.default.createElement(MediaSettings, { open: visible && mediaSettingsOpen, capabilities: mediaCapabilities, options: mediaOptions, type: outputType, onSave: onSaveMediaSettings, onClose: () => setMediaSettingsOpen(false) })
+    /* @__PURE__ */ import_react33.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) })
   );
 }
 
@@ -43414,6 +43414,7 @@ function createRevisionContext({ projectId, projectName: projectName2, projectPa
     references: JSON.parse(JSON.stringify(references)),
     taskId: editor?.taskId || version2.taskId || null,
     sessionId: editor?.sessionId || null,
+    generationMethod: editor?.generationMethod || "skill",
     ...editor?.media ? { mediaOptions: { ...editor.media } } : {},
     ...editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {}
   };
@@ -43438,6 +43439,7 @@ function createRevisionContext({ projectId, projectName: projectName2, projectPa
     outputPosition: { ...node.position },
     taskId: editor?.taskId || version2.taskId || null,
     sessionId: editor?.sessionId || null,
+    generationMethod: "skill",
     ...editor?.media ? { mediaOptions: { ...editor.media } } : {},
     ...editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {},
     recorded: editor?.recorded !== false,
@@ -43469,6 +43471,7 @@ function creationTaskInput(context) {
     ...context.pptEngine ? { pptEngine: context.pptEngine } : {},
     outputPosition: { ...context.outputPosition },
     selectedSkills: extractSkillNames(context.instruction),
+    ...["image", "video"].includes(context.outputType) ? { generationMethod: context.generationMethod || "skill" } : {},
     ...context.selection ? { selection: { ...context.selection } } : {},
     ...context.generation ? { generation: { ...context.generation } } : {}
   };
@@ -43587,6 +43590,7 @@ function OutputPreview({
   const unavailable = fileBlocked(status);
   const failed = mediaError === identity4;
   const hasText = extracted !== false && typeof content === "string" && content.trim();
+  const previewText = compact && hasText && content.length > 600 ? content.slice(0, 600).replace(/[\uD800-\uDBFF]$/, "") + "\u2026" : content;
   return /* @__PURE__ */ import_react34.default.createElement("section", { className: `wtt-output-preview is-${type}${compact ? " is-compact" : ""}`, "aria-label": `${title || "\u6210\u679C\u6587\u4EF6"}\u9884\u89C8` }, unavailable ? /* @__PURE__ */ import_react34.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, "\u6B64\u7248\u672C\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u65E0\u6CD5\u6CBF\u7528\u65E7\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u539F\u6587\u4EF6\u3002") : type === "pptx" ? /* @__PURE__ */ import_react34.default.createElement(PptCover, { artifactId, hash, loadPreview, getPageHref, src, title, onOpen: onOpenDeck, compact }) : type === "image" && src && !failed ? /* @__PURE__ */ import_react34.default.createElement("img", { key: identity4, className: "wtt-output-image", src, alt: title || "\u751F\u6210\u56FE\u7247", loading: "lazy", decoding: "async", draggable: false, onError: () => setMediaError(identity4) }) : type === "video" && src && !failed ? /* @__PURE__ */ import_react34.default.createElement(
     "video",
     {
@@ -43603,7 +43607,7 @@ function OutputPreview({
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => event.stopPropagation()
     }
-  ) : ["image", "video"].includes(type) ? /* @__PURE__ */ import_react34.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, failed ? type === "video" ? "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u7248\u672C\uFF0C\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002" : "\u6B64\u7248\u672C\u56FE\u7247\u672A\u80FD\u52A0\u8F7D\uFF0C\u53EF\u4E0B\u8F7D\u539F\u56FE\u67E5\u770B\u3002" : emptyMessage || "\u5C1A\u672A\u53D6\u5F97\u53EF\u9884\u89C8\u7684\u6587\u4EF6\u3002") : hasText ? /* @__PURE__ */ import_react34.default.createElement("pre", { className: `wtt-output-text${compact ? "" : " nodrag nowheel"}` }, content) : /* @__PURE__ */ import_react34.default.createElement("p", { className: "wtt-output-preview-note" }, emptyMessage || (extracted === false ? "\u6B64\u683C\u5F0F\u5C1A\u672A\u63D0\u53D6\u53EF\u8BFB\u6B63\u6587\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002" : "\u5C1A\u65E0\u5DF2\u4FDD\u5B58\u7684\u6587\u672C\u6210\u679C\u3002")), !compact && downloadHref && /* @__PURE__ */ import_react34.default.createElement("a", { className: "wtt-output-download", href: downloadHref, download: true, onClick: (event) => event.stopPropagation() }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C"));
+  ) : ["image", "video"].includes(type) ? /* @__PURE__ */ import_react34.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, failed ? type === "video" ? "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u7248\u672C\uFF0C\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002" : "\u6B64\u7248\u672C\u56FE\u7247\u672A\u80FD\u52A0\u8F7D\uFF0C\u53EF\u4E0B\u8F7D\u539F\u56FE\u67E5\u770B\u3002" : emptyMessage || "\u5C1A\u672A\u53D6\u5F97\u53EF\u9884\u89C8\u7684\u6587\u4EF6\u3002") : hasText ? /* @__PURE__ */ import_react34.default.createElement("pre", { className: `wtt-output-text${compact ? "" : " nodrag nowheel"}` }, previewText) : /* @__PURE__ */ import_react34.default.createElement("p", { className: "wtt-output-preview-note" }, emptyMessage || (extracted === false ? "\u6B64\u683C\u5F0F\u5C1A\u672A\u63D0\u53D6\u53EF\u8BFB\u6B63\u6587\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002" : "\u5C1A\u65E0\u5DF2\u4FDD\u5B58\u7684\u6587\u672C\u6210\u679C\u3002")), !compact && downloadHref && /* @__PURE__ */ import_react34.default.createElement("a", { className: "wtt-output-download", href: downloadHref, download: true, onClick: (event) => event.stopPropagation() }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C"));
 }
 function DeckPreview({ artifactId, hash, title = "\u8BFE\u4EF6\u9884\u89C8", loadPreview, getPageHref, downloadHref, onClose }) {
   const preview = useDeckManifest({ artifactId, hash, loadPreview });
@@ -45947,6 +45951,13 @@ function CanvasContent({
   const [creationVisible, setCreationVisible] = (0, import_react46.useState)(() => cache.current.visible);
   const [creationMenu, setCreationMenu] = (0, import_react46.useState)(null);
   const [deletePlan, setDeletePlan] = (0, import_react46.useState)(null);
+  const deleteRequest = (0, import_react46.useRef)(null);
+  (0, import_react46.useEffect)(() => {
+    if (!active && deleteRequest.current) {
+      deleteRequest.current = null;
+      setDeletePlan(null);
+    }
+  }, [active]);
   const [recycleOpen, setRecycleOpen] = (0, import_react46.useState)(false);
   (0, import_react46.useEffect)(() => {
     if (recycleRequest && active) setRecycleOpen(true);
@@ -46592,7 +46603,7 @@ function CanvasContent({
         title: descriptor.node.title,
         downloadHref: endpoint2(documentRef.startsWith("material:") ? { materialFile: descriptor.node.refId } : documentRef.startsWith("word:") ? { download: descriptor.node.refId } : { downloadArtifact: descriptor.node.refId }).href
       } : null);
-      if (["image", "video"].includes(next.outputType)) void restoreMediaCreation(next);
+      if (next.generationMethod === "api" && next.mediaJob) void restoreMediaCreation(next);
       return descriptor;
     } catch (cause) {
       if (mounted.current && epoch === epochRef.current && intent === creationIntent.current) setError(`\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u7248\u672C\u5931\u8D25\uFF1A${messageOf7(cause)}`);
@@ -46702,7 +46713,7 @@ function CanvasContent({
         return;
       }
       openComposition(result);
-      if (seed) updateCreation(creationRef.current.key, { instruction: seed.instruction, mediaOptions: seed.mediaOptions, selectedSkills: seed.selectedSkills || [] });
+      if (seed) updateCreation(creationRef.current.key, { instruction: seed.instruction, generationMethod: seed.generationMethod === "api" ? "api" : "skill", providerId: seed.providerId, mediaOptions: seed.mediaOptions, selectedSkills: seed.selectedSkills || [] });
     } catch (cause) {
       if (mounted.current && epoch === epochRef.current) setError(messageOf7(cause));
     } finally {
@@ -46789,7 +46800,7 @@ function CanvasContent({
       setDeckPreview(null);
       setOutcomeView(null);
       setDocumentView(null);
-      if (["image", "video"].includes(next.outputType)) void restoreMediaCreation(next);
+      if (next.generationMethod === "api" && next.mediaJob) void restoreMediaCreation(next);
     } catch (cause) {
       setError(messageOf7(cause));
     }
@@ -46807,7 +46818,7 @@ function CanvasContent({
       instruction: frame2.instruction,
       generation: frame2.generation,
       references: frame2.references.map((source) => [source.id, source.sourceHash]),
-      ...["image", "video"].includes(frame2.outputType) ? { media: frame2.mediaOptions } : {}
+      ...["image", "video"].includes(frame2.outputType) ? { generationMethod: frame2.generationMethod || "skill", ...frame2.generationMethod === "api" ? { providerId: frame2.providerId, media: frame2.mediaOptions } : {} } : {}
     });
   }
   function trackOutput(task, frame2, intent) {
@@ -47007,9 +47018,9 @@ function CanvasContent({
   async function refreshMediaCapabilities() {
     setMediaLoading(true);
     try {
-      const response = await fetch(endpoint2({ mediaCapabilities: "1" }), { credentials: "same-origin" });
+      const response = await fetch(endpoint2({ mediaApiCapabilities: "1" }), { credentials: "same-origin" });
       const result = await response.json();
-      if (!response.ok || !Array.isArray(result?.models)) throw new Error(result?.error || "\u5373\u68A6\u670D\u52A1\u68C0\u6D4B\u5931\u8D25");
+      if (!response.ok || !Array.isArray(result?.providers)) throw new Error(result?.error || "API \u670D\u52A1\u68C0\u6D4B\u5931\u8D25");
       if (mounted.current) {
         setMediaCapabilities(result);
         setMediaError(result.error || "");
@@ -47022,17 +47033,9 @@ function CanvasContent({
       if (mounted.current) setMediaLoading(false);
     }
   }
-  async function saveMediaSettings(settings) {
-    const result = await request("save-media-settings", settings);
-    if (mounted.current) {
-      setMediaCapabilities(result);
-      setMediaError(result.error || "");
-    }
-    return result;
-  }
   (0, import_react46.useEffect)(() => {
-    if (creationVisible && ["image", "video"].includes(creation?.outputType)) void refreshMediaCapabilities();
-  }, [projectId, creationVisible, creation?.outputType]);
+    if (creationVisible && creation?.generationMethod === "api") void refreshMediaCapabilities();
+  }, [projectId, creationVisible, creation?.generationMethod]);
   (0, import_react46.useEffect)(() => {
     let stopped = false;
     let timer2;
@@ -47458,23 +47461,36 @@ function CanvasContent({
   }
   async function removeElements() {
     const selected2 = nodesRef.current.filter((node) => isObject(node) && node.selected);
-    if (!selected2.length || busy) return;
+    if (!selected2.length || busy || deleteRequest.current) return;
     const epoch = epochRef.current, selection2 = selected2.map((n) => n.id).sort().join("|");
     if (textEditorOpen || editingNodeId) {
       setError("\u8BF7\u5148\u9000\u51FA\u6587\u5B57\u7F16\u8F91\uFF0C\u518D\u5220\u9664\u8282\u70B9\u3002");
       return;
     }
+    const token = Symbol();
+    deleteRequest.current = token;
+    closeCreation();
+    setContextMenu(null);
+    setDeletePlan({ loading: true, nodes: selected2.map((node) => ({ nodeId: node.id, title: contentCardTitle(node.data) })), files: [] });
     try {
       await saveLayout();
+      if (deleteRequest.current !== token || !mounted.current || epoch !== epochRef.current) return;
       if (conflictRef.current) throw new Error("\u753B\u5E03\u53D1\u751F\u51B2\u7A81\uFF0C\u8BF7\u5148\u5237\u65B0\u540E\u518D\u5220\u9664");
       const selections = selected2.map((n) => ({ nodeId: n.id, ...n.data.outputCard?.versionId ? { versionId: n.data.outputCard.versionId } : {} }));
       const plan = await request("canvas-recycle-plan", { requirementId: requirement.id, selections });
-      if (!mounted.current || !activeRef.current || epoch !== epochRef.current || nodesRef.current.filter((n) => isObject(n) && n.selected).map((n) => n.id).sort().join("|") !== selection2) return;
-      closeCreation();
-      setContextMenu(null);
+      if (deleteRequest.current !== token || !mounted.current || !activeRef.current || epoch !== epochRef.current) return;
+      if (nodesRef.current.filter((n) => isObject(n) && n.selected).map((n) => n.id).sort().join("|") !== selection2) {
+        setDeletePlan(null);
+        return;
+      }
       setDeletePlan(plan);
     } catch (cause) {
-      if (mounted.current) setError(messageOf7(cause));
+      if (mounted.current && epoch === epochRef.current && deleteRequest.current === token) {
+        setDeletePlan(null);
+        setError(messageOf7(cause));
+      }
+    } finally {
+      if (deleteRequest.current === token) deleteRequest.current = null;
     }
   }
   const lastFileRecycle = (0, import_react46.useRef)(null);
@@ -47484,14 +47500,18 @@ function CanvasContent({
     closeCreation();
     void recycledChanged().catch((cause) => setError(messageOf7(cause)));
   }, [fileRecycleSignal, active]);
-  async function recycledChanged() {
-    setDeletePlan(null);
+  async function recycledChanged({ keepVisible = false } = {}) {
+    const epoch = epochRef.current;
+    if (!keepVisible) setDeletePlan(null);
     setOutcomeView(null);
     setDocumentView(null);
     setDeckPreview(null);
     setSidebar(false);
     onCloseProjectFile?.();
-    await loadBoard({ preserveViewport: true });
+    const result = await loadBoard({ preserveViewport: true, keepVisible });
+    if (!mounted.current || epoch !== epochRef.current) return;
+    if (keepVisible && !result) throw new Error("\u8282\u70B9\u5DF2\u5904\u7406\uFF0C\u4F46\u753B\u5E03\u5237\u65B0\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5\u5237\u65B0\u3002");
+    setDeletePlan(null);
     onFilesChanged?.();
   }
   function alignSelection(direction) {
@@ -47639,7 +47659,7 @@ function CanvasContent({
   function backgroundLayoutReady() {
     return !conflictRef.current && !operationLock.current && !nodeDragging.current && !gestureBefore.current && !resizingRef.current && !gestureViewportActive.current && !pendingCount.current;
   }
-  async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false } = {}) {
+  async function loadBoard({ initial = false, selectIds, preserveViewport = false, selectionIntent, requireStableLayout = false, keepVisible = false } = {}) {
     if (requireStableLayout && (!boardRef.current || boardRead.current || !backgroundLayoutReady())) return;
     const epoch = epochRef.current;
     const read = Symbol();
@@ -47649,7 +47669,7 @@ function CanvasContent({
     const isCurrent = () => mounted.current && epoch === epochRef.current && boardRead.current === read;
     const canApply = () => isCurrent() && (!requireStableLayout || backgroundLayoutReady() && revision === boardRef.current?.revision && previousLayout === JSON.stringify(layoutSnapshot()));
     if (!requireStableLayout) {
-      setLoading(true);
+      if (!keepVisible) setLoading(true);
       setLoadError("");
     }
     try {
@@ -47763,6 +47783,8 @@ function CanvasContent({
     operationLock.current = false;
     restoredSession.current = false;
     setBoard(null);
+    deleteRequest.current = null;
+    setDeletePlan(null);
     setError("");
     setNotice("");
     setBusy("");
@@ -47780,6 +47802,7 @@ function CanvasContent({
     return () => {
       cancelCardOpen();
       mounted.current = false;
+      deleteRequest.current = null;
       epochRef.current += 1;
       for (const key of mediaRestores.current.keys()) {
         if (cache.current.drafts.get(key)?.mediaRestoring) updateCreation(key, { mediaRestoring: false });
@@ -48194,6 +48217,7 @@ function CanvasContent({
       taskId: null,
       pendingTaskId: null,
       pendingGeneration: null,
+      generationMethod: context.generationMethod === "api" ? "api" : "skill",
       intent,
       anchor,
       ...intent === "new" ? { targetCard: void 0 } : {},
@@ -48212,13 +48236,15 @@ function CanvasContent({
     if (!["image", "video"].includes(context?.outputType) || context.pendingTaskId || !context.instruction.trim() || context.mediaRestoring || context.mediaRecoveryError || mediaJobPending(context.mediaJob) || mediaNeedsDecision(context.mediaJob)) return;
     if (!cache.current.attempts.has(context.key)) cache.current.attempts.set(context.key, { current: null });
     const attempt = cache.current.attempts.get(context.key);
-    const options = mediaOptionsFor(context.outputType, mediaCapabilities, context.mediaOptions);
+    const provider = mediaCapabilities?.providers?.find((item) => item.id === context.providerId);
+    if (context.generationMethod !== "api" || !provider) return;
+    const options = mediaOptionsFor(context.outputType, provider, context.mediaOptions);
     const target = nodesRef.current.find((node) => node.id === context.composerNodeId);
     const { selectedSkills: _skills, ...input } = creationTaskInput({ ...context, ...target ? { outputPosition: absolutePosition(target, nodesRef.current) } : {} });
-    const data = { ...input, media: options };
+    const data = { ...input, generationMethod: "api", providerId: context.providerId, media: options };
     const submittedIntent = ++creationIntent.current;
     void perform("media", async (epoch) => {
-      const result = await request("generate-media", { ...data, operationId: stableOperation(attempt, data) });
+      const result = await request("generate-media-api", { ...data, operationId: stableOperation(attempt, data) });
       if (!mounted.current || epoch !== epochRef.current) return;
       trackOutput(result.task, { ...context, mediaOptions: options }, submittedIntent);
       rememberMediaTask(result);
@@ -48754,7 +48780,10 @@ function CanvasContent({
   ];
   return /* @__PURE__ */ import_react46.default.createElement("div", { ref: rootRef, tabIndex: -1, onKeyDown: keyboard, onPointerDownCapture: cancelPaneInsert, onMouseDownCapture: (event) => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true });
-  }, "data-editor-fullscreen": dockOpen && editorFullscreen || void 0, "data-dock-open": dockOpen || void 0, "data-dock-mobile": dock.mobile || void 0, "data-dock-resizing": dock.dragging || void 0, style: { "--wtt-dock-width": `${dock.width}px` }, className: `wtt-course-canvas wcc-studio${sidebar ? "" : " is-sidebar-collapsed"}${deskVisible ? " is-focus-open" : ""} is-tool-${tool}` }, deletePlan && /* @__PURE__ */ import_react46.default.createElement(DeleteNodesDialog, { plan: deletePlan, request, onClose: () => setDeletePlan(null), onDone: recycledChanged }), materialVersionView && /* @__PURE__ */ import_react46.default.createElement("dialog", { className: "wcc-version-view-dialog", open: true, "aria-labelledby": "wcc-version-view-title" }, /* @__PURE__ */ import_react46.default.createElement(DialogHeader, { title: `${materialVersionView.title} \xB7 V${materialVersionView.number}`, titleId: "wcc-version-view-title", onClose: () => setMaterialVersionView(null) }), /* @__PURE__ */ import_react46.default.createElement(DialogBody, null, /* @__PURE__ */ import_react46.default.createElement("pre", { className: "wcc-version-view-body" }, materialVersionView.content)), /* @__PURE__ */ import_react46.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-version-view-meta" }, materialVersionView.origin === "card-edit" ? "\u5361\u5185\u7F16\u8F91\u7248\u672C" : "\u5BFC\u5165\u57FA\u7EBF", " \xB7 ", new Date(materialVersionView.createdAt).toLocaleString()), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => setMaterialVersionView(null) }, "\u5173\u95ED"))), recycleOpen && /* @__PURE__ */ import_react46.default.createElement(ProjectRecycleDialog, { request, endpoint: endpoint2, onClose: () => {
+  }, "data-editor-fullscreen": dockOpen && editorFullscreen || void 0, "data-dock-open": dockOpen || void 0, "data-dock-mobile": dock.mobile || void 0, "data-dock-resizing": dock.dragging || void 0, style: { "--wtt-dock-width": `${dock.width}px` }, className: `wtt-course-canvas wcc-studio${sidebar ? "" : " is-sidebar-collapsed"}${deskVisible ? " is-focus-open" : ""} is-tool-${tool}` }, deletePlan && /* @__PURE__ */ import_react46.default.createElement(DeleteNodesDialog, { plan: deletePlan, request, onClose: () => {
+    deleteRequest.current = null;
+    setDeletePlan(null);
+  }, onDone: () => recycledChanged({ keepVisible: true }) }), materialVersionView && /* @__PURE__ */ import_react46.default.createElement("dialog", { className: "wcc-version-view-dialog", open: true, "aria-labelledby": "wcc-version-view-title" }, /* @__PURE__ */ import_react46.default.createElement(DialogHeader, { title: `${materialVersionView.title} \xB7 V${materialVersionView.number}`, titleId: "wcc-version-view-title", onClose: () => setMaterialVersionView(null) }), /* @__PURE__ */ import_react46.default.createElement(DialogBody, null, /* @__PURE__ */ import_react46.default.createElement("pre", { className: "wcc-version-view-body" }, materialVersionView.content)), /* @__PURE__ */ import_react46.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-version-view-meta" }, materialVersionView.origin === "card-edit" ? "\u5361\u5185\u7F16\u8F91\u7248\u672C" : "\u5BFC\u5165\u57FA\u7EBF", " \xB7 ", new Date(materialVersionView.createdAt).toLocaleString()), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => setMaterialVersionView(null) }, "\u5173\u95ED"))), recycleOpen && /* @__PURE__ */ import_react46.default.createElement(ProjectRecycleDialog, { request, endpoint: endpoint2, onClose: () => {
     setRecycleOpen(false);
     onCloseRecycle?.();
   }, onChanged: recycledChanged }), (error || notice) && /* @__PURE__ */ import_react46.default.createElement("div", { className: `wcc-message${error ? " is-error" : ""}`, role: error ? "alert" : "status" }, error ? /* @__PURE__ */ import_react46.default.createElement(UserError, { error, announce: false }) : /* @__PURE__ */ import_react46.default.createElement("span", null, notice), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => {
@@ -48960,11 +48989,16 @@ function CanvasContent({
       onOpenModelSettings,
       modelLoading,
       modelError,
+      onGenerationMethodChange: (method) => {
+        if (creation && !creation.pendingTaskId) updateCreation(creation.key, { generationMethod: method, mediaJob: null, error: "", mediaRecoveryError: false, mediaRestoring: false });
+      },
+      onMediaProviderChange: (providerId) => {
+        if (creation && !creation.pendingTaskId) updateCreation(creation.key, { providerId, mediaOptions: {}, error: "" });
+      },
       mediaCapabilities,
       mediaLoading,
       mediaError: creation?.mediaPollError || mediaError,
       onRefreshMedia: refreshMediaCapabilities,
-      onSaveMediaSettings: saveMediaSettings,
       onMediaOptionsChange: (value) => creation && updateCreation(creation.key, { mediaOptions: value, error: "" }),
       onGenerateMedia: generateMedia,
       onNewMedia: newMediaTask,
@@ -48985,7 +49019,7 @@ function CanvasContent({
       busy: !!busy || loading || !!creation?.mediaRestoring,
       error: creation?.error,
       sendLabel: creation?.outputType === "material" ? "\u4FDD\u5B58\u5173\u8054\u7D20\u6750" : creation?.outputType === "word" ? "\u5BFC\u51FA\u5F53\u524D\u7248\u672C Word" : `\u5F00\u59CB\u521B\u4F5C ${OUTPUT_LABELS[creation?.outputType] || ""}`,
-      canSend: !!creation && !creation.mediaRecoveryError && (creation.pendingTaskId ? pendingRetryAllowed(creation.pendingGeneration) && !["image", "video"].includes(creation.outputType) : creation.outputType === "material" ? !!creation.materialTitle?.trim() && !!creation.materialContent?.trim() : creation.outputType === "word" ? ["outline", "word"].includes(creation.anchor.kind) : !!creation.instruction.trim() && (!!creation.generation || creation.references.length > 0) && creation.references.length <= 24),
+      canSend: !!creation && !creation.mediaRecoveryError && (creation.pendingTaskId ? pendingRetryAllowed(creation.pendingGeneration) && creation.generationMethod !== "api" : creation.outputType === "material" ? !!creation.materialTitle?.trim() && !!creation.materialContent?.trim() : creation.outputType === "word" ? ["outline", "word"].includes(creation.anchor.kind) : !!creation.instruction.trim() && (!!creation.generation || creation.references.length > 0) && creation.references.length <= 24),
       hideSubmit: creation?.outputType === "excerpt",
       conversation: pptOwnsConversation ? null : conversation,
       conversationVisible: Boolean(creation?.sessionId && creation.sessionId === conversationSessionId),

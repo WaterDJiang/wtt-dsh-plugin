@@ -106,3 +106,18 @@ test('board refresh detects failed and waiting transitions before any successful
   assert.equal(generationStateSignature([{ id: 'candidate', input: { workflow: 'ppt-edit', outputCardId: 'c' } }]), generationStateSignature([]));
   assert.equal(generationStateSignature([{ ...task, instruction: 'unchanged task input' }]), original);
 });
+
+
+test('media pending contexts keep API provider identity and legacy jobs remain explicit', () => {
+  const original = fixture();
+  original.descriptor.card.type = 'image';
+  original.descriptor.task.kind = 'media';
+  original.descriptor.task.input = { generationMethod: 'api', providerId: 'synthetic', media: { model: 'image-one' }, sources: [] };
+  original.descriptor.task.mediaJob = { taskId: 'task-a', status: 'processing' };
+  const api = createPendingContext(original);
+  assert.equal(api.generationMethod, 'api');
+  assert.equal(api.providerId, 'synthetic');
+  delete original.descriptor.task.input.generationMethod;
+  delete original.descriptor.task.input.providerId;
+  assert.equal(createPendingContext(original).generationMethod, 'legacy');
+});

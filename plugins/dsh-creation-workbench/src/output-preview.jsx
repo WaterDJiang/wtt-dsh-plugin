@@ -58,6 +58,8 @@ export function OutputPreview({ type = 'text', title, content, extracted = true,
   const unavailable = fileBlocked(status)
   const failed = mediaError === identity
   const hasText = extracted !== false && typeof content === 'string' && content.trim()
+  const previewText = compact && hasText && content.length > 600
+    ? content.slice(0, 600).replace(/[\uD800-\uDBFF]$/, '') + '…' : content
   return <section className={`wtt-output-preview is-${type}${compact ? ' is-compact' : ''}`} aria-label={`${title || '成果文件'}预览`}>
     {unavailable ? <p className="wtt-output-preview-note" role="status">此版本文件已缺失或变化，无法沿用旧预览，请核对原文件。</p>
       : type === 'pptx' ? <PptCover artifactId={artifactId} hash={hash} loadPreview={loadPreview} getPageHref={getPageHref} src={src} title={title} onOpen={onOpenDeck} compact={compact} />
@@ -65,7 +67,7 @@ export function OutputPreview({ type = 'text', title, content, extracted = true,
           : type === 'video' && src && !failed ? <video key={identity} className="wtt-output-video nodrag nopan nowheel" src={src} controls preload="metadata" playsInline aria-label={title || '生成视频'}
             onError={() => setMediaError(identity)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} />
             : ['image', 'video'].includes(type) ? <p className="wtt-output-preview-note" role="status">{failed ? type === 'video' ? '浏览器无法播放此版本，可下载原视频查看。' : '此版本图片未能加载，可下载原图查看。' : emptyMessage || '尚未取得可预览的文件。'}</p>
-              : hasText ? <pre className={`wtt-output-text${compact ? '' : ' nodrag nowheel'}`}>{content}</pre>
+              : hasText ? <pre className={`wtt-output-text${compact ? '' : ' nodrag nowheel'}`}>{previewText}</pre>
                 : <p className="wtt-output-preview-note">{emptyMessage || (extracted === false ? '此格式尚未提取可读正文，可下载原文件查看。' : '尚无已保存的文本成果。')}</p>}
     {!compact && downloadHref && <a className="wtt-output-download" href={downloadHref} download onClick={event => event.stopPropagation()}>下载当前版本</a>}
   </section>

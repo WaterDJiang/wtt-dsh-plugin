@@ -4,7 +4,7 @@ import { UserError } from './user-feedback.jsx'
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { extractSkillNames, skillQueryAtCursor, pptEngineForSelection } from './skill-commands.mjs'
 import { SkillSettings } from './skill-settings.jsx'
-import { MediaPrompt, MediaSettings, mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
+import { ApiMediaPrompt, mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
 import { ModelSelection } from './model-selection.jsx'
 import { TaskInputSummary } from './task-input-summary.jsx'
 import { pendingContinueAllowed, pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
@@ -282,7 +282,7 @@ export function CardComposer({
   searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft,
   busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
-  mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onSaveMediaSettings, onMediaOptionsChange, onGenerateMedia, onResumeMedia, onNewMedia,
+  mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onMediaOptionsChange, onGenerationMethodChange, onMediaProviderChange, onGenerateMedia, onResumeMedia, onNewMedia,
   modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError,
 }) {
   const id = useId()
@@ -308,7 +308,6 @@ export function CardComposer({
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState(false)
   const [skillSettingsOpen, setSkillSettingsOpen] = useState(false)
-  const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false)
   const [conversationOpen, setConversationOpen] = useState(false)
   const [conversationOpening, setConversationOpening] = useState(null)
   const [conversationError, setConversationError] = useState(null)
@@ -323,16 +322,20 @@ export function CardComposer({
   const headingCard = context?.targetCard || context?.anchor
   const revising = context?.intent === 'revise'
   const inputLocked = Boolean(context?.pendingTaskId)
-  const isMedia = outputType === 'image' || outputType === 'video'
+  const mediaCard = outputType === 'image' || outputType === 'video'
+  const legacyMedia = mediaCard && Boolean(context?.mediaJob) && context?.generationMethod !== 'api' && Boolean(context?.pendingTaskId)
+  const isMedia = mediaCard && (context?.generationMethod === 'api' || legacyMedia)
+  const apiProvider = mediaCapabilities?.providers?.find(provider => provider.id === context?.providerId)
+  const activeMediaCapabilities = legacyMedia ? mediaCapabilities : apiProvider
   const taskMode = (inputLocked || context?.pendingGeneration?.published) && !isMedia
   const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation)
   const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing
   const showInitialInput = !taskMode && !reviewingResult
   const stageStatus = taskMode ? pendingLabel(context.pendingGeneration) : reviewingResult ? '已保存' : ''
-  const mediaOptions = mediaOptionsFor(outputType, mediaCapabilities, context?.mediaOptions)
-  const mediaModel = mediaCapabilities?.models?.find(model => model.type === outputType && model.id === mediaOptions.model)
-  const mediaPending = mediaJobPending(context?.mediaJob)
-  const recoveringMedia = Boolean(context?.mediaJob?.canResume && ['download_failed', 'registration_failed'].includes(context.mediaJob.status))
+  const mediaOptions = mediaOptionsFor(outputType, activeMediaCapabilities, context?.mediaOptions)
+  const mediaModel = activeMediaCapabilities?.models?.find(model => model.type === outputType && model.id === mediaOptions.model)
+  const mediaPending = isMedia && mediaJobPending(context?.mediaJob)
+  const recoveringMedia = Boolean(isMedia && context?.mediaJob?.canResume && ['download_failed', 'registration_failed'].includes(context.mediaJob.status))
   const hasConversation = !isMedia && Boolean(conversation) && conversationVisible
   const hasExecution = !isMedia && (hasConversation || Boolean(context?.sessionId))
   const executionExpanded = hasConversation && conversationOpen && !collapsed
@@ -365,7 +368,7 @@ export function CardComposer({
   const referenceNotes = [...new Set((context?.referenceNotes || []).map(note => typeof note === 'string' ? note : note?.message || note?.note || '').filter(Boolean))]
   const imageReferences = references.filter(card => (card.importedFile || card.generatedFile)?.mime?.startsWith('image/'))
   const hasVideoReference = references.some(card => (card.importedFile || card.generatedFile)?.mime?.startsWith('video/'))
-  const mediaReason = !mediaCapabilities?.healthy ? '请启动即梦服务，或在“即梦设置”中核对服务地址。' : !mediaCapabilities?.credentialConfigured ? '请在“即梦设置”中配置认证，或沿用本机即梦技能 配置。' : !mediaModel ? '此模型不在当前服务的可用列表中，请重新选择。' : hasVideoReference ? '本轮生成只支持文字与图片参考，请移除视频引用；当前卡片是视频时，从文本或图片卡发起。' : mediaModel.requiresReference && !imageReferences.length ? '此模型需要参考图片，请通过“＋引用”添加。' : imageReferences.length > mediaModel.maxReferences ? `此模型最多支持 ${mediaModel.maxReferences} 张参考图片。` : mediaModel.ratios?.length && !mediaModel.ratios.includes(mediaOptions.ratio) ? '请为当前模型重新选择画面比例。' : mediaModel.resolutions?.length && !mediaModel.resolutions.includes(mediaOptions.resolution) ? '请为当前模型重新选择分辨率。' : outputType === 'video' && mediaModel.durations?.length && !mediaModel.durations.includes(Number(mediaOptions.duration)) ? '请为当前模型重新选择视频时长。' : context?.mediaJob?.status === 'unknown' ? '本次提交结果未知，请先核对即梦生成记录。' : ''
+  const mediaReason = chosenSkills.length && !legacyMedia ? 'API 生成不执行 Skill，请移除技能指令或切换 Skill 生成' : !legacyMedia && !mediaCapabilities?.providers?.length ? '尚未接入 API 服务' : !activeMediaCapabilities ? '请选择 API 服务' : !activeMediaCapabilities.healthy ? 'API 服务未连接，请核对提供商配置' : !activeMediaCapabilities.credentialConfigured ? '尚未配置服务认证' : !mediaModel ? '请选择可用模型' : hasVideoReference ? '此 API 接口暂不支持视频参考，请切换 Skill 生成或移除视频引用' : mediaModel.requiresReference && !imageReferences.length ? '此模型需要参考图片' : imageReferences.length > (mediaModel.maxReferences || 0) ? `此模型最多支持 ${mediaModel.maxReferences || 0} 张参考图片` : mediaModel.ratios?.length && !mediaModel.ratios.includes(mediaOptions.ratio) ? '请选择画面比例' : mediaModel.resolutions?.length && !mediaModel.resolutions.includes(mediaOptions.resolution) ? '请选择分辨率' : outputType === 'video' && mediaModel.durations?.length && !mediaModel.durations.includes(Number(mediaOptions.duration)) ? '请选择视频时长' : context?.mediaJob?.status === 'unknown' ? '提交结果未知，请先核对原任务' : ''
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || (!mediaReason && !mediaPending && !mediaLoading))
   const reason = recoveringMedia ? '' : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || '该创作能力暂不可用。' : ''))
   const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
@@ -390,7 +393,7 @@ export function CardComposer({
   const label = recoveringMedia ? '取回生成结果' : inputLocked ? pendingRetryAllowed(context?.pendingGeneration) && !isMedia ? '重试原任务' : pendingLabel(context?.pendingGeneration) : isAction ? sendLabel || { material: '添加素材', excerpt: '选择原文摘录', word: '导出 Word' }[outputType] : revising ? '生成新版本' : `生成${['outline', 'exercise', 'script'].includes(outputType) ? '文本' : KIND_LABELS[outputType] || '文本'}`
   const acceptedFiles = Array.isArray(acceptedFileTypes) ? acceptedFileTypes.join(',') : acceptedFileTypes
   const submitFooter = !hideSubmit && showInitialInput && <footer className={`wcc-creation-submit${isMedia ? ' is-media' : ''}`}>
-    {isMedia ? <p>{recoveringMedia ? '取回原结果，不重复生成。' : '使用即梦账号积分，原文件保留。'}</p> : <div className="wcc-creation-footer-model">{!isAction && (inputLocked && !modelSelection ? <span title="继续沿用原任务会话">原任务模型</span> : <ModelSelection key={`model:${context?.key}`} compact catalog={modelCatalog} selection={modelSelection} onChange={busy || inputLocked ? undefined : onModelChange} onRefresh={onRefreshModels} onOpenSettings={onOpenModelSettings} loading={modelLoading} error={modelError} />)}{engineSummary && <span className="wcc-creation-engine-summary" aria-label={`PPT制作方式：${engineSummary}`} title={engineDetail}>{engineSummary}</span>}</div>}
+    {isMedia ? (recoveringMedia ? <p>取回原结果，不重复生成。</p> : <span />) : <div className="wcc-creation-footer-model">{!isAction && (inputLocked && !modelSelection ? <span title="继续沿用原任务会话">原任务模型</span> : <ModelSelection key={`model:${context?.key}`} compact catalog={modelCatalog} selection={modelSelection} onChange={busy || inputLocked ? undefined : onModelChange} onRefresh={onRefreshModels} onOpenSettings={onOpenModelSettings} loading={modelLoading} error={modelError} />)}{engineSummary && <span className="wcc-creation-engine-summary" aria-label={`PPT制作方式：${engineSummary}`} title={engineDetail}>{engineSummary}</span>}</div>}
     <UiButton variant="custom" type="button" className="wcc-creation-send" disabled={!ready} aria-label={busy ? '提交中…' : mediaPending ? '生成中…' : label} aria-busy={busy} title={`${busy ? '提交中…' : mediaPending ? '生成中…' : label} · ⌘ / Ctrl + Enter`} onClick={submit}><CreationIcon type="send" size={18} /><span className="wcc-send-label">{busy ? '提交中…' : mediaPending ? '生成中…' : label}</span></UiButton>
   </footer>
 
@@ -401,7 +404,7 @@ export function CardComposer({
 
   useEffect(() => {
     if (visible) setCollapsed(false)
-    else { setReferencesOpen(false); setSkillSettingsOpen(false); setMediaSettingsOpen(false) }
+    else { setReferencesOpen(false); setSkillSettingsOpen(false) }
   }, [visible])
 
   useEffect(() => {
@@ -419,7 +422,7 @@ export function CardComposer({
     return () => cancelAnimationFrame(frame)
   }, [visible, context?.key, context?.focusRequest])
 
-  useEffect(() => { setPreviewOpen(false); setReferencesOpen(false); setReferenceSource(null); setSearch(''); setCollapsed(false); setSkillSettingsOpen(false); setMediaSettingsOpen(false) }, [context?.key])
+  useEffect(() => { setPreviewOpen(false); setReferencesOpen(false); setReferenceSource(null); setSearch(''); setCollapsed(false); setSkillSettingsOpen(false) }, [context?.key])
   useEffect(() => { setConversationOpen(false); setRevisionEditing(false) }, [context?.key, context?.sessionId])
   useEffect(() => {
     if (scrollBody.current) scrollBody.current.scrollTop = 0
@@ -617,7 +620,7 @@ export function CardComposer({
     return () => cancelAnimationFrame(frame)
   }, [revisionEditing, visible])
 
-  return <section ref={composer} className={`wcc-card-composer nodrag nopan nowheel${taskMode || reviewingResult ? ' is-task-stage' : ''}${collapsed ? ' is-collapsed' : ''}${hasConversation ? ' has-task-conversation' : ''}${executionExpanded ? ' is-conversation-open' : ''}`} hidden={!visible || suspended}
+  return <section ref={composer} className={`wcc-card-composer nodrag nopan nowheel${isMedia && !legacyMedia && !inputLocked ? ' is-api-media' : ''}${taskMode || reviewingResult ? ' is-task-stage' : ''}${collapsed ? ' is-collapsed' : ''}${hasConversation ? ' has-task-conversation' : ''}${executionExpanded ? ' is-conversation-open' : ''}`} hidden={!visible || suspended}
     style={{ left: position.x, top: frameTop, ...(Number.isFinite(position.width) && position.width > 0 ? { width: `min(${Math.max(240, position.width)}px, calc(100% - 24px))` } : {}), '--wcc-creation-y': `${Math.max(0, frameTop)}px`, '--wcc-native-conversation-min': `${Math.max(360, nativeComposerHeight + 96)}px` }} aria-labelledby={`${id}-title`}
     onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
     onKeyDown={event => {
@@ -681,8 +684,12 @@ export function CardComposer({
         </details>)}</div></div>}
       </section>
       {inputLocked && <div className={`wcc-creation-pending-state is-${context?.pendingGeneration?.phase || 'unknown'}`} role="status"><strong>{pendingLabel(context?.pendingGeneration)}</strong><p>{context?.pendingGeneration?.error || context?.pendingGeneration?.message || '成果文件保存后会原位更新卡片。'}</p><small>任务已提交。需要补充要求或确认时，请打开「任务对话」。</small></div>}
+      {mediaCard && !inputLocked && !reviewingResult && <div className="wcc-media-method" role="group" aria-label="生成方式">
+        <UiButton variant="ghost" size="compact" aria-pressed={!isMedia} disabled={busy} onClick={() => onGenerationMethodChange?.('skill')}>Skill 生成</UiButton>
+        <UiButton variant="ghost" size="compact" aria-pressed={isMedia} disabled={busy} onClick={() => onGenerationMethodChange?.('api')}>API 生成</UiButton>
+      </div>}
       {isMedia && inputLocked ? <div className="wcc-creation-frozen-media"><label>原提示词<textarea value={instruction} readOnly rows={4} /></label><p>{[context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} 秒`].filter(Boolean).join(' · ')}</p>{context?.mediaJob?.error && <p className="wcc-creation-error">{context.mediaJob.error}</p>}{context?.mediaJob?.canResume && <UiButton variant="custom" type="button" disabled={busy} onClick={onResumeMedia}>查看进度或取回文件</UiButton>}{['unknown', 'download_failed', 'registration_failed'].includes(context?.mediaJob?.status) && <UiButton variant="custom" type="button" disabled={busy} onClick={onNewMedia}>确认后重新生成</UiButton>}</div>
-        : isMedia ? <MediaPrompt key={context?.key} type={outputType} instruction={instruction} onChange={onInstructionChange} options={mediaOptions} onOptionsChange={onMediaOptionsChange} capabilities={mediaCapabilities} loading={mediaLoading} error={mediaError} job={context?.mediaJob} onRefresh={onRefreshMedia} onOpenSettings={() => setMediaSettingsOpen(true)} onResume={onResumeMedia} onPrepareNew={onNewMedia} onSubmit={submit} disabled={referencesBusy} mentionProps={mentionProps} /> : isAction ? (actionContent != null ? <div className="wcc-creation-action-content">{actionContent}</div> : <label className="wcc-creation-instruction"><span>处理说明</span><textarea value={instruction} onChange={event => onInstructionChange?.(event.target.value)} disabled={busy} rows={4} maxLength={8000} /></label>) : <SkillCommandInput key={context?.key} instruction={instruction} onChange={onInstructionChange} disabled={busy || inputLocked} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onOpenSettings={() => setSkillSettingsOpen(true)} onSubmit={submit} mentionProps={mentionProps} footer={submitFooter} />}
+        : isMedia && !legacyMedia ? <ApiMediaPrompt type={outputType} instruction={instruction} onChange={onInstructionChange} options={mediaOptions} onOptionsChange={onMediaOptionsChange} providers={mediaCapabilities?.providers || []} providerId={context?.providerId} onProviderChange={onMediaProviderChange} capabilities={activeMediaCapabilities} loading={mediaLoading} error={mediaError} onRefresh={onRefreshMedia} onSubmit={submit} disabled={referencesBusy} mentionProps={mentionProps} /> : isAction ? (actionContent != null ? <div className="wcc-creation-action-content">{actionContent}</div> : <label className="wcc-creation-instruction"><span>处理说明</span><textarea value={instruction} onChange={event => onInstructionChange?.(event.target.value)} disabled={busy} rows={4} maxLength={8000} /></label>) : <SkillCommandInput key={context?.key} instruction={instruction} onChange={onInstructionChange} disabled={busy || inputLocked} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onOpenSettings={() => setSkillSettingsOpen(true)} onSubmit={submit} mentionProps={mentionProps} footer={submitFooter} />}
 
       {reason && <p className="wcc-creation-disabled-reason" role="status">{reason}</p>}
       {displayError && <UserError className="wcc-creation-error" error={displayError} />}
@@ -704,6 +711,5 @@ export function CardComposer({
     <div ref={conversationPanel} id={`${id}-conversation`} className="wcc-creation-conversation" hidden={!visible || collapsed || !conversationOpen || !hasConversation}>{conversation}</div>
     </div>
     <SkillSettings open={visible && skillSettingsOpen} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onSave={onSaveSkillSettings} onPreference={onUpdateSkillPreference} onClose={() => setSkillSettingsOpen(false)} />
-    <MediaSettings open={visible && mediaSettingsOpen} capabilities={mediaCapabilities} options={mediaOptions} type={outputType} onSave={onSaveMediaSettings} onClose={() => setMediaSettingsOpen(false)} />
   </section>
 }

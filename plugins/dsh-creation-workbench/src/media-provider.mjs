@@ -151,7 +151,6 @@ function resultOf(payload) {
 export function createMediaProvider(config = {}) {
   const settingsPath = config.mediaSettingsPath || path.join(config.dshHome || process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'wtt-creation-workbench/media-settings.json');
   try { const legacy = settingsPath.replace('wtt-creation-workbench/', 'wtt-course-workbench/'); if (!existsSync(settingsPath) && existsSync(legacy)) { mkdirSync(path.dirname(settingsPath), { recursive: true }); writeFileSync(settingsPath, readFileSync(legacy)); } } catch {}
-  const skillConfigPath = config.mediaSkillConfigPath || path.join(os.homedir(), '.codex/skills/wtt-jimeng-api/config.json');
   const active = new Set();
   let closed = false;
   const assertOpen = () => { if (closed) throw fail('provider_closed', '媒体服务连接已关闭。'); };
@@ -172,10 +171,6 @@ export function createMediaProvider(config = {}) {
     let secret = '';
     if (!settings.credentialCleared) {
       secret = settings.sessionId || config.mediaSessionId || '';
-      if (!secret) {
-        try { const value = JSON.parse(readFileSync(skillConfigPath, 'utf8')); secret = typeof value.session_id === 'string' ? value.session_id : ''; }
-        catch { /* Missing or malformed external configuration never exposes its contents. */ }
-      }
     }
     secret = typeof secret === 'string' ? secret.trim().replace(/^Bearer\s+/i, '') : '';
     if (secret && (/\s/.test(secret) || secret.length > 8192)) throw fail('provider_configuration_invalid', '媒体认证格式无效，请重新填写 sessionId。');

@@ -22,22 +22,56 @@ export class CanvasRecycle {
   const hash=sha(readFileSync(file)),after=statSync(file);if(s.ino!==after.ino||s.mtimeMs!==after.mtimeMs||s.size!==after.size)throw new Error('文件正在写入，请稍后重新确认');if(expected&&hash!==expected)throw new Error('源文件已变化，请核对后重新操作');return {file,hash};
  }
  primary(n){return n.projectFile?{path:n.projectFile.path,hash:n.projectFile.hash}:n.importedFile?{path:n.importedFile.path,hash:n.importedFile.hash}:n.kind==='requirement'||n.kind==='whiteboard'||n.kind==='generation'?null:n.path?{path:n.path,hash:n.kind==='word'?undefined:n.sourceHash}:null}
- selection(requirementId,selections){
+ sourceLocations(){
+  const requirements=new Map(this.db.prepare('SELECT id,title FROM requirements').all().map(row=>[row.id,row.title]));
+  const sources=new Map();
+  const add=(sourceId,requirementId,title,relative)=>{
+   if(relative&&requirements.has(requirementId))sources.set(sourceId,{requirementId,nodeId:sourceId,title,path:relative,course:requirements.get(requirementId)});
+  };
+  const materials=this.db.prepare(`SELECT m.id,m.requirement_id,m.title,
+   COALESCE(p.source_path,i.file_path,m.markdown_path) AS path
+   FROM canvas_materials m LEFT JOIN canvas_project_references p ON p.material_id=m.id
+   LEFT JOIN canvas_imports i ON i.material_id=m.id`).all();
+  for(const row of materials)add('material:'+row.id,row.requirement_id,row.title,row.path);
+  for(const row of this.db.prepare('SELECT id,requirement_id,number,markdown_path,word_path FROM outline_versions').all()){
+   add('outline:'+row.id,row.requirement_id,'大纲 v'+row.number,row.markdown_path);
+   add('word:'+row.id,row.requirement_id,'Word · 大纲 v'+row.number,row.word_path);
+  }
+  for(const row of this.db.prepare('SELECT id,requirement_id,title,path FROM task_files').all()){
+   add('artifact:'+row.id,row.requirement_id,row.title,row.path);
+  }
+  const outputs=this.db.prepare(`SELECT o.source_ref,v.legacy FROM output_card_outputs o
+   LEFT JOIN output_card_versions v ON v.id=o.version_id`).all();
+  const hidden=new Set(outputs.map(row=>row.source_ref));
+  for(const row of outputs)if(row.source_ref.startsWith('outline:')&&!row.legacy)hidden.add(row.source_ref.replace('outline:','word:'));
+  const visible=[...sources.values()].filter(source=>!hidden.has(source.nodeId));
+  const cards=this.db.prepare(`SELECT c.id,c.node_id,c.requirement_id,v.primary_ref FROM output_cards c
+   JOIN output_card_versions v ON v.id=c.head_version_id`).all();
+  for(const card of cards){
+   const source=sources.get(card.primary_ref);
+   if(source&&source.requirementId===card.requirement_id)visible.push({...source,nodeId:card.node_id||'output:'+card.id});
+  }
+  return visible;
+ }
+ selection(requirementId,selections,{includeFiles=true}={}){
   if(!this.store.getRequirement(requirementId))throw new Error('课程不存在');if(!Array.isArray(selections)||!selections.length||selections.length>100)throw new Error('请选择1至100个节点');
-  const raw=this.raw(requirementId),hidden=this.hiddenIds(requirementId),seen=new Set(),nodes=[],files=new Map();
+  const sourceBoard=this.service.canvas.getRawBoard(requirementId),raw=this.store.cards.project(sourceBoard),hidden=this.hiddenIds(requirementId),seen=new Set(),nodes=[],files=new Map();
   for(const choice of selections){
    if(!choice||typeof choice.nodeId!=='string'||seen.has(choice.nodeId)||hidden.has(choice.nodeId))throw new Error('节点不存在、已移除或重复');seen.add(choice.nodeId);
    const current=raw.nodes.find(n=>n.id===choice.nodeId)||raw.elements.find(e=>e.id===choice.nodeId)&&{...raw.elements.find(e=>e.id===choice.nodeId),kind:'whiteboard',position:this.layout(requirementId).positions[choice.nodeId]};if(!current)throw new Error('节点不属于当前课程');
    if(current.pendingGeneration&&!inactive.has(current.pendingGeneration.phase))throw new Error(`「${current.title||'此卡片'}」的任务尚未停止，请先打开原任务停止执行，再删除。`);
-   let n=current;if(choice.versionId){if(!current.outputCard)throw new Error('此节点没有所选版本');n=this.service.cards.describe({requirementId,cardId:current.outputCard.id,versionId:choice.versionId}).node}
+   let n=current;if(choice.versionId){if(!current.outputCard)throw new Error('此节点没有所选版本');n=this.service.cards.describe({requirementId,cardId:current.outputCard.id,versionId:choice.versionId},sourceBoard).node}
    const item={nodeId:current.id,title:n.title||n.text?.slice(0,40)||'空白文字',kind:n.kind,versionId:n.outputCard?.versionId||null,headVersionId:current.outputCard?.versionId||null,sourceHash:n.sourceHash||sha(n.text||n.content||''),position:current.position};nodes.push(item);
-   const source=this.primary(n);if(source){
+   const source=includeFiles&&this.primary(n);if(source){
     const candidates=[{...source,role:n.projectFile?'引用源文件':'当前源文件'}];
     const ref=n.sourceId||n.id,delivery=this.service.deliverables.info(ref);if(!n.projectFile&&delivery?.originalPath===source.path&&delivery.path!==source.path)candidates.push({path:delivery.path,hash:delivery.hash,role:'成果文件夹副本'});
     for(const candidate of candidates){if(files.has(candidate.path))continue;let hash=candidate.hash,error='';try{hash=this.file(candidate.path,hash).hash}catch(e){error=e.message}files.set(candidate.path,{...candidate,hash:hash||null,error,references:[]})}
    }
   }
-  for(const req of this.store.listRequirements())for(const n of this.raw(req.id).nodes){if(req.id===requirementId&&seen.has(n.id))continue;const source=this.primary(n);if(source&&files.has(source.path))files.get(source.path).references.push({requirementId:req.id,nodeId:n.id,title:n.title,course:req.title})}
+  if(files.size)for(const source of this.sourceLocations()){
+   if(source.requirementId===requirementId&&seen.has(source.nodeId))continue;
+   if(files.has(source.path)){const {path:_path,...reference}=source;files.get(source.path).references.push(reference)}
+  }
   const layout=this.layout(requirementId);layout.edges=layout.edges.filter(e=>seen.has(e.source)||seen.has(e.target));layout.groups=layout.groups.filter(g=>g.nodeIds.some(id=>seen.has(id)));
   return {requirementId,nodes,files:[...files.values()].sort((a,b)=>a.path.localeCompare(b.path)),selections:selections.map(x=>({nodeId:x.nodeId,...(x.versionId?{versionId:x.versionId}:{})})),layout};
  }
@@ -52,7 +86,7 @@ export class CanvasRecycle {
   if(typeof deleteFiles!=='boolean')throw new Error('请选择是否删除源文件');let row=this.entry(planId);if(row.plan.kind==='project-files')throw new Error('请使用文件树删除确认');if(row.state==='removed'){if(Boolean(row.mode)!==deleteFiles)throw new Error('此删除记录已按不同方式执行');return {id:planId,state:'removed'}}if(row.state!=='planned')throw new Error('该回收记录正在处理或已恢复，请刷新');
   const plan=row.plan;if(this.db.prepare("UPDATE canvas_recycle_entries SET state=?,mode=?,owner_pid=?,updated_at=? WHERE id=? AND state='planned'").run('moving',deleteFiles?1:0,process.pid,new Date().toISOString(),planId).changes!==1)throw new Error('回收记录已在其他位置处理');
   const moved=[];this.db.exec('BEGIN IMMEDIATE');try{
-   const current=this.selection(plan.requirementId,plan.selections);this.validateNodes(plan,current);
+   const current=this.selection(plan.requirementId,plan.selections,{includeFiles:deleteFiles});this.validateNodes(plan,current);
    if(deleteFiles){if(!plan.files.length)throw new Error('这些节点没有可删除的源文件');const compare=p=>p.files.map(({path,hash,error,references})=>({path,hash,error,references}));if(JSON.stringify(compare(plan))!==JSON.stringify(compare(current)))throw new Error('文件或其他引用已变化，请重新确认');
     if(plan.files.some(f=>f.error))throw new Error('有文件当前不可安全回收，请只移除节点或先处理文件状态');
     for(const f of plan.files){const original=this.file(f.path,f.hash).file,dest=this.trash(f.trash);if(existsSync(dest))throw new Error('回收位置已被占用');this.move(original,dest);moved.push(f);if(sha(readFileSync(dest))!==f.hash)throw new Error('文件在回收时发生变化，已停止操作')}

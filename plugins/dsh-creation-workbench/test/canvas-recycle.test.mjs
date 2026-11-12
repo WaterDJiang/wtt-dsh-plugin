@@ -2,6 +2,43 @@ import test from 'node:test';import assert from 'node:assert/strict';import {mkd
 function fixture(t,config={}){const root=mkdtempSync(path.join(tmpdir(),'cw38-')),service=new WorkbenchService({workspaceRoot:root,...config}),req=service.store.createRequirement({background:'回收站验收',operationId:randomUUID()});t.after(()=>{service.close();rmSync(root,{recursive:true,force:true})});return {root,service,req,r:service.recycle}}
 async function reference(f,name='参考.md',requirementId=f.req.id){writeFileSync(path.join(f.root,name),'# 原文\n不覆盖');const v=await f.service.projectFiles.preview(name),result=await f.service.projectFiles.reference({requirementId,path:name,hash:v.hash,operationId:randomUUID(),position:{x:280,y:320}});return result.board.nodes.find(n=>n.refId===result.material.id)}
 const plan=(f,n)=>f.r.plan({requirementId:f.req.id,selections:[{nodeId:n.id,...(n.outputCard?.versionId?{versionId:n.outputCard.versionId}:{})}]});
+test('reference metadata matches projected heads and legacy versions without hydrating other canvases', async t => {
+ const f=fixture(t),other=f.service.store.createCanvas({title:'其他画布',operationId:randomUUID()});
+ const shared=await reference(f);
+ const v=await f.service.projectFiles.preview('参考.md');
+ await f.service.projectFiles.reference({requirementId:other.id,path:v.path,hash:v.hash,operationId:randomUUID()});
+ f.service.store.saveOutline({requirementId:other.id,markdown:'# 历史大纲',operationId:randomUUID()});
+ await f.service.importMaterial({requirementId:other.id,filename:'导入.md',bytes:Buffer.from('# 导入快照'),operationId:randomUUID()});
+ let generation={mode:'new'};
+ for(let index=1;index<=2;index++){
+  const {task,prepared}=f.service.createTask({requirementId:other.id,instruction:'合成版本 '+index,outputType:'text',selectedCardIds:[],sourceRefs:[],selectedSkills:[],generation,operationId:randomUUID()});
+  const relative=prepared.deliveryDirectory+'/v'+index+'.md',sessionId='test:'+task.id;
+  writeFileSync(path.join(f.root,relative),'# 第 '+index+' 版');
+  f.service.tasks.bindSession({taskId:task.id,sessionId});
+  await f.service.tasks.files.register({taskId:task.id,path:relative,title:'版本 '+index,kind:'text',primary:true,operationId:randomUUID()},{sessionId});
+  const node=f.r.raw(other.id).nodes.find(node=>node.outputCard?.id===task.outputCardId);
+  generation={mode:'revise',cardId:node.outputCard.id,baseVersionId:node.outputCard.versionId};
+ }
+ const normalize=rows=>rows.sort((a,b)=>(a.requirementId+':'+a.nodeId).localeCompare(b.requirementId+':'+b.nodeId));
+ const expected=[f.req.id,other.id].flatMap(id=>f.r.raw(id).nodes.flatMap(node=>{
+  const source=f.r.primary(node);return source?[{requirementId:id,nodeId:node.id,title:node.title,path:source.path,course:f.service.store.getRequirement(id).title}]:[];
+ }));
+ assert.deepEqual(normalize(f.r.sourceLocations()),normalize(expected));
+ const raw=f.service.canvas.getRawBoard.bind(f.service.canvas),reads=[];
+ f.service.canvas.getRawBoard=id=>{reads.push(id);return raw(id)};
+ const p=plan(f,shared);
+ assert.deepEqual(reads,[f.req.id]);
+ assert.equal(p.files[0].references.length,1);
+ const third=f.service.store.createCanvas({title:'确认后新增引用',operationId:randomUUID()});
+ await f.service.projectFiles.reference({requirementId:third.id,path:v.path,hash:v.hash,operationId:randomUUID()});
+ assert.throws(()=>f.r.remove({planId:p.id,deleteFiles:true}),/引用已变化/);
+ assert.ok(existsSync(path.join(f.root,'参考.md')));
+ reads.length=0;
+ f.r.sourceLocations=()=>{throw new Error('node-only removal must not scan project files')};
+ f.r.remove({planId:p.id});
+ assert.deepEqual(reads,[f.req.id]);
+ assert.ok(existsSync(path.join(f.root,'参考.md')));
+});
 test('hiding requirement and file nodes preserves business records and files across restart, then restores',async t=>{
  const f=fixture(t),n=await reference(f),before=readFileSync(path.join(f.root,'参考.md')),count=f.service.store.db.prepare('select count(*) as n from canvas_materials').get().n,p=plan(f,n);assert.equal(f.r.list().length,0);f.r.remove({planId:p.id});assert.equal(f.service.canvas.getBoard(f.req.id).nodes.some(x=>x.id===n.id),false);assert.deepEqual(readFileSync(path.join(f.root,'参考.md')),before);assert.equal(f.service.store.db.prepare('select count(*) as n from canvas_materials').get().n,count);
  const second=new WorkbenchService({workspaceRoot:f.root});t.after(()=>second.close());assert.equal(second.canvas.getBoard(f.req.id).nodes.some(x=>x.id===n.id),false);second.recycle.restore({entryId:p.id});assert.ok(second.canvas.getBoard(f.req.id).nodes.some(x=>x.id===n.id));

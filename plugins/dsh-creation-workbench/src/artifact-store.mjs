@@ -118,7 +118,7 @@ export class ArtifactStore {
     const separate = task.input.outputPresentation === 'cards';
     if (input.kind === 'pptx' && task.input.pptEngine === 'baoyu') throw new Error('宝玉课件请在右栏导出保存，必须绑定准确工程快照');
     if (task.input.workflow === 'ppt-edit') throw new Error('PPT 局部修改只能提交待确认方案，不能通过普通文件登记发布；请使用 course_propose_ppt_edit');
-    if (!separate && ['image', 'video'].includes(input.kind)) throw new Error('生成媒体只能由受管媒体任务内部登记，不能通过原生会话工具登记');
+    if (!separate && ['image', 'video'].includes(input.kind) && task.input.generationMethod !== 'skill') throw new Error('生成媒体只能由受管媒体任务或显式 Skill 任务登记');
     const operationId = id(input.operationId, '产物登记操作标识');
     if (typeof input.title !== 'string' || !input.title.trim() || Buffer.byteLength(input.title) > 600 || input.title.includes('\0')) throw new Error('请填写不超过 600 字节的产物标题');
     const kind = input.kind;

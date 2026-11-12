@@ -29,12 +29,66 @@ export function DeleteProjectFilesDialog({plan,request,onClose,onDone}){
   </form>
  </dialog>
 }
-export function DeleteNodesDialog({plan,request,onClose,onDone}){
- const dialog=useRef(null),[deleteFiles,setDeleteFiles]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('')
- useEffect(()=>{dialog.current?.showModal()},[])
- const unavailable=plan.files.some(f=>f.error)
- async function remove(e){e.preventDefault();setBusy(true);setError('');try{await request('canvas-recycle-remove',{planId:plan.id,deleteFiles});await onDone()}catch(e){setError(e.message)}finally{setBusy(false)}}
- return <dialog className="wtt-recycle-dialog" ref={dialog} aria-labelledby="wtt-delete-heading" onCancel={e=>{e.preventDefault();if(!busy)onClose()}}><form onSubmit={remove}><DialogHeader title={`删除${plan.nodes.length>1?` ${plan.nodes.length} 个节点`:'节点'}`} titleId="wtt-delete-heading" onClose={onClose} closeLabel="关闭删除确认" busy={busy}/><div className="wtt-recycle-body"><ul className="wtt-delete-names">{plan.nodes.map(n=><li key={n.nodeId}>{n.title}</li>)}</ul><fieldset><legend className="wtt-visually-hidden">删除范围</legend><label><input type="radio" name="delete-scope" checked={!deleteFiles} disabled={busy} onChange={()=>setDeleteFiles(false)}/><span>只移除画布节点</span></label>{plan.files.length>0&&<label><input type="radio" name="delete-scope" checked={deleteFiles} disabled={busy||unavailable} onChange={()=>setDeleteFiles(true)}/><span>同时将源文件移到项目回收站</span></label>}</fieldset><p>{deleteFiles?'仅回收下面列出的当前文件，其他版本保留。':'文件和版本保留，可从项目回收站恢复节点。'}</p>{plan.files.length>0&&<details open={deleteFiles||unavailable}><summary>涉及文件 · {plan.files.length}</summary><ul className="wtt-delete-files">{plan.files.map(f=><li key={f.path}><code>{f.path}</code><small>{f.role}</small>{f.error&&<p role="alert">{f.error}</p>}{f.references.length>0&&<div className="wtt-recycle-shared">还有 {f.references.length} 张卡片引用此文件<ul>{f.references.map(r=><li key={`${r.requirementId}:${r.nodeId}`}>{r.course} · {r.title}</li>)}</ul></div>}</li>)}</ul></details>}{error&&<UserError error={error}/>}</div><DialogFooter><UiButton variant="quiet" type="button" disabled={busy} onClick={onClose}>取消</UiButton><UiButton variant={deleteFiles?'danger':'primary'} type="submit" className={deleteFiles?'is-danger':''} disabled={busy}>{busy?'正在删除…':deleteFiles?'回收文件并移除节点':'移除节点'}</UiButton></DialogFooter></form></dialog>
+export function DeleteNodesDialog({ plan, request, onClose, onDone }) {
+  const dialog = useRef(null)
+  const [deleteFiles, setDeleteFiles] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const planning = Boolean(plan.loading)
+  const unavailable = plan.files.some(file => file.error)
+  useEffect(() => { dialog.current?.showModal() }, [])
+
+  async function remove(event) {
+    event.preventDefault()
+    if (busy || planning) return
+    setBusy(true)
+    setError('')
+    try {
+      await request('canvas-recycle-remove', { planId: plan.id, deleteFiles })
+      await onDone()
+    } catch (cause) { setError(cause.message) }
+    finally { setBusy(false) }
+  }
+
+  return <dialog className="wtt-recycle-dialog" ref={dialog} aria-labelledby="wtt-delete-heading"
+    aria-busy={planning || busy} onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
+    <form onSubmit={remove}>
+      <DialogHeader title={plan.nodes.length > 1 ? '删除 ' + plan.nodes.length + ' 个节点' : '删除节点'}
+        titleId="wtt-delete-heading" onClose={onClose} closeLabel="关闭删除确认" busy={busy} />
+      <div className="wtt-recycle-body">
+        <ul className="wtt-delete-names">{plan.nodes.map(node => <li key={node.nodeId}>{node.title}</li>)}</ul>
+        {planning ? <p role="status">正在核对删除范围…</p> : <>
+          <fieldset>
+            <legend className="wtt-visually-hidden">删除范围</legend>
+            <label><input type="radio" name="delete-scope" checked={!deleteFiles} disabled={busy}
+              onChange={() => setDeleteFiles(false)} /><span>只移除画布节点</span></label>
+            {plan.files.length > 0 && <label><input type="radio" name="delete-scope" checked={deleteFiles}
+              disabled={busy || unavailable} onChange={() => setDeleteFiles(true)} /><span>同时将源文件移到项目回收站</span></label>}
+          </fieldset>
+          <p>{deleteFiles ? '仅回收下面列出的当前文件，其他版本保留。' : '文件和版本保留，可从项目回收站恢复节点。'}</p>
+          {plan.files.length > 0 && <details open={deleteFiles || unavailable}>
+            <summary>涉及文件 · {plan.files.length}</summary>
+            <ul className="wtt-delete-files">{plan.files.map(file => <li key={file.path}>
+              <code>{file.path}</code><small>{file.role}</small>
+              {file.error && <p role="alert">{file.error}</p>}
+              {file.references.length > 0 && <div className="wtt-recycle-shared">
+                还有 {file.references.length} 张卡片引用此文件
+                <ul>{file.references.map(reference => <li key={reference.requirementId + ':' + reference.nodeId}>
+                  {reference.course} · {reference.title}
+                </li>)}</ul>
+              </div>}
+            </li>)}</ul>
+          </details>}
+        </>}
+        {error && <UserError error={error} />}
+      </div>
+      <DialogFooter>
+        <UiButton variant="quiet" type="button" disabled={busy} onClick={onClose}>取消</UiButton>
+        <UiButton variant={deleteFiles ? 'danger' : 'primary'} type="submit" className={deleteFiles ? 'is-danger' : ''}
+          disabled={busy || planning}>{planning ? '正在核对…' : busy ? '正在删除…' : deleteFiles ? '回收文件并移除节点' : '移除节点'}</UiButton>
+      </DialogFooter>
+    </form>
+  </dialog>
 }
 export function ProjectRecycleDialog({request,endpoint,onClose,onChanged}){
  const dialog=useRef(null),mounted=useRef(false)

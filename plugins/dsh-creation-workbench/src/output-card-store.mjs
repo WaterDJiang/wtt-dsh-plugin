@@ -236,6 +236,7 @@ export class OutputCardStore {
       ...(input?.outputType === 'pptx' ? { pptEngine: input.pptEngine || 'native' } : {}),
       ...(input?.modelSelection ? { modelSelection: { ...input.modelSelection } } : {}),
       selectedSkills: [...(input?.selectedSkills || input?.skills || (input?.skill ? [input.skill] : []))],
+      generationMethod: input?.generationMethod || (task?.kind === 'media' ? 'legacy' : 'skill'), providerId: input?.providerId || null,
       media: input?.media || null, taskId: task?.id || null, sessionId: task?.sessionId || null,
       ...(input?.effectivePrompt ? { effectivePrompt: input.effectivePrompt } : {}),
       ...(!recorded ? { note: '未记录生成提示词' } : {}) };
@@ -323,8 +324,7 @@ export class OutputCardStore {
     return { card, node, task, pendingGeneration: node.pendingGeneration };
   }
 
-  describe({ requirementId, cardId, versionId } = {}) {
-    const raw = this.#raw(requirementId);
+  describe({ requirementId, cardId, versionId } = {}, raw = this.#raw(requirementId)) {
     if (typeof cardId !== 'string') throw new Error('产物卡标识无效');
     const row = this.db.prepare('SELECT * FROM output_cards WHERE id=? AND requirement_id=?').get(cardId, requirementId);
     let card, version;

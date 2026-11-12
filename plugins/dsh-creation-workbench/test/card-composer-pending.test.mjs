@@ -34,7 +34,7 @@ function retryButton(markup) {
   return markup.match(/<button\b[^>]*>重试原任务<\/button>/u)?.[0];
 }
 
-for (const type of ['text', 'pptx']) {
+for (const type of ['text', 'pptx', 'image', 'video']) {
   for (const status of ['draft', 'failed']) test(`${type} original ${status} task can retry despite an unreferenceable placeholder and disabled new-source menu`, () => {
     const markup = render(type, status);
     const button = retryButton(markup);
@@ -70,4 +70,20 @@ test('saved output opens an explicit revision action instead of a second editabl
   assert.match(markup, /基于此版修改/);
   assert.match(markup, /已保存/);
   assert.doesNotMatch(markup, /aria-label="创作要求"|class="wcc-model-selection|\bwcc-creation-send\b/u);
+});
+
+
+for (const outputType of ['image', 'video']) test(`${outputType} defaults to Skill and API without providers cannot submit`, () => {
+  const context = { key: 'media', outputType, anchor: { kind: 'canvas', title: '媒体' }, references: [], instruction: '制作一份媒体', generation: { mode: 'new' } };
+  const renderMedia = generationMethod => renderToStaticMarkup(React.createElement(CardComposer, { context: { ...context, generationMethod }, instruction: context.instruction,
+    creationTypes: [{ id: outputType, available: true }], mediaCapabilities: { providers: [] }, onSend() {} }));
+  const skill = renderMedia(undefined);
+  assert.match(skill, /aria-pressed="true"[^>]*>Skill 生成/);
+  assert.match(skill, /选择技能/);
+  assert.doesNotMatch(sendButton(skill), /\sdisabled(?:=|\s|>)/u);
+  assert.doesNotMatch(skill, /即梦|jimeng|生成模型/);
+  const api = renderMedia('api');
+  assert.match(api, /尚未接入 API 服务/);
+  assert.match(sendButton(api), /\sdisabled(?:=|\s|>)/u);
+  assert.doesNotMatch(api, /即梦|jimeng|选择技能/);
 });

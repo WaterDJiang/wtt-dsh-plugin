@@ -266,3 +266,45 @@ test('successful versions and original editor snapshots survive reopening and ca
       generation: { mode: 'revise', cardId: selected.outputCard.id, baseVersionId: selected.outputCard.versionId } }), /不存在|不属于|无效/);
   } finally { reopened.close(); }
 });
+
+
+test('Skill image and video tasks freeze arbitrary chosen Skills and register validated files as immutable card versions', async t => {
+  const { service, root, requirement, input } = fixture(t, { mediaProvider: {
+    capabilities() { assert.fail('Skill creation must not detect a media provider'); }, close() {},
+  } });
+  const image = spawnSync('python3', ['-c', 'import io,sys; from PIL import Image; b=io.BytesIO(); Image.new("RGB",(3,2)).save(b,format="PNG"); sys.stdout.buffer.write(b.getvalue())']);
+  assert.equal(image.status, 0, image.stderr.toString());
+  const videoPath = path.join(root, 'synthetic.mp4');
+  const video = spawnSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=32x24:d=0.2', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', videoPath]);
+  assert.equal(video.status, 0, video.stderr.toString());
+  for (const [type, bytes, name] of [['image', image.stdout, 'result.png'], ['video', readFileSync(videoPath), 'result.mp4']]) {
+    const args = input({ outputType: type, instruction: '/custom-media-skill 制作内容', selectedSkills: ['custom-media-skill'] });
+    const first = service.createTask(args, { skillRefs: [{ name: 'custom-media-skill', hash: 'a'.repeat(64) }] });
+    assert.equal(first.task.kind, 'ai');
+    assert.equal(first.task.input.generationMethod, 'skill');
+    assert.equal(first.task.input.media, undefined);
+    assert.deepEqual(first.task.input.skills, ['custom-media-skill']);
+    assert.match(first.prepared.prompt, /\/custom-media-skill/);
+    assert.ok(!first.prepared.prompt.includes('/wtt-jimeng-api'));
+    assert.match(first.prepared.prompt, new RegExp('kind=' + type));
+    const register = async (created, content = bytes, filename = name, session = `session:${created.task.id}`) => {
+      const relative = `${created.prepared.deliveryDirectory}/${filename}`;
+      writeFileSync(path.join(root, relative), content);
+      service.tasks.bindSession({ taskId: created.task.id, sessionId: `session:${created.task.id}` });
+      return service.tasks.files.register({ taskId: created.task.id, operationId: randomUUID(), path: relative, kind: type, title: filename }, { sessionId: session });
+    };
+    await assert.rejects(register(first, bytes, name, 'foreign-session'), /当前会话/);
+    await assert.rejects(register(first, Buffer.from('not media'), name), /图片|视频|格式|真实|容器|验证失败/);
+    const one = await register(first);
+    const cardId = first.task.outputCardId;
+    const v1 = service.cards.describe({ requirementId: requirement.id, cardId }).version;
+    const second = service.createTask(input({ outputType: type, generation: { mode: 'revise', cardId, baseVersionId: v1.id } }));
+    const two = await register(second);
+    const described = service.cards.describe({ requirementId: requirement.id, cardId });
+    assert.equal(described.card.versions.length, 2);
+    assert.equal(described.node.refId, two.id);
+    assert.equal(described.editor.generationMethod, 'skill');
+    assert.equal(sha(readFileSync(path.join(root, one.path))), one.hash);
+    assert.equal(service.cards.describe({ requirementId: requirement.id, cardId, versionId: v1.id }).node.path, one.path);
+  }
+});

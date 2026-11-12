@@ -94,6 +94,7 @@ export class CanvasStore {
     this.store = store;
     this.db = store.db;
     this.workspaceRoot = store.workspaceRoot;
+    this.fileStateCache = new Map();
     this.#pruneEmptyImportDirs();
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS canvas_boards (
@@ -203,13 +204,24 @@ export class CanvasStore {
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
 
-  #fileState(relativePath, hash, maxBytes = MAX_BYTES) {
+  #fileState(relativePath, hash, maxBytes = MAX_BYTES, fresh = false) {
     try {
       const file = path.resolve(this.workspaceRoot, relativePath);
-      if (realpathSync(file) !== file || !file.startsWith(this.workspaceRoot + path.sep) || !statSync(file).isFile()) return 'unavailable';
-      if (hash && statSync(file).size > maxBytes) return 'changed';
-      if (hash && sha(readFileSync(file)) !== hash) return 'changed';
-      return 'ready';
+      if (realpathSync(file) !== file || !file.startsWith(this.workspaceRoot + path.sep)) return 'unavailable';
+      const info = statSync(file);
+      if (!info.isFile()) return 'unavailable';
+      if (!hash) return 'ready';
+      if (info.size > maxBytes) return 'changed';
+      const signature = [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs, hash].join(':');
+      const cached = this.fileStateCache.get(file);
+      if (!fresh && cached?.signature === signature) return cached.state;
+      const state = sha(readFileSync(file)) === hash ? 'ready' : 'changed';
+      const after = statSync(file);
+      if (info.dev !== after.dev || info.ino !== after.ino || info.size !== after.size
+        || info.mtimeMs !== after.mtimeMs || info.ctimeMs !== after.ctimeMs) return 'changed';
+      if (this.fileStateCache.size >= 2048) this.fileStateCache.clear();
+      this.fileStateCache.set(file, { signature, state });
+      return state;
     } catch { return 'missing'; }
   }
 
@@ -331,7 +343,7 @@ export class CanvasStore {
       }
     }
     if (!source) throw new Error('来源卡片不存在或不属于当前需求');
-    if (sourceDigest(source.content) !== source.hash || (verifyFile && this.#fileState(source.path, source.hash) !== 'ready')) throw new Error('来源文件不可用或已被外部修改，请核对后重新选择');
+    if (sourceDigest(source.content) !== source.hash || (verifyFile && this.#fileState(source.path, source.hash, MAX_BYTES, true) !== 'ready')) throw new Error('来源文件不可用或已被外部修改，请核对后重新选择');
     return source;
   }
 
@@ -358,11 +370,29 @@ export class CanvasStore {
     const nodes = requirement.origin !== 'canvas' || requirement.background.trim() ? [{ id: reqId, kind: 'requirement', refId: requirement.id, title: requirement.title, content: brief, excerpt: brief.slice(0, 160), requirementBackground: requirement.background, sourceHash: sourceDigest(brief), position: { x: 40, y: 60 } }] : [];
     const edges = [];
     const materialRows = this.db.prepare('SELECT * FROM canvas_materials WHERE requirement_id=? ORDER BY created_at,id').all(requirement.id);
+    const materialDetails = new Map(materialRows.map(row => [row.id, { refs: [], versions: [] }]));
+    if (materialRows.length) {
+      for (const [key, table] of [
+        ['excerpt', 'canvas_excerpts'], ['projectFile', 'canvas_project_references'], ['imported', 'canvas_imports'],
+        ['whiteboard', 'canvas_whiteboard_snapshots'], ['media', 'canvas_import_media'], ['association', 'canvas_material_associations'],
+      ]) {
+        const rows = this.db.prepare(`SELECT detail.* FROM ${table} detail
+          JOIN canvas_materials material ON material.id=detail.material_id WHERE material.requirement_id=?`).all(requirement.id);
+        for (const row of rows) materialDetails.get(row.material_id)[key] = row;
+      }
+      const sources = this.db.prepare(`SELECT source.material_id,source.source_card_id AS cardId,source.source_hash AS hash,
+        source.source_title AS title,source.source_kind AS kind FROM canvas_material_sources source
+        JOIN canvas_materials material ON material.id=source.material_id WHERE material.requirement_id=? ORDER BY source.source_card_id`).all(requirement.id);
+      for (const { material_id, ...reference } of sources) materialDetails.get(material_id).refs.push(reference);
+      const versions = this.db.prepare(`SELECT version.material_id,version.id,version.number,version.origin,version.created_at
+        FROM canvas_material_versions version JOIN canvas_materials material ON material.id=version.material_id
+        WHERE material.requirement_id=? ORDER BY version.number`).all(requirement.id);
+      for (const row of versions) materialDetails.get(row.material_id).versions.push(row);
+    }
     materialRows.forEach((row, index) => {
-      const material = this.#materialResult(row);
-      const excerpt = this.db.prepare('SELECT * FROM canvas_excerpts WHERE material_id=?').get(row.id);
-      const refs = this.#materialSources(row.id);
-      const projectFile = this.db.prepare('SELECT source_path,source_hash FROM canvas_project_references WHERE material_id=?').get(row.id);
+      const detail = materialDetails.get(row.id);
+      const material = this.#materialResult(row, detail);
+      const { excerpt, projectFile, refs } = detail;
       nodes.push({ ...material, id: `material:${row.id}`, kind: excerpt ? 'excerpt' : 'material', refId: row.id, excerpt: row.content.slice(0, 180), sourceHash: row.hash,
         position: { x: 40, y: 350 + index * (CARD_HEIGHT + 32) }, status: this.#fileState(row.markdown_path, row.hash),
         sourceStatus: material.importedFile ? this.#importState(material.id) : row.source_path ? this.#fileState(row.source_path) : null,
@@ -468,14 +498,15 @@ export class CanvasStore {
     return this.db.prepare('SELECT source_card_id AS cardId,source_hash AS hash,source_title AS title,source_kind AS kind FROM canvas_material_sources WHERE material_id=? ORDER BY source_card_id').all(materialId).map(ref => ({ ...ref }));
   }
 
-  #materialResult(row) {
-    const refs = this.#materialSources(row.id);
-      const projectFile = this.db.prepare('SELECT source_path,source_hash FROM canvas_project_references WHERE material_id=?').get(row.id);
-    const imported = this.db.prepare('SELECT * FROM canvas_imports WHERE material_id=?').get(row.id);
-    const whiteboard = this.db.prepare('SELECT * FROM canvas_whiteboard_snapshots WHERE material_id=?').get(row.id);
-    const media = this.db.prepare('SELECT media_json FROM canvas_import_media WHERE material_id=?').get(row.id);
-    const association = this.db.prepare('SELECT * FROM canvas_material_associations WHERE material_id=?').get(row.id);
-    const versions = this.db.prepare('SELECT id,number,origin,created_at FROM canvas_material_versions WHERE material_id=? ORDER BY number').all(row.id);
+  #materialResult(row, detail) {
+    const { refs, imported, whiteboard, media, association, versions } = detail || {
+      refs: this.#materialSources(row.id),
+      imported: this.db.prepare('SELECT * FROM canvas_imports WHERE material_id=?').get(row.id),
+      whiteboard: this.db.prepare('SELECT * FROM canvas_whiteboard_snapshots WHERE material_id=?').get(row.id),
+      media: this.db.prepare('SELECT media_json FROM canvas_import_media WHERE material_id=?').get(row.id),
+      association: this.db.prepare('SELECT * FROM canvas_material_associations WHERE material_id=?').get(row.id),
+      versions: this.db.prepare('SELECT id,number,origin,created_at FROM canvas_material_versions WHERE material_id=? ORDER BY number').all(row.id),
+    };
     return { ...materialValue(row), ...(refs.length ? { sourceRefs: refs } : {}),
       ...(versions.length ? { materialVersions: versions.map(version => ({ id: version.id, number: version.number, origin: version.origin, createdAt: version.created_at })), currentMaterialVersionId: versions.at(-1).id } : {}),
       ...(imported ? { importedFile: { name: imported.original_name, path: imported.file_path, hash: imported.file_hash,

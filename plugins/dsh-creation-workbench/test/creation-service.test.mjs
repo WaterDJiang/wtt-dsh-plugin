@@ -72,16 +72,18 @@ test('missing production dependencies disable only their type and preserve the l
     courseSkillDir: missing, pptGeneratorSkillDir: missing, pptSkillDir: missing, exerciseSkillDir: missing, scriptSkillDir: missing,
   });
   const types = service.creationTypes();
-  assert.deepEqual(types.map(type => type.id), ['outline', 'pptx', 'exercise', 'script', 'text']);
+  assert.deepEqual(types.map(type => type.id), ['outline', 'pptx', 'exercise', 'script', 'text', 'image', 'video']);
   assert.equal(types.find(type => type.id === 'text').available, true);
-  for (const type of types.filter(type => type.id !== 'text')) {
+  for (const type of types.filter(type => !['text', 'image', 'video'].includes(type.id))) {
     assert.equal(type.available, false);
     assert.match(type.message, /缺少本机课程 Skill/);
     assert.throws(() => create(type.id), /暂不可用/);
   }
   assert.equal(service.tasks.list(requirement.id).length, 0);
   assert.equal(create(undefined).task.input.outputType, 'outline');
-  assert.throws(() => create('video'), /类型/);
+  assert.equal(create('image').task.input.generationMethod, 'skill');
+  assert.equal(create('video').task.input.generationMethod, 'skill');
+  assert.throws(() => create('audio'), /类型/);
   assert.throws(() => create(null), /类型/);
 });
 

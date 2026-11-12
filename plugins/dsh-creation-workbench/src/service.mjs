@@ -141,6 +141,8 @@ export class WorkbenchService {
       ] },
       { id: 'script', label: '课程逐字稿', skills: ['wtt-course-scriptwriter'], files: [[this.scriptSkillDir, 'SKILL.md']] },
       { id: 'text', label: '文本', skills: [], files: [] },
+      { id: 'image', label: '图片', skills: [], files: [] },
+      { id: 'video', label: '视频', skills: [], files: [] },
     ];
     return definitions.filter(type => onlyType === undefined || type.id === onlyType).map(({ files, ...type }) => {
       const missing = files.filter(([root, file]) => !existsSync(path.join(root, file))).map(([root, file]) => path.join(root, file));
@@ -361,8 +363,8 @@ export class WorkbenchService {
       throw new Error('选段不能超过 12000 字符，请缩小选择范围或改用整份已保存版本');
     }
     const outputType = input?.outputType === undefined ? 'outline' : input.outputType;
-    if (['image', 'video'].includes(outputType)) throw new Error('媒体类型请通过图片／视频生成入口提交，不使用原生会话');
-    if (!['outline', 'pptx', 'exercise', 'script', 'text'].includes(outputType)) throw new Error('不支持的创作类型');
+    if (['image', 'video'].includes(outputType) && (input.media || input.providerId || input.generationMethod && input.generationMethod !== 'skill')) throw new Error('媒体 API 参数请通过 API 生成入口提交；Skill 任务不接收媒体模型参数');
+    if (!['outline', 'pptx', 'exercise', 'script', 'text', 'image', 'video'].includes(outputType)) throw new Error('不支持的创作类型');
     const replay = this.tasks.replay(input);
     const selectedSkills = input.selectedSkills || [];
     if (!Array.isArray(skillRefs) || skillRefs.length !== selectedSkills.length
@@ -433,6 +435,7 @@ export class WorkbenchService {
     const snapshot = { requirement: { id: requirement.id, title: requirement.title, customer: requirement.customer,
       audience: requirement.audience, background: requirement.background, objectives: requirement.objectives, origin: requirement.origin },
     canvasId: requirement.id, sources, selection, instruction: input.instruction.trim(), outputType, productionPolicy: this.production.policy(),
+    ...(['image', 'video'].includes(outputType) ? { generationMethod: 'skill' } : {}),
     ...(exactSkills ? { contextVersion: 1 } : {}),
     ...(pptEngine ? { pptEngine } : {}),
     ...(pptEngine === 'baoyu' ? { baoyuSkill: { path: creation.skillPath, hash: digest(readFileSync(creation.skillPath)) } } : {}),
@@ -572,6 +575,10 @@ export class WorkbenchService {
       `产物真实生成并检查后调用 course_register_artifact，传本次 taskId=${task.id}、kind、title、相对项目的 path 和新 UUID operationId；失败重试复用该 operationId。`,
       '有多个文件时优先一次调用 course_register_artifacts，传本次 taskId 和 files 数组（每项 kind/title/path/operationId/primary），主文件先登记，附属资料 primary=false。逐项核对短回执，失败仅修复和重试失败项；完整检查结果保留文件详情，不重复回传整份报告。',
       '正式文件保留新文件名；已登记文件不覆盖。这里只登记该任务目录下的真实文件，不用聊天中的完成文字冒充产物。',
+    ];
+    if (['image', 'video'].includes(type)) return [...shared,
+      `本次输出为${type === 'image' ? '图片' : '视频'}，卡片只承载文件，不指定生成模型或供应商。只使用用户明确选择的 Skill；没有可用生成能力时询问用户，不自动调用即梦或其他付费服务。`,
+      '沿所选 Skill 的原有确认步骤制作；完成后将真实文件复制到本任务 delivery，保留原文件。由绑定主会话核验后以 kind=' + type + ' 登记，不用提示词、远程链接或占位文件冒充成果。',
     ];
     if (type === 'text') {
       const names = (task.input.selectedSkills || task.input.skills || []).map(name => name.replace(/-builtin$/, ''));
