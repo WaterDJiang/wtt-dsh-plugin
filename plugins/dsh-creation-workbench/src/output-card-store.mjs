@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { OutputDraftStore } from './output-draft-store.mjs';
 import { isActiveTaskPhase } from './pending-card-state.mjs';
+import { CARD_WIDTH, CARD_HEIGHT } from './creation-context.mjs';
 
 const REF = /^(artifact|outline|word|material):[0-9a-f-]{36}$/;
 const typeOf = type => type === 'pptx' ? 'pptx' : ['image', 'video'].includes(type) ? type : 'text';
@@ -8,7 +9,7 @@ const legacyId = ref => `legacy:${ref}`;
 const legacyVersion = ref => `legacy-v1:${ref}`;
 
 function nextOutputPosition(anchor, occupied) {
-  const width = 258, height = 208, gap = 28, limit = 999_000;
+  const width = CARD_WIDTH, height = CARD_HEIGHT, gap = 28, limit = 999_000;
   const free = (x, y) => x >= -limit && x <= limit && y >= -limit && y <= limit
     && occupied.every(node => x + width + gap <= node.position.x || x >= node.position.x + (node.width || width) + gap
       || y + height + gap <= node.position.y || y >= node.position.y + (node.height || height) + gap);

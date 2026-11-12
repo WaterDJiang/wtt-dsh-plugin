@@ -85,10 +85,10 @@
 .wtt-course-canvas .wcc-graph { position: relative; flex: 1; min-width: 0; height: 100%; }
 .wtt-course-canvas .wcc-graph[aria-busy="true"] .react-flow { pointer-events: none; }
 .wtt-course-canvas .react-flow { background: var(--wtt-ui-canvas, #f7f9fc); --xy-edge-stroke: var(--wtt-ui-edge, #8194b8); --xy-edge-stroke-selected: var(--wtt-ui-accent, #3559c7); --xy-edge-stroke-width: 1.5; --xy-selection-background-color: var(--wtt-ui-selection, #3559c70b); --xy-selection-border: 1px solid var(--wtt-ui-accent-line, #7d94dd); }
-.wtt-course-canvas .react-flow__node-content { border: 0; width: 258px; height: 208px; border-radius: 8px; }
+.wtt-course-canvas .react-flow__node-content { border: 0; width: 320px; height: 256px; border-radius: 8px; }
 .wtt-course-canvas .react-flow__node-courseGroup { border: 0; border-radius: 10px; }
 .wtt-course-canvas .react-flow__node:focus-visible { outline: 2px solid var(--wtt-ui-accent, #627fda); outline-offset: 4px; border-radius: 8px; }
-.wtt-course-canvas .wcc-card { position: relative; display: flex; flex-direction: column; width: 258px; height: 208px; border: 1px solid var(--wtt-ui-line, #dce2eb); border-radius: 8px; background: var(--wtt-ui-surface, #fff); box-shadow: 0 2px 6px var(--wtt-ui-shadow, #25344b06); overflow: visible; }
+.wtt-course-canvas .wcc-card { position: relative; display: flex; flex-direction: column; width: 320px; height: 256px; border: 1px solid var(--wtt-ui-line, #dce2eb); border-radius: 8px; background: var(--wtt-ui-surface, #fff); box-shadow: 0 2px 6px var(--wtt-ui-shadow, #25344b06); overflow: visible; }
 .wtt-course-canvas .wcc-card[data-card-format], .wtt-course-canvas .wcc-card.has-skill-todo[data-card-format] { border-color: color-mix(in srgb, var(--wcc-type-color) 85%, light-dark(#dde1e7, #44474e)); }
 .wtt-course-canvas .wcc-card[data-card-format="text"] { --wcc-type-color: light-dark(#5487cf, #78a5e8); }
 .wtt-course-canvas .wcc-card[data-card-format="pptx"] { --wcc-type-color: light-dark(#cc873f, #e3a568); }

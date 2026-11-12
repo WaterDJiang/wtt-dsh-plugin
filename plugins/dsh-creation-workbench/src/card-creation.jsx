@@ -9,6 +9,7 @@ import { ModelSelection } from './model-selection.jsx'
 import { TaskInputSummary } from './task-input-summary.jsx'
 import { pendingContinueAllowed, pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
 import { ReferencePromptInput } from './reference-prompt-input.jsx'
+import { cardDisplayTitle } from './card-capabilities.mjs'
 import { reviewDraftFromQuestion } from './conversation-file.mjs'
 import './card-creation.css'
 import './task-stage.css'
@@ -67,7 +68,7 @@ function CreationIcon({ type = 'outline', size = 17 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[type] || paths.outline}</svg>
 }
 
-function cardTitle(card) { return card?.displayTitle || card?.title || `${KIND_LABELS[card?.kind] || '资料'}${card?.number ? ` v${card.number}` : ''}` }
+function cardTitle(card) { return card?.displayTitle || cardDisplayTitle(card) || `${KIND_LABELS[card?.kind] || '资料'}${card?.number ? ` v${card.number}` : ''}` }
 function referenceFormat(card) {
   const name=card.importedFile?.name||card.generatedFile?.name||card.path||card.sourcePath||card.title||'';
   const ext=name.match(/\.([a-z0-9]{1,8})(?:[?#].*)?$/i)?.[1]?.toLowerCase();
@@ -346,7 +347,7 @@ export function CardComposer({
   // Original tasks resume their frozen input; the placeholder is not a new source.
   const selectedType = inputLocked ? { id: outputType, label: KIND_LABELS[outputType] || '创作任务', available: true } : creationTypes.find(type => type.id === outputType)
   const isAction = ACTION_TYPES.has(outputType)
-  const heading = stageStatus || collapsed ? headingCard?.defaultOutcome?.name || cardTitle(headingCard) : isAction ? selectedType?.label || KIND_LABELS[outputType] : revising ? '修改此版本' : 'AI 创作'
+  const heading = stageStatus || collapsed ? cardTitle(headingCard) : isAction ? selectedType?.label || KIND_LABELS[outputType] : revising ? '修改此版本' : 'AI 创作'
   const headingDetail = stageStatus || (!isAction && !revising ? KIND_LABELS[outputType] : '')
   const generation = context?.generation
   const allowsEmptyReferences = generation?.mode === 'new' || generation?.mode === 'revise' && Boolean(generation.cardId && generation.baseVersionId)
@@ -368,7 +369,7 @@ export function CardComposer({
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || (!mediaReason && !mediaPending && !mediaLoading))
   const reason = recoveringMedia ? '' : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || '该创作能力暂不可用。' : ''))
   const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
-  const candidates = uniqueCards(availableReferences).filter(card => [cardTitle(card), card.title, KIND_LABELS[card.kind]].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const candidates = uniqueCards(availableReferences).filter(card => [cardTitle(card), card.title, card.defaultOutcome?.name, KIND_LABELS[card.kind]].join(' ').toLowerCase().includes(search.toLowerCase()))
   const projectReferences = new Map(availableReferences.filter(card => card.projectFile).map(card => [card.id, card.projectFile]))
   const referenceOptions = uniqueCards([...references, ...availableReferences])
     .filter(card => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith('video/')))
@@ -379,7 +380,7 @@ export function CardComposer({
       const detail = [isChosen(card) ? '已引用' : '画布', referenceFormat(card), projectPath].filter(Boolean).join(' · ')
       const readyProjectPath = projectFile?.status === 'ready' ? projectPath : undefined
       return { key: card.id, card, label, detail, mentionLabel: projectPath, path: readyProjectPath,
-        searchText: [label, card.title, detail].join(' ').normalize('NFC').toLowerCase() }
+        searchText: [label, card.title, card.defaultOutcome?.name, card.path, detail].join(' ').normalize('NFC').toLowerCase() }
     })
   const mentionProps = {
     referenceOptions, searchReferences: searchProjectReferences,

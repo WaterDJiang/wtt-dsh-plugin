@@ -5,7 +5,19 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'no
 import os from 'node:os';
 import path from 'node:path';
 import { WorkbenchService } from '../src/service.mjs';
-import { cardCapabilities } from '../src/card-capabilities.mjs';
+import { cardCapabilities, cardDisplayTitle } from '../src/card-capabilities.mjs';
+
+test('card names follow the selected outcome title while original file names remain separate', () => {
+  const first = { title: '旧任务名称', defaultOutcome: { title: '故事方案与人物设定 V1', name: '20261112_story.md' } };
+  const second = { title: '旧任务名称', defaultOutcome: { title: '故事方案与人物设定 V2', name: '20261112_story_revised.md' } };
+  assert.equal(cardDisplayTitle(first), '故事方案与人物设定 V1');
+  assert.equal(cardDisplayTitle(second), '故事方案与人物设定 V2');
+  assert.equal(first.defaultOutcome.name, '20261112_story.md');
+  assert.equal(cardDisplayTitle({ title: '手动命名素材', defaultOutcome: { name: 'source.md' } }), '手动命名素材');
+  assert.equal(cardDisplayTitle({ defaultOutcome: { name: 'source.md' } }), 'source.md');
+  assert.equal(cardDisplayTitle({ title: '创作草稿' }), '创作草稿');
+  assert.equal(cardDisplayTitle(null), '');
+});
 import { createLayoutHistory } from '../src/canvas-history.mjs';
 
 function fixture(t) {

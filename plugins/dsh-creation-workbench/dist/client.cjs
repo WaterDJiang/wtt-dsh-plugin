@@ -42409,6 +42409,89 @@ function createPendingContext({ projectId, projectName: projectName2, projectPat
   };
 }
 
+// src/card-capabilities.mjs
+var TEXT_FILE = /\.(md|markdown|txt)$/i;
+var OFFICE_FILE = /\.(docx|pptx|csv|pdf)$/i;
+function cardDisplayTitle(card) {
+  return card?.defaultOutcome?.title || card?.title || card?.defaultOutcome?.name || "";
+}
+function editableCardText(card) {
+  if (!card) return null;
+  if (card.kind === "generation") return card.composition?.editable && card.outputCard?.type === "text" ? "" : null;
+  if (card.kind === "requirement") return card.requirementBackground ?? "";
+  if (card.kind === "whiteboard") return card.text ?? "";
+  if (card.kind === "outline") return card.content ?? "";
+  if (["material", "excerpt"].includes(card.kind)) {
+    if (card.importedFile?.mime?.startsWith("image/") || card.importedFile?.mime?.startsWith("video/")) return null;
+    if (card.extracted !== false) return card.content ?? "";
+    return card.importedFile?.mime?.startsWith("text/") ? "" : null;
+  }
+  if (card.kind === "artifact" && /\.(md|txt)$/i.test(card.path || "") && card.extracted !== false) return card.content ?? "";
+  return null;
+}
+var cardTextDraftKey = (card) => `${card.id}:${card.outputCard?.versionId || card.sourceHash || ""}`;
+function cardFormat(card) {
+  if (["requirement", "outline", "excerpt"].includes(card.kind)) return "text";
+  const type = card.outputCard?.type || card.artifactKind;
+  const mime = card.generatedFile?.mime || card.importedFile?.mime || card.mime || "";
+  const file = card.importedFile?.name || (card.kind === "material" ? card.sourcePath || card.path : card.path) || "";
+  if (type === "pptx" || /presentation|powerpoint/.test(mime) || /\.(pptx?|odp)$/i.test(file)) return "pptx";
+  if (type === "image" || mime.startsWith("image/") || card.imagePreview || /\.(png|jpe?g|webp|gif|svg)$/i.test(file)) return "image";
+  if (type === "video" || mime.startsWith("video/") || card.videoPreview || /\.(mp4|webm|mov)$/i.test(file)) return "video";
+  if (card.kind === "word" || /\.(pdf|docx?|xlsx?|csv|ods|odt)$/i.test(file) || /pdf|word|spreadsheet|csv/.test(mime)) return "document";
+  if (card.kind === "material" || /\.(md|txt|jsonl?|html?)$/i.test(file) || ["text", "outline", "script", "storyboard", "excerpt"].includes(type)) return "text";
+  return null;
+}
+function cardPurpose(card) {
+  if (card.kind === "requirement") return "\u80CC\u666F";
+  if (["material", "excerpt"].includes(card.kind)) return "\u53C2\u8003";
+  return null;
+}
+function cardWriteBack(card) {
+  if (!card) return { mode: "none", path: null };
+  if (card.kind === "generation" && editableCardText(card) !== null) return { mode: "draft", path: null };
+  if (card.kind === "requirement") return { mode: "background", path: null };
+  if (card.kind === "outline") return { mode: "version", path: null };
+  if (card.kind === "artifact" && card.outputCard && TEXT_FILE.test(card.path || "") && card.extracted !== false) return { mode: "version", path: null };
+  if (card.kind === "material" && editableCardText(card) !== null) {
+    if (card.projectFile && TEXT_FILE.test(card.projectFile.path || "")) return { mode: "project-file", path: card.projectFile.path };
+    if (card.importedFile) return { mode: "none", path: null };
+    if (!card.sourcePath && TEXT_FILE.test(card.path || "")) return { mode: "snapshot", path: card.path };
+  }
+  return { mode: "none", path: null };
+}
+function cardOpenFile(card) {
+  if (!card) return null;
+  if (card.projectFile?.path) return { path: card.projectFile.path, source: "project" };
+  if (card.importedFile?.path) return { path: card.importedFile.path, source: "import" };
+  if (card.kind === "material" && card.path) return { path: card.path, source: "snapshot" };
+  if (["artifact", "word", "outline"].includes(card.kind) && card.path) return { path: card.path, source: "registered" };
+  return null;
+}
+function openWithCategory(card, path) {
+  if (!path) return null;
+  if (TEXT_FILE.test(path)) return "text";
+  if (OFFICE_FILE.test(path)) return "office";
+  if (card.importedFile?.mime?.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(path)) return "view";
+  if (card.importedFile?.mime?.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(path)) return "view";
+  return null;
+}
+function cardCapabilities(card) {
+  const format = cardFormat(card);
+  const base2 = format === "text" ? editableCardText(card) : null;
+  const writeBack = cardWriteBack(card);
+  const openFile = cardOpenFile(card);
+  return {
+    format,
+    purpose: cardPurpose(card),
+    editableText: { editable: base2 !== null, base: base2 },
+    writeBack,
+    openWith: openFile ? { path: openFile.path, source: openFile.source, sourceRef: openFile.sourceRef || null, category: openWithCategory(card, openFile.path) } : null,
+    versioned: Boolean(card.outputCard?.versions?.length > 0 || card.materialVersions?.length || writeBack.mode === "snapshot"),
+    aiChat: Boolean(card) && card.kind !== "generation"
+  };
+}
+
 // src/conversation-file.mjs
 function nativeConversationFilePath(button) {
   if (!button) return "";
@@ -42496,7 +42579,7 @@ function CreationIcon({ type = "outline", size = 17 }) {
   return /* @__PURE__ */ import_react33.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.55", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, paths[type] || paths.outline);
 }
 function cardTitle(card) {
-  return card?.displayTitle || card?.title || `${KIND_LABELS[card?.kind] || "\u8D44\u6599"}${card?.number ? ` v${card.number}` : ""}`;
+  return card?.displayTitle || cardDisplayTitle(card) || `${KIND_LABELS[card?.kind] || "\u8D44\u6599"}${card?.number ? ` v${card.number}` : ""}`;
 }
 function referenceFormat(card) {
   const name2 = card.importedFile?.name || card.generatedFile?.name || card.path || card.sourcePath || card.title || "";
@@ -42884,7 +42967,7 @@ function CardComposer({
   const displayError = error || referenceErrors.get(context?.key) || "";
   const selectedType = inputLocked ? { id: outputType, label: KIND_LABELS[outputType] || "\u521B\u4F5C\u4EFB\u52A1", available: true } : creationTypes.find((type) => type.id === outputType);
   const isAction = ACTION_TYPES.has(outputType);
-  const heading = stageStatus || collapsed ? headingCard?.defaultOutcome?.name || cardTitle(headingCard) : isAction ? selectedType?.label || KIND_LABELS[outputType] : revising ? "\u4FEE\u6539\u6B64\u7248\u672C" : "AI \u521B\u4F5C";
+  const heading = stageStatus || collapsed ? cardTitle(headingCard) : isAction ? selectedType?.label || KIND_LABELS[outputType] : revising ? "\u4FEE\u6539\u6B64\u7248\u672C" : "AI \u521B\u4F5C";
   const headingDetail = stageStatus || (!isAction && !revising ? KIND_LABELS[outputType] : "");
   const generation = context?.generation;
   const allowsEmptyReferences = generation?.mode === "new" || generation?.mode === "revise" && Boolean(generation.cardId && generation.baseVersionId);
@@ -42908,7 +42991,7 @@ function CardComposer({
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || !mediaReason && !mediaPending && !mediaLoading);
   const reason = recoveringMedia ? "" : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || "\u8BE5\u521B\u4F5C\u80FD\u529B\u6682\u4E0D\u53EF\u7528\u3002" : ""));
   const isChosen = (candidate) => references.some((reference) => sameReference(reference, candidate));
-  const candidates = uniqueCards(availableReferences).filter((card) => [cardTitle(card), card.title, KIND_LABELS[card.kind]].join(" ").toLowerCase().includes(search.toLowerCase()));
+  const candidates = uniqueCards(availableReferences).filter((card) => [cardTitle(card), card.title, card.defaultOutcome?.name, KIND_LABELS[card.kind]].join(" ").toLowerCase().includes(search.toLowerCase()));
   const projectReferences = new Map(availableReferences.filter((card) => card.projectFile).map((card) => [card.id, card.projectFile]));
   const referenceOptions = uniqueCards([...references, ...availableReferences]).filter((card) => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith("video/"))).map((card) => {
     const projectFile = projectReferences.get(card.id);
@@ -42923,7 +43006,7 @@ function CardComposer({
       detail,
       mentionLabel: projectPath,
       path: readyProjectPath,
-      searchText: [label3, card.title, detail].join(" ").normalize("NFC").toLowerCase()
+      searchText: [label3, card.title, card.defaultOutcome?.name, card.path, detail].join(" ").normalize("NFC").toLowerCase()
     };
   });
   const mentionProps = {
@@ -43252,6 +43335,8 @@ function CardComposer({
 }
 
 // src/creation-context.mjs
+var CARD_WIDTH = 320;
+var CARD_HEIGHT = 256;
 var BLOCKED = /^(missing|modified|changed|unavailable)$/;
 var FIELDS = ["id", "nodeId", "kind", "artifactKind", "title", "number", "refId", "content", "excerpt", "path", "sourcePath", "sourceHash", "status", "sourceStatus", "extracted", "excerptInfo", "importedFile", "generatedFile", "whiteboardSource", "referenceNote", "unavailable"];
 function creationSource(card) {
@@ -43388,7 +43473,7 @@ function creationTaskInput(context) {
     ...context.generation ? { generation: { ...context.generation } } : {}
   };
 }
-function adjacentCreationPosition(anchor, cards, width = 258, height = 208) {
+function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
   let x2 = Math.min(999e3, Math.max(-999e3, anchor.position.x + (anchor.width || width) + 80));
   let y2 = Math.min(999e3, Math.max(-999e3, anchor.position.y));
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -43401,7 +43486,7 @@ function adjacentCreationPosition(anchor, cards, width = 258, height = 208) {
   }
   return { x: x2, y: y2 };
 }
-function visibleCreationPosition(anchor, cards, viewport, size, width = 258, height = 208) {
+function visibleCreationPosition(anchor, cards, viewport, size, width = CARD_WIDTH, height = CARD_HEIGHT) {
   const zoom = viewport.zoom;
   const left = (16 - viewport.x) / zoom, right = (size.width - 16 - viewport.x) / zoom - width;
   const top = (96 - viewport.y) / zoom;
@@ -43811,86 +43896,6 @@ function AssetBoard({ projectId, requirementId, endpoint: endpoint2, request, on
 
 // src/card-text-editor.jsx
 var import_react40 = __toESM(require("react"), 1);
-
-// src/card-capabilities.mjs
-var TEXT_FILE = /\.(md|markdown|txt)$/i;
-var OFFICE_FILE = /\.(docx|pptx|csv|pdf)$/i;
-function editableCardText(card) {
-  if (!card) return null;
-  if (card.kind === "generation") return card.composition?.editable && card.outputCard?.type === "text" ? "" : null;
-  if (card.kind === "requirement") return card.requirementBackground ?? "";
-  if (card.kind === "whiteboard") return card.text ?? "";
-  if (card.kind === "outline") return card.content ?? "";
-  if (["material", "excerpt"].includes(card.kind)) {
-    if (card.importedFile?.mime?.startsWith("image/") || card.importedFile?.mime?.startsWith("video/")) return null;
-    if (card.extracted !== false) return card.content ?? "";
-    return card.importedFile?.mime?.startsWith("text/") ? "" : null;
-  }
-  if (card.kind === "artifact" && /\.(md|txt)$/i.test(card.path || "") && card.extracted !== false) return card.content ?? "";
-  return null;
-}
-var cardTextDraftKey = (card) => `${card.id}:${card.outputCard?.versionId || card.sourceHash || ""}`;
-function cardFormat(card) {
-  if (["requirement", "outline", "excerpt"].includes(card.kind)) return "text";
-  const type = card.outputCard?.type || card.artifactKind;
-  const mime = card.generatedFile?.mime || card.importedFile?.mime || card.mime || "";
-  const file = card.importedFile?.name || (card.kind === "material" ? card.sourcePath || card.path : card.path) || "";
-  if (type === "pptx" || /presentation|powerpoint/.test(mime) || /\.(pptx?|odp)$/i.test(file)) return "pptx";
-  if (type === "image" || mime.startsWith("image/") || card.imagePreview || /\.(png|jpe?g|webp|gif|svg)$/i.test(file)) return "image";
-  if (type === "video" || mime.startsWith("video/") || card.videoPreview || /\.(mp4|webm|mov)$/i.test(file)) return "video";
-  if (card.kind === "word" || /\.(pdf|docx?|xlsx?|csv|ods|odt)$/i.test(file) || /pdf|word|spreadsheet|csv/.test(mime)) return "document";
-  if (card.kind === "material" || /\.(md|txt|jsonl?|html?)$/i.test(file) || ["text", "outline", "script", "storyboard", "excerpt"].includes(type)) return "text";
-  return null;
-}
-function cardPurpose(card) {
-  if (card.kind === "requirement") return "\u80CC\u666F";
-  if (["material", "excerpt"].includes(card.kind)) return "\u53C2\u8003";
-  return null;
-}
-function cardWriteBack(card) {
-  if (!card) return { mode: "none", path: null };
-  if (card.kind === "generation" && editableCardText(card) !== null) return { mode: "draft", path: null };
-  if (card.kind === "requirement") return { mode: "background", path: null };
-  if (card.kind === "outline") return { mode: "version", path: null };
-  if (card.kind === "artifact" && card.outputCard && TEXT_FILE.test(card.path || "") && card.extracted !== false) return { mode: "version", path: null };
-  if (card.kind === "material" && editableCardText(card) !== null) {
-    if (card.projectFile && TEXT_FILE.test(card.projectFile.path || "")) return { mode: "project-file", path: card.projectFile.path };
-    if (card.importedFile) return { mode: "none", path: null };
-    if (!card.sourcePath && TEXT_FILE.test(card.path || "")) return { mode: "snapshot", path: card.path };
-  }
-  return { mode: "none", path: null };
-}
-function cardOpenFile(card) {
-  if (!card) return null;
-  if (card.projectFile?.path) return { path: card.projectFile.path, source: "project" };
-  if (card.importedFile?.path) return { path: card.importedFile.path, source: "import" };
-  if (card.kind === "material" && card.path) return { path: card.path, source: "snapshot" };
-  if (["artifact", "word", "outline"].includes(card.kind) && card.path) return { path: card.path, source: "registered" };
-  return null;
-}
-function openWithCategory(card, path) {
-  if (!path) return null;
-  if (TEXT_FILE.test(path)) return "text";
-  if (OFFICE_FILE.test(path)) return "office";
-  if (card.importedFile?.mime?.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(path)) return "view";
-  if (card.importedFile?.mime?.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(path)) return "view";
-  return null;
-}
-function cardCapabilities(card) {
-  const format = cardFormat(card);
-  const base2 = format === "text" ? editableCardText(card) : null;
-  const writeBack = cardWriteBack(card);
-  const openFile = cardOpenFile(card);
-  return {
-    format,
-    purpose: cardPurpose(card),
-    editableText: { editable: base2 !== null, base: base2 },
-    writeBack,
-    openWith: openFile ? { path: openFile.path, source: openFile.source, sourceRef: openFile.sourceRef || null, category: openWithCategory(card, openFile.path) } : null,
-    versioned: Boolean(card.outputCard?.versions?.length > 0 || card.materialVersions?.length || writeBack.mode === "snapshot"),
-    aiChat: Boolean(card) && card.kind !== "generation"
-  };
-}
 
 // src/rich-text-editor.jsx
 var import_react38 = __toESM(require("react"), 1);
@@ -45513,8 +45518,6 @@ function attachCanvasGestures(root2, options) {
 }
 
 // src/canvas.jsx
-var CARD_WIDTH = 258;
-var CARD_HEIGHT = 208;
 var LARGE_CANVAS_THRESHOLD = 80;
 var isCanvasOverview = (state) => state.nodes.length >= LARGE_CANVAS_THRESHOLD && state.transform[2] < 0.4;
 var LABELS2 = { requirement: "\u80CC\u666F", material: "\u7D20\u6750", excerpt: "\u6458\u5F55", outline: "\u8BFE\u7A0B\u5927\u7EB2", word: "Word \u6587\u6863", whiteboard: "\u767D\u677F", artifact: "\u6210\u679C\u6587\u4EF6", generation: "\u521B\u4F5C\u4EFB\u52A1" };
@@ -45523,7 +45526,7 @@ var EMPTY_MATERIAL = { title: "", content: "", sourcePath: "" };
 var REFERENCE_FILE_TYPES = /\.(txt|md|csv|json|jsonl|pdf|docx|pptx|png|jpe?g|webp|gif|mp4|webm)$/i;
 var REFERENCE_FILE_LIMIT = 20 * 1024 * 1024;
 function contentCardTitle(card) {
-  return card.defaultOutcome?.name || card.title || pendingCardTitle(card);
+  return cardDisplayTitle(card) || pendingCardTitle(card);
 }
 async function referenceHash(bytes) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((value) => value.toString(16).padStart(2, "0")).join("");
@@ -45612,12 +45615,13 @@ var ContentCard = (0, import_react46.memo)(function ContentCard2({ id: id2, data
   const fileDeck = data.defaultOutcome?.format === "pptx" ? data.defaultOutcome : null;
   const purpose = caps.purpose;
   const title = contentCardTitle(data);
+  const titleHint = [title, data.defaultOutcome?.name !== title && data.defaultOutcome?.name].filter(Boolean).join("\n");
   const formatLabel = data.defaultOutcome?.format?.toUpperCase() || (format === "document" && documentExtension ? documentExtension : { text: "\u6587\u672C", pptx: "PPT", image: "\u56FE\u7247", video: "\u89C6\u9891", document: "\u6587\u6863" }[format] || "\u5185\u5BB9");
   (0, import_react46.useEffect)(() => {
     setVideoError(false);
   }, [data.videoPreview]);
   const warning = data.delivery?.status === "failed" || /missing|modified|changed|unavailable|缺失|变化|外改/.test(`${data.status || ""} ${data.sourceStatus || ""} ${data.projectFile?.status || ""}`);
-  return /* @__PURE__ */ import_react46.default.createElement("article", { className: `wcc-card wcc-card-${data.kind}${selected2 ? " is-selected" : ""}${data.skillTodo ? " has-skill-todo" : ""}`, "aria-label": `${formatLabel}${purpose ? ` \xB7 ${purpose}` : ""}\u5361\uFF1A${data.title}`, "data-card-format": format || void 0, "data-card-id": id2, "data-card-draft": data.composition ? true : void 0 }, /* @__PURE__ */ import_react46.default.createElement(
+  return /* @__PURE__ */ import_react46.default.createElement("article", { className: `wcc-card wcc-card-${data.kind}${selected2 ? " is-selected" : ""}${data.skillTodo ? " has-skill-todo" : ""}`, "aria-label": `${formatLabel}${purpose ? ` \xB7 ${purpose}` : ""}\u5361\uFF1A${title}`, "data-card-format": format || void 0, "data-card-id": id2, "data-card-draft": data.composition ? true : void 0 }, /* @__PURE__ */ import_react46.default.createElement(
     NodeResizer,
     {
       nodeId: id2,
@@ -45632,7 +45636,7 @@ var ContentCard = (0, import_react46.memo)(function ContentCard2({ id: id2, data
       onResizeStart: () => data.onResizeStart?.(),
       onResizeEnd: (_event, size) => data.onResizeEnd?.(id2, size)
     }
-  ), /* @__PURE__ */ import_react46.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable, "aria-label": `\u8FDE\u63A5\u5230 ${data.title}` }), /* @__PURE__ */ import_react46.default.createElement("header", { className: "wcc-card-grip" }, /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-heading" }, /* @__PURE__ */ import_react46.default.createElement("h3", { title }, title), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-metadata" }, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-card-kind" }, formatLabel), purpose && /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-card-purpose" }, purpose))), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-heading-actions" }, caps.versioned && /* @__PURE__ */ import_react46.default.createElement(
+  ), /* @__PURE__ */ import_react46.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable, "aria-label": `\u8FDE\u63A5\u5230 ${data.title}` }), /* @__PURE__ */ import_react46.default.createElement("header", { className: "wcc-card-grip" }, /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-heading" }, /* @__PURE__ */ import_react46.default.createElement("h3", { title: titleHint }, title)), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-metadata" }, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-card-kind" }, formatLabel), purpose && /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-card-purpose" }, purpose)), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-card-heading-actions" }, caps.versioned && /* @__PURE__ */ import_react46.default.createElement(
     VersionSelect,
     {
       className: "wtt-version-compact",

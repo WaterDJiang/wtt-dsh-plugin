@@ -3,7 +3,7 @@ import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readF
 import path from 'node:path';
 import { sourceDigest, verifySourceRange } from './source-range.mjs';
 import { extractMaterialImport, inspectMaterialImport, IMPORT_MAX_BYTES } from './material-import.mjs';
-import { adjacentCreationPosition } from './creation-context.mjs';
+import { adjacentCreationPosition, CARD_WIDTH, CARD_HEIGHT } from './creation-context.mjs';
 import { editableCardText, cardWriteBack } from './card-capabilities.mjs';
 import { extractSkillNames } from './skill-commands.mjs';
 import { deliverableName } from './deliverable-files.mjs';
@@ -364,7 +364,7 @@ export class CanvasStore {
       const refs = this.#materialSources(row.id);
       const projectFile = this.db.prepare('SELECT source_path,source_hash FROM canvas_project_references WHERE material_id=?').get(row.id);
       nodes.push({ ...material, id: `material:${row.id}`, kind: excerpt ? 'excerpt' : 'material', refId: row.id, excerpt: row.content.slice(0, 180), sourceHash: row.hash,
-        position: { x: 40, y: 350 + index * 240 }, status: this.#fileState(row.markdown_path, row.hash),
+        position: { x: 40, y: 350 + index * (CARD_HEIGHT + 32) }, status: this.#fileState(row.markdown_path, row.hash),
         sourceStatus: material.importedFile ? this.#importState(material.id) : row.source_path ? this.#fileState(row.source_path) : null,
         ...(projectFile ? { projectFile: { path: projectFile.source_path, hash: projectFile.source_hash, status: this.#fileState(projectFile.source_path,projectFile.source_hash,IMPORT_MAX_BYTES) } } : {}),
         ...(refs.length ? { sourceRefs: refs, sourceCardIds: refs.map(ref => ref.cardId) } : {}),
@@ -409,7 +409,7 @@ export class CanvasStore {
         ...(['image', 'video'].includes(file.kind) ? { generatedFile: { name: path.basename(file.path), path: file.path,
           mime: file.mime, hash: file.hash, sha256: file.hash, byteSize: file.byteSize, status,
           media: file.validation.media }, sourceStatus: status } : {}),
-        position: placements.get(cardId) || { x: 410 + index % 3 * 350, y: 780 + Math.floor(index / 3) * 260 } });
+        position: placements.get(cardId) || { x: 410 + index % 3 * 350, y: 780 + Math.floor(index / 3) * (CARD_HEIGHT + 52) } });
       for (const source of file.sourceCardIds.length ? file.sourceCardIds : this.store.cards.binding(file.taskId) ? [] : [reqId]) edges.push({ id: `file-source:${source}:${file.id}`, source, target: cardId, provenance: true });
     });
     layout.elements.forEach((element, index) => {
@@ -719,7 +719,7 @@ export class CanvasStore {
     if (['material', 'excerpt'].includes(node.kind)) {
       const result = this.#addMaterial({ requirementId: requirement.id, operationId: input.operationId,
         title: node.title, content, sourceRefs: [{ cardId: node.id, hash: node.sourceHash }],
-        position: { x: node.position.x + (node.width || 258) + 50, y: node.position.y } });
+        position: { x: node.position.x + (node.width || CARD_WIDTH) + 50, y: node.position.y } });
       return { nodeId: `material:${result.material.id}` };
     }
     if (previous) throw new Error('编辑操作标识已用于不同内容');

@@ -1,13 +1,17 @@
 /* CW-47：画布卡的专用拖动标题，不复用预览面板的固定操作条。 */
-.wtt-course-canvas .wcc-card-grip{height:auto;min-height:56px;align-items:flex-start;padding:9px 12px;gap:8px}
-.wtt-course-canvas .wcc-card-heading{flex:1;min-width:0}
-.wtt-course-canvas .wcc-card .wcc-card-heading h3{margin:0;line-height:1.4;font-size:var(--wtt-text-lg);font-weight:600;-webkit-line-clamp:2;overflow-wrap:anywhere}
-.wtt-course-canvas .wcc-card-metadata{display:flex;align-items:center;gap:6px;margin-top:4px;min-width:0;line-height:1.3;color:var(--wtt-ui-muted)}
+.wtt-course-canvas .wcc-card{container-type:size}
+.wtt-course-canvas .wcc-card-grip{display:grid;grid-template-columns:minmax(0,1fr) max-content;height:auto;min-height:56px;align-items:center;padding:9px 12px;gap:4px 8px}
+.wtt-course-canvas .wcc-card-heading{grid-column:1/-1;min-width:0}
+.wtt-course-canvas .wcc-card .wcc-card-heading h3{margin:0;line-height:1.4;font-size:var(--wtt-text-lg);font-weight:600;-webkit-line-clamp:3;overflow-wrap:anywhere}
+.wtt-course-canvas .wcc-card-metadata{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;line-height:1.3;color:var(--wtt-ui-muted)}
 .wtt-course-canvas .wcc-card-metadata .wcc-card-kind{font-size:var(--wtt-text-xs);font-weight:400}
-.wtt-course-canvas .wcc-card-heading-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;max-width:42%;min-width:0;padding-top:2px}
+.wtt-course-canvas .wcc-card-heading-actions{display:flex;align-items:center;justify-self:end;gap:6px;min-width:0}
 .wtt-course-canvas .wcc-card-heading-actions .wcc-card-versions{min-width:42px;max-width:86px;width:auto;flex:0 1 auto;margin:0}
 .wtt-course-canvas .wcc-card-heading-actions .wcc-grip{flex:0 0 auto;margin:0}
 .wtt-course-canvas .wcc-card-body{padding-top:10px}
+@container(max-height:210px){
+ .wtt-course-canvas .wcc-card .wcc-card-heading h3{-webkit-line-clamp:2}
+}
 
 /* 引用入口保留文字；格式、名称与移除各有自己的视觉／交互位置。 */
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;align-items:center;gap:var(--wtt-space-1);margin:0 0 var(--wtt-space-2);min-width:0}

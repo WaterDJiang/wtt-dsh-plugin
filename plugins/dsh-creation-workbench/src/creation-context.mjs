@@ -1,4 +1,6 @@
 import { extractSkillNames } from './skill-commands.mjs';
+export const CARD_WIDTH = 320;
+export const CARD_HEIGHT = 256;
 const BLOCKED = /^(missing|modified|changed|unavailable)$/;
 const FIELDS = ['id', 'nodeId', 'kind', 'artifactKind', 'title', 'number', 'refId', 'content', 'excerpt', 'path', 'sourcePath', 'sourceHash', 'status', 'sourceStatus', 'extracted', 'excerptInfo', 'importedFile', 'generatedFile', 'whiteboardSource', 'referenceNote', 'unavailable'];
 
@@ -99,7 +101,7 @@ export function creationTaskInput(context) {
     ...(context.generation ? { generation: { ...context.generation } } : {}) };
 }
 
-export function adjacentCreationPosition(anchor, cards, width = 258, height = 208) {
+export function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
   let x = Math.min(999_000, Math.max(-999_000, anchor.position.x + (anchor.width || width) + 80));
   let y = Math.min(999_000, Math.max(-999_000, anchor.position.y));
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -111,7 +113,7 @@ export function adjacentCreationPosition(anchor, cards, width = 258, height = 20
 }
 
 // Prefer a free visible spot for B without moving the user's viewport.
-export function visibleCreationPosition(anchor, cards, viewport, size, width = 258, height = 208) {
+export function visibleCreationPosition(anchor, cards, viewport, size, width = CARD_WIDTH, height = CARD_HEIGHT) {
   const zoom = viewport.zoom;
   const left = (16 - viewport.x) / zoom, right = (size.width - 16 - viewport.x) / zoom - width;
   const top = (96 - viewport.y) / zoom;

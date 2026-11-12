@@ -3799,8 +3799,8 @@ svg.react-flow__connectionline {
 }
 .wtt-course-canvas .react-flow__node-content {
   border: 0;
-  width: 258px;
-  height: 208px;
+  width: 320px;
+  height: 256px;
   border-radius: 8px;
 }
 .wtt-course-canvas .react-flow__node-courseGroup {
@@ -3816,8 +3816,8 @@ svg.react-flow__connectionline {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 258px;
-  height: 208px;
+  width: 320px;
+  height: 256px;
   border: 1px solid var(--wtt-ui-line, #dce2eb);
   border-radius: 8px;
   background: var(--wtt-ui-surface, #fff);
@@ -11600,15 +11600,20 @@ dialog.wtt-project-picker[open] {
 }
 
 /* src/card-reference-ui.css */
+.wtt-course-canvas .wcc-card {
+  container-type: size;
+}
 .wtt-course-canvas .wcc-card-grip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
   height: auto;
   min-height: 56px;
-  align-items: flex-start;
+  align-items: center;
   padding: 9px 12px;
-  gap: 8px;
+  gap: 4px 8px;
 }
 .wtt-course-canvas .wcc-card-heading {
-  flex: 1;
+  grid-column: 1/-1;
   min-width: 0;
 }
 .wtt-course-canvas .wcc-card .wcc-card-heading h3 {
@@ -11616,14 +11621,14 @@ dialog.wtt-project-picker[open] {
   line-height: 1.4;
   font-size: var(--wtt-text-lg);
   font-weight: 600;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   overflow-wrap: anywhere;
 }
 .wtt-course-canvas .wcc-card-metadata {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
   min-width: 0;
   line-height: 1.3;
   color: var(--wtt-ui-muted);
@@ -11635,11 +11640,9 @@ dialog.wtt-project-picker[open] {
 .wtt-course-canvas .wcc-card-heading-actions {
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: 6px;
-  flex: 0 0 auto;
-  max-width: 42%;
   min-width: 0;
-  padding-top: 2px;
 }
 .wtt-course-canvas .wcc-card-heading-actions .wcc-card-versions {
   min-width: 42px;
@@ -11654,6 +11657,11 @@ dialog.wtt-project-picker[open] {
 }
 .wtt-course-canvas .wcc-card-body {
   padding-top: 10px;
+}
+@container (max-height:210px) {
+  .wtt-course-canvas .wcc-card .wcc-card-heading h3 {
+    -webkit-line-clamp: 2;
+  }
 }
 .wtt-course-canvas .wcc-card-composer .wcc-creation-reference-area {
   display: grid;

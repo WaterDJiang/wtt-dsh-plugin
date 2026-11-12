@@ -5,6 +5,10 @@
 const TEXT_FILE = /\.(md|markdown|txt)$/i;
 const OFFICE_FILE = /\.(docx|pptx|csv|pdf)$/i;
 
+export function cardDisplayTitle(card) {
+  return card?.defaultOutcome?.title || card?.title || card?.defaultOutcome?.name || '';
+}
+
 export function editableCardText(card) {
   if (!card) return null;
   if (card.kind === 'generation') return card.composition?.editable && card.outputCard?.type === 'text' ? '' : null;

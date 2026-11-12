@@ -22,7 +22,7 @@ import { CourseTasks } from './course-tasks.jsx'
 import { normalizeLineEndings } from './text-diff.mjs'
 import { NodeCreateMenu, CardComposer } from './card-creation.jsx'
 import { mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
-import { createCardContext, createCompositionContext, createRevisionContext, creationSource, updateCreationReferences, creationTaskInput, adjacentCreationPosition, visibleCreationPosition, usableCreationSource } from './creation-context.mjs'
+import { CARD_WIDTH, CARD_HEIGHT, createCardContext, createCompositionContext, createRevisionContext, creationSource, updateCreationReferences, creationTaskInput, adjacentCreationPosition, visibleCreationPosition, usableCreationSource } from './creation-context.mjs'
 import { OutputPreview, DeckPreview } from './output-preview.jsx'
 import { SlideDraftCover } from './slide-draft-cover.jsx'
 import { AssetBoard } from './asset-board.jsx'
@@ -37,11 +37,9 @@ import { createPendingContext, generationStateSignature, isActiveTaskPhase, nati
 import { taskInteractions, interactionLabel } from './skill-interactions.mjs'
 import { SkillConfirmation } from './skill-confirmation.jsx'
 import { attachCanvasGestures } from './canvas-gestures.mjs'
-import { cardCapabilities, cardTextDraftKey } from './card-capabilities.mjs'
+import { cardCapabilities, cardTextDraftKey, cardDisplayTitle } from './card-capabilities.mjs'
 import { VersionSelect } from './version-select.jsx'
 
-const CARD_WIDTH = 258
-const CARD_HEIGHT = 208
 const LARGE_CANVAS_THRESHOLD = 80
 const isCanvasOverview = state => state.nodes.length >= LARGE_CANVAS_THRESHOLD && state.transform[2] < 0.4
 const LABELS = { requirement: '背景', material: '素材', excerpt: '摘录', outline: '课程大纲', word: 'Word 文档', whiteboard: '白板', artifact: '成果文件', generation: '创作任务' }
@@ -51,7 +49,7 @@ const REFERENCE_FILE_TYPES = /\.(txt|md|csv|json|jsonl|pdf|docx|pptx|png|jpe?g|w
 const REFERENCE_FILE_LIMIT = 20 * 1024 * 1024
 
 function contentCardTitle(card) {
-  return card.defaultOutcome?.name || card.title || pendingCardTitle(card)
+  return cardDisplayTitle(card) || pendingCardTitle(card)
 }
 
 async function referenceHash(bytes) {
@@ -133,16 +131,18 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const fileDeck = data.defaultOutcome?.format === 'pptx' ? data.defaultOutcome : null
   const purpose = caps.purpose
   const title = contentCardTitle(data)
+  const titleHint = [title, data.defaultOutcome?.name !== title && data.defaultOutcome?.name].filter(Boolean).join('\n')
   const formatLabel = data.defaultOutcome?.format?.toUpperCase() || (format === 'document' && documentExtension ? documentExtension : { text: '文本', pptx: 'PPT', image: '图片', video: '视频', document: '文档' }[format] || '内容')
   useEffect(() => { setVideoError(false) }, [data.videoPreview])
   const warning = data.delivery?.status === 'failed' || /missing|modified|changed|unavailable|缺失|变化|外改/.test(`${data.status || ''} ${data.sourceStatus || ''} ${data.projectFile?.status || ''}`)
-  return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${data.title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined}>
+  return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined}>
     <NodeResizer nodeId={id} isVisible={selected} minWidth={200} minHeight={160} maxWidth={1200} maxHeight={1200}
       color="var(--wtt-ui-accent)" handleClassName="wcc-content-resize-handle" lineClassName="wcc-content-resize-line"
       onResizeStart={() => data.onResizeStart?.()} onResizeEnd={(_event, size) => data.onResizeEnd?.(id, size)} />
     <Handle type="target" position={Position.Left} isConnectable={isConnectable} aria-label={`连接到 ${data.title}`} />
     <header className="wcc-card-grip">
-      <div className="wcc-card-heading"><h3 title={title}>{title}</h3><div className="wcc-card-metadata"><span className="wcc-card-kind">{formatLabel}</span>{purpose && <span className="wcc-card-purpose">{purpose}</span>}</div></div>
+      <div className="wcc-card-heading"><h3 title={titleHint}>{title}</h3></div>
+      <div className="wcc-card-metadata"><span className="wcc-card-kind">{formatLabel}</span>{purpose && <span className="wcc-card-purpose">{purpose}</span>}</div>
       <div className="wcc-card-heading-actions">{caps.versioned && <VersionSelect className="wtt-version-compact" ariaLabel={`选择 ${data.title} 的版本`}
         versions={data.outputCard?.versions?.length ? data.outputCard.versions : data.materialVersions}
         value={data.outputCard?.versionId || data.currentMaterialVersionId}

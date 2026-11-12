@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCardContext, updateCreationReferences, creationTaskInput, adjacentCreationPosition } from '../src/creation-context.mjs';
+import { CARD_WIDTH, CARD_HEIGHT, createCardContext, updateCreationReferences, creationTaskInput, adjacentCreationPosition } from '../src/creation-context.mjs';
 const card = (id, content = '原正文') => ({ id, kind: 'outline', refId: id, title: id, sourceHash: 'a'.repeat(64), content, position: { x: 40, y: 60 } });
 const context = anchor => createCardContext({ projectId: '项目A', projectPath: '/A', requirement: { id: '需求A', title: '课程A' }, anchor, outputPosition: { x: 378, y: 60 } });
 
@@ -45,10 +45,10 @@ test('imported file and whiteboard snapshot metadata stay frozen with their orig
 
 test('new products start beside the original anchor and avoid existing cards', () => {
   const anchor = card('base');
-  const crowded = { ...card('occupied'), position: { x: 378, y: 60 } };
+  const crowded = { ...card('occupied'), position: { x: 40 + CARD_WIDTH + 80, y: 60 } };
   const result = adjacentCreationPosition(anchor, [anchor, crowded]);
-  assert.equal(result.x, 378);
-  assert.ok(result.y > crowded.position.y + 208);
+  assert.equal(result.x, crowded.position.x);
+  assert.ok(result.y > crowded.position.y + CARD_HEIGHT);
 });
 
 test('a selected passage has a separate draft from whole-source creation and carries its exact range', () => {
