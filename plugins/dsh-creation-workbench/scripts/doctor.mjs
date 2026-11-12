@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -9,8 +9,10 @@ let service;
 try {
   service = new WorkbenchService({ workspaceRoot: temporary });
   const result = service.environment();
+  const hostRoot = path.join(root, '.runtime/host/node_modules/@deepseek-ai/dsh');
+  const hostManifest = existsSync(path.join(hostRoot, 'package.json')) ? JSON.parse(readFileSync(path.join(hostRoot, 'package.json'), 'utf8')) : null;
   const checks = [{ name: 'Node >=24', available: Number(process.versions.node.split('.')[0]) >= 24 },
-    { name: 'DSH 0.2.1-rc.5 隔离运行时', available: existsSync(path.join(root, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js')) },
+    { name: `DSH ${hostManifest?.version || '未安装'} 隔离运行时`, available: Boolean(hostManifest?.version) && existsSync(path.join(hostRoot, 'lib/bin.js')) },
     { name: '插件前端', available: existsSync(path.join(root, 'dist/client.js')) }, ...result.checks];
   for (const item of checks) console.log(`${item.available ? 'PASS' : 'FAIL'} ${item.name}${item.message ? `：${item.message}` : ''}`);
   console.log(`环境指纹：${result.fingerprint}`);

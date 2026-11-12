@@ -34,6 +34,13 @@
 .wtt-project-workbench .wtt-ui-dialog-body>.wtt-field{margin:0}
 
 /* 版本选择按钮：卡片头部／预览面板／资产看板共用，按页面布局自适应 */
+.wtt-project-workbench.wtt-media-service-settings{--wtt-radius-control:var(--dsw-radius-md,6px);--wtt-radius-panel:var(--dsw-radius-lg,10px)}
+.wtt-project-workbench.wtt-media-service-settings .wtt-ui-dialog-footer .wtt-ui-button{min-height:36px;padding:0 14px;background:transparent;border-color:var(--wtt-ui-line)}
+.wtt-project-workbench.wtt-media-service-settings .wtt-ui-dialog-footer .wtt-ui-button[data-ui-variant=primary]{border-color:transparent;background:var(--wtt-media-primary);color:var(--wtt-media-primary-ink)}
+.wtt-project-workbench.wtt-media-service-settings .wtt-ui-dialog-footer .wtt-ui-button[data-ui-variant=primary]:hover:not(:disabled){background:var(--wtt-media-primary-hover)}
+.wtt-project-workbench.wtt-media-service-settings .wtt-media-add-modes .wtt-ui-button{background:transparent;border-radius:var(--wtt-radius-control);color:var(--wtt-ui-muted)}
+.wtt-project-workbench.wtt-media-service-settings .wtt-media-add-modes .wtt-ui-button[aria-selected=true]{background:var(--wtt-media-input);border-color:var(--wtt-ui-line);color:var(--wtt-ui-ink)}
+.wtt-project-workbench.wtt-media-service-settings footer.wtt-ui-dialog-footer{padding:var(--wtt-space-2) 0 0;border:0;background:transparent}
 .wtt-version-select { max-width: 132px; padding: 2px 4px; border: 1px solid var(--wtt-ui-line, #dce5f2); border-radius: 5px; background: var(--wtt-ui-accent-paper, #f6f9fe); color: var(--wtt-ui-muted, #7b8faf); font-size: var(--wtt-text-xs, 12px); cursor: pointer; }
 .wtt-version-select.wtt-version-compact { max-width: 96px; margin-left: auto; }
 .wtt-card-open-divider, .wtt-version-divider { height: 1px; margin: 4px 0; background: var(--wtt-ui-line, #e4e8ef); }

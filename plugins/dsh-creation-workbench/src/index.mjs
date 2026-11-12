@@ -19,6 +19,7 @@ export { Config } from './media-service-config.mjs';
 import { Config as MediaConfig } from './media-service-config.mjs';
 import { createMediaServiceAccess } from './media-service-host.mjs';
 import { mediaServiceProfiles } from './media-service-settings.mjs';
+import { discoverMediaModels } from './media-model-discovery.mjs';
 
 export const name = 'wtt-creation-workbench';
 export const inject = ['connection', 'tools', 'skills', 'agents', 'sessionQuery'];
@@ -302,6 +303,7 @@ export function apply(ctx, config = {}) {
         const body = await request.text();
         if (Buffer.byteLength(body) > 1_500_000) throw new Error('请求内容过大');
         const { action, data } = JSON.parse(body);
+        if (action === 'discover-media-models') return Response.json(await discoverMediaModels(mediaServiceAccess, data), { headers });
         if(['document-external-open','document-external-status','document-open-application','document-reveal-file','document-external-save-version'].includes(action)&&!projectId)throw new Error('本机文档操作必须指定当前项目');
         if (action === 'open-project') return Response.json({ project: projects.open(data?.path) }, { headers });
         const service = projects.get(projectId);

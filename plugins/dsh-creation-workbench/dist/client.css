@@ -37,9 +37,10 @@
   min-height: 0;
   gap: var(--wtt-space-3);
   margin-top: var(--wtt-space-4);
-  padding: var(--wtt-space-3);
+  padding: 0;
+  max-width: 720px;
   color: var(--wtt-ui-ink);
-  background: var(--wtt-ui-surface);
+  background: transparent;
   border-radius: var(--wtt-radius-control);
 }
 .wtt-media-service-settings h3 {
@@ -79,8 +80,12 @@
   overflow-wrap: anywhere;
 }
 .wtt-media-service-form {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--wtt-space-3);
+  padding: var(--wtt-space-4);
+  border-radius: var(--wtt-radius-panel);
+  background: var(--wtt-media-card);
 }
 .wtt-media-service-form label {
   display: grid;
@@ -92,11 +97,12 @@
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  padding: var(--wtt-space-2);
+  height: var(--wtt-control-h);
+  padding: 0 var(--wtt-space-2);
   font: inherit;
   color: var(--wtt-ui-ink);
-  background: var(--wtt-ui-subtle);
-  border: 1px solid var(--wtt-ui-control-line);
+  background: var(--wtt-media-input);
+  border: 1px solid var(--wtt-media-stroke);
   border-radius: var(--wtt-radius-control);
 }
 .wtt-media-service-form input:focus-visible,
@@ -133,6 +139,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--wtt-ui-line);
+  background: var(--wtt-ui-surface);
   box-sizing: border-box;
 }
 .wtt-media-service-dialog:not([open]) {
@@ -152,6 +159,127 @@
   gap: var(--wtt-space-3);
   overflow: auto;
   padding: var(--wtt-space-3);
+}
+.wtt-media-service-settings > .wtt-ui-panel-toolbar {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.wtt-media-service-form label {
+  color: var(--wtt-ui-text);
+  font-size: var(--wtt-text-sm);
+}
+.wtt-media-add-modes {
+  display: flex;
+  flex-wrap: wrap;
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--wtt-space-1);
+  gap: var(--wtt-space-1);
+  border-radius: var(--wtt-radius-panel);
+  background: var(--wtt-media-switch-track);
+}
+.wtt-media-add-panel,
+.wtt-media-customized-body,
+.wtt-media-model-field {
+  display: grid;
+  min-width: 0;
+  gap: var(--wtt-space-3);
+}
+.wtt-media-provider-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wtt-space-3);
+}
+.wtt-media-provider-fields label {
+  flex: 0 1 240px;
+}
+.wtt-media-provider-fields label:last-child {
+  flex-basis: 120px;
+}
+.wtt-media-customized {
+  border-top: 1px solid var(--wtt-ui-line);
+  padding-top: var(--wtt-space-3);
+}
+.wtt-media-customized summary {
+  cursor: pointer;
+  color: var(--wtt-ui-text);
+  font-size: var(--wtt-text-sm);
+}
+.wtt-media-customized-body {
+  padding-top: var(--wtt-space-3);
+}
+.wtt-media-service-form .wtt-ui-dialog-footer {
+  padding: var(--wtt-space-2) 0 0;
+  border: 0;
+  background: transparent;
+}
+.wtt-media-model-heading,
+.wtt-media-model-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wtt-space-2);
+}
+.wtt-media-model-field {
+  gap: var(--wtt-space-1);
+}
+.wtt-media-model-field small {
+  color: var(--wtt-ui-muted);
+}
+.wtt-media-model-picker {
+  display: grid;
+  gap: var(--wtt-space-2);
+  padding: var(--wtt-space-2);
+  border: 1px solid var(--wtt-ui-line);
+  border-radius: var(--wtt-radius-control);
+}
+.wtt-media-model-candidates {
+  max-height: 240px;
+  overflow: auto;
+}
+.wtt-media-service-form .wtt-media-model-candidate {
+  display: flex;
+  align-items: center;
+  gap: var(--wtt-space-2);
+  padding: var(--wtt-space-2);
+  cursor: pointer;
+}
+.wtt-media-service-form .wtt-media-model-candidate input {
+  width: auto;
+  height: auto;
+  flex: none;
+}
+.wtt-media-model-candidate code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wtt-media-model-actions {
+  justify-content: flex-end;
+}
+.wtt-media-service-form .wtt-media-discovery-error {
+  color: var(--wtt-ui-warning);
+}
+.wtt-media-service-form .wtt-media-clear-key {
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .wtt-media-add-modes {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .wtt-media-add-modes .wtt-ui-button {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+  }
+  .wtt-media-provider-fields label {
+    flex: 1 1 160px;
+  }
+  .wtt-media-model-heading {
+    flex-wrap: wrap;
+  }
 }
 
 /* src/workbench.css */
@@ -1202,6 +1330,15 @@
   --wtt-ui-purple-fill: #695193;
   --wtt-ui-purple-line: #b4a3ce;
   --wtt-ui-purple-paper: #f4effa;
+}
+.wtt-project-workbench.wtt-media-service-settings {
+  --wtt-media-card: var(--dsw-alias-bg-module-platform, var(--wtt-ui-subtle));
+  --wtt-media-input: var(--dsw-alias-bg-layer-1, var(--wtt-ui-surface));
+  --wtt-media-stroke: var(--dsw-alias-border-l4, var(--wtt-ui-line));
+  --wtt-media-primary: var(--dsw-alias-button-primary-fill, var(--wtt-ui-ink));
+  --wtt-media-primary-ink: var(--dsw-alias-label-primary-foreground, var(--wtt-ui-surface));
+  --wtt-media-primary-hover: var(--dsw-alias-button-primary-hover, var(--wtt-ui-muted));
+  --wtt-media-switch-track: color-mix(in srgb, var(--wtt-ui-ink) 12%, var(--wtt-media-card));
 }
 html[data-ds-theme-source=dark] .wtt-project-workbench,
 html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench {
@@ -11807,6 +11944,39 @@ dialog.wtt-project-picker[open] {
 }
 .wtt-project-workbench .wtt-ui-dialog-body > .wtt-field {
   margin: 0;
+}
+.wtt-project-workbench.wtt-media-service-settings {
+  --wtt-radius-control:var(--dsw-radius-md,6px);
+  --wtt-radius-panel:var(--dsw-radius-lg,10px);
+}
+.wtt-project-workbench.wtt-media-service-settings .wtt-ui-dialog-footer .wtt-ui-button {
+  min-height: 36px;
+  padding: 0 14px;
+  background: transparent;
+  border-color: var(--wtt-ui-line);
+}
+.wtt-project-workbench.wtt-media-service-settings .wtt-ui-dialog-footer .wtt-ui-button[data-ui-variant=primary] {
+  border-color: transparent;
+  background: var(--wtt-media-primary);
+  color: var(--wtt-media-primary-ink);
+}
+.wtt-project-workbench.wtt-media-service-settings .wtt-ui-dialog-footer .wtt-ui-button[data-ui-variant=primary]:hover:not(:disabled) {
+  background: var(--wtt-media-primary-hover);
+}
+.wtt-project-workbench.wtt-media-service-settings .wtt-media-add-modes .wtt-ui-button {
+  background: transparent;
+  border-radius: var(--wtt-radius-control);
+  color: var(--wtt-ui-muted);
+}
+.wtt-project-workbench.wtt-media-service-settings .wtt-media-add-modes .wtt-ui-button[aria-selected=true] {
+  background: var(--wtt-media-input);
+  border-color: var(--wtt-ui-line);
+  color: var(--wtt-ui-ink);
+}
+.wtt-project-workbench.wtt-media-service-settings footer.wtt-ui-dialog-footer {
+  padding: var(--wtt-space-2) 0 0;
+  border: 0;
+  background: transparent;
 }
 .wtt-version-select {
   max-width: 132px;

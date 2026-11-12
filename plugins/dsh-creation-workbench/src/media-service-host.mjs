@@ -3,8 +3,7 @@ import { mediaServiceProfiles } from './media-service-settings.mjs';
 export function createMediaServiceAccess(ctx, config) {
   const profiles = () => mediaServiceProfiles(config.mediaServices);
   profiles();
-  const get = id => {
-    const profile = profiles()[id];
+  const draft = (profile, id) => {
     if (!profile?.connection) return profile;
     const settings = ctx.get?.('settings') || ctx.settings;
     const namespace = settings?.describe({ redactSecrets: true }).find(entry => entry.ns === profile.connection.namespace);
@@ -13,9 +12,11 @@ export function createMediaServiceAccess(ctx, config) {
     if (!source || typeof source.apiKeyEnv !== 'string') throw new Error('引用的 DSH 提供商凭据配置不可用，请重新选择连接');
     return mediaServiceProfiles({ [id]: { ...profile, apiKeyEnv: source.apiKeyEnv, baseURL: source.baseURL || profile.baseURL } })[id];
   };
+  const get = id => draft(profiles()[id], id);
   const credentials = () => ctx.get?.('credentials') || ctx.credentials;
   return {
-    profiles, get,
+    profiles, get, draft,
+    async resolveReference(ref) { return (await credentials()?.resolve?.(ref))?.value; },
     async describe(id) {
       const profile = get(id);
       if (!profile) throw new Error('媒体服务配置已移除');

@@ -100,3 +100,75 @@ test('profile validation rejects inline secrets and invalid endpoints, while Con
   assert.equal(parsed.mediaServices.get()[id].apiKeyEnv, ownRef);
   assert.deepEqual(configuredCredentialReferences([], {}).size, 0);
 });
+
+// A real local listing exercises the same transport as the Host without a paid model call.
+async function listingServer(handler, work) {
+  const { createServer } = await import('node:http');
+  const { once } = await import('node:events');
+  const server = createServer(handler);
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try { await work(`http://127.0.0.1:${server.address().port}`); }
+  finally { await new Promise(resolve => server.close(resolve)); }
+}
+
+test('media discovery reads a draft before saving, uses stored credentials, deduplicates and returns only candidate metadata', async () => {
+  const { discoverMediaModels } = await import('../src/media-model-discovery.mjs');
+  let calls = 0;
+  await listingServer((request, response) => {
+    calls++; assert.equal(request.method, 'GET'); assert.equal(request.url, '/v1/models');
+    assert.equal(request.headers.authorization, 'Bearer synthetic-listing-key');
+    response.end(JSON.stringify({ data: [{ id: 'custom-image', display_name: '自定义图像', apiKey: 'do-not-return' }, { id: 'custom-image' }, { id: 'custom-video' }, { id: 'synthetic-listing-key' }, {}] }));
+  }, async baseURL => {
+    const access = createMediaServiceAccess({ credentials: { resolve: async () => ({ value: 'synthetic-listing-key' }) } }, { mediaServices: {} });
+    const result = await discoverMediaModels(access, { id, profile: { ...profile, baseURL: baseURL + '/v1', model: '', displayName: '' } });
+    assert.deepEqual(result, { models: [{ id: 'custom-image', name: '自定义图像' }, { id: 'custom-video' }] });
+    assert.deepEqual(access.profiles(), {});
+    assert.equal(calls, 1);
+  });
+});
+
+test('media discovery follows Host connection URL and key, rejects shared key writes and late connection changes', async () => {
+  const { discoverMediaModels } = await import('../src/media-model-discovery.mjs');
+  await listingServer((request, response) => {
+    assert.equal(request.headers.authorization, 'Bearer shared-secret'); response.end('{"data":[{"id":"shared-model"}]}');
+  }, async baseURL => {
+    let source = { baseURL, apiKeyEnv: 'SHARED_KEY' };
+    const ctx = { settings: { describe: () => [{ ns: 'llm-pi-ai', value: { providers: { existing: source } } }] }, credentials: { resolve: async ref => { assert.equal(ref, 'SHARED_KEY'); return { value: 'shared-secret' }; } } };
+    const access = createMediaServiceAccess(ctx, { mediaServices: {} });
+    const linked = { ...profile, baseURL: 'https://stale.invalid/v1', connection: { namespace: 'llm-pi-ai', path: ['providers', 'existing'] } };
+    assert.deepEqual((await discoverMediaModels(access, { id, profile: linked })).models, [{ id: 'shared-model' }]);
+    await assert.rejects(discoverMediaModels(access, { id, profile: linked, apiKey: 'must-not-write' }), /已有凭据只能引用/);
+    ctx.credentials.resolve = async () => { source = { ...source, baseURL: 'https://changed.invalid' }; return { value: 'shared-secret' }; };
+    await assert.rejects(discoverMediaModels(access, { id, profile: linked }), /连接.*已变化/);
+  });
+});
+
+test('media discovery refuses redirects, HTTP errors and malformed listings without leaking upstream keys', async () => {
+  const { discoverMediaModels } = await import('../src/media-model-discovery.mjs');
+  let status = 302, body = 'synthetic-listing-key';
+  await listingServer((_request, response) => {
+    response.statusCode = status; response.setHeader('Location', 'https://should-not-follow.invalid/models'); response.end(body);
+  }, async baseURL => {
+    const access = createMediaServiceAccess({}, { mediaServices: {} });
+    const probe = () => discoverMediaModels(access, { id, profile: { ...profile, baseURL }, apiKey: 'synthetic-listing-key' });
+    await assert.rejects(probe(), /HTTP 302/);
+    status = 401; await assert.rejects(probe(), error => /HTTP 401/.test(error.message) && !error.message.includes('synthetic-listing-key'));
+    status = 200; await assert.rejects(probe(), /JSON/);
+    body = '{}'; await assert.rejects(probe(), /未提供.*模型列表/);
+  });
+});
+
+test('Gemini model discovery uses Google headers, strips resource prefixes and follows bounded pagination', async () => {
+  const { discoverMediaModels } = await import('../src/media-model-discovery.mjs');
+  let requests = 0;
+  await listingServer((request, response) => {
+    requests++; assert.equal(request.headers['x-goog-api-key'], 'google-synthetic'); assert.equal(request.headers.authorization, undefined);
+    const url = new URL(request.url, 'http://localhost');
+    assert.equal(url.pathname, '/v1beta/models');
+    response.end(JSON.stringify(url.searchParams.has('pageToken') ? { models: [{ name: 'models/custom-video' }] } : { models: [{ name: 'models/custom-image', displayName: '图像' }], nextPageToken: 'next' }));
+  }, async baseURL => {
+    const access = createMediaServiceAccess({}, { mediaServices: {} });
+    assert.deepEqual((await discoverMediaModels(access, { id, profile: { ...profile, protocol: 'gemini-image', baseURL: baseURL + '/v1beta' }, apiKey: 'google-synthetic' })).models, [{ id: 'custom-image', name: '图像' }, { id: 'custom-video' }]);
+    assert.equal(requests, 2);
+  });
+});

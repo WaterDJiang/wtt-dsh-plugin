@@ -40,6 +40,16 @@
   --wtt-ui-purple-line: #b4a3ce;
   --wtt-ui-purple-paper: #f4effa;
 }
+/* 媒体模型设置对齐宿主 Models；仅此作用域消费原生设置色值。 */
+.wtt-project-workbench.wtt-media-service-settings {
+  --wtt-media-card: var(--dsw-alias-bg-module-platform, var(--wtt-ui-subtle));
+  --wtt-media-input: var(--dsw-alias-bg-layer-1, var(--wtt-ui-surface));
+  --wtt-media-stroke: var(--dsw-alias-border-l4, var(--wtt-ui-line));
+  --wtt-media-primary: var(--dsw-alias-button-primary-fill, var(--wtt-ui-ink));
+  --wtt-media-primary-ink: var(--dsw-alias-label-primary-foreground, var(--wtt-ui-surface));
+  --wtt-media-primary-hover: var(--dsw-alias-button-primary-hover, var(--wtt-ui-muted));
+  --wtt-media-switch-track: color-mix(in srgb, var(--wtt-ui-ink) 12%, var(--wtt-media-card));
+}
 /* 固定主题（包括宿主自定义主题的解析结果）优先于浏览器偏好。 */
 html[data-ds-theme-source="dark"] .wtt-project-workbench,
 html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench {

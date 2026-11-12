@@ -23,6 +23,13 @@ export function createMediaSettingsOperations(ctx) {
     form, mirror,
     ensure: () => mirror.ensure(),
     references,
+    async discover(id, profile, apiKey = '', signal) {
+      const response = await fetch('/api/wtt-creation-workbench', { method: 'POST', signal,
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'discover-media-models', data: { id, profile, apiKey } }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '获取可用模型失败');
+      return result.models;
+    },
     connections() {
       const snapshot = mirror.getSnapshot().view;
       return [...references()].flatMap(([ref, usages]) => usages.filter(usage => usage.namespace !== MEDIA_SETTINGS_NAMESPACE).map(usage => {

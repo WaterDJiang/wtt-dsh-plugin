@@ -1,5 +1,7 @@
 const RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
 const definition = (vendor, label, type, endpoint, models, parameters) => ({ vendor, label, type, endpoint, models, ...parameters });
+export const MEDIA_PROVIDERS = { openai: 'OpenAI', gemini: 'Google', jimeng: '火山方舟', kling: '可灵', minimax: 'MiniMax', wan: '阿里云百炼' };
+export const mediaServiceName = protocol => `${MEDIA_PROVIDERS[MEDIA_PROTOCOLS[protocol].vendor]} ${MEDIA_PROTOCOLS[protocol].type === 'image' ? '图片' : '视频'}`;
 export const MEDIA_PROTOCOLS = {
   'openai-image': definition('openai', 'GPT 图片', 'image', 'https://api.openai.com/v1', ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2', 'gpt-image-1.5'], { sizes: ['1024x1024', '1536x1024', '1024x1536'], qualities: ['auto', 'low', 'medium', 'high'], maxReferences: 1 }),
   'openai-video': definition('openai', 'Sora 视频', 'video', 'https://api.openai.com/v1', ['sora-2', 'sora-2-pro'], { sizes: ['1280x720', '720x1280'], durations: [4, 8, 12], maxReferences: 1 }),
