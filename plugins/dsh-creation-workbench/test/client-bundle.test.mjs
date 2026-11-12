@@ -21,12 +21,15 @@ test('distributed DSH factory activates and disposes its styles with the plugin'
     ? { apply() {} } : localRequire(name));
   const disposers = [], registrations = [], sources = new Set();
   const ctx = {
+    configForms: { get: () => ({}), describe: () => ({}) },
     effect: (apply) => { disposers.push(apply()); },
     inputTriggers: { registerSource: source => { sources.add(source); return () => sources.delete(source); } },
     slots: { inject: (_key, apply) => apply(), register: (options, component) => { registrations.push({ options, component }); return () => {}; } },
   };
   plugin.apply(ctx);
   assert.equal(styles.size, 1);
+  assert.equal(plugin.inject.includes('remote.credentials'), true);
+  assert.equal(registrations.find(r => r.options.name === 'settings.models.footer').options.id, 'wtt-media-services');
   assert.equal(sources.size, 1);
   assert.equal([...sources][0].name, 'wtt-course-native-editor');
   assert.equal(plugin.inject.includes('inputTriggers'), true);

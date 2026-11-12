@@ -186,6 +186,15 @@ async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
     resume();
     await page.unrouteAll({ behavior: 'wait' });
   }
+  const beforeFit = await board();
+  const savedView = page.waitForResponse(reply => new URL(reply.url()).pathname === api.pathname
+    && reply.request().method() === 'POST' && ['save-canvas-viewport', 'save-canvas'].includes(reply.request().postDataJSON()?.action));
+  await canvas.getByRole('button', { name: '查看全部卡片', exact: true }).click();
+  const fitted = await savedView;
+  assert(fitted.ok(), `保存适应全部后的视口失败，HTTP ${fitted.status()}`);
+  assert.notDeepEqual((await fitted.json()).viewport, beforeFit.viewport, '查看全部必须实际改变视口');
+  assert.deepEqual((await board()).nodes.find(node => node.id === nodeId).position,
+    beforeFit.nodes.find(node => node.id === nodeId).position, '适应全部不能修改卡片坐标');
 }
 
 const start = performance.now();

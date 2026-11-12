@@ -84,6 +84,21 @@ const end = (seq = 3, turn = 1, reason = { kind: 'completed' }) => ({ type: 'tur
 const failure = (seq = 3, turn = 1) => end(seq, turn, { kind: 'error', error: { code: 'PI_AI_ERROR', status: 405,
   message: '<html><style>do not show</style><h1>405 Not Allowed</h1><p>Bearer sample-secret api_key=another-secret sk-fakeKey123456</p></html>' } });
 
+test('explicit state refresh retries a failed history read without repeating normal board hydration', async t => {
+  let attempts = 0, available = false;
+  const f = fixture(t, { query: {
+    listEvents() { attempts++; if (!available) throw new Error('synthetic history unavailable'); return Promise.resolve([{ sessionId: 'native-session', type: 'turn/end', seq: 3 }]); },
+    async readEvent() { return { session: { id: 'native-session', cwd: '/project-a' }, target: end() }; },
+  } });
+  f.tracker.read(f.boundTask, f.service); await setImmediate();
+  assert.equal(attempts, 1);
+  available = true;
+  f.tracker.read(f.boundTask, f.service); await setImmediate();
+  assert.equal(attempts, 1, 'ordinary board reads must not repeatedly query history');
+  assert.equal((await f.tracker.refresh(f.boundTask, f.service)).phase, 'idle');
+  assert.equal(attempts, 2);
+});
+
 test('accepted provider 405 becomes a compact durable failure without changing dispatch or resubmitting', t => {
   const f = fixture(t);
   f.agents.set(f.boundTask.sessionId, { id: f.boundTask.sessionId, status: 'running' });

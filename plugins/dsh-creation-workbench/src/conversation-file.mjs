@@ -38,3 +38,30 @@ export function reviewDraftFromQuestion(root, question) {
   }
   return drafts.size === 1 ? drafts.values().next().value : null
 }
+
+export function reviewImagesFromQuestion(root, question) {
+  if (!root || !question) return []
+  const text = String(question).slice(0, 65536), references = []
+  const pattern = /!?\[[^\[\]\r\n]*\]\((?:<([^<>\r\n]+)>|([^()\r\n]+))\)|`([^`\r\n]+)`/gu
+  for (const match of text.matchAll(pattern)) {
+    let file = match[1] || match[2] || match[3]
+    try { if (!match[3]) file = decodeURIComponent(file) } catch { continue }
+    if (!/\.[a-z\d]{1,10}$/i.test(file)) continue
+    references.push({ file, start: match.index, end: match.index + match[0].length })
+    if (references.length >= 200) break
+  }
+  const images = new Map()
+  for (let index = 0; index < references.length && images.size < 24; index++) {
+    const reference = references[index]
+    if (!/\.(png|jpe?g|webp|gif)$/i.test(reference.file)) continue
+    const tail = text.slice(reference.end, references[index + 1]?.start ?? text.length)
+    const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu)
+    if (!checksum) continue
+    try {
+      const selection = conversationFileSelection(root, reference.file)
+      const hash = (checksum[1] || checksum[2]).toLowerCase()
+      images.set(`${selection.path}:${hash}`, { ...selection, hash })
+    } catch { /* Ignore files outside the selected project. */ }
+  }
+  return [...images.values()]
+}

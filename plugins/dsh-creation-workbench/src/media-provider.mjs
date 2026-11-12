@@ -150,7 +150,7 @@ function resultOf(payload) {
 
 export function createMediaProvider(config = {}) {
   const settingsPath = config.mediaSettingsPath || path.join(config.dshHome || process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'wtt-creation-workbench/media-settings.json');
-  try { const legacy = settingsPath.replace('wtt-creation-workbench/', 'wtt-course-workbench/'); if (!existsSync(settingsPath) && existsSync(legacy)) { mkdirSync(path.dirname(settingsPath), { recursive: true }); writeFileSync(settingsPath, readFileSync(legacy)); } } catch {}
+  try { const legacy = settingsPath.replace('wtt-creation-workbench/', 'wtt-course-workbench/'); if (!config.mediaTransportOnly && !existsSync(settingsPath) && existsSync(legacy)) { mkdirSync(path.dirname(settingsPath), { recursive: true }); writeFileSync(settingsPath, readFileSync(legacy)); } } catch {}
   const active = new Set();
   let closed = false;
   const assertOpen = () => { if (closed) throw fail('provider_closed', '媒体服务连接已关闭。'); };
@@ -369,5 +369,5 @@ export function createMediaProvider(config = {}) {
     }
   }
 
-  return { capabilities, updateSettings, submit, query, download, async close() { closed = true; for (const controller of active) controller.abort(); active.clear(); } };
+  return { capabilities, updateSettings, submit, query, download, request, async close() { closed = true; for (const controller of active) controller.abort(); active.clear(); } };
 }

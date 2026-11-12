@@ -1,5 +1,6 @@
 import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton, UiIcon } from './ui/controls.jsx'
 import {DeleteNodesDialog,ProjectRecycleDialog} from './canvas-recycle.jsx'
+import { TaskControlDialog } from './task-control.jsx'
 import {PROJECT_FILE_DRAG, ProjectFilePreview} from './project-explorer.jsx'
 import { SvgSourceView } from './svg-source-view.jsx'
 import {SavedPptPreview} from './saved-ppt-preview.jsx'
@@ -8,7 +9,7 @@ import { UserError } from './user-feedback.jsx'
 import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Background, ConnectionLineType, Handle, MiniMap, NodeResizer, NodeToolbar, Position, ReactFlow, ReactFlowProvider,
-  SelectionMode, applyEdgeChanges, applyNodeChanges, useReactFlow, useStore,
+  SelectionMode, applyEdgeChanges, applyNodeChanges, getViewportForBounds, useReactFlow, useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './canvas.css'
@@ -32,7 +33,7 @@ import './studio-polish.css'
 import { useDockLayout } from './dock-layout.jsx'
 import { PptEditor } from './ppt-editor.jsx'
 import { BaoyuSlides } from './baoyu-slides.jsx'
-import { createPendingContext, generationStateSignature, isActiveTaskPhase, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from './pending-card-state.mjs'
+import { createPendingContext, generationStateSignature, isActiveTaskPhase, unconfirmedExecution, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from './pending-card-state.mjs'
 
 import { taskInteractions, interactionLabel } from './skill-interactions.mjs'
 import { SkillConfirmation } from './skill-confirmation.jsx'
@@ -181,6 +182,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         <UiButton variant="quiet" size="compact" type="button" onClick={event => { event.stopPropagation(); data.onEditText?.() }}>编辑正文</UiButton>
         <UiButton variant="quiet" size="compact" type="button" onClick={event => { event.stopPropagation(); data.onOpenPending?.() }}>用 AI 创作</UiButton>
       </div>}
+      {pending && data.onTaskControl && <UiButton variant="quiet" size="compact" className="nodrag nopan" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onTaskControl() }}>任务控制</UiButton>}
       {pending && !data.skillTodo && !textDraft && <UiButton variant="custom" className={`wcc-card-generation-status nodrag nopan is-${pending.phase || 'unknown'}`} type="button"
         onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenPending?.() }} title={pending.error || pending.message}>
         <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' && !pending.published ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : pendingContinueAllowed(pending) ? '继续任务 →' : '查看任务 →'}</span>
@@ -345,7 +347,7 @@ function GroupDialog({ busy, onClose, onSubmit }) {
 }
 
 function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
-  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile }) {
+  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
@@ -375,6 +377,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   creationRef.current = creation
   const [creationVisible, setCreationVisible] = useState(() => cache.current.visible)
   const [creationMenu, setCreationMenu] = useState(null)
+  const [taskControl, setTaskControl] = useState(null)
   const [deletePlan,setDeletePlan]=useState(null)
   const deleteRequest = useRef(null)
   useEffect(() => {
@@ -1125,7 +1128,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function mediaNeedsDecision(job) {
-    return ['unknown', 'download_failed', 'registration_failed'].includes(job?.status)
+    return ['unknown', 'paused', 'cancelled', 'download_failed', 'registration_failed'].includes(job?.status)
   }
 
   async function restoreMediaCreation(frame) {
@@ -1264,6 +1267,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   useEffect(() => {
     if (creationVisible && creation?.generationMethod === 'api') void refreshMediaCapabilities()
   }, [projectId, creationVisible, creation?.generationMethod])
+
+  useEffect(() => {
+    if (!creationVisible || creation?.generationMethod !== 'api' || !onWatchMediaSettings) return;
+    return onWatchMediaSettings(() => void refreshMediaCapabilities());
+  }, [projectId, creationVisible, creation?.generationMethod, onWatchMediaSettings]);
 
   useEffect(() => {
     let stopped = false
@@ -1514,6 +1522,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onOpenSkillTodo: () => openSkillReview(interactionsRef.current.find(entry => (entry.task.outputCardId && entry.task.outputCardId === node.data.outputCard?.id) || node.data.outputCard?.versions?.some(version => version.taskId === entry.task.id))),
       onOpenPending: () => publishedGeneration || node.data.pendingGeneration?.published
         ? void openOutputCard(node.data, card.latestVersionId, { showDeck: false }) : void openPendingCard(node.data, { showDeck: false }),
+      onTaskControl: () => { const taskId = publishedGeneration?.taskId || node.data.pendingGeneration?.taskId; if (taskId) { selectCard(node.id); closeCreation(); setTaskControl({ taskId }) } },
       onOpenInspect: () => { selectCard(node.id); closeCreation(); setSidebar(true); setTab('inspect') },
       onRevealFile: entry => void openProjectFileAction('project-file-reveal', entry),
       onOpenExternal: entry => void openProjectFileAction('project-file-open', entry),
@@ -1629,7 +1638,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   async function removeElements() {
     const selected = nodesRef.current.filter(node => isObject(node) && node.selected)
-    if(!selected.length||busy||deleteRequest.current)return
+    if(!selected.length||busy||deleteRequest.current||deletePlan)return
+    const running = selected.find(node => {
+      const pending = node.data.pendingGeneration || node.data.publishedGeneration
+      return pending && !['composing','idle','failed','cancelled'].includes(pending.phase) && !unconfirmedExecution(pending)
+    })
+    if (running) { closeCreation(); setTaskControl({taskId:(running.data.pendingGeneration || running.data.publishedGeneration).taskId}); return }
     const epoch=epochRef.current,selection=selected.map(n=>n.id).sort().join('|')
     if (textEditorOpen || editingNodeId) { setError('请先退出文字编辑，再删除节点。'); return }
     const token = Symbol()
@@ -1717,6 +1731,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   function fitSelection() {
     const selected = nodesRef.current.filter(node => isObject(node) && node.selected)
     if (selected.length) void flow.fitView({ nodes: selected, padding: 0.45, maxZoom: 1, duration: 200 })
+  }
+
+  function fitAllCards() {
+    const visible = nodesRef.current.filter(node => !node.hidden)
+    const rect = graphRef.current?.getBoundingClientRect()
+    if (!visible.length || !flow.viewportInitialized || !rect?.width || !rect.height) return
+    const bounds = flow.getNodesBounds(visible)
+    if (!bounds.width || !bounds.height) return
+    void flow.setViewport(getViewportForBounds(bounds, rect.width, rect.height, 0.1, 1, 0.15), { duration: 180 })
   }
 
   function zoom100() {
@@ -1917,6 +1940,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     operationLock.current = false
     restoredSession.current = false
     setBoard(null)
+    setTaskControl(null)
     deleteRequest.current = null
     setDeletePlan(null)
     setError('')
@@ -2663,7 +2687,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   function keyboard(event) {
     if (deskVisible) return
-    if (event.target.closest('input,textarea,select,[contenteditable="true"],[role="textbox"],[role="separator"]') || event.nativeEvent?.isComposing) return
+    if (event.target.closest('dialog,input,textarea,select,[contenteditable="true"],[role="textbox"],[role="separator"]') || event.nativeEvent?.isComposing) return
     cancelPaneInsert()
     const key = event.key.toLowerCase(), command = event.metaKey || event.ctrlKey
     if (key === 'escape') { setTool('select'); setContextMenu(null); selectCard(null); return }
@@ -2680,7 +2704,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (key === '+' || key === '=') { event.preventDefault(); void flow.zoomIn({ duration: 100 }) }
     if (key === '-') { event.preventDefault(); void flow.zoomOut({ duration: 100 }) }
     if (key === '0') { event.preventDefault(); zoom100() }
-    if (key === '1') { event.preventDefault(); void flow.fitView({ padding: 0.16, maxZoom: 1, duration: 180 }) }
+    if (key === '1') { event.preventDefault(); fitAllCards() }
     if (key === '2') { event.preventDefault(); fitSelection() }
   }
 
@@ -2709,12 +2733,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     ...[['note', '便签', 'N'], ['text', '文本', 'T'], ['rectangle', '矩形', 'R'], ['ellipse', '椭圆', 'O']].map(([kind, label, shortcut]) => ({ label: `添加${label}`, onClick: () => addElement(kind, contextMenu.point), shortcut })),
     { label: '撤销', onClick: () => undo(), disabled: !historyRef.current.canUndo, shortcut: '⌘Z' },
     { label: '全选', onClick: selectAllCards, shortcut: '⌘A' },
-    { label: '适应全部', onClick: () => void flow.fitView({ padding: 0.16, maxZoom: 1, duration: 180 }) },
+    { label: '适应全部', onClick: fitAllCards },
   ]
 
   return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}`}>
+    {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
+      request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
+      onRemove={() => void removeElements()} />}
     {deletePlan&&<DeleteNodesDialog plan={deletePlan} request={request} onClose={()=>{deleteRequest.current=null;setDeletePlan(null)}} onDone={()=>recycledChanged({keepVisible:true})}/>}
     {materialVersionView && <dialog className="wcc-version-view-dialog" open aria-labelledby="wcc-version-view-title">
       <DialogHeader title={`${materialVersionView.title} · V${materialVersionView.number}`} titleId="wcc-version-view-title" onClose={() => setMaterialVersionView(null)} />
@@ -2773,7 +2800,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           {showMap && <MiniMap pannable zoomable position="bottom-right" nodeColor={node => node.type === 'whiteboard' ? 'var(--wtt-ui-warning, #e6ce8d)' : 'var(--wtt-ui-edge, #a6b6d5)'} />}
         </ReactFlow>}
         <CanvasChrome tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
-          onZoom100={zoom100} onFitAll={() => void flow.fitView({ padding: 0.15, maxZoom: 1, duration: 180 })} onFitSelected={fitSelection}
+          onZoom100={zoom100} onFitAll={fitAllCards} onFitSelected={fitSelection}
           showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => { setMaterialError(''); setMaterialDialog(EMPTY_MATERIAL) }}
           onUndo={() => undo()} onRedo={() => undo(true)} canUndo={historyRef.current.canUndo} canRedo={historyRef.current.canRedo}
           onArrange={arrangeCards} canArrange={canArrange}
@@ -2802,7 +2829,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       creationTypes={creation ? [...creationMenuItems(creation.anchor).map(item => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...['outline', 'exercise', 'script'].map(id => ({ id, label: '文本', available: true })), ...['word', 'excerpt', 'material'].map(id => ({ id, label: OUTPUT_LABELS[id], available: true }))] : productionTypes}
       skillCatalog={skillCatalog} skillCatalogLoading={skillCatalogLoading} skillCatalogError={skillCatalogError}
       onRefreshSkills={refreshSkillCatalog} onSaveSkillSettings={saveSkillSettings} onUpdateSkillPreference={updateSkillPreference}
-      modelCatalog={modelCatalog} modelSelection={creation?.pendingTaskId ? creation.modelSelection : modelSelection}
+      onOpenMediaSettings={onOpenMediaSettings} modelCatalog={modelCatalog} modelSelection={creation?.pendingTaskId ? creation.modelSelection : modelSelection}
       onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError}
       onGenerationMethodChange={method => { if (creation && !creation.pendingTaskId) updateCreation(creation.key, { generationMethod: method, mediaJob: null, error: '', mediaRecoveryError: false, mediaRestoring: false }) }}
       onMediaProviderChange={providerId => { if (creation && !creation.pendingTaskId) updateCreation(creation.key, { providerId, mediaOptions: {}, error: '' }) }}
@@ -2814,8 +2841,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onReferencesChange={changeCreationReferences} onImportFiles={importCreationFiles}
       searchProjectReferences={searchCreationFiles} onReferenceProjectFile={referenceCreationFile}
       projectRoot={project.path} onOpenReviewDraft={onPreviewProjectFile}
+      getReviewImageHref={(image, preview) => endpoint({ [preview ? 'reviewImage' : 'projectFileDownload']: image.path, hash: image.hash }).href}
       acceptedFileTypes=".txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm"
       getReferenceFileHref={(card, preview = false) => endpoint({ [card.generatedFile ? 'downloadArtifact' : 'materialFile']: card.refId, ...(preview ? { preview: '1' } : {}) }).href}
+      onTaskControl={() => { const taskId = creation?.pendingGeneration?.taskId || creation?.pendingTaskId || creation?.mediaJob?.taskId || creation?.taskId; if (taskId) setTaskControl({taskId}) }}
       onClose={closeCreation} onSend={sendToAI} onAction={creationAction}
       busy={!!busy || loading || !!creation?.mediaRestoring} error={creation?.error}
       sendLabel={creation?.outputType === 'material' ? '保存关联素材' : creation?.outputType === 'word' ? '导出当前版本 Word' : `开始创作 ${OUTPUT_LABELS[creation?.outputType] || ''}`}

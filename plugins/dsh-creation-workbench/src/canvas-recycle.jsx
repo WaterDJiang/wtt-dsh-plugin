@@ -35,7 +35,8 @@ export function DeleteNodesDialog({ plan, request, onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const planning = Boolean(plan.loading)
-  const unavailable = plan.files.some(file => file.error)
+  const executionWarnings = [...new Set(plan.nodes.map(node => node.executionWarning).filter(Boolean))]
+  const unavailable = plan.files.some(file => file.error) || executionWarnings.length > 0
   useEffect(() => { dialog.current?.showModal() }, [])
 
   async function remove(event) {
@@ -58,6 +59,7 @@ export function DeleteNodesDialog({ plan, request, onClose, onDone }) {
       <div className="wtt-recycle-body">
         <ul className="wtt-delete-names">{plan.nodes.map(node => <li key={node.nodeId}>{node.title}</li>)}</ul>
         {planning ? <p role="status">正在核对删除范围…</p> : <>
+          {executionWarnings.map(warning => <p key={warning} role="note">{warning} 仅移除画布卡片，任务和文件保留，不会重新提交。</p>)}
           <fieldset>
             <legend className="wtt-visually-hidden">删除范围</legend>
             <label><input type="radio" name="delete-scope" checked={!deleteFiles} disabled={busy}

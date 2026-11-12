@@ -3,6 +3,7 @@ import {existsSync,lstatSync,statSync,readFileSync,realpathSync,mkdirSync,linkSy
 import path from 'node:path';
 import {CanvasRecyclePurge} from './canvas-recycle-purge.mjs';
 import {ProjectFileRecycle} from './project-file-recycle.mjs';
+import {unconfirmedExecution} from './pending-card-state.mjs';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const uuid=x=>typeof x==='string'&&/^[0-9a-f-]{36}$/.test(x);
 const inactive=new Set(['composing','idle','failed','cancelled']);
@@ -59,9 +60,10 @@ export class CanvasRecycle {
   for(const choice of selections){
    if(!choice||typeof choice.nodeId!=='string'||seen.has(choice.nodeId)||hidden.has(choice.nodeId))throw new Error('节点不存在、已移除或重复');seen.add(choice.nodeId);
    const current=raw.nodes.find(n=>n.id===choice.nodeId)||raw.elements.find(e=>e.id===choice.nodeId)&&{...raw.elements.find(e=>e.id===choice.nodeId),kind:'whiteboard',position:this.layout(requirementId).positions[choice.nodeId]};if(!current)throw new Error('节点不属于当前课程');
-   if(current.pendingGeneration&&!inactive.has(current.pendingGeneration.phase))throw new Error(`「${current.title||'此卡片'}」的任务尚未停止，请先打开原任务停止执行，再删除。`);
+   const executionWarning=unconfirmedExecution(current.pendingGeneration);
+   if(current.pendingGeneration&&!inactive.has(current.pendingGeneration.phase)&&!executionWarning)throw new Error(`「${current.title||'此卡片'}」的任务尚未停止，请在卡片的「任务控制」中停止，再移除。`);
    let n=current;if(choice.versionId){if(!current.outputCard)throw new Error('此节点没有所选版本');n=this.service.cards.describe({requirementId,cardId:current.outputCard.id,versionId:choice.versionId},sourceBoard).node}
-   const item={nodeId:current.id,title:n.title||n.text?.slice(0,40)||'空白文字',kind:n.kind,versionId:n.outputCard?.versionId||null,headVersionId:current.outputCard?.versionId||null,sourceHash:n.sourceHash||sha(n.text||n.content||''),position:current.position};nodes.push(item);
+   const item={nodeId:current.id,title:n.title||n.text?.slice(0,40)||'空白文字',kind:n.kind,versionId:n.outputCard?.versionId||null,headVersionId:current.outputCard?.versionId||null,sourceHash:n.sourceHash||sha(n.text||n.content||''),position:current.position,...(executionWarning?{executionWarning}:{})};nodes.push(item);
    const source=includeFiles&&this.primary(n);if(source){
     const candidates=[{...source,role:n.projectFile?'引用源文件':'当前源文件'}];
     const ref=n.sourceId||n.id,delivery=this.service.deliverables.info(ref);if(!n.projectFile&&delivery?.originalPath===source.path&&delivery.path!==source.path)candidates.push({path:delivery.path,hash:delivery.hash,role:'成果文件夹副本'});
@@ -87,6 +89,7 @@ export class CanvasRecycle {
   const plan=row.plan;if(this.db.prepare("UPDATE canvas_recycle_entries SET state=?,mode=?,owner_pid=?,updated_at=? WHERE id=? AND state='planned'").run('moving',deleteFiles?1:0,process.pid,new Date().toISOString(),planId).changes!==1)throw new Error('回收记录已在其他位置处理');
   const moved=[];this.db.exec('BEGIN IMMEDIATE');try{
    const current=this.selection(plan.requirementId,plan.selections,{includeFiles:deleteFiles});this.validateNodes(plan,current);
+   if(deleteFiles&&(plan.nodes.some(n=>n.executionWarning)||current.nodes.some(n=>n.executionWarning)))throw new Error('任务执行状态未确认，只能移除卡片，不能回收源文件');
    if(deleteFiles){if(!plan.files.length)throw new Error('这些节点没有可删除的源文件');const compare=p=>p.files.map(({path,hash,error,references})=>({path,hash,error,references}));if(JSON.stringify(compare(plan))!==JSON.stringify(compare(current)))throw new Error('文件或其他引用已变化，请重新确认');
     if(plan.files.some(f=>f.error))throw new Error('有文件当前不可安全回收，请只移除节点或先处理文件状态');
     for(const f of plan.files){const original=this.file(f.path,f.hash).file,dest=this.trash(f.trash);if(existsSync(dest))throw new Error('回收位置已被占用');this.move(original,dest);moved.push(f);if(sha(readFileSync(dest))!==f.hash)throw new Error('文件在回收时发生变化，已停止操作')}

@@ -1,6 +1,6 @@
 import {spawnSync} from 'node:child_process';
 import test from 'node:test';import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,existsSync,rmSync,symlinkSync} from 'node:fs';import path from 'node:path';import {tmpdir} from 'node:os';import {randomUUID} from 'node:crypto';import {WorkbenchService} from '../src/service.mjs';import {apply} from '../src/index.mjs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,existsSync,rmSync,symlinkSync} from 'node:fs';import path from 'node:path';import {tmpdir} from 'node:os';import {randomUUID,createHash} from 'node:crypto';import {WorkbenchService} from '../src/service.mjs';import {apply} from '../src/index.mjs';
 function fixture(t){const root=mkdtempSync(path.join(tmpdir(),'cw37-')),service=new WorkbenchService({workspaceRoot:root}),req=service.store.createRequirement({background:'文件树验收',operationId:randomUUID()});t.after(()=>{service.close();rmSync(root,{recursive:true,force:true})});return {root,service,req,files:service.projectFiles}}
 test('project tree is lazy, directory-first and hides current control paths; visible links are not followed and create never overwrites',async t=>{
  const f=fixture(t);mkdirSync(path.join(f.root,'资料'));writeFileSync(path.join(f.root,'原件.md'),'原文');mkdirSync(path.join(f.root,'node_modules'));writeFileSync(path.join(f.root,'.secret'),'secret');symlinkSync(path.join(f.root,'资料'),path.join(f.root,'link'));
@@ -52,6 +52,14 @@ test('project file HTTP requires explicit scope and denies script execution, alt
  const made=await request({projectId},{action:'project-file-create',data:{name:'参考.md'}});assert.equal(made.status,200);const v=await (await request({projectId,projectFilePreview:'参考.md'})).json();assert.equal(v.content,'');assert.equal((await request({projectId,projectFileDownload:'参考.md',hash:v.hash})).status,200);
  writeFileSync(path.join(root,'参考.md'),'changed');assert.equal((await request({projectId,projectFileDownload:'参考.md',hash:v.hash})).status,400);assert.equal((await request({projectId,projectFiles:'.wtt-workbench'})).status,400);
  writeFileSync(path.join(root,'page.html'),'<script>alert(1)</script>');const code=await request({projectId,projectFileDownload:'page.html',preview:'1'});assert.equal(code.status,400);const download=await request({projectId,projectFileDownload:'page.html'});assert.match(download.headers.get('content-disposition'),/attachment/);
+ const jpeg=spawnSync('python3',['-c','import io,sys; from PIL import Image; b=io.BytesIO(); Image.new("RGB",(8,6),(30,90,160)).save(b,format="JPEG");sys.stdout.buffer.write(b.getvalue())']);assert.equal(jpeg.status,0,jpeg.stderr.toString());
+ const bytes=jpeg.stdout,hash=createHash('sha256').update(bytes).digest('hex');writeFileSync(path.join(root,'候选错名.png'),bytes);
+ assert.equal((await request({projectId,projectFileDownload:'候选错名.png',hash,preview:'1'})).status,400,'ordinary import preview retains its format-match contract');
+ const candidate=await request({projectId,reviewImage:'候选错名.png',hash});assert.equal(candidate.status,200);assert.equal(candidate.headers.get('content-type'),'image/jpeg');assert.equal(candidate.headers.get('x-content-type-options'),'nosniff');assert.match(candidate.headers.get('content-disposition'),/^inline/);assert.deepEqual(Buffer.from(await candidate.arrayBuffer()),bytes);assert.deepEqual(readFileSync(path.join(root,'候选错名.png')),bytes);
+ for(const query of [{reviewImage:'候选错名.png',hash},{projectId,reviewImage:'候选错名.png'},{projectId,reviewImage:'../候选错名.png',hash},{projectId,reviewImage:'.wtt-workbench/a.png',hash},{projectId,reviewImage:'page.html',hash},{projectId,reviewImage:'候选错名.png',hash:'0'.repeat(64)}])assert.equal((await request(query)).status,400);
+ writeFileSync(path.join(root,'损坏.png'),Buffer.from([137,80,78,71,13,10,26,10]));const damagedHash=createHash('sha256').update(readFileSync(path.join(root,'损坏.png'))).digest('hex');assert.equal((await request({projectId,reviewImage:'损坏.png',hash:damagedHash})).status,400,'valid signature alone cannot pass image decode validation');
+ symlinkSync(path.join(root,'候选错名.png'),path.join(root,'链接.png'));assert.equal((await request({projectId,reviewImage:'链接.png',hash})).status,400);
+ writeFileSync(path.join(root,'候选错名.png'),Buffer.from('changed'));assert.equal((await request({projectId,reviewImage:'候选错名.png',hash})).status,400);
 });
 
 test('file tree PDF pages reuse checked renderer without creating course cards',async t=>{

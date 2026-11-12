@@ -72,7 +72,7 @@ export function createNativeTaskStateTracker(ctx) {
       phase TEXT NOT NULL, turn INTEGER NOT NULL, seq INTEGER NOT NULL, time INTEGER NOT NULL,
       message TEXT NOT NULL, code TEXT, status INTEGER
     )`);
-    record = { service, db, hydrating: new Set(), hydrated: new Set() };
+    record = { service, db, hydrating: new Map(), hydrated: new Set() };
     services.set(service, record);
     return record;
   }
@@ -97,13 +97,13 @@ export function createNativeTaskStateTracker(ctx) {
       .run(task.id, task.sessionId, state.phase, state.turn, state.seq, state.time, state.message, state.code, state.status);
   }
 
-  function hydrate(record, task) {
+  function hydrate(record, task, force = false) {
     const query = serviceOf('sessionQuery');
     if (typeof query?.listEvents !== 'function' || typeof query?.readEvent !== 'function') return;
     const key = `${task.id}:${task.sessionId}`;
-    if (record.hydrating.has(key) || record.hydrated.has(key)) return;
-    record.hydrating.add(key);
-    void (async () => {
+    if (record.hydrating.has(key)) return record.hydrating.get(key);
+    if (!force && record.hydrated.has(key)) return;
+    const pending = Promise.resolve().then(async () => {
       try {
         const records = await query.listEvents(task.sessionId);
         if (!open(record) || !bound(record, task) || !Array.isArray(records)) return;
@@ -117,7 +117,9 @@ export function createNativeTaskStateTracker(ctx) {
         write(record, task, eventState(result.target));
       } catch (error) { if (open(record)) warn(error); }
       finally { record.hydrating.delete(key); record.hydrated.add(key); }
-    })();
+    });
+    record.hydrating.set(key, pending);
+    return pending;
   }
 
   function observe(session, event) {
@@ -138,6 +140,13 @@ export function createNativeTaskStateTracker(ctx) {
   catch (error) { warn(error); }
 
   return {
+    async refresh(task, service) {
+      if (closed || task?.kind !== 'ai' || !task.sessionId) return null;
+      const record = register(service);
+      if (!record || !bound(record, task)) return null;
+      await hydrate(record, task, true);
+      return this.read(task, service);
+    },
     read(task, service) {
       if (closed || task?.kind !== 'ai' || typeof task.id !== 'string' || typeof task.sessionId !== 'string' || !task.sessionId.trim()) return null;
       try {

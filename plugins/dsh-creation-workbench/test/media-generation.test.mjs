@@ -52,6 +52,87 @@ async function until(service, taskId, predicate = value => value.job.status === 
   assert.fail(`media timeout: ${JSON.stringify(result)}`);
 }
 
+test('cancelling queued work and pausing a blocked submission releases the queue and rejects late output', async t => {
+  let resolveFirst;
+  const fake = provider({ onSubmit: () => fake.calls.submit.length === 1
+    ? new Promise(resolve => { resolveFirst = resolve; }) : { resultBase64: png.toString('base64') } });
+  const { service, input } = fixture(t, fake);
+  const first = await service.media.create(input());
+  await until(service, first.task.id, value => value.job.status === 'submitting');
+  const second = await service.media.create(input());
+  assert.equal(service.media.pause(second.task.id).job.status, 'cancelled');
+  assert.equal(service.media.pause(first.task.id).job.status, 'paused');
+  const third = await service.media.create(input());
+  await until(service, third.task.id);
+  assert.equal(fake.calls.submit.length, 2, 'cancelled queue item must never submit');
+  resolveFirst({ resultBase64: png.toString('base64') });
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(service.media.get(first.task.id).job.status, 'paused');
+  assert.equal(service.media.get(first.task.id).task.files.length, 0);
+  assert.equal(service.media.get(second.task.id).task.files.length, 0);
+});
+
+test('a late provider acknowledgement is retained for manual lookup without resubmitting or resuming polling', async t => {
+  let acknowledge;
+  const fake = provider({ onSubmit: () => new Promise(resolve => { acknowledge = resolve; }) });
+  const { service, root, input } = fixture(t, fake);
+  const { task } = await service.media.create(input());
+  await until(service, task.id, value => value.job.status === 'submitting');
+  service.media.pause(task.id);
+  acknowledge({ providerTaskId: 'synthetic-provider-id' });
+  await until(service, task.id, value => value.job.providerTaskId === 'synthetic-provider-id');
+  assert.equal(service.media.job(task.id).status, 'paused');
+  assert.equal(service.media.job(task.id).canResume, true);
+  assert.equal(fake.calls.query.length, 0);
+  service.close();
+  const reopened = new WorkbenchService({ workspaceRoot: root, mediaProvider: fake, mediaPollIntervalMs: 5 });
+  try {
+    await new Promise(resolve => setTimeout(resolve, 25));
+    assert.equal(reopened.media.job(task.id).status, 'paused');
+    assert.equal(fake.calls.query.length, 0, 'restart must not resume a paused task');
+    reopened.media.resume(task.id);
+    await until(reopened, task.id);
+    assert.equal(fake.calls.submit.length, 1, 'resume must query the original provider task');
+    assert.deepEqual(fake.calls.query, ['synthetic-provider-id']);
+  } finally { reopened.close(); }
+});
+
+test('pausing a pending query ignores its late result and only an explicit resume may register output', async t => {
+  let finishQuery;
+  const fake = provider({ onSubmit: () => ({ providerTaskId: 'pending-query' }),
+    onQuery: () => new Promise(resolve => { finishQuery = resolve; }) });
+  const { service, input } = fixture(t, fake);
+  const { task } = await service.media.create(input());
+  await until(service, task.id, () => Boolean(finishQuery));
+  service.media.pause(task.id);
+  finishQuery({ status: 'succeeded', resultURL: 'https://media.example.test/late' });
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(service.media.job(task.id).status, 'paused');
+  assert.equal(fake.calls.download.length, 0);
+  assert.equal(service.media.get(task.id).task.files.length, 0);
+  fake.onQuery = () => ({ status: 'succeeded', resultURL: 'https://media.example.test/resumed' });
+  service.media.resume(task.id);
+  await until(service, task.id);
+  assert.equal(fake.calls.submit.length, 1);
+  assert.equal(service.media.get(task.id).task.files.length, 1);
+});
+
+test('a download arriving after pause cannot write or register media bytes', async t => {
+  let finishDownload;
+  const fake = provider({ onSubmit: () => ({ resultURL: 'https://media.example.test/held' }),
+    onDownload: () => new Promise(resolve => { finishDownload = resolve; }) });
+  const { service, input } = fixture(t, fake);
+  const { task } = await service.media.create(input());
+  await until(service, task.id, () => Boolean(finishDownload));
+  service.media.pause(task.id);
+  finishDownload({ bytes: png, mime: 'image/png' });
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(service.media.job(task.id).status, 'paused');
+  assert.equal(service.media.get(task.id).task.files.length, 0);
+  assert.equal(service.store.db.prepare('SELECT downloaded_path FROM media_jobs WHERE task_id=?').get(task.id).downloaded_path, null);
+  assert.equal(fake.calls.submit.length, 1);
+});
+
 test('image generation persists a separate task, one real validated delivery, immutable inputs and provenance', async t => {
   const { service, input, fake, requirement, source, root } = fixture(t);
   const args = input();

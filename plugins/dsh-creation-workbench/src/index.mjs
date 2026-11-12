@@ -9,18 +9,33 @@ import { extractSkillNames } from './skill-commands.mjs';
 import { importedFileResponse } from './media-response.mjs';
 import { createArtifactPreview } from './artifact-preview.mjs';
 import { createNativeTaskStateTracker } from './native-task-state.mjs';
+import { createTaskControl } from './task-control.mjs';
+import { readReviewImage } from './review-image.mjs';
 import { editorParentOrigin } from './baoyu-runtime.mjs';
 import { createProductionObserver } from './production-control.mjs';
 import { DocumentPreview } from './document-preview.mjs';
+
+export { Config } from './media-service-config.mjs';
+import { Config as MediaConfig } from './media-service-config.mjs';
+import { createMediaServiceAccess } from './media-service-host.mjs';
+import { mediaServiceProfiles } from './media-service-settings.mjs';
 
 export const name = 'wtt-creation-workbench';
 export const inject = ['connection', 'tools', 'skills', 'agents', 'sessionQuery'];
 
 export function apply(ctx, config = {}) {
+  const mediaServiceAccess = createMediaServiceAccess(ctx, config);
+  ctx.inject?.(['settings'], child => child.effect(() => child.settings.configure({ auto: false }, ctx.fiber)));
+  ctx.on?.('internal/config', function(_raw, next) {
+    const raw = next();
+    if (this === ctx.fiber) mediaServiceProfiles(MediaConfig(raw).mediaServices);
+    return raw;
+  });
   const taskRuntime = createNativeTaskStateTracker(ctx);
+  const taskControl = createTaskControl(ctx, taskRuntime);
   const productionObserver = createProductionObserver(ctx);
   ctx.effect(() => () => productionObserver.close());
-  const projects = new ProjectRegistry({ ...config,
+  const projects = new ProjectRegistry({ ...config, mediaServiceAccess,
     attachProduction: productionObserver.attach, readProductionUsage: productionObserver.read, refreshProductionUsage: productionObserver.refresh,
     deliverSlideComments: async (sessionId, message) => {
       const agent = ctx.get("agents")?.get(sessionId);
@@ -106,6 +121,11 @@ export function apply(ctx, config = {}) {
           if(url.searchParams.has('recycleEntries')){if(!projectId)throw new Error('回收站必须指定项目');return Response.json({entries:service.recycle.list()},{headers})}
           if(url.searchParams.has('projectFiles')){if(!projectId)throw new Error('文件树必须指定项目');return Response.json(service.projectFiles.list(url.searchParams.get('projectFiles')),{headers})}
           if(url.searchParams.has('projectReferenceSearch')){if(!projectId)throw new Error('搜索文件必须指定项目');return Response.json(service.projectFiles.searchReferences(url.searchParams.get('projectReferenceSearch')),{headers})}
+          if(url.searchParams.has('reviewImage')){
+            if(!projectId)throw new Error('候选图片预览必须指定项目');
+            const file=await readReviewImage(service,url.searchParams.get('reviewImage'),url.searchParams.get('hash'));
+            return importedFileResponse(file,{method:request.method,preview:true,headers});
+          }
           if(url.searchParams.has('projectFilePreview')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(await service.projectFiles.preview(url.searchParams.get('projectFilePreview')),{headers})}
           if(url.searchParams.has('projectFileText')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(service.projectFiles.text({relative:url.searchParams.get('projectFileText'),page:Number(url.searchParams.get('page')||1)}),{headers})}
           if(url.searchParams.has('projectFileStat')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(service.projectFiles.stat(url.searchParams.get('projectFileStat')),{headers})}
@@ -285,6 +305,10 @@ export function apply(ctx, config = {}) {
         if(['document-external-open','document-external-status','document-open-application','document-reveal-file','document-external-save-version'].includes(action)&&!projectId)throw new Error('本机文档操作必须指定当前项目');
         if (action === 'open-project') return Response.json({ project: projects.open(data?.path) }, { headers });
         const service = projects.get(projectId);
+        if (['inspect-task-control', 'stop-task-control'].includes(action)) {
+          if (!projectId) throw new Error('任务控制必须指定当前项目');
+          return Response.json(await taskControl[action === 'inspect-task-control' ? 'inspect' : 'stop'](service, data || {}), { headers });
+        }
         await syncServiceSkills(service, ['create-task', 'prepare-course', 'course-outline-skill', 'prepare-canvas', 'export-word'].includes(action) || /^(ppt|slides|svg)-/.test(action));
         if (typeof action === 'string' && /^(ppt|slides|svg)-/.test(action) && !projectId) throw new Error('PPT 编辑请求必须指定当前项目');
         if (typeof action === 'string' && /^document-/.test(action) && !projectId) throw new Error('文档编辑请求必须指定当前项目');
@@ -489,7 +513,7 @@ export function apply(ctx, config = {}) {
   })));
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_register_artifact',
-    description: '登记本次任务目录内已真实生成并通过技术验证的文本、PPTX、分镜、练习或逐字稿文件。必须由已绑定的原生会话调用。',
+    description: '登记本次任务目录内已真实生成并通过技术验证的文本、PPTX、图片、视频等成果。独立成果按任务规则自动建卡，原生主会话调用。',
     parameters: {
       projectId: projectParameter,
       taskId: { type: 'string', required: true },
@@ -497,7 +521,7 @@ export function apply(ctx, config = {}) {
       title: { type: 'string', required: true },
       path: { type: 'string', required: true, description: '本项目 courses/<需求ID>/tasks/<任务ID>/ 内的真实文件路径；正式产物在 delivery/ 下' },
       operationId: { type: 'string', required: true, description: '本次登记的 UUID，失败重试原样复用' },
-      primary: { type: 'boolean', description: '主文件留在原卡。其他独立成果可传 false，各自生成卡片。' },
+      primary: { type: 'boolean', description: '首个主文件为 true，复用原容器；其他独立成果省略。附件另用 presentation。' },
       presentation: { type: 'string', enum: ['attachment'], description: '仅需跟随主卡的附件传 attachment；独立成果省略。' },
     },
     output: textOutput,
@@ -523,7 +547,7 @@ export function apply(ctx, config = {}) {
         title: { type: 'string', required: true },
         path: { type: 'string', required: true, description: '当前项目本任务内真实文件路径，正式交付在 delivery/' },
         operationId: { type: 'string', required: true, description: '该文件独立 UUID，失败重试复用原值' },
-        primary: { type: 'boolean', description: '原卡的主文件为 true，其他独立成果可用 false' },
+        primary: { type: 'boolean', description: '首个主文件为 true；其他独立成果省略，按实际成果数量自动扩卡' },
         presentation: { type: 'string', enum: ['attachment'], description: '仅需跟随主卡的附件用 attachment；独立成果省略。' },
       } } },
     },

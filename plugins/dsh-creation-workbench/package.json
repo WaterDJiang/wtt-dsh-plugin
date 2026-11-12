@@ -1,6 +1,6 @@
 {
   "name": "@wtt/dsh-creation-workbench",
-  "version": "0.54.0",
+  "version": "0.55.0",
   "description": "DeepSeek Harness 的 AI 创作画布。在同一个项目里整理资料、引用卡片与文件、调用本机 Skill，并管理文本、演示文稿、图片和视频的成果版本。",
   "keywords": [
     "dsh",
@@ -51,7 +51,9 @@
         "@deepseek-ai/dsh-client-ui-chat",
         "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
-        "@deepseek-ai/dsh-client-ui-input-trigger"
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-models"
       ]
     }
   },
@@ -63,7 +65,8 @@
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-skill-filesystem": "0.2.1-rc.5",
-    "@deepseek-ai/dsh-tools": "0.2.1-rc.5"
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.5",
+    "@deepseek-ai/schemastery": "3.18.5"
   },
   "devDependencies": {
     "@tiptap/extension-table": "3.32.2",

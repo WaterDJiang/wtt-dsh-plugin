@@ -38,6 +38,18 @@ test('HTTP actions and existing Agent tool share exact task, excerpt and version
   const { task, prepared } = await call('create-task', { requirementId: requirement.id, selectedCardIds: [`material:${excerpt.material.id}`],
     instruction: '生成课程大纲', operationId: randomUUID() });
   assert.equal(prepared.requestId, task.requestId);
+  const controlRequest = (projectId, data) => endpoint.fetch(new Request(`http://localhost/api/wtt-creation-workbench${projectId ? `?projectId=${projectId}` : ''}`, {
+    method: 'POST', body: JSON.stringify({ action: 'inspect-task-control', data }),
+  }));
+  const missingProject = await controlRequest(null, { requirementId: requirement.id, taskId: task.id });
+  assert.equal(missingProject.status, 400);
+  assert.match((await missingProject.json()).error, /projectId|项目/);
+  const wrongCanvas = await controlRequest(prepared.projectId, { requirementId: randomUUID(), taskId: task.id });
+  assert.equal(wrongCanvas.status, 400);
+  assert.match((await wrongCanvas.json()).error, /不属于/);
+  const control = await controlRequest(prepared.projectId, { requirementId: requirement.id, taskId: task.id });
+  assert.equal(control.status, 200);
+  assert.equal((await control.json()).stopLabel, '取消未发送任务');
   assert.equal((await get(`tasks=${requirement.id}`))[0].id, task.id);
   assert.equal((await get(`task=${task.id}`)).input.sources[0].annotation, '讲师注释');
   await call('bind-task-session', { taskId: task.id, sessionId: 'native-session' });

@@ -112,10 +112,11 @@ export class TaskStore {
     if (['image', 'video'].includes(input.outputType) && (input.media !== undefined || input.generationMethod === 'api')) {
       if (input.generationMethod === 'skill') throw new Error('Skill 任务不接收媒体模型参数');
       const media = input.media;
-      if (!media || typeof media.model !== 'string' || typeof media.ratio !== 'string' || typeof media.resolution !== 'string'
-        || (input.outputType === 'video' && !Number.isInteger(media.duration))) throw new Error('媒体模型参数无效');
-      additional.media = { model: media.model, ratio: media.ratio, resolution: media.resolution,
-        ...(input.outputType === 'video' ? { duration: media.duration } : {}) };
+      if (!media || typeof media.model !== 'string' || !media.model.trim()
+        || Object.keys(media).some(key => !['model','ratio','resolution','duration','size','quality'].includes(key))
+        || ['ratio','resolution','size','quality'].some(key => media[key] !== undefined && typeof media[key] !== 'string')
+        || media.duration !== undefined && !Number.isInteger(media.duration)) throw new Error('媒体模型参数无效');
+      additional.media = Object.fromEntries(['model','ratio','resolution','duration','size','quality'].filter(key => media[key] !== undefined).map(key => [key, media[key]]));
     }
     if (input.selectedSkills !== undefined) {
       if (!Array.isArray(input.selectedSkills) || input.selectedSkills.length > 24
@@ -211,9 +212,20 @@ export class TaskStore {
     if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 200 || sessionId.includes('\0')) throw new Error('会话标识无效');
     return this.#transaction(() => {
       const row = this.#row(taskId);
+      if (row.status === 'cancelled') throw new Error('任务已取消，不能重新绑定或提交');
       if (row.kind !== 'ai') throw new Error('人工修订任务不绑定模型会话');
       if (row.session_id && row.session_id !== sessionId) throw new Error('任务已绑定其他会话，不能替换');
       this.db.prepare('UPDATE course_tasks SET session_id=?,updated_at=? WHERE id=?').run(sessionId, new Date().toISOString(), row.id);
+      return this.get(row.id);
+    });
+  }
+
+  cancelDraft(taskId) {
+    return this.#transaction(() => {
+      const row = this.#row(taskId), task = this.get(row.id);
+      if (row.status === 'cancelled') return task;
+      if (row.kind !== 'ai' || row.status !== 'draft' || row.session_id || task.files.length || task.artifacts.length) throw new Error('任务已开始提交，请重新核对后停止原会话');
+      this.db.prepare("UPDATE course_tasks SET status='cancelled',error=?,updated_at=? WHERE id=?").run('已取消未发送任务', new Date().toISOString(), row.id);
       return this.get(row.id);
     });
   }
@@ -223,6 +235,7 @@ export class TaskStore {
     if (error !== undefined && (typeof error !== 'string' || error.length > 20_000 || error.includes('\0'))) throw new Error('任务错误信息无效');
     return this.#transaction(() => {
       const row = this.#row(taskId), task = this.get(row.id);
+      if (row.status === 'cancelled') throw new Error('任务已取消，不能重新提交');
       if (task.artifacts.length || task.files.length || row.status === 'output') return task;
       if (task.input.workflow === 'ppt-edit' && ['proposed', 'discarded', 'applied'].includes(row.status)) return task;
       if (row.kind !== 'ai') throw new Error('人工修订任务不提交模型请求');

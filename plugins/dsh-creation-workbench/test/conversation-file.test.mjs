@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion } from '../src/conversation-file.mjs'
+import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewImagesFromQuestion } from '../src/conversation-file.mjs'
 
 test('card chat opens project-relative and same-project absolute file links', () => {
   const root = '/tmp/项目'
@@ -41,4 +41,28 @@ test('the review opens only the explicit draft and pins it to the checksum in th
     `文件：\`${path}\`。`,
     reference + reference.replace(path, 'courses/任务/working/另一稿.md'),
   ]) assert.equal(reviewDraftFromQuestion(root, question), null)
+})
+
+test('image choices in native plain-text questions retain paths, order and exact SHA-256', () => {
+  const root = '/tmp/项目', hash = 'AB'.repeat(32)
+  const question = `候选及 SHA-256：\n1. [首张](courses/task/working/a.png) —\n${hash}\n2. ![第二张](<courses/task/working/有 空格.jpg>) SHA-256：\`${hash}\`\n3. \`courses/task/working/第三.webp\`；校验值：${hash}`
+  const images = reviewImagesFromQuestion(root, question + '\n' + question)
+  assert.deepEqual(images.map(image => image.path), ['courses/task/working/a.png', 'courses/task/working/有 空格.jpg', 'courses/task/working/第三.webp'])
+  assert(images.every(image => image.hash === hash.toLowerCase() && image.fromConversation))
+  assert.equal(images[1].name, '有 空格.jpg')
+  assert.equal(reviewImagesFromQuestion(root, `[a](courses/%E5%9B%BE.png) — ${hash}`)[0].name, '图.png')
+})
+
+test('image preview never guesses a hash from a different file, remote link, internal path or prose', () => {
+  const root = '/tmp/项目', hash = 'ab'.repeat(32)
+  for (const question of [
+    `[a](../a.png) — ${hash}`, `[a](/tmp/别的项目/a.png) — ${hash}`,
+    `[a](https://example.test/a.png) — ${hash}`, `[a](.wtt-workbench/a.png) — ${hash}`,
+    `[a](%2e%2e/a.png) — ${hash}`, `[a](courses/a.svg) — ${hash}`, '[a](courses/a.png)',
+    `[a](courses/a.png)\n[b](courses/b.md) — ${hash}`, `[a](courses/a.png) 请对比后使用 ${hash}`,
+    `[a](courses/a.png) — ${hash}0`, `[a](courses/a.png) — \`${hash}0\``,
+  ]) assert.deepEqual(reviewImagesFromQuestion(root, question), [], question)
+  assert.deepEqual(reviewImagesFromQuestion(root, null), [])
+  const many = Array.from({ length: 30 }, (_, index) => `[${index}](courses/${index}.gif) — ${hash}`).join('\n')
+  assert.equal(reviewImagesFromQuestion(root, many).length, 24)
 })

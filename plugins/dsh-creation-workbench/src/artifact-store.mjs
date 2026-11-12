@@ -289,6 +289,7 @@ export class ArtifactStore {
 
   /** Internal provider path. The Agent tool above still requires its original bound native session. */
   async registerGeneratedMedia(input, validationOptions = {}) {
+    validationOptions.signal?.throwIfAborted();
     if (this.store.closed) throw new Error('工作台已关闭');
     const taskId = id(input?.taskId, '媒体任务标识');
     const mediaTask = () => {
@@ -310,6 +311,7 @@ export class ArtifactStore {
     const inspected = this.#inspect(relative), bytes = readFileSync(inspected.file), hash = sha(bytes);
     if (hash !== job.downloaded_hash) throw new Error('生成媒体在下载后发生变化，未登记');
     const { mime, validation } = await validateArtifact(kind, relative, bytes, validationOptions);
+    validationOptions.signal?.throwIfAborted();
     if (this.store.closed) throw new Error('工作台已关闭，未登记媒体产物');
     if (this.#hash(this.#inspect(relative).file) !== hash) throw new Error('验证期间生成媒体文件发生变化，未登记');
     const sourceCardIds = [...new Set((snapshot.sources || []).map(source => source.cardId))];

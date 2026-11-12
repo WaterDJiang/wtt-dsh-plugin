@@ -1,0 +1,20 @@
+.wtt-project-workbench.wtt-media-service-settings { display:flex; flex-direction:column; height:auto; min-height:0; gap:var(--wtt-space-3); margin-top:var(--wtt-space-4); padding:var(--wtt-space-3); color:var(--wtt-ui-ink); background:var(--wtt-ui-surface); border-radius:var(--wtt-radius-control); }
+.wtt-media-service-settings h3 { margin:0; flex:1; font-size:var(--wtt-text-lg); }
+.wtt-media-service-settings p { margin:0; font-size:var(--wtt-text-sm); }
+.wtt-media-service-list { display:flex; flex-direction:column; gap:var(--wtt-space-2); }
+.wtt-media-service-row { display:flex; align-items:center; flex-wrap:wrap; gap:var(--wtt-space-2); padding:var(--wtt-space-2); border-bottom:1px solid var(--wtt-ui-line); }
+.wtt-media-service-row>div { display:flex; flex:1; min-width:0; flex-direction:column; }
+.wtt-media-service-row strong { overflow-wrap:anywhere; }
+.wtt-media-service-row span,.wtt-media-service-row small { color:var(--wtt-ui-muted); overflow-wrap:anywhere; }
+.wtt-media-service-form { display:grid; gap:var(--wtt-space-3); }
+.wtt-media-service-form label { display:grid; gap:var(--wtt-space-1); min-width:0; }
+.wtt-media-service-form input,.wtt-media-service-form select { box-sizing:border-box; width:100%; min-width:0; padding:var(--wtt-space-2); font:inherit; color:var(--wtt-ui-ink); background:var(--wtt-ui-subtle); border:1px solid var(--wtt-ui-control-line); border-radius:var(--wtt-radius-control); }
+.wtt-media-service-form input:focus-visible,.wtt-media-service-form select:focus-visible { outline:2px solid var(--wtt-ui-accent); outline-offset:2px; }
+.wtt-media-service-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:var(--wtt-space-2); padding:var(--wtt-space-2); background:var(--wtt-ui-warning-paper); color:var(--wtt-ui-warning); border-radius:var(--wtt-radius-control); }
+.wtt-media-service-confirm p { flex-basis:100%; }
+.wtt-project-workbench.wtt-media-service-settings.is-compact { padding:0; margin-top:var(--wtt-space-3); background:transparent; }
+.wtt-project-workbench.wtt-media-service-dialog { position:fixed; inset:0; width:calc(100vw - 24px); max-width:none; height:calc(100dvh - 24px); max-height:none; margin:12px; padding:0; overflow:hidden; border:1px solid var(--wtt-ui-line); box-sizing:border-box; }
+.wtt-media-service-dialog:not([open]) { display:none; }
+.wtt-media-service-dialog::backdrop { background:var(--wtt-ui-scrim); }
+.wtt-media-service-dialog .wtt-ui-panel-header { flex-shrink:0; }
+.wtt-media-service-dialog .wtt-media-service-dialog-body { display:flex; flex:1; flex-direction:column; min-height:0; gap:var(--wtt-space-3); overflow:auto; padding:var(--wtt-space-3); }

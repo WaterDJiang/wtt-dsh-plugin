@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { WorkbenchService } from '../src/service.mjs';
 
 function fixture(t) {
@@ -23,6 +24,85 @@ function fixture(t) {
   const batch = (files, options = {}) => service.tasks.files.registerBatch({ taskId, files }, { sessionId, ...options });
   return { root, service, requirement, created, taskId, sessionId, file, batch };
 }
+
+test('one image container expands to seven real image cards, retaining successes and supporting isolated revision and replay', async t => {
+  const { root, service, requirement } = fixture(t);
+  const made = service.createTask({ requirementId: requirement.id, outputType: 'image', instruction: '制作七张独立图片',
+    selectedCardIds: [`requirement:${requirement.id}`], generation: { mode: 'new' }, operationId: randomUUID() });
+  const taskId = made.task.id, sessionId = 'seven-images';
+  service.tasks.bindSession({ taskId, sessionId });
+  assert.equal(made.task.input.outputPresentation, 'cards', 'new media defaults must not depend on a selectedSkills field');
+  assert.match(made.prepared.prompt, /交付7张图就登记7个 image/);
+  const png = spawnSync('python3', ['-c', 'import io,sys;from PIL import Image;b=io.BytesIO();Image.new("RGB",(12,8),(25,100,170)).save(b,format="PNG");sys.stdout.buffer.write(b.getvalue())']);
+  assert.equal(png.status, 0, png.stderr.toString());
+  const files = Array.from({ length: 7 }, (_, index) => {
+    const relative = `${made.prepared.deliveryDirectory}/图${index + 1}.png`;
+    writeFileSync(path.join(root, relative), png.stdout);
+    return { kind: 'image', title: `独立图片 ${index + 1}`, path: relative, operationId: randomUUID(), ...(index === 0 ? { primary: true } : {}) };
+  });
+  const batch = files => service.tasks.files.registerBatch({ taskId, files }, { sessionId });
+  const cards = () => service.canvas.getBoard(requirement.id).nodes.filter(node => node.taskId === taskId && node.outputCard);
+  const first = await batch(files.slice(0, 1));
+  assert.equal(first.succeeded, 1); assert.equal(cards().length, 1);
+  assert.equal(cards()[0].outputCard.id, made.task.outputCardId);
+  const mainVersion = service.tasks.get(taskId).cardVersionId;
+  writeFileSync(path.join(root, files[3].path), 'not a real PNG');
+  const partial = await batch(files.slice(1));
+  assert.equal(partial.succeeded, 5); assert.equal(partial.failed, 1);
+  assert.equal(cards().length, 6, 'a failed file must not create a fake successful card');
+  assert.equal(service.tasks.get(taskId).cardVersionId, mainVersion);
+  writeFileSync(path.join(root, files[3].path), png.stdout);
+  assert.equal((await batch([files[3]])).succeeded, 1);
+  const seven = cards(); assert.equal(seven.length, 7);
+  assert(seven.every(node => node.artifactKind === 'image' && node.generatedFile.media.validated && node.outputCard.versions.length === 1));
+  assert.equal(new Set(seven.map(node => node.outputCard.id)).size, 7);
+  assert.equal(new Set(seven.map(node => JSON.stringify(node.position))).size, 7);
+  assert(seven.every(node => service.canvas.getBoard(requirement.id).edges.some(edge => edge.target === node.id)));
+  const artifactIds = service.tasks.get(taskId).files.map(file => file.id).sort();
+  assert.equal((await batch(files)).succeeded, 7);
+  assert.deepEqual(service.tasks.get(taskId).files.map(file => file.id).sort(), artifactIds);
+  assert.equal(cards().length, 7);
+  const reportPath = `${made.prepared.deliveryDirectory}/报告.md`; writeFileSync(path.join(root, reportPath), '# 校验报告');
+  assert.equal((await batch([{ kind: 'support', title: '报告附件', path: reportPath, operationId: randomUUID(), presentation: 'attachment' }])).succeeded, 1);
+  assert.equal(cards().length, 7, 'an explicit attachment must not become an eighth card');
+  const child = seven.find(node => node.outputCard.id !== made.task.outputCardId);
+  assert.equal(service.outcomes.manifest({ requirementId: requirement.id, cardId: child.outputCard.id }).files.length, 1);
+  const revision = service.createTask({ requirementId: requirement.id, outputType: 'image', instruction: '只修改这一张图', selectedCardIds: [], selectedSkills: [],
+    generation: { mode: 'revise', cardId: child.outputCard.id, baseVersionId: child.outputCard.versionId }, operationId: randomUUID() });
+  service.tasks.bindSession({ taskId: revision.task.id, sessionId: 'revise-one-image' });
+  const revisionPath = `${revision.prepared.deliveryDirectory}/修改.png`; writeFileSync(path.join(root, revisionPath), png.stdout);
+  await service.tasks.files.register({ taskId: revision.task.id, kind: 'image', title: '只修改这一张图', path: revisionPath, operationId: randomUUID(), primary: true }, { sessionId: 'revise-one-image' });
+  const allImages = service.canvas.getBoard(requirement.id).nodes.filter(node => node.outputCard?.type === 'image');
+  assert.equal(allImages.length, 7);
+  assert.equal(allImages.find(node => node.outputCard.id === child.outputCard.id).outputCard.versions.length, 2);
+  assert(allImages.filter(node => node.outputCard.id !== child.outputCard.id).every(node => node.outputCard.versions.length === 1));
+  service.close();
+  const reopened = new WorkbenchService({ workspaceRoot: root });
+  try {
+    assert.equal(reopened.canvas.getBoard(requirement.id).nodes.filter(node => node.outputCard?.type === 'image').length, 7);
+    assert.equal((await reopened.tasks.files.registerBatch({ taskId, files }, { sessionId })).succeeded, 7);
+    assert.equal(reopened.canvas.getBoard(requirement.id).nodes.filter(node => node.outputCard?.type === 'image').length, 7);
+  } finally { reopened.close(); }
+});
+
+test('new media defaults do not rewrite the frozen attachment mode of an existing image task', async t => {
+  const { root, service, requirement } = fixture(t);
+  const made = service.createTask({ requirementId: requirement.id, outputType: 'image', instruction: '历史图片任务',
+    selectedCardIds: [], generation: { mode: 'new' }, operationId: randomUUID() });
+  const frozen = { ...made.task.input }; delete frozen.outputPresentation;
+  service.store.db.prepare('UPDATE course_tasks SET input_json=? WHERE id=?').run(JSON.stringify(frozen), made.task.id);
+  service.tasks.bindSession({ taskId: made.task.id, sessionId: 'legacy-images' });
+  const bytes = spawnSync('python3', ['-c', 'import io,sys;from PIL import Image;b=io.BytesIO();Image.new("RGB",(3,2)).save(b,format="PNG");sys.stdout.buffer.write(b.getvalue())']);
+  assert.equal(bytes.status, 0, bytes.stderr.toString());
+  const files = [1, 2].map(index => {
+    const relative = `${made.prepared.deliveryDirectory}/旧图${index}.png`; writeFileSync(path.join(root, relative), bytes.stdout);
+    return { kind: 'image', title: `旧图${index}`, path: relative, operationId: randomUUID() };
+  });
+  assert.equal((await service.tasks.files.registerBatch({ taskId: made.task.id, files }, { sessionId: 'legacy-images' })).succeeded, 2);
+  assert.equal(service.tasks.get(made.task.id).input.outputPresentation, undefined);
+  const cards = service.canvas.getBoard(requirement.id).nodes.filter(node => node.taskId === made.task.id && node.outputCard);
+  assert.equal(cards.length, 1); assert.equal(cards[0].outputCard.versions[0].outputs.length, 2);
+});
 
 test('20 real files batch once, mirror once, return compact results and preserve one card version on replay/restart', async t => {
   const { root, service, requirement, taskId, file, batch } = fixture(t);

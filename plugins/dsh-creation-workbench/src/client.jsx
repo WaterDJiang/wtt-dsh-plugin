@@ -1,3 +1,5 @@
+import { MediaServiceSettings } from './media-service-settings.jsx';
+import { createMediaSettingsOperations } from './media-service-operations.mjs';
 import { DialogBody, DialogFooter, DialogHeader, UiButton } from './ui/controls.jsx'
 import { UserError } from './user-feedback.jsx'
 import React, { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
@@ -23,7 +25,7 @@ const PANEL_ID = 'wtt-creation-workbench'
 const EMPTY_SESSION_STATUSES = new Map()
 
 export const name = 'wtt-creation-workbench-client'
-export const inject = ['slots', 'layout', 'remote', 'remote.session', 'remote.workspace', 'remote.skills', 'uiWorkspace', 'sessions', 'uiSession', 'uiConversation', 'inputTriggers', 'remote.userQuestions','locale','sidebarRightTabs','remote.workspaceFiles','configForms','resources']
+export const inject = ['slots', 'layout', 'remote', 'remote.session', 'remote.workspace', 'remote.skills', 'uiWorkspace', 'sessions', 'uiSession', 'uiConversation', 'inputTriggers', 'remote.userQuestions','locale','sidebarRightTabs','remote.workspaceFiles','configForms','resources','remote.settings','remote.credentials','settingsSchema']
 
 function endpoint(query = {}, projectId) {
   const url = new URL('api/wtt-creation-workbench', document.baseURI)
@@ -199,7 +201,7 @@ function RenameRequirementDialog({ value, onChange, busy, error, onClose, onSubm
 }
 
 function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStart, onStartCanvas, onRestoreCanvas, onPrepareContinuation, onWatchTaskSessions, acquirePreviewSession, acquireEditingSession,nativeEditorBridge,SessionProvider, renderSlot,
-  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, modelLoading, modelError, nativeSessionStatuses }) {
+  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses }) {
   const outlineTitleId = useId()
   const activeRef = useRef(active)
   activeRef.current = active
@@ -617,7 +619,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
       onPreviewProjectFile={previewProjectFile}
       onAssetNavigate={(requirementId, cardId, versionId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId }; selectRequirement(target) }}
-      modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
+      onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
     {!selected&&recycleRequest&&<ProjectRecycleDialog request={request} endpoint={q=>endpoint(q,project.id)} onClose={()=>setRecycleRequest(null)} onChanged={()=>setFileRefresh(v=>v+1)}/>}
     {view==='canvas'&&!selected&&projectFileSelection&&<div className="wtt-empty-file-preview"><ProjectFilePreview selection={projectFileSelection} endpoint={q=>endpoint(q,project.id)} onClose={()=>setProjectFileSelection(null)}/></div>}
     {view === 'canvas' && workspace && !selected && <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>拖入文件，继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div>}
@@ -763,6 +765,11 @@ function ProjectWorkbench(props) {
 }
 
 export function apply(ctx) {
+  const mediaSettings = createMediaSettingsOperations(ctx);
+  ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
+    name: 'settings.models.footer', id: 'wtt-media-services', order: 20,
+    inject: () => ({ operations: mediaSettings }),
+  }, MediaServiceSettings));
   let useLocalDirectoryBrowser = false
   const browseDirectory = async (path, signal) => {
     if (!useLocalDirectoryBrowser) {
@@ -813,6 +820,19 @@ export function apply(ctx) {
         return normalizeModelCatalog(result.value)
       },
       onOpenModelSettings: () => openNativeModelSettings(ctx),
+      onOpenMediaSettings: () => {
+        openNativeModelSettings(ctx);
+        let remaining = 30;
+        const focus = () => { const section = document.getElementById('wtt-media-services'); if (section) { section.scrollIntoView({ block: 'start' }); const opener = section.querySelector('[data-media-settings-open]'); if (opener) opener.click(); else section.focus({ preventScroll: true }); } else if (remaining-- > 0) requestAnimationFrame(focus); };
+        requestAnimationFrame(focus);
+      },
+      onWatchMediaSettings: listener => {
+        const form = mediaSettings.form;
+        let previous = form.getSnapshot().revision;
+        const stop = form.subscribe(() => { const revision = form.getSnapshot().revision; if (revision !== previous) { previous = revision; listener(); } });
+        const stopCredentials = mediaSettings.watchCredentials(listener);
+        return () => { stop(); stopCredentials(); };
+      },
       nativeSessionStatus: ctx.uiSession.sessionStatus,
     }),
   }, ProjectWorkbench))

@@ -103,6 +103,10 @@ test('board refresh detects failed and waiting transitions before any successful
   assert.notEqual(generationStateSignature([{ ...task, dispatchStatus: 'failed', error: '网络错误' }]), original);
   assert.notEqual(generationStateSignature([{ ...task, runtimeState: { phase: 'awaiting-input' } }]), original);
   assert.notEqual(generationStateSignature([{ ...task, cardVersionId: 'real-v1' }]), original);
+  const first = { ...task, cardVersionId: 'real-v1', files: [{ id: 'image-1' }] };
+  assert.notEqual(generationStateSignature([{ ...first, files: [...first.files, { id: 'image-2' }] }]), generationStateSignature([first]), 'later independent files must refresh even with an unchanged main version and running phase');
+  assert.notEqual(generationStateSignature([{ ...first, artifacts: [{ versionId: 'outline-1' }] }]), generationStateSignature([first]));
+  assert.equal(generationStateSignature([{ ...first, files: [{ id: 'image-1', title: 'unchanged saved output' }] }]), generationStateSignature([first]));
   assert.equal(generationStateSignature([{ id: 'candidate', input: { workflow: 'ppt-edit', outputCardId: 'c' } }]), generationStateSignature([]));
   assert.equal(generationStateSignature([{ ...task, instruction: 'unchanged task input' }]), original);
 });

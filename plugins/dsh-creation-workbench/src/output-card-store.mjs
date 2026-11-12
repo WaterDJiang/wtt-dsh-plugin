@@ -275,11 +275,13 @@ export class OutputCardStore {
     const mediaJob = task.mediaJob;
     let phase = 'unknown', message;
     if (task.kind === 'media' && mediaJob) {
-      if (['queued', 'submitting'].includes(mediaJob.status)) phase = 'submitting';
+      if (mediaJob.status === 'paused') phase = 'idle';
+      else if (mediaJob.status === 'cancelled') phase = 'cancelled';
+      else if (['queued', 'submitting'].includes(mediaJob.status)) phase = 'submitting';
       else if (['accepted', 'processing', 'polling', 'downloading', 'downloaded', 'registering'].includes(mediaJob.status)) phase = 'generating';
       else if (['failed', 'download_failed', 'registration_failed'].includes(mediaJob.status)) phase = 'failed';
       message = mediaJob.error;
-    } else if (['draft', 'submitting', 'failed'].includes(status)) phase = status;
+    } else if (['draft', 'submitting', 'failed', 'cancelled'].includes(status)) phase = status;
     else if (task.runtimeState) ({ phase, message } = task.runtimeState);
     const messages = { draft: '任务已创建，等待发送', submitting: '正在提交生成任务', generating: '内容正在生成',
       'awaiting-input': '等待你确认或补充信息', 'awaiting-approval': '等待授权', idle: '等待继续，请查看执行',

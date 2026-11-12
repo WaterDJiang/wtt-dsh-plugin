@@ -5,12 +5,22 @@ const LABELS = {
 };
 
 export function pendingLabel(pending) {
+  if (pending?.mediaJob?.status === 'paused') return '已停止本地跟进';
+  if (pending?.mediaJob?.status === 'cancelled') return '已取消排队';
   if (pending?.published && pending.phase === 'generating') return '任务仍在运行';
   if (pending?.phase === 'idle') {
     if (pending.message?.startsWith('本轮执行已取消') || pending.message?.startsWith('本轮执行已停止')) return '本轮已中断';
     if (pending.message?.startsWith('本轮达到输出上限')) return '已达输出上限';
   }
   return pending?.nativeLabel || LABELS[pending?.phase] || '状态待核对';
+}
+
+export function unconfirmedExecution(pending) {
+  if (pending?.mediaJob?.status === 'paused') return '已停止本地跟进，外部生成可能仍在继续。';
+  if (pending?.phase === 'unknown') return pending.mediaJob
+    ? '提交结果尚未确认，外部服务可能仍在生成，请在服务商核对结果和费用。'
+    : '原任务状态尚未核实，移除卡片不会停止原任务。';
+  return null;
 }
 
 export function pendingCardTitle(card) {
@@ -55,7 +65,8 @@ export function publishedTaskGeneration(task, status) {
 export function generationStateSignature(tasks = []) {
   return JSON.stringify(tasks.filter(task => task.outputCardId).map(task => [task.id,
     task.dispatchStatus || task.status, task.cardVersionId, task.sessionId, task.error,
-    task.runtimeState, task.mediaJob?.status, task.mediaJob?.error, task.mediaJob?.updatedAt]).sort((a, b) => a[0].localeCompare(b[0])));
+    task.runtimeState, task.files?.length || 0, task.artifacts?.length || 0,
+    task.mediaJob?.status, task.mediaJob?.error, task.mediaJob?.updatedAt]).sort((a, b) => a[0].localeCompare(b[0])));
 }
 
 export function createPendingContext({ projectId, projectName, projectPath, requirement, descriptor }) {
