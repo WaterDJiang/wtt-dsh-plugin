@@ -615,7 +615,7 @@ export function CardComposer({
   }
 
   useEffect(() => {
-    if (visible && context?.openExecutionRequest) void toggleConversation()
+    if (visible && context?.openExecutionRequest) void toggleConversation(true)
   }, [context?.openExecutionRequest])
 
   useEffect(() => {

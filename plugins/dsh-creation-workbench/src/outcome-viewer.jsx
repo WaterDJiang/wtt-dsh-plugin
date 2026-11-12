@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { PanelHeader, PanelToolbar, UiButton } from './ui/controls.jsx'
 import { UserError } from './user-feedback.jsx'
 import { DocumentViewer } from './document-preview.jsx'
+import { OutputPreview } from './output-preview.jsx'
 
 const externalFormats = ['pptx', 'docx', 'pdf', 'csv']
 export function OutcomeViewer({ target, endpoint, request, renderNativePreview, onOpenSlides, onEditPpt, onSaved, onClose, onAdd,
@@ -91,7 +92,8 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     </PanelToolbar>
     {file?.role === 'attachment' && <div className="wtt-outcome-status" role="status">附件 · 未作为正式版本归档</div>}
     <div className="wtt-outcome-viewer-body">{error ? <UserError error={error} /> : source
-      ? source.format === 'mp4' || source.format === 'webm' ? <video src={downloadHref} controls playsInline aria-label={source.name} />
+      ? source.mime?.startsWith('image/') ? <OutputPreview type="image" title={source.name} src={downloadHref} status={source.status} />
+        : source.format === 'mp4' || source.format === 'webm' || source.format === 'mov' ? <video key={selectionKey} src={downloadHref} controls preload="metadata" playsInline aria-label={source.name} />
         : renderNativePreview?.(source) || <UserError error="DSH 原生文件预览尚未连接。" />
       : <p role="status">正在读取成果文件…</p>}</div>
   </aside>

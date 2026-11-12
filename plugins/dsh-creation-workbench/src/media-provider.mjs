@@ -6,6 +6,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync, unlinkS
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
+import { isLocalMediaServiceHost } from './media-service-address.mjs';
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
 const GENERATED_MEDIA_MAX_BYTES = 200 * 1024 * 1024;
@@ -347,13 +348,16 @@ export function createMediaProvider(config = {}) {
     throw fail('provider_rejected', '视频服务未返回可核对的任务状态。');
   }
 
-  async function download(value, { maxBytes = GENERATED_MEDIA_MAX_BYTES } = {}) {
+  async function download(value, { maxBytes = GENERATED_MEDIA_MAX_BYTES, localOrigin } = {}) {
     assertOpen();
     if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw fail('download_failed', '下载字节上限无效。');
     let url = value;
     for (let redirects = 0; redirects <= 3; redirects += 1) {
       let response;
-      try { response = await request(url, { localOnly: false, allowLocal: config.mediaAllowLocalDownloads === true, skipRedirectBody: true,
+      try {
+        const target = URL.canParse(url) ? new URL(url) : null;
+        const configuredLocal = Boolean(target && target.origin === localOrigin && isLocalMediaServiceHost(target.hostname));
+        response = await request(url, { localOnly: false, allowLocal: config.mediaAllowLocalDownloads === true || configuredLocal, skipRedirectBody: true,
         headers: { 'Accept-Encoding': 'identity' }, maxBytes, timeoutMs: config.mediaDownloadTimeoutMs || 60_000 }); }
       catch (cause) {
         if (cause.code === 'download_url_blocked' || cause.code === 'download_url_invalid') throw cause;

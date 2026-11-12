@@ -1,6 +1,7 @@
 import { createMediaProvider } from './media-provider.mjs';
 import { mediaDefaults, mediaModelDefinition, validateMediaParameters } from './media-api-catalog.mjs';
 import { GENERATED_MEDIA_MAX_BYTES } from './artifact-validation.mjs';
+import { isLocalMediaServiceHost } from './media-service-address.mjs';
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const dataURI = ref => `data:${ref.mime};base64,${Buffer.from(ref.bytes).toString('base64')}`;
@@ -35,14 +36,14 @@ export function createOfficialMediaProvider(id, access, config = {}) {
     let response;
     try {
       response = await transport.request(apiURL(current, suffix), { method, body: bytes,
-        localOnly: false, allowLocal: ['localhost', '127.0.0.1', '[::1]'].includes(new URL(current.baseURL).hostname),
+        localOnly: false, allowLocal: isLocalMediaServiceHost(new URL(current.baseURL).hostname),
         timeoutMs: config.mediaApiTimeoutMs || 600_000, maxBytes: binary ? GENERATED_MEDIA_MAX_BYTES : Math.ceil(GENERATED_MEDIA_MAX_BYTES * 4 / 3) + 1024 * 1024,
         headers: { ...(google ? { 'x-goog-api-key': secret, 'Api-Revision': '2026-05-20' } : { Authorization: `Bearer ${secret}` }), ...(contentType ? { 'Content-Type': contentType } : {}), ...(asyncHeader ? { 'X-DashScope-Async': 'enable' } : {}), Accept: binary ? '*/*' : 'application/json' } });
     } catch (cause) {
       const unavailable = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'].includes(cause.code);
       throw fail(method === 'POST' && !unavailable ? 'submission_unknown' : 'service_unavailable', method === 'POST' && !unavailable ? '提交结果未知，请先核对原任务，不会自动重投' : '媒体服务不可达，请检查地址与网络');
     }
-    if (binary && response.status >= 300 && response.status < 400 && response.headers.location) return transport.download(new URL(response.headers.location, current.baseURL + suffix).href, { maxBytes: GENERATED_MEDIA_MAX_BYTES });
+    if (binary && response.status >= 300 && response.status < 400 && response.headers.location) return transport.download(new URL(response.headers.location, current.baseURL + suffix).href, { maxBytes: GENERATED_MEDIA_MAX_BYTES, localOrigin: new URL(current.baseURL).origin });
     let payload;
     if (!binary) { try { payload = JSON.parse(response.bytes.toString('utf8')); } catch { throw fail(method === 'POST' ? 'submission_unknown' : 'provider_rejected', '媒体服务未返回有效 JSON，请核对原任务'); } }
     const refusal = response.status < 200 || response.status >= 300 || payload?.error || payload?.code !== undefined && ![0, '0', 200, '200'].includes(payload.code) || payload?.base_resp?.status_code;
@@ -90,6 +91,14 @@ export function createOfficialMediaProvider(id, access, config = {}) {
     if (references.some(ref => ref.bytes.length > (model.maxReferenceBytes || 20 * 1024 * 1024)) || references.reduce((sum, ref) => sum + ref.bytes.length, 0) > 32 * 1024 * 1024) throw fail('provider_rejected', '参考图片超过所选模型上传大小限制');
     const request = { method: 'POST', expectedEndpoint, expectedProfile: current };
     const { ratio, resolution, duration, size, quality } = parameters;
+    if (protocol === 'jimeng-image') {
+      const values = { model: current.model, prompt, ratio, resolution, response_format: 'url' };
+      if (!references.length) return singleResult(await api('/images/generations', { ...request, body: values }), type);
+      const form = new FormData();
+      for (const [key, value] of Object.entries(values)) form.append(key, String(value));
+      for (const ref of references) form.append('images', new Blob([ref.bytes], { type: ref.mime }), ref.name);
+      return singleResult(await api('/images/generations', { ...request, multipart: form }), type);
+    }
     if (protocol === 'openai-image') {
       if (references.length) {
         const form = new FormData();
@@ -185,7 +194,7 @@ export function createOfficialMediaProvider(id, access, config = {}) {
       const current = profile();
       const prefix = `${current.baseURL}/videos/`;
       if (current.protocol === 'openai-video' && url.startsWith(prefix) && /^[-\w]+\/content$/.test(url.slice(prefix.length))) return api(url.slice(current.baseURL.length), { binary: true });
-      return transport.download(url, options);
+      return transport.download(url, { ...options, localOrigin: new URL(current.baseURL).origin });
     },
     close() { closed = true; return transport.close(); },
   };

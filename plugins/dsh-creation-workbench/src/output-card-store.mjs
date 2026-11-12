@@ -1,36 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { OutputDraftStore } from './output-draft-store.mjs';
 import { isActiveTaskPhase } from './pending-card-state.mjs';
-import { CARD_WIDTH, CARD_HEIGHT } from './creation-context.mjs';
+import { CARD_WIDTH, adjacentCreationPosition, creationPositionFree, creationSourceAnchor } from './creation-context.mjs';
 
 const REF = /^(artifact|outline|word|material):[0-9a-f-]{36}$/;
 const typeOf = type => type === 'pptx' ? 'pptx' : ['image', 'video'].includes(type) ? type : 'text';
 const legacyId = ref => `legacy:${ref}`;
 const legacyVersion = ref => `legacy-v1:${ref}`;
-
-function nextOutputPosition(anchor, occupied) {
-  const width = CARD_WIDTH, height = CARD_HEIGHT, gap = 28, limit = 999_000;
-  const free = (x, y) => x >= -limit && x <= limit && y >= -limit && y <= limit
-    && occupied.every(node => x + width + gap <= node.position.x || x >= node.position.x + (node.width || width) + gap
-      || y + height + gap <= node.position.y || y >= node.position.y + (node.height || height) + gap);
-  const right = anchor.position.x + (anchor.width || width) + gap;
-  for (let row = 0; row <= occupied.length; row++) {
-    for (const direction of row === 0 ? [1] : [1, -1]) {
-      const y = anchor.position.y + direction * row * (height + gap);
-      for (let column = 0; column < 3; column++) {
-        const x = right + column * (width + gap);
-        if (free(x, y)) return { x, y };
-      }
-    }
-  }
-  // Large existing cards can cover several nearby slots. Use a wider grid only as a fallback.
-  const step = 1600, columns = Math.floor(2 * limit / step);
-  for (let index = 0; index <= occupied.length * 4; index++) {
-    const x = -limit + (index % columns) * step, y = -limit + Math.floor(index / columns) * step;
-    if (free(x, y)) return { x, y };
-  }
-  throw new Error('画布没有可用的产物卡位置');
-}
 
 export function normalizeGeneration(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('产物卡生成目标无效');
@@ -144,8 +120,16 @@ export class OutputCardStore {
     if(plan.composition)this.db.prepare('UPDATE output_cards SET title=? WHERE id=?').run(plan.title,plan.id);
     let card = this.db.prepare('SELECT * FROM output_cards WHERE id=?').get(plan.id);
     if (!card) {
+      let position;
+      if (!plan.adoption) {
+        const input = JSON.parse(this.db.prepare('SELECT input_json FROM course_tasks WHERE id=?').get(taskId).input_json);
+        const occupied = this.project(this.#raw(plan.requirementId)).nodes;
+        position = creationPositionFree(input.outputPosition, occupied) ? input.outputPosition : adjacentCreationPosition(
+          creationSourceAnchor(input.sources, occupied) || { position: { x: (input.outputPosition?.x ?? 410) - CARD_WIDTH - 80, y: input.outputPosition?.y ?? 60 } }, occupied);
+      }
       this.db.prepare('INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at) VALUES (?,?,?,?,?,NULL,0,?)')
         .run(plan.id, plan.requirementId, plan.type, plan.title, plan.adoption?.card.nodeId || `output:${plan.id}`, now);
+      if (position) this.db.prepare('UPDATE output_cards SET initial_position_json=? WHERE id=?').run(JSON.stringify(position), plan.id);
       if (plan.adoption) {
         const base = plan.adoption.version;
         this.#source(plan.requirementId, base.primaryRef);
@@ -202,9 +186,9 @@ export class OutputCardStore {
   #createIndependent(parent, artifact, sourceRef) {
     const raw = this.#raw(parent.requirement_id);
     const occupied = this.project(raw).nodes.filter(node => node.id !== sourceRef);
-    const anchor = occupied.find(node => node.id === (parent.node_id || `output:${parent.id}`))
+    const anchor = creationSourceAnchor(artifact.sourceCardIds, occupied) || occupied.find(node => node.id === (parent.node_id || `output:${parent.id}`))
       || { position: { x: 410, y: 60 } };
-    const position = nextOutputPosition(anchor, occupied);
+    const position = adjacentCreationPosition(anchor, occupied);
     const cardId = randomUUID(), versionId = randomUUID(), now = new Date().toISOString();
     const type = /\.pptx$/i.test(artifact.path) ? 'pptx' : typeOf(artifact.kind);
     this.db.prepare(`INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at,initial_position_json)
@@ -294,7 +278,7 @@ export class OutputCardStore {
   }
 
   #pendingNode(card, task, raw) {
-    const position = raw.layoutPositions?.[card.nodeId] || task.input.outputPosition || { x: 410, y: 60 };
+    const position = raw.layoutPositions?.[card.nodeId] || card.initialPosition || task.input.outputPosition || { x: 410, y: 60 };
     const node = { id: card.nodeId, kind: 'generation', title: card.title, position, ...(raw.sizes?.[card.nodeId] || {}),
       outputCard: { ...card, versionId: null }, pendingGeneration: this.#pendingGeneration(task) };
     const annotated = this.store.slides?.annotate(node) || node;

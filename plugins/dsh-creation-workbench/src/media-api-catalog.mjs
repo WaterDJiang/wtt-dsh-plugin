@@ -1,7 +1,7 @@
 const RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
 const definition = (vendor, label, type, endpoint, models, parameters) => ({ vendor, label, type, endpoint, models, ...parameters });
 export const MEDIA_PROVIDERS = { openai: 'OpenAI', gemini: 'Google', jimeng: '火山方舟', kling: '可灵', minimax: 'MiniMax', wan: '阿里云百炼' };
-export const mediaServiceName = protocol => `${MEDIA_PROVIDERS[MEDIA_PROTOCOLS[protocol].vendor]} ${MEDIA_PROTOCOLS[protocol].type === 'image' ? '图片' : '视频'}`;
+export const mediaServiceName = protocol => MEDIA_PROTOCOLS[protocol].customOnly ? MEDIA_PROTOCOLS[protocol].label : `${MEDIA_PROVIDERS[MEDIA_PROTOCOLS[protocol].vendor]} ${MEDIA_PROTOCOLS[protocol].type === 'image' ? '图片' : '视频'}`;
 export const MEDIA_PROTOCOLS = {
   'openai-image': definition('openai', 'GPT 图片', 'image', 'https://api.openai.com/v1', ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2', 'gpt-image-1.5'], { sizes: ['1024x1024', '1536x1024', '1024x1536'], qualities: ['auto', 'low', 'medium', 'high'], maxReferences: 1 }),
   'openai-video': definition('openai', 'Sora 视频', 'video', 'https://api.openai.com/v1', ['sora-2', 'sora-2-pro'], { sizes: ['1280x720', '720x1280'], durations: [4, 8, 12], maxReferences: 1 }),
@@ -15,6 +15,7 @@ export const MEDIA_PROTOCOLS = {
   'minimax-video': definition('minimax', 'MiniMax 视频', 'video', 'https://api.minimax.io', ['MiniMax-H3', 'MiniMax-H3-Highspeed', 'MiniMax-H3-Lite', 'MiniMax-H3-Max', 'MiniMax-Hailuo-2.3'], { resolutions: ['768P', '1080P'], durations: [6, 10], maxReferences: 1 }),
   'wan-image': definition('wan', '万相图片', 'image', 'https://dashscope.aliyuncs.com/api/v1', ['wan2.6-t2i', 'wan2.6-image'], { sizes: ['1280x1280', '1280x720', '720x1280', '1024x1024'], maxReferences: 0 }),
   'wan-video': definition('wan', '万相视频', 'video', 'https://dashscope.aliyuncs.com/api/v1', ['wan2.6-t2v', 'wan2.6-i2v'], { ratios: ['16:9', '9:16', '1:1'], resolutions: ['720P', '1080P'], durations: [5, 10, 15], maxReferences: 0 }),
+  'jimeng-image': definition('jimeng', '即梦反代 · 图片', 'image', 'http://127.0.0.1:8000/v1', ['jimeng-5.0'], { ratios: RATIOS, resolutions: ['2k', '4k'], maxReferences: 10, customOnly: true }),
 };
 
 export const MEDIA_PARAMETER_KEYS = ['model', 'ratio', 'resolution', 'duration', 'size', 'quality'];

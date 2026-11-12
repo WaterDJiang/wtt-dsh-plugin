@@ -104,33 +104,56 @@ export function creationTaskInput(context) {
     ...(context.generation ? { generation: { ...context.generation } } : {}) };
 }
 
-export function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
-  let x = Math.min(999_000, Math.max(-999_000, anchor.position.x + (anchor.width || width) + 80));
-  let y = Math.min(999_000, Math.max(-999_000, anchor.position.y));
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    if (!cards.some(card => x < card.position.x + (card.width || width) + 20 && x + width + 20 > card.position.x && y < card.position.y + (card.height || height) + 20 && y + height + 20 > card.position.y)) return { x, y };
-    y += height + 48;
-    if (y > 999_000) { y = Math.max(-999_000, anchor.position.y); x = Math.max(-999_000, x - width - 80); }
+// Shared by first creation and multi-output registration. Never return an occupied fallback.
+export function creationSourceAnchor(sources, cards) {
+  for (const source of sources || []) {
+    const id = typeof source === 'string' ? source : source.nodeId || source.cardId || source.id;
+    const card = cards.find(value => value.id === id || value.sourceId === id || value.outputCard?.versions?.some(version => version.primaryRef === id));
+    if (card) return card;
   }
-  return { x, y };
 }
 
-// Prefer a free visible spot for B without moving the user's viewport.
+export function creationPositionFree(position, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+  return Number.isFinite(position?.x) && Number.isFinite(position?.y) && Math.abs(position.x) <= 999_000 && Math.abs(position.y) <= 999_000
+    && !cards.some(card => position.x < card.position.x + (card.width || CARD_WIDTH) + 24
+      && position.x + width + 24 > card.position.x && position.y < card.position.y + (card.height || CARD_HEIGHT) + 24
+      && position.y + height + 24 > card.position.y);
+}
+
+export function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+  const min = -999_000, maxX = 999_000 - width, maxY = 999_000 - height;
+  const clamp = (value, max) => Math.max(min, Math.min(max, value));
+  const origin = { x: clamp(anchor.position.x + (anchor.width || CARD_WIDTH) + 80, maxX), y: clamp(anchor.position.y, maxY) };
+  const columns = new Set([origin.x, clamp(anchor.position.x - width - 80, maxX), min, maxX]);
+  for (const card of cards) {
+    columns.add(clamp(card.position.x + (card.width || CARD_WIDTH) + 24, maxX));
+    columns.add(clamp(card.position.x - width - 24, maxX));
+  }
+  let best = null, score = Infinity;
+  for (const x of [...columns].sort((a, b) => Math.abs(a - origin.x) - Math.abs(b - origin.x) || b - a)) {
+    const distance = (x - origin.x) ** 2;
+    if (distance > score) break;
+    const intervals = cards.filter(card => x < card.position.x + (card.width || CARD_WIDTH) + 24 && x + width + 24 > card.position.x)
+      .map(card => [card.position.y - height - 24, card.position.y + (card.height || CARD_HEIGHT) + 24]).sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const interval of intervals) {
+      const last = merged.at(-1);
+      if (last && interval[0] < last[1]) last[1] = Math.max(last[1], interval[1]);
+      else merged.push([...interval]);
+    }
+    const blocked = merged.find(([top, bottom]) => origin.y > top && origin.y < bottom);
+    const rows = blocked ? [blocked[1], blocked[0]] : [origin.y];
+    for (const y of rows) {
+      if (y < min || y > maxY) continue;
+      const nextScore = distance + (y - origin.y) ** 2;
+      if (nextScore < score && creationPositionFree({ x, y }, cards, width, height)) { best = { x, y }; score = nextScore; }
+    }
+  }
+  if (!best) throw new Error('来源附近没有可用的卡片位置，请整理画布后重试。');
+  return best;
+}
+
+// Keep the existing caller contract; source proximity now takes precedence over the viewport.
 export function visibleCreationPosition(anchor, cards, viewport, size, width = CARD_WIDTH, height = CARD_HEIGHT) {
-  const zoom = viewport.zoom;
-  const left = (16 - viewport.x) / zoom, right = (size.width - 16 - viewport.x) / zoom - width;
-  const top = (96 - viewport.y) / zoom;
-  const bottom = Math.max(top, (size.height - 240 - viewport.y) / zoom - height);
-  if (right < left) return adjacentCreationPosition(anchor,cards,width,height);
-  const clamp = p => ({x:Math.max(left,Math.min(right,p.x)),y:Math.max(top,Math.min(bottom,p.y))});
-  const free = p => !cards.some(card=>p.x<card.position.x+(card.width||width)+16&&p.x+width+16>card.position.x&&p.y<card.position.y+(card.height||height)+16&&p.y+height+16>card.position.y);
-  const candidates = [adjacentCreationPosition(anchor,cards,width,height),
-    {x:anchor.position.x-width-80,y:anchor.position.y},
-    {x:anchor.position.x,y:anchor.position.y+(anchor.height||height)+48},
-    {x:anchor.position.x,y:anchor.position.y-height-48}];
-  for(const p of candidates.map(clamp))if(free(p))return p;
-  for(let y=top;y<=bottom;y+=height+32)for(let x=left;x<=right;x+=width+32)if(free({x,y}))return {x,y};
-  const fullBottom=(size.height-16-viewport.y)/zoom-height;
-  for(let y=top;y<=fullBottom;y+=height+32)for(let x=left;x<=right;x+=width+32)if(free({x,y}))return {x,y};
-  return adjacentCreationPosition(anchor,cards,width,height);
+  return adjacentCreationPosition(anchor, cards, width, height);
 }

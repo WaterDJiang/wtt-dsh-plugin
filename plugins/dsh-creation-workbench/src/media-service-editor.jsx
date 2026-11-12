@@ -3,11 +3,11 @@ import { UiButton, DialogFooter } from './ui/controls.jsx';
 import { MEDIA_PROTOCOLS, MEDIA_PROVIDERS, mediaServiceName } from './media-api-catalog.mjs';
 import { mediaCredentialRef } from './media-service-settings.mjs';
 
-export function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave, onCancel, onClear, busy, writable, infos, refs, connections, operations }) {
+export function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave, onCancel, onClear, busy, writable, infos, refs, connections, operations, addressError }) {
   const { id, profile } = editor;
   const ownRef = mediaCredentialRef(id);
   const preset = MEDIA_PROTOCOLS[profile.protocol];
-  const [mode, setMode] = useState(() => profile.connection || profile.baseURL !== preset.endpoint ? 'custom' : 'catalog');
+  const [mode, setMode] = useState(() => preset.customOnly || profile.connection || profile.baseURL !== preset.endpoint ? 'custom' : 'catalog');
   const drafts = useRef({});
   const dedicated = profile.apiKeyEnv === ownRef && !profile.connection;
   const [fetching, setFetching] = useState(false);
@@ -17,6 +17,12 @@ export function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave
   const [failure, setFailure] = useState('');
   const request = useRef(null);
   const advanced = useRef(null);
+  const addressInput = useRef(null);
+  useEffect(() => {
+    if (!addressError) return;
+    if (mode === 'catalog' && advanced.current) advanced.current.open = true;
+    addressInput.current?.focus();
+  }, [addressError, mode]);
   const scope = JSON.stringify([profile.baseURL, profile.protocol, profile.apiKeyEnv, profile.connection, apiKey]);
   const activeScope = useRef(scope);
   activeScope.current = scope;
@@ -76,7 +82,7 @@ export function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave
     {!profile.connection && <label>凭据来源<select aria-label="凭据来源" value={dedicated ? '' : profile.apiKeyEnv} disabled={busy} onChange={event => { setApiKey(''); change({ apiKeyEnv: event.target.value || ownRef }); }}><option value="">此提供商的 API 密钥</option>{refs.filter(ref => ref !== ownRef).map(ref => <option key={ref} value={ref}>{ref}{infos[ref]?.configured ? ' · 已配置' : ''}</option>)}</select></label>}
   </>;
   const nameField = <label>显示名称<input aria-label="显示名称" value={profile.displayName} maxLength={80} disabled={busy} onChange={event => change({ displayName: event.target.value })} required /></label>;
-  const addressField = <label>API 地址<input aria-label="API 地址" value={profile.baseURL} type="url" placeholder="https://gateway.example/v1" disabled={busy || Boolean(profile.connection)} onChange={event => change({ baseURL: event.target.value })} required /></label>;
+  const addressField = <label>API 地址<input ref={addressInput} aria-label="API 地址" aria-invalid={Boolean(addressError)} aria-describedby={addressError ? `media-address-error-${id}` : undefined} value={profile.baseURL} type="url" placeholder="https://gateway.example/v1" disabled={busy || Boolean(profile.connection)} onChange={event => change({ baseURL: event.target.value })} required />{addressError && <span id={`media-address-error-${id}`} className="wtt-media-address-error" role="alert">{addressError}</span>}</label>;
   return <form className="wtt-media-service-form" onSubmit={onSave}>
     <div className="wtt-media-add-modes" role="tablist" aria-label="媒体模型接入方式">{[['catalog', '第三方模型提供商'], ['custom', '自定义模型 API']].map(([value, label]) => <UiButton key={value} role="tab" id={`media-tab-${id}-${value}`} aria-controls={`media-panel-${id}`} aria-selected={mode === value} disabled={busy || fetching} onClick={() => switchMode(value)}>{label}</UiButton>)}</div>
     <div className="wtt-media-add-panel" role="tabpanel" id={`media-panel-${id}`} aria-labelledby={`media-tab-${id}-${mode}`}>

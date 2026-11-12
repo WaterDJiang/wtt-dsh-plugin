@@ -58,6 +58,12 @@ test('one image container expands to seven real image cards, retaining successes
   assert.equal(new Set(seven.map(node => node.outputCard.id)).size, 7);
   assert.equal(new Set(seven.map(node => JSON.stringify(node.position))).size, 7);
   assert(seven.every(node => service.canvas.getBoard(requirement.id).edges.some(edge => edge.target === node.id)));
+  const allNodes = service.canvas.getBoard(requirement.id).nodes;
+  for (const node of seven) for (const other of allNodes) if (node.id !== other.id) {
+    assert(!(node.position.x < other.position.x + (other.width || 320) && node.position.x + (node.width || 320) > other.position.x
+      && node.position.y < other.position.y + (other.height || 256) && node.position.y + (node.height || 256) > other.position.y), 'new output cannot overlap any current card');
+  }
+  const fixedPositions = new Map(seven.map(node => [node.id, node.position]));
   const artifactIds = service.tasks.get(taskId).files.map(file => file.id).sort();
   assert.equal((await batch(files)).succeeded, 7);
   assert.deepEqual(service.tasks.get(taskId).files.map(file => file.id).sort(), artifactIds);
@@ -80,6 +86,7 @@ test('one image container expands to seven real image cards, retaining successes
   const reopened = new WorkbenchService({ workspaceRoot: root });
   try {
     assert.equal(reopened.canvas.getBoard(requirement.id).nodes.filter(node => node.outputCard?.type === 'image').length, 7);
+    for (const node of reopened.canvas.getBoard(requirement.id).nodes.filter(node => fixedPositions.has(node.id))) assert.deepEqual(node.position, fixedPositions.get(node.id));
     assert.equal((await reopened.tasks.files.registerBatch({ taskId, files }, { sessionId })).succeeded, 7);
     assert.equal(reopened.canvas.getBoard(requirement.id).nodes.filter(node => node.outputCard?.type === 'image').length, 7);
   } finally { reopened.close(); }

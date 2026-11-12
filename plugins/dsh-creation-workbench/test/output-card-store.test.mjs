@@ -308,3 +308,17 @@ test('Skill image and video tasks freeze arbitrary chosen Skills and register va
     assert.equal(service.cards.describe({ requirementId: requirement.id, cardId, versionId: v1.id }).node.path, one.path);
   }
 });
+
+test('new task reservations avoid collisions once without rewriting the frozen requested position or moving on publication',async t=>{
+  const {service,requirement,input,file}=fixture(t);
+  const first=service.createTask(input()),args=input(),second=service.createTask(args);
+  const before=outputNodes(service,requirement.id),a=before.find(n=>n.outputCard.id===first.task.outputCardId),b=before.find(n=>n.outputCard.id===second.task.outputCardId);
+  assert.notDeepEqual(a.position,b.position);
+  assert(!(a.position.x<b.position.x+320&&a.position.x+320>b.position.x&&a.position.y<b.position.y+256&&a.position.y+256>b.position.y));
+  assert.deepEqual(second.task.input.outputPosition,args.outputPosition,'request snapshot remains unchanged');
+  assert.equal(service.createTask(args).task.id,second.task.id);
+  await file(first,'first.md','# 第一张');await file(second,'second.md','# 第二张');
+  const after=outputNodes(service,requirement.id);
+  assert.deepEqual(after.find(n=>n.outputCard.id===first.task.outputCardId).position,a.position);
+  assert.deepEqual(after.find(n=>n.outputCard.id===second.task.outputCardId).position,b.position);
+});

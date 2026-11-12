@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CARD_WIDTH, CARD_HEIGHT, createCardContext, updateCreationReferences, creationTaskInput, adjacentCreationPosition } from '../src/creation-context.mjs';
+import { CARD_WIDTH, CARD_HEIGHT, createCardContext, updateCreationReferences, creationTaskInput, adjacentCreationPosition, creationPositionFree } from '../src/creation-context.mjs';
 const card = (id, content = '原正文') => ({ id, kind: 'outline', refId: id, title: id, sourceHash: 'a'.repeat(64), content, position: { x: 40, y: 60 } });
 const context = anchor => createCardContext({ projectId: '项目A', projectPath: '/A', requirement: { id: '需求A', title: '课程A' }, anchor, outputPosition: { x: 378, y: 60 } });
 
@@ -59,4 +59,15 @@ test('a selected passage has a separate draft from whole-source creation and car
   assert.notEqual(selected.key, whole.key);
   assert.deepEqual(creationTaskInput(selected).selection, selected.selection);
   assert.equal(creationTaskInput(whole).selection, undefined);
+});
+
+
+test('crowded placement has no forty-slot or giant-obstacle overlap fallback and remains local', () => {
+ const anchor=card('source'),barrier={position:{x:440,y:-20000},width:600,height:40000};
+ const position=adjacentCreationPosition(anchor,[anchor,barrier]);
+ assert(creationPositionFree(position,[anchor,barrier]));
+ assert(Math.hypot(position.x-anchor.position.x,position.y-anchor.position.y)<2000);
+ const occupied=[anchor];
+ for(let i=0;i<90;i++){const next=adjacentCreationPosition(anchor,occupied);assert(creationPositionFree(next,occupied));occupied.push({position:next});}
+ assert.equal(new Set(occupied.map(node=>JSON.stringify(node.position))).size,91);
 });

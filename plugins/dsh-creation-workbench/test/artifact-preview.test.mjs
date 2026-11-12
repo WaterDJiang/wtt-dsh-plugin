@@ -55,8 +55,7 @@ deck.save(sys.argv[1])
 
 function cacheDirectory(preview, artifact) {
   const parent = path.join(preview.cacheRoot, artifact.id);
-  const name = readdirSync(parent).find(name => !name.includes('.attempt-'));
-  return path.join(parent, name);
+  return path.join(parent, `${artifact.hash}-${preview.documentFontConfiguration().rendererVersion}`);
 }
 
 test('a superseded editor revision waiting in the shared queue never starts conversion', async t => {
@@ -201,22 +200,78 @@ test('manual two-page editable PPTX: actual Builder rendering, exact pages, cach
     assert.deepEqual(original.bytes, f.bytes);
   });
 
-  await t.test('Chinese text with a deliberately Latin-only font configuration cannot become a blank ready preview', async () => {
-    const fonts = path.join(f.root, 'latin-only-fonts'); mkdirSync(fonts);
-    cpSync('/System/Library/Fonts/Times.ttc', path.join(fonts, 'Times.ttc'));
-    const missingChinese = createArtifactPreview(f.service, { fontDirectories: [fonts] });
-    const result = await missingChinese.get(f.artifact.id); missingChinese.close();
+  await t.test('extractable but invisible Chinese glyphs cannot become a blank ready preview', async () => {
+    // Fontconfig alone cannot force missing glyphs: native/bundled fonts may
+    // still paint Chinese. Inject that precise failure into a real conversion.
+    const renderer = path.join(f.root, 'invisible-chinese-renderer.py');
+    const evidence = path.join(f.root, 'invisible-chinese.json');
+    writeFileSync(renderer, `
+import hashlib,json,runpy,sys
+from pathlib import Path
+import fitz
+out=Path(sys.argv[sys.argv.index('--out')+1])
+try: runpy.run_path(${JSON.stringify(f.preview.script)},run_name='__main__')
+except SystemExit as error:
+ if error.code not in (0,None): raise
+pdf=out/'source.pdf';changed=out/'invisible.pdf'
+with fitz.open(pdf) as document:
+ for page in document:
+  original=page.get_text()
+  page.add_redact_annot(page.rect);page.apply_redactions()
+  page.insert_text((72,100),'Rendered ASCII only',fontsize=18)
+  page.insert_text((72,140),original,fontname='china-s',fontsize=18,render_mode=3)
+ document.save(changed)
+changed.replace(pdf)
+manifest=json.loads((out/'manifest.json').read_text());checks=[]
+with fitz.open(pdf) as document:
+ for index,page in enumerate(document):
+  chinese=lambda code: 0x4e00<=code<=0x9fff
+  extracted=any(chinese(ord(char)) for char in page.get_text())
+  painted=any(chinese(char[0]) for span in page.get_texttrace() if span['type'] in (0,1,2) for char in span['chars'])
+  assert extracted and not painted, 'Fault injection must leave extractable but unpainted Chinese'
+  image=out/manifest['pages'][index]['image']
+  page.get_pixmap(matrix=fitz.Matrix(1280/page.rect.width,1280/page.rect.width),alpha=False).save(image)
+  manifest['pages'][index]['image_sha256']=hashlib.sha256(image.read_bytes()).hexdigest()
+  manifest['pages'][index]['pdf_sha256']=hashlib.sha256(pdf.read_bytes()).hexdigest()
+  checks.append({'extractableChinese':extracted,'paintedChinese':painted})
+(out/'manifest.json').write_text(json.dumps(manifest))
+Path(${JSON.stringify(evidence)}).write_text(json.dumps(checks))
+`);
+    const missingChinese = createArtifactPreview(f.service);
+    missingChinese.script = renderer;
+    let result;
+    try { result = await missingChinese.get(f.artifact.id); }
+    finally { missingChinese.close(); }
+    assert.deepEqual(JSON.parse(readFileSync(evidence, 'utf8')), [
+      { extractableChinese: true, paintedChinese: false }, { extractableChinese: true, paintedChinese: false },
+    ]);
     assert.equal(result.status, 'failed'); assert.match(result.error, /中文未实际绘制|字体转换失败/);
+    assert.equal(existsSync(cacheDirectory(missingChinese, f.artifact)), false);
     assert.deepEqual((await f.service.tasks.files.download(f.artifact.id)).bytes, f.bytes);
   });
 
   await t.test('source mutation while the renderer works cannot publish a stale preview', async () => {
+    const unrelated = path.join(f.preview.cacheRoot, f.artifact.id, '0-another-renderer');
+    mkdirSync(unrelated); writeFileSync(path.join(unrelated, 'keep.txt'), 'another font configuration');
     const cached = cacheDirectory(f.preview, f.artifact); rmSync(cached, { recursive: true });
-    const timer = setTimeout(() => writeFileSync(f.file, Buffer.concat([f.bytes, Buffer.from('changed during preview')])), 100);
-    const result = await f.preview.get(f.artifact.id); clearTimeout(timer);
-    assert.equal(result.status, 'failed'); assert.match(result.error, /外改|变更/);
-    assert.equal(existsSync(cached), false);
-    writeFileSync(f.file, f.bytes);
+    let started = false;
+    const addChild = f.preview.children.add;
+    f.preview.children.add = function (child) {
+      child.once('spawn', () => {
+        started = true;
+        writeFileSync(f.file, Buffer.concat([f.bytes, Buffer.from('changed during preview')]));
+      });
+      return addChild.call(this, child);
+    };
+    try {
+      const result = await f.preview.get(f.artifact.id);
+      assert.equal(started, true, 'The source must change after actual renderer startup, without a cache hit');
+      assert.equal(result.status, 'failed'); assert.match(result.error, /外改|变更/);
+      assert.equal(existsSync(cached), false);
+      assert.equal(readFileSync(path.join(unrelated, 'keep.txt'), 'utf8'), 'another font configuration');
+    } finally { f.preview.children.add = addChild; writeFileSync(f.file, f.bytes); }
+    assert.equal((await f.preview.get(f.artifact.id)).status, 'ready');
+    assert.deepEqual((await f.service.tasks.files.download(f.artifact.id)).bytes, f.bytes);
   });
 
   await t.test('same artifact id in a second project stays within that service and uses its own hash/cache', async () => {

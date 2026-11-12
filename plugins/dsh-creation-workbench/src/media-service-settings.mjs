@@ -1,4 +1,5 @@
 import { MEDIA_PROTOCOLS } from './media-api-catalog.mjs';
+import { normalizeMediaServiceAddress } from './media-service-address.mjs';
 export const MEDIA_SETTINGS_NAMESPACE = 'wtt-creation-workbench';
 export const MEDIA_SETTINGS_SECTION = 'models';
 const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -21,11 +22,7 @@ export function mediaServiceProfile(id, value) {
   if (!MEDIA_PROTOCOLS[profile.protocol] || MEDIA_PROTOCOLS[profile.protocol].type !== profile.type) throw new Error('媒体类型与生成协议不匹配');
   if (!['image', 'video'].includes(profile.type)) throw new Error('媒体服务类型必须为图片或视频');
   if (!REF.test(profile.apiKeyEnv)) throw new Error('DSH 凭据引用名称无效');
-  let url;
-  try { url = new URL(profile.baseURL); } catch { throw new Error('媒体服务地址无效'); }
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && local))) throw new Error('媒体服务使用 HTTPS；本机可用 HTTP，地址不能包含凭据、查询参数或片段');
-  profile.baseURL = url.href.replace(/\/+$/, '');
+  profile.baseURL = normalizeMediaServiceAddress(profile.baseURL, profile.protocol, profile.model);
   if (value.connection != null) {
     const connection = value.connection;
     if (!connection || typeof connection.namespace !== 'string' || !connection.namespace || !Array.isArray(connection.path)

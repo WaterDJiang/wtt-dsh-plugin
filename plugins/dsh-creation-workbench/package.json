@@ -1,6 +1,6 @@
 {
   "name": "@wtt/dsh-creation-workbench",
-  "version": "0.55.1",
+  "version": "0.55.2",
   "description": "DeepSeek Harness 的 AI 创作画布。在同一个项目里整理资料、引用卡片与文件、调用本机 Skill，并管理文本、演示文稿、图片和视频的成果版本。",
   "keywords": [
     "dsh",

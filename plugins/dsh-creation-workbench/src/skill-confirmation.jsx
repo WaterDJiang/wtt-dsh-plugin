@@ -3,10 +3,12 @@ import { UserError } from './user-feedback.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { answerTaskInteraction, buildQuestionAnswer, interactionLabel, questionFingerprint } from './skill-interactions.mjs'
 import { OutputPreview } from './output-preview.jsx'
+import { reviewImagesFromInteraction } from './conversation-file.mjs'
+import { ReviewImageGallery } from './review-image-gallery.jsx'
 import './skill-confirmation.css'
 
 export function SkillConfirmation({ entry, currentEntry, position, draftCache, loadOutputs, verifyOutputs, onClose, onOpenNative, onOpenOutput,
-  loadDeckPreview, getDeckPageHref }) {
+  loadDeckPreview, getDeckPageHref, projectRoot, getReviewImageHref, renderConversation }) {
   const [drafts, setDrafts] = useState(() => draftCache.get(entry.key) || {})
   const [outputs, setOutputs] = useState(null)
   const [previewError, setPreviewError] = useState('')
@@ -18,6 +20,8 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
   const current = currentEntry()
   const stale = current?.key !== entry.key || current?.interaction !== pending || questionFingerprint(current?.interaction) !== questionFingerprint(pending)
   const permission = pending.kind === 'approval'
+  const images = !stale && !sent ? reviewImagesFromInteraction(projectRoot, pending) : []
+  const nativeChat = Boolean(renderConversation && entry.task.sessionId)
   useEffect(() => {
     mounted.current = true
     let cancelled = false
@@ -49,7 +53,15 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
     <PanelHeader title={entry.task.title} subtitle={`任务待确认 · ${interactionLabel(pending)}`} onClose={onClose} closeLabel="稍后处理 任务待确认"/>
     <div className="wcc-skill-confirmation-body">
       <p className="wcc-skill-scope">回答后继续这次任务。本次确认不会发送文件给客户。</p>
-      {sent ? <p role="status">回答已提交。请关闭浮窗查看原任务进展；达到预算时需调整后继续。</p> : stale ? <p role="status">此问题已结束或已更新。请关闭后打开当前待办。</p> : permission ? <p>AI 需要你的授权才能继续。请打开任务对话，查看具体操作后决定是否允许。</p> : (pending.questions || []).map(question => <fieldset key={question.id} disabled={disabled}>
+      {sent ? <p role="status">回答已提交。请关闭浮窗查看原任务进展；达到预算时需调整后继续。</p> : stale ? <p role="status">此问题已结束或已更新。请关闭后打开当前待办。</p> : <>
+      {images.length > 0 && getReviewImageHref && <ReviewImageGallery key={`${entry.key}:${questionFingerprint(pending)}`}
+        images={images} getHref={getReviewImageHref} onOpen={image => {
+          const latest = currentEntry()
+          return latest?.key === entry.key && questionFingerprint(latest.interaction) === questionFingerprint(pending)
+            && reviewImagesFromInteraction(projectRoot, latest.interaction).some(value => value.path === image.path && value.hash === image.hash)
+        }} />}
+      {nativeChat ? <section className="wcc-skill-chat" aria-label="当前任务原始对话">{renderConversation(entry.task)}</section>
+        : permission ? <p>AI 需要你的授权才能继续。请打开任务对话，查看具体操作后决定是否允许。</p> : (pending.questions || []).map(question => <fieldset key={question.id} disabled={disabled}>
         <legend>{question.question.length > 240 ? question.header || '请审阅后回答' : `${question.header ? `${question.header} · ` : ''}${question.question}`}</legend>
         {question.question.length > 240 && <pre className="wcc-skill-plan">{question.question}</pre>}
         {question.detail && <pre className="wcc-skill-plan">{question.detail}</pre>}
@@ -60,7 +72,7 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
           }} /><span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>
         </label>)}</div>
         <label className="wcc-skill-custom">{plan ? '修改意见／补充说明' : '你的回答／补充说明'}<textarea rows={3} maxLength={8000} value={drafts[question.id]?.custom || ''} onChange={event => edit(question.id, { custom: event.target.value })} placeholder={plan ? '有修改要求时填写，再点「提交修改意见」' : '选择选项，或直接填写回答'} /></label>
-      </fieldset>)}
+      </fieldset>)}</>}
       {!permission && <details className="wcc-skill-preview" open><summary>本次已保存文件 · {outputs?.length ?? '读取中'}</summary>
         <p>先核对下面的文件版本。尚未保存成文件的方案，请看上方内容。</p>
         {previewError && <p role="alert">预览读取失败：{previewError}</p>}
@@ -73,8 +85,8 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
       </details>}
       {error && <UserError className="wcc-skill-error" error={error} />}
     </div>
-    <footer><UiButton variant="quiet" type="button" onClick={onClose}>稍后处理</UiButton><UiButton variant="quiet" type="button" onClick={onOpenNative}>打开任务</UiButton>
-      {!permission && !sent && (plan ? <><UiButton variant="quiet" type="button" disabled={disabled || !drafts[pending.questions[0].id]?.custom?.trim()} onClick={() => void submit('modify')}>提交修改意见</UiButton><UiButton variant="primary" className="is-primary" type="button" disabled={disabled || Boolean(drafts[pending.questions[0].id]?.custom?.trim())} onClick={() => void submit('approve')}>{sending ? '提交中…' : pending.questions[0].intent.approve}</UiButton></> : <UiButton variant="primary" className="is-primary" type="button" disabled={disabled} onClick={() => void submit('answer')}>{sending ? '提交中…' : '提交回答'}</UiButton>)}
+    <footer><UiButton variant="quiet" type="button" onClick={onClose}>稍后处理</UiButton><UiButton variant="quiet" type="button" onClick={onOpenNative}>回到卡片对话</UiButton>
+      {!nativeChat && !permission && !sent && (plan ? <><UiButton variant="quiet" type="button" disabled={disabled || !drafts[pending.questions[0].id]?.custom?.trim()} onClick={() => void submit('modify')}>提交修改意见</UiButton><UiButton variant="primary" className="is-primary" type="button" disabled={disabled || Boolean(drafts[pending.questions[0].id]?.custom?.trim())} onClick={() => void submit('approve')}>{sending ? '提交中…' : pending.questions[0].intent.approve}</UiButton></> : <UiButton variant="primary" className="is-primary" type="button" disabled={disabled} onClick={() => void submit('answer')}>{sending ? '提交中…' : '提交回答'}</UiButton>)}
     </footer>
   </section>
 }

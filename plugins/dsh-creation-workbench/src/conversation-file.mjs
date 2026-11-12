@@ -55,13 +55,25 @@ export function reviewImagesFromQuestion(root, question) {
     const reference = references[index]
     if (!/\.(png|jpe?g|webp|gif)$/i.test(reference.file)) continue
     const tail = text.slice(reference.end, references[index + 1]?.start ?? text.length)
-    const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu)
+    const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：=]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu)
     if (!checksum) continue
     try {
       const selection = conversationFileSelection(root, reference.file)
       const hash = (checksum[1] || checksum[2]).toLowerCase()
       images.set(`${selection.path}:${hash}`, { ...selection, hash })
     } catch { /* Ignore files outside the selected project. */ }
+  }
+  return [...images.values()]
+}
+
+export function reviewImagesFromInteraction(root, interaction) {
+  const images = new Map()
+  for (const question of interaction?.questions || []) {
+    const parts = [question.question, question.detail, ...(question.options || []).flatMap(option => [option.label, option.description])]
+    for (const part of parts) for (const image of reviewImagesFromQuestion(root, part)) {
+      if (images.size >= 24) return [...images.values()]
+      images.set(`${image.path}:${image.hash}`, image)
+    }
   }
   return [...images.values()]
 }

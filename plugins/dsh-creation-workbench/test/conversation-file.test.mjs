@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewImagesFromQuestion } from '../src/conversation-file.mjs'
+import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewImagesFromQuestion, reviewImagesFromInteraction } from '../src/conversation-file.mjs'
 
 test('card chat opens project-relative and same-project absolute file links', () => {
   const root = '/tmp/项目'
@@ -65,4 +65,16 @@ test('image preview never guesses a hash from a different file, remote link, int
   assert.deepEqual(reviewImagesFromQuestion(root, null), [])
   const many = Array.from({ length: 30 }, (_, index) => `[${index}](courses/${index}.gif) — ${hash}`).join('\n')
   assert.equal(reviewImagesFromQuestion(root, many).length, 24)
+})
+
+test('task reviews include candidates in detail and option descriptions without pairing hashes across fields or questions', () => {
+  const root = '/tmp/项目', hash = 'ab'.repeat(32)
+  const images = reviewImagesFromInteraction(root, { questions: [
+    { question: `对比 [原始](courses/base.png) — ${hash}`, detail: `[候选](courses/candidate.png) SHA256=${hash}`,
+      options: [{ label: '第二张', description: `[对照](courses/option.jpg) — ${hash}` }, { label: '保留', description: `[重复](courses/base.png) — ${hash}` }] },
+    { question: '[不能猜](courses/no-hash.png)', detail: hash },
+    { question: hash },
+  ] })
+  assert.deepEqual(images.map(image => image.path), ['courses/base.png', 'courses/candidate.png', 'courses/option.jpg'])
+  assert.deepEqual(reviewImagesFromInteraction(root, null), [])
 })

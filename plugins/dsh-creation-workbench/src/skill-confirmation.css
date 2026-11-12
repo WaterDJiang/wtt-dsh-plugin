@@ -25,7 +25,18 @@
 .wcc-skill-output > small { display: block; margin: 5px 0; color: var(--wtt-ui-muted, #96a0af); overflow-wrap: anywhere; }
 .wcc-skill-output .wtt-output-text { max-height: 260px; }
 .wcc-skill-error { color: var(--wtt-ui-danger, #a24836); line-height: 1.7; }
-.wcc-skill-confirmation footer { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 11px 14px; border-top: 1px solid var(--wtt-ui-line, #f0e9df); }
-.wtt-course-canvas .wcc-skill-confirmation button { min-height: 30px; padding: 5px 9px; border: 1px solid var(--wtt-ui-line, #dce3ef); border-radius: 6px; background: var(--wtt-ui-surface, #fff); color: var(--wtt-ui-text, #637999); font-size:var(--wtt-text-sm); }
+.wcc-skill-confirmation > footer { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 11px 14px; border-top: 1px solid var(--wtt-ui-line, #f0e9df); }
+.wtt-course-canvas .wcc-skill-confirmation button:where(:not(.wtt-native-editor-conversation *)) { min-height: 30px; padding: 5px 9px; border: 1px solid var(--wtt-ui-line, #dce3ef); border-radius: 6px; background: var(--wtt-ui-surface, #fff); color: var(--wtt-ui-text, #637999); font-size:var(--wtt-text-sm); }
 .wtt-course-canvas .wcc-skill-confirmation .is-primary { border-color: var(--wtt-ui-warning-line, #9a702e); background: var(--wtt-ui-warning-fill, #9a702e); color: var(--wtt-ui-on-accent, #fff); }
-.wtt-course-canvas .wcc-skill-confirmation button:disabled { opacity: .5; cursor: default; }
+.wtt-course-canvas .wcc-skill-confirmation button:disabled:where(:not(.wtt-native-editor-conversation *)) { opacity: .5; cursor: default; }
+.wcc-skill-confirmation-body { min-width: 0; overflow-x: hidden; overflow-wrap: anywhere; }
+.wcc-skill-confirmation legend { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wcc-skill-chat { display: flex; flex-direction: column; min-width: 0; height: min(580px, 64dvh); }
+.wcc-skill-chat .wtt-native-editor-conversation { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.wcc-skill-chat [data-conversation-scroll] { overflow-y: auto; overscroll-behavior: contain; }
+.wcc-skill-chat [data-composer-seat]:has([data-question-scroll]) { position: relative; inset: auto; background: none; }
+.wcc-skill-chat [data-question-scroll] { flex: 0 0 auto; overflow: visible; }
+.wcc-skill-chat [data-question-key] > section:has([data-question-scroll]) { max-height: none; overflow-wrap: anywhere; }
+.wcc-skill-chat [data-question-scroll] h2 { white-space: pre-wrap; overflow-wrap: anywhere; }
+.wcc-skill-confirmation .wcc-review-images { margin-inline: 0; }
+.wtt-course-canvas .wcc-skill-confirmation .wcc-review-image-thumb { padding: 0; }

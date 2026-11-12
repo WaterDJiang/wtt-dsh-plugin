@@ -116,12 +116,23 @@ test('drafts remain bound to their canvas, format and immutable source hash',t=>
  assert.deepEqual(f.service.store.db.prepare('PRAGMA foreign_key_check').all(),[]);
 });
 
-test('new B stays visible without overlapping A or changing the viewport in a narrow canvas',()=>{
+test('new B stays beside its source even outside a narrow viewport without changing the viewport',()=>{
  const viewport={x:0,y:0,zoom:0.8},size={width:404,height:844};
  const anchor={position:{x:40,y:60},width:258,height:208};
  const position=visibleCreationPosition(anchor,[anchor],viewport,size);
- assert.ok(position.x*viewport.zoom>=0);assert.ok((position.x+258)*viewport.zoom<=size.width);
+ assert.equal(position.x,anchor.position.x+anchor.width+80);assert.equal(position.y,anchor.position.y);
  assert.ok(position.y>=anchor.position.y+anchor.height+16 || position.x>=anchor.position.x+anchor.width+16 || position.x+258+16<=anchor.position.x || position.y+208+16<=anchor.position.y);
- assert.ok((position.y+208)*viewport.zoom+220<size.height);
+
  assert.deepEqual(viewport,{x:0,y:0,zoom:0.8});
+});
+
+
+test('colliding draft requests are placed near the live source once, and replay keeps the stored position',t=>{
+ const f=fixture(t),input=f.input();
+ const first=f.service.createOutputDraft(input),secondInput={...input,operationId:randomUUID()},second=f.service.createOutputDraft(secondInput);
+ const overlap=(a,b)=>a.position.x<b.position.x+320&&a.position.x+320>b.position.x&&a.position.y<b.position.y+256&&a.position.y+256>b.position.y;
+ assert.equal(overlap(first.node,second.node),false);
+ assert.equal(overlap(second.node,f.source),false);
+ assert.deepEqual(f.service.createOutputDraft(secondInput).node.position,second.node.position);
+ assert.deepEqual(f.service.cards.describeDraft({requirementId:f.canvas.id,cardId:first.card.id}).node.position,first.node.position);
 });

@@ -275,7 +275,7 @@ function UserError({ error, className = "", announce = true }) {
 var RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
 var definition = (vendor, label2, type, endpoint2, models, parameters) => ({ vendor, label: label2, type, endpoint: endpoint2, models, ...parameters });
 var MEDIA_PROVIDERS = { openai: "OpenAI", gemini: "Google", jimeng: "\u706B\u5C71\u65B9\u821F", kling: "\u53EF\u7075", minimax: "MiniMax", wan: "\u963F\u91CC\u4E91\u767E\u70BC" };
-var mediaServiceName = (protocol) => `${MEDIA_PROVIDERS[MEDIA_PROTOCOLS[protocol].vendor]} ${MEDIA_PROTOCOLS[protocol].type === "image" ? "\u56FE\u7247" : "\u89C6\u9891"}`;
+var mediaServiceName = (protocol) => MEDIA_PROTOCOLS[protocol].customOnly ? MEDIA_PROTOCOLS[protocol].label : `${MEDIA_PROVIDERS[MEDIA_PROTOCOLS[protocol].vendor]} ${MEDIA_PROTOCOLS[protocol].type === "image" ? "\u56FE\u7247" : "\u89C6\u9891"}`;
 var MEDIA_PROTOCOLS = {
   "openai-image": definition("openai", "GPT \u56FE\u7247", "image", "https://api.openai.com/v1", ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2", "gpt-image-1.5"], { sizes: ["1024x1024", "1536x1024", "1024x1536"], qualities: ["auto", "low", "medium", "high"], maxReferences: 1 }),
   "openai-video": definition("openai", "Sora \u89C6\u9891", "video", "https://api.openai.com/v1", ["sora-2", "sora-2-pro"], { sizes: ["1280x720", "720x1280"], durations: [4, 8, 12], maxReferences: 1 }),
@@ -288,8 +288,57 @@ var MEDIA_PROTOCOLS = {
   "minimax-image": definition("minimax", "MiniMax \u56FE\u7247", "image", "https://api.minimax.io/v1", ["image-01"], { sizes: ["1024x1024", "1280x720", "720x1280", "2048x2048"], maxReferences: 1 }),
   "minimax-video": definition("minimax", "MiniMax \u89C6\u9891", "video", "https://api.minimax.io", ["MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max", "MiniMax-Hailuo-2.3"], { resolutions: ["768P", "1080P"], durations: [6, 10], maxReferences: 1 }),
   "wan-image": definition("wan", "\u4E07\u76F8\u56FE\u7247", "image", "https://dashscope.aliyuncs.com/api/v1", ["wan2.6-t2i", "wan2.6-image"], { sizes: ["1280x1280", "1280x720", "720x1280", "1024x1024"], maxReferences: 0 }),
-  "wan-video": definition("wan", "\u4E07\u76F8\u89C6\u9891", "video", "https://dashscope.aliyuncs.com/api/v1", ["wan2.6-t2v", "wan2.6-i2v"], { ratios: ["16:9", "9:16", "1:1"], resolutions: ["720P", "1080P"], durations: [5, 10, 15], maxReferences: 0 })
+  "wan-video": definition("wan", "\u4E07\u76F8\u89C6\u9891", "video", "https://dashscope.aliyuncs.com/api/v1", ["wan2.6-t2v", "wan2.6-i2v"], { ratios: ["16:9", "9:16", "1:1"], resolutions: ["720P", "1080P"], durations: [5, 10, 15], maxReferences: 0 }),
+  "jimeng-image": definition("jimeng", "\u5373\u68A6\u53CD\u4EE3 \xB7 \u56FE\u7247", "image", "http://127.0.0.1:8000/v1", ["jimeng-5.0"], { ratios: RATIOS, resolutions: ["2k", "4k"], maxReferences: 10, customOnly: true })
 };
+
+// src/media-service-address.mjs
+function isLocalMediaServiceHost(value) {
+  const host = value.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "::1") return true;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    const parts = host.split(".").map(Number);
+    if (parts.some((part) => part > 255)) return false;
+    const [a, b2] = parts;
+    return a === 127 || a === 10 || a === 192 && b2 === 168 || a === 172 && b2 >= 16 && b2 <= 31;
+  }
+  const mapped = host.match(/^::ffff:([a-f0-9]{1,4}):([a-f0-9]{1,4})$/);
+  if (mapped) {
+    const high = parseInt(mapped[1], 16), low = parseInt(mapped[2], 16);
+    return isLocalMediaServiceHost(`${high >>> 8}.${high & 255}.${low >>> 8}.${low & 255}`);
+  }
+  return /^f[cd][a-f0-9]{2}:/.test(host);
+}
+var addressError = (message2) => Object.assign(new Error(message2), { field: "baseURL" });
+var generationPaths = {
+  "openai-image": ["/images/generations", "/images/edits"],
+  "openai-video": ["/videos"],
+  "gemini-image": ["/interactions"],
+  "gemini-video": ["/interactions"],
+  "volc-image": ["/images/generations"],
+  "jimeng-image": ["/images/generations"],
+  "volc-video": ["/contents/generations/tasks"],
+  "kling-image": ["/v1/images/generations"],
+  "minimax-image": ["/image_generation"],
+  "minimax-video": ["/v2/video_generation", "/v1/video_generation"],
+  "wan-image": ["/services/aigc/multimodal-generation/generation"],
+  "wan-video": ["/services/aigc/video-generation/video-synthesis"]
+};
+function normalizeMediaServiceAddress(value, protocol, model) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw addressError("API \u5730\u5740\u65E0\u6548\uFF0C\u8BF7\u586B\u5199\u5B8C\u6574\u7684 HTTP(S) \u5730\u5740");
+  }
+  if (url.username || url.password || url.search || url.hash) throw addressError("API \u5730\u5740\u4E0D\u80FD\u5305\u542B\u8D26\u53F7\u3001\u5BC6\u7801\u3001\u67E5\u8BE2\u53C2\u6570\u6216\u7247\u6BB5\uFF1B\u5BC6\u94A5\u8BF7\u586B\u5165 API \u5BC6\u94A5");
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalMediaServiceHost(url.hostname))) throw addressError("API \u5730\u5740\u4F7F\u7528 HTTPS\uFF1B\u672C\u673A\u6216\u5C40\u57DF\u7F51 IP \u53EF\u4F7F\u7528 HTTP");
+  const pathname = url.pathname.replace(/\/+$/, "");
+  const paths = protocol === "kling-video" ? [`/text-to-video/${encodeURIComponent(model)}`] : generationPaths[protocol] || [];
+  const endpoint2 = paths.find((suffix) => pathname.endsWith(suffix));
+  if (endpoint2) url.pathname = pathname.slice(0, -endpoint2.length) || "/";
+  return url.href.replace(/\/+$/, "");
+}
 
 // src/media-service-settings.mjs
 var MEDIA_SETTINGS_NAMESPACE = "wtt-creation-workbench";
@@ -311,15 +360,7 @@ function mediaServiceProfile(id2, value) {
   if (!MEDIA_PROTOCOLS[profile.protocol] || MEDIA_PROTOCOLS[profile.protocol].type !== profile.type) throw new Error("\u5A92\u4F53\u7C7B\u578B\u4E0E\u751F\u6210\u534F\u8BAE\u4E0D\u5339\u914D");
   if (!["image", "video"].includes(profile.type)) throw new Error("\u5A92\u4F53\u670D\u52A1\u7C7B\u578B\u5FC5\u987B\u4E3A\u56FE\u7247\u6216\u89C6\u9891");
   if (!REF.test(profile.apiKeyEnv)) throw new Error("DSH \u51ED\u636E\u5F15\u7528\u540D\u79F0\u65E0\u6548");
-  let url;
-  try {
-    url = new URL(profile.baseURL);
-  } catch {
-    throw new Error("\u5A92\u4F53\u670D\u52A1\u5730\u5740\u65E0\u6548");
-  }
-  const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  if (url.username || url.password || url.search || url.hash || url.protocol !== "https:" && !(url.protocol === "http:" && local)) throw new Error("\u5A92\u4F53\u670D\u52A1\u4F7F\u7528 HTTPS\uFF1B\u672C\u673A\u53EF\u7528 HTTP\uFF0C\u5730\u5740\u4E0D\u80FD\u5305\u542B\u51ED\u636E\u3001\u67E5\u8BE2\u53C2\u6570\u6216\u7247\u6BB5");
-  profile.baseURL = url.href.replace(/\/+$/, "");
+  profile.baseURL = normalizeMediaServiceAddress(profile.baseURL, profile.protocol, profile.model);
   if (value.connection != null) {
     const connection = value.connection;
     if (!connection || typeof connection.namespace !== "string" || !connection.namespace || !Array.isArray(connection.path) || connection.path.length > 16 || connection.path.some((key) => typeof key !== "string" || ["__proto__", "prototype", "constructor"].includes(key))) throw new Error("DSH \u63D0\u4F9B\u5546\u5F15\u7528\u65E0\u6548");
@@ -354,11 +395,11 @@ function configuredCredentialReferences(namespaces, schema) {
 
 // src/media-service-editor.jsx
 var import_react3 = __toESM(require("react"), 1);
-function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave, onCancel, onClear, busy, writable, infos, refs, connections, operations }) {
+function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave, onCancel, onClear, busy, writable, infos, refs, connections, operations, addressError: addressError2 }) {
   const { id: id2, profile } = editor;
   const ownRef = mediaCredentialRef(id2);
   const preset = MEDIA_PROTOCOLS[profile.protocol];
-  const [mode, setMode] = (0, import_react3.useState)(() => profile.connection || profile.baseURL !== preset.endpoint ? "custom" : "catalog");
+  const [mode, setMode] = (0, import_react3.useState)(() => preset.customOnly || profile.connection || profile.baseURL !== preset.endpoint ? "custom" : "catalog");
   const drafts = (0, import_react3.useRef)({});
   const dedicated = profile.apiKeyEnv === ownRef && !profile.connection;
   const [fetching, setFetching] = (0, import_react3.useState)(false);
@@ -368,6 +409,12 @@ function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave, onCan
   const [failure, setFailure] = (0, import_react3.useState)("");
   const request = (0, import_react3.useRef)(null);
   const advanced = (0, import_react3.useRef)(null);
+  const addressInput = (0, import_react3.useRef)(null);
+  (0, import_react3.useEffect)(() => {
+    if (!addressError2) return;
+    if (mode === "catalog" && advanced.current) advanced.current.open = true;
+    addressInput.current?.focus();
+  }, [addressError2, mode]);
   const scope = JSON.stringify([profile.baseURL, profile.protocol, profile.apiKeyEnv, profile.connection, apiKey]);
   const activeScope = (0, import_react3.useRef)(scope);
   activeScope.current = scope;
@@ -444,7 +491,7 @@ function MediaServiceEditor({ editor, apiKey, setApiKey, onChange, onSave, onCan
     change({ apiKeyEnv: event.target.value || ownRef });
   } }, /* @__PURE__ */ import_react3.default.createElement("option", { value: "" }, "\u6B64\u63D0\u4F9B\u5546\u7684 API \u5BC6\u94A5"), refs.filter((ref) => ref !== ownRef).map((ref) => /* @__PURE__ */ import_react3.default.createElement("option", { key: ref, value: ref }, ref, infos[ref]?.configured ? " \xB7 \u5DF2\u914D\u7F6E" : "")))));
   const nameField = /* @__PURE__ */ import_react3.default.createElement("label", null, "\u663E\u793A\u540D\u79F0", /* @__PURE__ */ import_react3.default.createElement("input", { "aria-label": "\u663E\u793A\u540D\u79F0", value: profile.displayName, maxLength: 80, disabled: busy, onChange: (event) => change({ displayName: event.target.value }), required: true }));
-  const addressField = /* @__PURE__ */ import_react3.default.createElement("label", null, "API \u5730\u5740", /* @__PURE__ */ import_react3.default.createElement("input", { "aria-label": "API \u5730\u5740", value: profile.baseURL, type: "url", placeholder: "https://gateway.example/v1", disabled: busy || Boolean(profile.connection), onChange: (event) => change({ baseURL: event.target.value }), required: true }));
+  const addressField = /* @__PURE__ */ import_react3.default.createElement("label", null, "API \u5730\u5740", /* @__PURE__ */ import_react3.default.createElement("input", { ref: addressInput, "aria-label": "API \u5730\u5740", "aria-invalid": Boolean(addressError2), "aria-describedby": addressError2 ? `media-address-error-${id2}` : void 0, value: profile.baseURL, type: "url", placeholder: "https://gateway.example/v1", disabled: busy || Boolean(profile.connection), onChange: (event) => change({ baseURL: event.target.value }), required: true }), addressError2 && /* @__PURE__ */ import_react3.default.createElement("span", { id: `media-address-error-${id2}`, className: "wtt-media-address-error", role: "alert" }, addressError2));
   return /* @__PURE__ */ import_react3.default.createElement("form", { className: "wtt-media-service-form", onSubmit: onSave }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-media-add-modes", role: "tablist", "aria-label": "\u5A92\u4F53\u6A21\u578B\u63A5\u5165\u65B9\u5F0F" }, [["catalog", "\u7B2C\u4E09\u65B9\u6A21\u578B\u63D0\u4F9B\u5546"], ["custom", "\u81EA\u5B9A\u4E49\u6A21\u578B API"]].map(([value, label2]) => /* @__PURE__ */ import_react3.default.createElement(UiButton, { key: value, role: "tab", id: `media-tab-${id2}-${value}`, "aria-controls": `media-panel-${id2}`, "aria-selected": mode === value, disabled: busy || fetching, onClick: () => switchMode(value) }, label2))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-media-add-panel", role: "tabpanel", id: `media-panel-${id2}`, "aria-labelledby": `media-tab-${id2}-${mode}` }, mode === "catalog" ? /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-media-provider-fields" }, /* @__PURE__ */ import_react3.default.createElement("label", null, "\u63D0\u4F9B\u5546", /* @__PURE__ */ import_react3.default.createElement("select", { "aria-label": "\u63D0\u4F9B\u5546", value: preset.vendor, disabled: busy, onChange: (event) => protocol(Object.keys(MEDIA_PROTOCOLS).find((key) => MEDIA_PROTOCOLS[key].vendor === event.target.value && MEDIA_PROTOCOLS[key].type === profile.type)) }, Object.entries(MEDIA_PROVIDERS).map(([value, label2]) => /* @__PURE__ */ import_react3.default.createElement("option", { value, key: value }, label2)))), /* @__PURE__ */ import_react3.default.createElement("label", null, "\u5A92\u4F53\u7C7B\u578B", /* @__PURE__ */ import_react3.default.createElement("select", { "aria-label": "\u5A92\u4F53\u7C7B\u578B", value: profile.type, disabled: busy, onChange: (event) => protocol(Object.keys(MEDIA_PROTOCOLS).find((key) => MEDIA_PROTOCOLS[key].vendor === preset.vendor && MEDIA_PROTOCOLS[key].type === event.target.value)) }, /* @__PURE__ */ import_react3.default.createElement("option", { value: "image" }, "\u56FE\u7247"), /* @__PURE__ */ import_react3.default.createElement("option", { value: "video" }, "\u89C6\u9891")))) : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, nameField, addressField, /* @__PURE__ */ import_react3.default.createElement("label", null, "API \u534F\u8BAE", /* @__PURE__ */ import_react3.default.createElement("select", { "aria-label": "API \u534F\u8BAE", value: profile.protocol, disabled: busy, onChange: (event) => protocol(event.target.value) }, Object.entries(MEDIA_PROTOCOLS).map(([value, definition2]) => /* @__PURE__ */ import_react3.default.createElement("option", { key: value, value }, definition2.label))))), dedicated ? /* @__PURE__ */ import_react3.default.createElement("label", null, "API \u5BC6\u94A5", /* @__PURE__ */ import_react3.default.createElement("input", { "aria-label": "API \u5BC6\u94A5", type: "password", autoComplete: "new-password", value: apiKey, disabled: busy || infos[ownRef]?.writable === false, onChange: (event) => setApiKey(event.target.value), onBlur: () => {
     if (apiKey && profile.baseURL) {
       if (mode === "catalog" && advanced.current) advanced.current.open = true;
@@ -465,6 +512,7 @@ function MediaServiceSettings({ operations }) {
   const [credentialEpoch, setCredentialEpoch] = (0, import_react4.useState)(0);
   const [busy, setBusy] = (0, import_react4.useState)(false);
   const [error, setError] = (0, import_react4.useState)("");
+  const [errorField, setErrorField] = (0, import_react4.useState)("");
   const [notice, setNotice] = (0, import_react4.useState)("");
   const [confirm, setConfirm] = (0, import_react4.useState)(null);
   const mobileQuery = (0, import_react4.useMemo)(() => window.matchMedia("(max-width: 640px)"), []);
@@ -503,6 +551,7 @@ function MediaServiceSettings({ operations }) {
     if (busy) return;
     setBusy(true);
     setError("");
+    setErrorField("");
     setNotice("");
     try {
       await work();
@@ -511,6 +560,7 @@ function MediaServiceSettings({ operations }) {
       return true;
     } catch (cause) {
       setError(cause.message || String(cause));
+      setErrorField(cause.field || "");
       return false;
     } finally {
       setBusy(false);
@@ -520,6 +570,7 @@ function MediaServiceSettings({ operations }) {
     setApiKey("");
     setConfirm(null);
     setError("");
+    setErrorField("");
     setNotice("");
     setEditor({ id: id2, profile: { ...profile2 }, revision: snapshot.revision });
   }
@@ -544,7 +595,11 @@ function MediaServiceSettings({ operations }) {
       editor,
       apiKey,
       setApiKey,
-      onChange: (profile2) => setEditor((value) => ({ ...value, profile: profile2 })),
+      onChange: (profile2) => {
+        setEditor((value) => ({ ...value, profile: profile2 }));
+        setError("");
+        setErrorField("");
+      },
       onSave: save,
       onCancel: () => {
         setEditor(null);
@@ -557,7 +612,8 @@ function MediaServiceSettings({ operations }) {
       infos,
       refs,
       connections,
-      operations
+      operations,
+      addressError: errorField === "baseURL" ? error : ""
     }
   ), confirm && /* @__PURE__ */ import_react4.default.createElement("div", { className: "wtt-media-service-confirm", role: "group", "aria-label": "\u786E\u8BA4\u5A92\u4F53\u8BBE\u7F6E\u64CD\u4F5C" }, /* @__PURE__ */ import_react4.default.createElement("p", null, confirm.kind === "clear" ? "\u6E05\u9664\u6B64\u63D0\u4F9B\u5546\u7684 API \u5BC6\u94A5\uFF1F\u73AF\u5883\u53D8\u91CF\u6765\u6E90\u4ECD\u53EF\u80FD\u751F\u6548\u3002" : "\u79FB\u9664\u6B64\u63D0\u4F9B\u5546\u914D\u7F6E\uFF1F\u5DF2\u5B58 API \u5BC6\u94A5\u4FDD\u7559\u5728 DSH\u3002"), /* @__PURE__ */ import_react4.default.createElement(UiButton, { disabled: busy, onClick: () => void act(() => confirm.kind === "clear" ? operations.clearCredential(confirm.id) : operations.remove(confirm.id, confirm.revision), confirm.kind === "clear" ? "\u5DF2\u6E05\u9664 API \u5BC6\u94A5\uFF1B\u51ED\u636E\u72B6\u6001\u5DF2\u5237\u65B0" : "\u5DF2\u79FB\u9664\u670D\u52A1\u914D\u7F6E\uFF0C\u5BC6\u94A5\u4FDD\u7559").then((ok) => {
     if (ok) {
@@ -567,7 +623,7 @@ function MediaServiceSettings({ operations }) {
         setApiKey("");
       }
     }
-  }) }, "\u786E\u8BA4", confirm.kind === "clear" ? "\u6E05\u9664 API \u5BC6\u94A5" : "\u79FB\u9664\u914D\u7F6E"), /* @__PURE__ */ import_react4.default.createElement(UiButton, { disabled: busy, onClick: () => setConfirm(null) }, "\u53D6\u6D88")), error && /* @__PURE__ */ import_react4.default.createElement(UserError, { error }), notice && /* @__PURE__ */ import_react4.default.createElement("p", { role: "status" }, notice));
+  }) }, "\u786E\u8BA4", confirm.kind === "clear" ? "\u6E05\u9664 API \u5BC6\u94A5" : "\u79FB\u9664\u914D\u7F6E"), /* @__PURE__ */ import_react4.default.createElement(UiButton, { disabled: busy, onClick: () => setConfirm(null) }, "\u53D6\u6D88")), error && errorField !== "baseURL" && /* @__PURE__ */ import_react4.default.createElement(UserError, { error }), notice && /* @__PURE__ */ import_react4.default.createElement("p", { role: "status" }, notice));
   return /* @__PURE__ */ import_react4.default.createElement("section", { className: `wtt-project-workbench wtt-media-service-settings${compact ? " is-compact" : ""}`, "aria-label": "\u56FE\u7247\u4E0E\u89C6\u9891\u670D\u52A1", id: "wtt-media-services", tabIndex: -1 }, compact ? /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement(UiButton, { "data-media-settings-open": true, onClick: () => setMobileOpen(true) }, "\u56FE\u7247\u4E0E\u89C6\u9891\u670D\u52A1"), /* @__PURE__ */ import_react4.default.createElement("dialog", { ref: dialog, className: "wtt-project-workbench wtt-media-service-settings wtt-media-service-dialog", "aria-labelledby": "wtt-media-dialog-title", onCancel: (event) => {
     event.preventDefault();
     setMobileOpen(false);
@@ -1290,7 +1346,7 @@ function NativeEditorInputDock({ sessionId, useInput, inputActions, bridge }) {
   };
   return /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-native-edit-reference", "aria-label": "\u8BFE\u4EF6\u4FEE\u6539\u5F15\u7528" }, /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("span", { title: owner.label }, entry.mode ? owner.label : "\u666E\u901A\u5BF9\u8BDD"), /* @__PURE__ */ import_react6.default.createElement(UiButton, { size: "compact", disabled: ["adjudicating", "submitting"].includes(input.phase) || !owner.ready, onClick: switchMode }, entry.mode ? "\u666E\u901A\u5BF9\u8BDD" : "\u5F15\u7528\u5F53\u524D\u5185\u5BB9")), owner.controls);
 }
-function NativeEditorConversation({ identity: identity4, project, sessionId, acquire, onSession, owner, bridge, SessionProvider, renderSlot, onSettled }) {
+function NativeEditorConversation({ identity: identity4, project, sessionId, acquire, onSession, owner, bridge, SessionProvider, renderSlot, onSettled, label: label2 = "\u8BFE\u4EF6" }) {
   const [binding, setBinding] = (0, import_react6.useState)(null), [error, setError] = (0, import_react6.useState)(""), ownerRef = (0, import_react6.useRef)(owner), sessionCallback = (0, import_react6.useRef)(onSession);
   ownerRef.current = owner;
   sessionCallback.current = onSession;
@@ -1326,8 +1382,8 @@ function NativeEditorConversation({ identity: identity4, project, sessionId, acq
   (0, import_react6.useEffect)(() => {
     if (binding?.identity === identity4 && owner) bridge.update(binding.reference.sessionId, JSON.stringify([owner.ready, owner.label, owner.autoCommand, owner.uiKey]));
   }, [binding, identity4, owner?.ready, owner?.label, owner?.autoCommand, owner?.uiKey]);
-  if (error) return /* @__PURE__ */ import_react6.default.createElement(UserError, { error: `\u8BFE\u4EF6\u5BF9\u8BDD\u672A\u80FD\u6253\u5F00\uFF1A${error}` });
-  if (binding?.identity !== identity4) return /* @__PURE__ */ import_react6.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6253\u5F00\u8BFE\u4EF6\u5BF9\u8BDD\u2026");
+  if (error) return /* @__PURE__ */ import_react6.default.createElement(UserError, { error: `${label2}\u5BF9\u8BDD\u672A\u80FD\u6253\u5F00\uFF1A${error}` });
+  if (binding?.identity !== identity4) return /* @__PURE__ */ import_react6.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6253\u5F00", label2, "\u5BF9\u8BDD\u2026");
   return /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-native-editor-conversation" }, /* @__PURE__ */ import_react6.default.createElement(SessionProvider, { session: binding.reference }, renderSlot(CANVAS_CONVERSATION_SLOT, { onSettled, editing: true })));
 }
 
@@ -31901,7 +31957,7 @@ function SavedPptPreview({ scope, endpoint: endpoint2, renderNativePreview }) {
 }
 
 // src/outcome-viewer.jsx
-var import_react20 = __toESM(require("react"), 1);
+var import_react21 = __toESM(require("react"), 1);
 
 // src/document-preview.jsx
 var import_react19 = __toESM(require("react"), 1);
@@ -32070,6 +32126,143 @@ function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requireme
   }) }, "\u21BB"), data?.dirty && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !canSave, onClick: () => void save() }, busy === "save" ? "\u4FDD\u5B58\u4E2D\u2026" : outcome && !versionId ? "\u4FDD\u5B58\u4E3A\u6B63\u5F0F\u7248\u672C" : "\u4FDD\u5B58\u65B0\u7248\u672C")), (error || data?.error) && /* @__PURE__ */ import_react19.default.createElement(UserError, { error: error || data.error }), notice && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wtt-document-notice", role: "status" }, notice, /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "button", "aria-label": "\u5173\u95ED\u6253\u5F00\u63D0\u793A", onClick: () => setNotice("") }, "\xD7")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-document-preview-body" }, data && renderNativePreview ? renderNativePreview(data.previewSource) : data?.format === "csv" ? /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("small", null, data.rows.length, " \u884C \xD7 ", data.rows[0]?.length || 0, " \u5217"), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-document-csv-readonly" }, /* @__PURE__ */ import_react19.default.createElement("table", { "aria-label": "CSV \u53EA\u8BFB\u9884\u89C8" }, /* @__PURE__ */ import_react19.default.createElement("tbody", null, data.rows.map((row, r) => /* @__PURE__ */ import_react19.default.createElement("tr", { key: r }, /* @__PURE__ */ import_react19.default.createElement("th", null, r + 1), row.map((cell, c) => /* @__PURE__ */ import_react19.default.createElement("td", { key: c }, cell)))))))) : data && /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, previewError && /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement(UserError, { error: previewError }), /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => setRetry((n) => n + 1) }, "\u91CD\u65B0\u9884\u89C8")), manifest ? /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("nav", { "aria-label": "\u6587\u6863\u9875\u7801" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page <= 1, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react19.default.createElement("span", null, "\u7B2C ", page, " / ", manifest.pageCount, " \u9875"), /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page >= manifest.pageCount, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react19.default.createElement("img", { className: "wtt-document-preview-image", src: endpoint2({ documentDraftPage: data.id, revision: String(manifest.revision), page: String(page) }).href, alt: `${title} \xB7 \u7B2C${page}\u9875\u5B9E\u9645\u9884\u89C8` })) : !previewError && /* @__PURE__ */ import_react19.default.createElement("p", { role: "status" }, "\u6B63\u5728\u51C6\u5907\u5B9E\u9645\u5206\u9875\u2026"))), data && /* @__PURE__ */ import_react19.default.createElement("footer", { className: "wtt-document-file" }, /* @__PURE__ */ import_react19.default.createElement("span", { title: data.workingFile || data.fileName }, data.fileName, data.dirty ? " \xB7 \u5DE5\u4F5C\u7A3F" : ""), data.workingFile && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => void reveal() }, "\u6587\u4EF6\u4F4D\u7F6E")));
 }
 
+// src/output-preview.jsx
+var import_react20 = __toESM(require("react"), 1);
+var fileBlocked = (status) => ["missing", "changed", "modified", "unavailable"].includes(status);
+var messageOf = (value) => value?.message || value?.error?.message || value?.error || String(value);
+function useDeckManifest({ artifactId, hash, loadPreview, enabled = true }) {
+  const identity4 = `${artifactId || ""}:${hash || ""}`;
+  const loader = (0, import_react20.useRef)(loadPreview);
+  loader.current = loadPreview;
+  const [attempt, setAttempt] = (0, import_react20.useState)(0);
+  const [result, setResult] = (0, import_react20.useState)(null);
+  const canLoad = Boolean(enabled && artifactId && hash && loadPreview);
+  (0, import_react20.useEffect)(() => {
+    if (!canLoad) return;
+    let disposed = false;
+    const controller = new AbortController();
+    Promise.resolve().then(() => loader.current({ artifactId, hash, signal: controller.signal })).then((manifest) => {
+      if (disposed) return;
+      if (manifest?.artifactId !== artifactId || manifest?.hash !== hash) throw new Error("\u8BFE\u4EF6\u9884\u89C8\u4E0E\u5F53\u524D\u6587\u4EF6\u7248\u672C\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u3002");
+      if (manifest.status !== "ready") throw new Error(messageOf(manifest.error || "\u6B64\u7248\u672C\u7684\u8BFE\u4EF6\u9884\u89C8\u672A\u80FD\u751F\u6210\u3002"));
+      const pages = manifest.pages;
+      if (!Array.isArray(pages) || !pages.length || manifest.pageCount !== pages.length || pages.some((page) => !Number.isInteger(page.number) || page.number < 1) || new Set(pages.map((page) => page.number)).size !== pages.length) throw new Error("\u8BFE\u4EF6\u9884\u89C8\u9875\u4FE1\u606F\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u3002");
+      setResult({ identity: identity4, attempt, manifest: { ...manifest, pages: [...pages].sort((a, b2) => a.number - b2.number) } });
+    }).catch((cause) => {
+      if (!disposed) setResult({ identity: identity4, attempt, error: messageOf(cause) });
+    });
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
+  }, [artifactId, hash, canLoad, attempt]);
+  const current = result?.identity === identity4 && result.attempt === attempt ? result : null;
+  return {
+    identity: identity4,
+    attempt,
+    manifest: current?.manifest,
+    error: current?.error,
+    loading: canLoad && !current,
+    unavailable: !canLoad,
+    retry: () => setAttempt((value) => value + 1)
+  };
+}
+function PptCover({ artifactId, hash, loadPreview, getPageHref, src, title, onOpen, disabled, compact }) {
+  const preview = useDeckManifest({ artifactId, hash, loadPreview, enabled: !src && !disabled });
+  const [imageError, setImageError] = (0, import_react20.useState)("");
+  const page = preview.manifest?.pages.find((item) => item.number === preview.manifest.coverPage) || preview.manifest?.pages[0];
+  const image = src || page && getPageHref?.({ artifactId, hash, page: page.number });
+  const imageKey = `${image || ""}:${preview.attempt}`;
+  const failed = imageError === imageKey;
+  return /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "custom", type: "button", className: "wtt-output-ppt-cover", disabled: disabled || !onOpen, onClick: (event) => {
+    if (!compact || event.detail === 0) {
+      event.stopPropagation();
+      onOpen?.();
+    }
+  }, onDoubleClick: compact ? (event) => {
+    event.stopPropagation();
+    onOpen?.();
+  } : void 0, "aria-label": `${compact ? "\u53CC\u51FB\u9010\u9875\u9884\u89C8" : "\u9010\u9875\u9884\u89C8"}\uFF1A${title || "PPT"}` }, image && !failed ? /* @__PURE__ */ import_react20.default.createElement("img", { key: imageKey, src: image, alt: `${title || "PPT"}\u5C01\u9762`, loading: "lazy", draggable: false, onError: () => setImageError(imageKey) }) : /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-output-ppt-placeholder" }, preview.loading ? "\u6B63\u5728\u751F\u6210\u5C01\u9762\u2026" : preview.error ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6253\u5F00\u8BFE\u4EF6\u67E5\u770B" : failed ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528" : "PPT \u8BFE\u4EF6"), /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-output-ppt-caption" }, preview.manifest ? `${preview.manifest.pageCount} \u9875 \xB7 ` : "", compact ? "\u53CC\u51FB\u9010\u9875\u67E5\u770B" : "\u9010\u9875\u67E5\u770B"));
+}
+function OutputPreview({
+  type = "text",
+  title,
+  content,
+  extracted = true,
+  mime,
+  src,
+  downloadHref,
+  status = "ready",
+  onOpenDeck,
+  artifactId,
+  hash,
+  loadPreview,
+  getPageHref,
+  compact = false,
+  emptyMessage,
+  onOpenMedia
+}) {
+  const [mediaError, setMediaError] = (0, import_react20.useState)("");
+  const identity4 = `${type}:${src || ""}`;
+  const unavailable = fileBlocked(status);
+  const failed = mediaError === identity4;
+  const hasText = extracted !== false && typeof content === "string" && content.trim();
+  const previewText = compact && hasText && content.length > 600 ? content.slice(0, 600).replace(/[\uD800-\uDBFF]$/, "") + "\u2026" : content;
+  return /* @__PURE__ */ import_react20.default.createElement("section", { className: `wtt-output-preview is-${type}${compact ? " is-compact" : ""}`, "aria-label": `${title || "\u6210\u679C\u6587\u4EF6"}\u9884\u89C8` }, unavailable ? /* @__PURE__ */ import_react20.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, "\u6B64\u7248\u672C\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u65E0\u6CD5\u6CBF\u7528\u65E7\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u539F\u6587\u4EF6\u3002") : type === "pptx" ? /* @__PURE__ */ import_react20.default.createElement(PptCover, { artifactId, hash, loadPreview, getPageHref, src, title, onOpen: onOpenDeck, compact }) : type === "image" && src && !failed ? /* @__PURE__ */ import_react20.default.createElement("img", { key: identity4, className: "wtt-output-image", src, alt: title || "\u751F\u6210\u56FE\u7247", loading: "lazy", decoding: "async", draggable: false, onError: () => setMediaError(identity4) }) : type === "video" && src && !failed ? /* @__PURE__ */ import_react20.default.createElement(
+    "video",
+    {
+      key: identity4,
+      className: "wtt-output-video nodrag nopan nowheel",
+      src,
+      controls: true,
+      preload: "metadata",
+      playsInline: true,
+      "aria-label": title || "\u751F\u6210\u89C6\u9891",
+      onError: () => setMediaError(identity4),
+      onPointerDown: (event) => event.stopPropagation(),
+      onClick: (event) => event.stopPropagation(),
+      onDoubleClickCapture: (event) => {
+        if (compact && onOpenMedia) {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenMedia();
+        }
+      },
+      onDoubleClick: (event) => event.stopPropagation(),
+      onKeyDown: (event) => event.stopPropagation()
+    }
+  ) : ["image", "video"].includes(type) ? /* @__PURE__ */ import_react20.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, failed ? type === "video" ? "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u7248\u672C\uFF0C\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002" : "\u6B64\u7248\u672C\u56FE\u7247\u672A\u80FD\u52A0\u8F7D\uFF0C\u53EF\u4E0B\u8F7D\u539F\u56FE\u67E5\u770B\u3002" : emptyMessage || "\u5C1A\u672A\u53D6\u5F97\u53EF\u9884\u89C8\u7684\u6587\u4EF6\u3002") : hasText ? /* @__PURE__ */ import_react20.default.createElement("pre", { className: `wtt-output-text${compact ? "" : " nodrag nowheel"}` }, previewText) : /* @__PURE__ */ import_react20.default.createElement("p", { className: "wtt-output-preview-note" }, emptyMessage || (extracted === false ? "\u6B64\u683C\u5F0F\u5C1A\u672A\u63D0\u53D6\u53EF\u8BFB\u6B63\u6587\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002" : "\u5C1A\u65E0\u5DF2\u4FDD\u5B58\u7684\u6587\u672C\u6210\u679C\u3002")), !compact && downloadHref && /* @__PURE__ */ import_react20.default.createElement("a", { className: "wtt-output-download", href: downloadHref, download: true, onClick: (event) => event.stopPropagation() }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C"));
+}
+function DeckPreview({ artifactId, hash, title = "\u8BFE\u4EF6\u9884\u89C8", loadPreview, getPageHref, downloadHref, onClose }) {
+  const preview = useDeckManifest({ artifactId, hash, loadPreview });
+  const [selection2, setSelection] = (0, import_react20.useState)(null);
+  const [pageErrors, setPageErrors] = (0, import_react20.useState)(() => /* @__PURE__ */ new Set());
+  const identity4 = `${preview.identity}:${preview.attempt}`;
+  const pages = preview.manifest?.pages || [];
+  const selectedNumber = selection2?.identity === identity4 ? selection2.number : preview.manifest?.coverPage || pages[0]?.number;
+  const currentIndex = Math.max(0, pages.findIndex((page) => page.number === selectedNumber));
+  const current = pages[currentIndex];
+  const pageHref = (page) => getPageHref?.({ artifactId, hash, page: page.number });
+  const choose = (index2) => {
+    if (pages[index2]) setSelection({ identity: identity4, number: pages[index2].number });
+  };
+  const failPage = (number) => setPageErrors((previous) => new Set(previous).add(`${identity4}:${number}`));
+  function onKeyDown(event) {
+    event.stopPropagation();
+    if (event.key === "Escape" && onClose) {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.target?.closest("input,textarea,select,video") || !pages.length) return;
+    const target = { ArrowLeft: currentIndex - 1, ArrowRight: currentIndex + 1, Home: 0, End: pages.length - 1 }[event.key];
+    if (target === void 0) return;
+    event.preventDefault();
+    choose(Math.max(0, Math.min(pages.length - 1, target)));
+  }
+  return /* @__PURE__ */ import_react20.default.createElement("aside", { className: "wtt-deck-preview nodrag nopan nowheel", "aria-label": "PPT \u9010\u9875\u9884\u89C8", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown }, /* @__PURE__ */ import_react20.default.createElement(PanelHeader, { title, subtitle: "PPT \xB7 \u5B9E\u9645\u8BFE\u4EF6\u9884\u89C8", downloadHref, onClose, closeLabel: "\u5173\u95ED\u8BFE\u4EF6\u9884\u89C8" }), preview.loading ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-deck-feedback", role: "status" }, /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-deck-loading", "aria-hidden": "true" }), /* @__PURE__ */ import_react20.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u6B64\u7248\u672C\u7684\u5B9E\u9645\u5E7B\u706F\u7247\u2026"), /* @__PURE__ */ import_react20.default.createElement("small", null, "\u9996\u6B21\u9884\u89C8\u4F1A\u5728\u672C\u673A\u8F6C\u6362\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\u3002")) : preview.error || preview.unavailable ? /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react20.default.createElement("strong", null, "\u8BFE\u4EF6\u9884\u89C8\u6682\u4E0D\u53EF\u7528"), /* @__PURE__ */ import_react20.default.createElement("p", null, preview.error || "\u5F53\u524D\u6587\u4EF6\u7F3A\u5C11\u9884\u89C8\u4FE1\u606F\u3002"), /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry, disabled: preview.unavailable }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"), /* @__PURE__ */ import_react20.default.createElement("small", null, "\u6B63\u5F0F PPTX \u4FDD\u7559\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002")) : /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-deck-body" }, /* @__PURE__ */ import_react20.default.createElement("nav", { className: "wtt-deck-thumbnails", "aria-label": "\u5E7B\u706F\u7247\u7F29\u7565\u56FE" }, pages.map((page, index2) => /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "custom", type: "button", key: `${identity4}:${page.number}`, "aria-label": `\u7B2C ${page.number} \u9875`, "aria-current": index2 === currentIndex ? "page" : void 0, onClick: () => choose(index2) }, /* @__PURE__ */ import_react20.default.createElement("span", null, page.number), /* @__PURE__ */ import_react20.default.createElement("img", { src: pageHref(page), alt: `\u7B2C ${page.number} \u9875\u7F29\u7565\u56FE`, loading: "lazy", decoding: "async", draggable: false })))), /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-deck-stage" }, /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-deck-page", tabIndex: 0, "aria-label": `\u7B2C ${current?.number || 1} \u9875\uFF0C\u5DE6\u53F3\u952E\u7FFB\u9875` }, current && !pageErrors.has(`${identity4}:${current.number}`) ? /* @__PURE__ */ import_react20.default.createElement("img", { key: `${identity4}:${current.number}`, src: pageHref(current), alt: `${title} \xB7 \u7B2C ${current.number} \u9875`, draggable: false, onError: () => failPage(current.number) }) : /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react20.default.createElement("p", null, "\u6B64\u9875\u9884\u89C8\u52A0\u8F7D\u5931\u8D25\u3002"), /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"))), /* @__PURE__ */ import_react20.default.createElement("footer", { className: "wtt-deck-navigation" }, /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex - 1), disabled: currentIndex === 0 }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react20.default.createElement("span", { "aria-live": "polite" }, "\u7B2C ", current?.number || 1, " \u9875 / \u5171 ", pages.length, " \u9875"), /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex + 1), disabled: currentIndex >= pages.length - 1 }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react20.default.createElement("p", { className: "wtt-deck-derived-note" }, "\u6309\u6B64\u7248\u672C PPTX \u6E32\u67D3\uFF1B\u9884\u89C8\u56FE\u4E0D\u66FF\u4EE3\u53EF\u7F16\u8F91\u8BFE\u4EF6\u3002"), !!preview.manifest?.warnings?.length && /* @__PURE__ */ import_react20.default.createElement("details", { className: "wtt-deck-render-notes" }, /* @__PURE__ */ import_react20.default.createElement("summary", null, "\u6E32\u67D3\u63D0\u793A \xB7 ", preview.manifest.warnings.length), preview.manifest.warnings.map((warning, index2) => /* @__PURE__ */ import_react20.default.createElement("p", { key: index2 }, typeof warning === "string" ? warning : [warning.source, warning.message].filter(Boolean).join("\uFF1A")))))));
+}
+
 // src/outcome-viewer.jsx
 var externalFormats = ["pptx", "docx", "pdf", "csv"];
 function OutcomeViewer({
@@ -32086,9 +32279,9 @@ function OutcomeViewer({
   widthExpanded,
   active = true
 }) {
-  const [manifest, setManifest] = (0, import_react20.useState)(null), [selected2, setSelected] = (0, import_react20.useState)(""), [sourceBinding, setSource] = (0, import_react20.useState)(null);
-  const [error, setError] = (0, import_react20.useState)("");
-  const [svgBinding, setSvgBinding] = (0, import_react20.useState)(null), [svgChoice, setSvgChoice] = (0, import_react20.useState)("");
+  const [manifest, setManifest] = (0, import_react21.useState)(null), [selected2, setSelected] = (0, import_react21.useState)(""), [sourceBinding, setSource] = (0, import_react21.useState)(null);
+  const [error, setError] = (0, import_react21.useState)("");
+  const [svgBinding, setSvgBinding] = (0, import_react21.useState)(null), [svgChoice, setSvgChoice] = (0, import_react21.useState)("");
   const identity4 = JSON.stringify(target);
   const read = async (query) => {
     const response = await fetch(endpoint2(query), { credentials: "same-origin" });
@@ -32096,7 +32289,7 @@ function OutcomeViewer({
     if (!response.ok) throw new Error(result.error || "\u6587\u4EF6\u8BFB\u53D6\u5931\u8D25\u3002");
     return result;
   };
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     let live = true;
     setManifest(null);
     setSource(null);
@@ -32126,7 +32319,7 @@ function OutcomeViewer({
   const file = manifest?.files.find((item) => item.sourceRef === selected2);
   const selectionKey = `${identity4}:${selected2}:${file?.hash || ""}`;
   const source = sourceBinding?.key === selectionKey ? sourceBinding.value : null;
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     if (!file) return;
     let live = true;
     setSource(null);
@@ -32145,7 +32338,7 @@ function OutcomeViewer({
       live = false;
     };
   }, [selectionKey, Boolean(file)]);
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     if (!source || !active) return;
     const textLike = ["md", "markdown", "txt", "csv", "json", "jsonl", "yaml", "yml", "html", "css", "js", "mjs", "py", "xml", "log"].includes(source.format);
     if (target.projectPath ? !textLike : !["html", "htm", "md", "markdown"].includes(source.format)) return;
@@ -32167,7 +32360,7 @@ function OutcomeViewer({
   }, [source?.path, source?.hash, active, target.projectPath]);
   const editScope = source?.format === "pptx" && file?.artifactId && manifest?.cardId ? { requirementId: target.requirementId, cardId: manifest.cardId, versionId: manifest.versionId, artifactId: file.artifactId, hash: source.hash, outcome: true } : null;
   const svg = svgBinding?.key === selectionKey ? svgBinding.value : null;
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     if (!editScope) return;
     let live = true;
     setSvgBinding(null);
@@ -32187,7 +32380,7 @@ function OutcomeViewer({
   const canModify = source && manifest?.cardId && externalFormats.includes(source.format);
   const downloadHref = file?.artifactId ? endpoint2({ downloadArtifact: file.artifactId }).href : source ? endpoint2({ projectFileDownload: source.originalPath, hash: source.hash }).href : void 0;
   const otherWebProject = source?.format === "pptx" && manifest?.slideProject?.artifactId !== file?.artifactId;
-  const choices = (disabled) => /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, manifest?.files.length > 1 && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-outcome-picker" }, /* @__PURE__ */ import_react20.default.createElement("select", { "aria-label": "\u9009\u62E9\u6210\u679C\u6587\u4EF6", value: selected2, disabled, onChange: (e) => setSelected(e.target.value) }, manifest.files.map((item) => /* @__PURE__ */ import_react20.default.createElement("option", { key: item.sourceRef, value: item.sourceRef }, item.format?.toUpperCase(), " \xB7 ", item.name, item.role === "attachment" ? " \xB7 \u9644\u4EF6" : "")))), editScope && /* @__PURE__ */ import_react20.default.createElement(
+  const choices = (disabled) => /* @__PURE__ */ import_react21.default.createElement(import_react21.default.Fragment, null, manifest?.files.length > 1 && /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-outcome-picker" }, /* @__PURE__ */ import_react21.default.createElement("select", { "aria-label": "\u9009\u62E9\u6210\u679C\u6587\u4EF6", value: selected2, disabled, onChange: (e) => setSelected(e.target.value) }, manifest.files.map((item) => /* @__PURE__ */ import_react21.default.createElement("option", { key: item.sourceRef, value: item.sourceRef }, item.format?.toUpperCase(), " \xB7 ", item.name, item.role === "attachment" ? " \xB7 \u9644\u4EF6" : "")))), editScope && /* @__PURE__ */ import_react21.default.createElement(
     UiButton,
     {
       variant: "quiet",
@@ -32199,8 +32392,8 @@ function OutcomeViewer({
       }
     },
     "\u7F16\u8F91\u6E90\u6587\u4EF6"
-  ), editScope && svg?.candidates?.length > 1 && /* @__PURE__ */ import_react20.default.createElement("select", { "aria-label": "\u9009\u62E9SVG\u6E90\u5DE5\u7A0B", value: svgChoice, disabled, onChange: (e) => setSvgChoice(e.target.value) }, /* @__PURE__ */ import_react20.default.createElement("option", { value: "" }, "\u9009\u62E9\u6E90\u5DE5\u7A0B\u2026"), svg.candidates.map((c) => /* @__PURE__ */ import_react20.default.createElement("option", { key: c.id, value: c.id }, c.path))), !editScope && manifest?.slideProject && /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "quiet", disabled, onClick: () => onOpenSlides?.(manifest) }, "\u7F16\u8F91\u6E90\u6587\u4EF6"));
-  if (canModify) return /* @__PURE__ */ import_react20.default.createElement(
+  ), editScope && svg?.candidates?.length > 1 && /* @__PURE__ */ import_react21.default.createElement("select", { "aria-label": "\u9009\u62E9SVG\u6E90\u5DE5\u7A0B", value: svgChoice, disabled, onChange: (e) => setSvgChoice(e.target.value) }, /* @__PURE__ */ import_react21.default.createElement("option", { value: "" }, "\u9009\u62E9\u6E90\u5DE5\u7A0B\u2026"), svg.candidates.map((c) => /* @__PURE__ */ import_react21.default.createElement("option", { key: c.id, value: c.id }, c.path))), !editScope && manifest?.slideProject && /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: "quiet", disabled, onClick: () => onOpenSlides?.(manifest) }, "\u7F16\u8F91\u6E90\u6587\u4EF6"));
+  if (canModify) return /* @__PURE__ */ import_react21.default.createElement(
     DocumentViewer,
     {
       key: selectionKey,
@@ -32223,7 +32416,7 @@ function OutcomeViewer({
       widthExpanded
     }
   );
-  return /* @__PURE__ */ import_react20.default.createElement("aside", { className: "wtt-outcome-viewer nodrag nopan nowheel", "aria-label": target.reviewDraft ? "\u5F85\u5BA1\u7A3F\u9884\u89C8" : "\u6210\u679C\u6587\u4EF6\u9884\u89C8", onPointerDown: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react20.default.createElement(
+  return /* @__PURE__ */ import_react21.default.createElement("aside", { className: "wtt-outcome-viewer nodrag nopan nowheel", "aria-label": target.reviewDraft ? "\u5F85\u5BA1\u7A3F\u9884\u89C8" : "\u6210\u679C\u6587\u4EF6\u9884\u89C8", onPointerDown: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react21.default.createElement(
     PanelHeader,
     {
       title: file?.name || target.title || "\u6210\u679C\u6587\u4EF6",
@@ -32234,7 +32427,7 @@ function OutcomeViewer({
       onClose,
       closeLabel: "\u5173\u95ED\u6210\u679C\u9884\u89C8"
     }
-  ), /* @__PURE__ */ import_react20.default.createElement(PanelToolbar, null, choices(false), onAdd2 && source && /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react20.default.createElement(UserError, { error }) : source ? source.format === "mp4" || source.format === "webm" ? /* @__PURE__ */ import_react20.default.createElement("video", { src: downloadHref, controls: true, playsInline: true, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react20.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react20.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
+  ), /* @__PURE__ */ import_react21.default.createElement(PanelToolbar, null, choices(false), onAdd2 && source && /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react21.default.createElement(UserError, { error }) : source ? source.mime?.startsWith("image/") ? /* @__PURE__ */ import_react21.default.createElement(OutputPreview, { type: "image", title: source.name, src: downloadHref, status: source.status }) : source.format === "mp4" || source.format === "webm" || source.format === "mov" ? /* @__PURE__ */ import_react21.default.createElement("video", { key: selectionKey, src: downloadHref, controls: true, preload: "metadata", playsInline: true, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react21.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
 }
 
 // src/canvas.jsx
@@ -32242,7 +32435,7 @@ var import_react50 = __toESM(require("react"), 1);
 
 // node_modules/@xyflow/react/dist/esm/index.js
 var import_jsx_runtime4 = require("react/jsx-runtime");
-var import_react22 = require("react");
+var import_react23 = require("react");
 
 // node_modules/classcat/index.js
 function cc(names) {
@@ -37963,7 +38156,7 @@ function XYResizer({ domNode, nodeId, getStoreItems, onChange, onEnd }) {
 }
 
 // node_modules/zustand/esm/traditional.mjs
-var import_react21 = __toESM(require("react"), 1);
+var import_react22 = __toESM(require("react"), 1);
 var import_with_selector2 = __toESM(require_with_selector(), 1);
 
 // node_modules/zustand/esm/vanilla.mjs
@@ -38000,7 +38193,7 @@ var createStoreImpl = (createState) => {
 var createStore = (createState) => createState ? createStoreImpl(createState) : createStoreImpl;
 
 // node_modules/zustand/esm/traditional.mjs
-var { useDebugValue: useDebugValue2 } = import_react21.default;
+var { useDebugValue: useDebugValue2 } = import_react22.default;
 var { useSyncExternalStoreWithSelector: useSyncExternalStoreWithSelector2 } = import_with_selector2.default;
 var identity3 = (arg) => arg;
 function useStoreWithEqualityFn(api, selector2 = identity3, equalityFn) {
@@ -38062,22 +38255,22 @@ function shallow$1(objA, objB) {
 
 // node_modules/@xyflow/react/dist/esm/index.js
 var import_react_dom2 = require("react-dom");
-var StoreContext = (0, import_react22.createContext)(null);
+var StoreContext = (0, import_react23.createContext)(null);
 var Provider$1 = StoreContext.Provider;
 var zustandErrorMessage = errorMessages["error001"]("react");
 function useStore(selector2, equalityFn) {
-  const store = (0, import_react22.useContext)(StoreContext);
+  const store = (0, import_react23.useContext)(StoreContext);
   if (store === null) {
     throw new Error(zustandErrorMessage);
   }
   return useStoreWithEqualityFn(store, selector2, equalityFn);
 }
 function useStoreApi() {
-  const store = (0, import_react22.useContext)(StoreContext);
+  const store = (0, import_react23.useContext)(StoreContext);
   if (store === null) {
     throw new Error(zustandErrorMessage);
   }
-  return (0, import_react22.useMemo)(() => ({
+  return (0, import_react23.useMemo)(() => ({
     getState: store.getState,
     setState: store.setState,
     subscribe: store.subscribe
@@ -38108,14 +38301,14 @@ function A11yDescriptions({ rfId, disableKeyboardA11y }) {
   const ariaLabelConfig = useStore(ariaLabelConfigSelector);
   return (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [(0, import_jsx_runtime4.jsx)("div", { id: `${ARIA_NODE_DESC_KEY}-${rfId}`, style: style2, children: disableKeyboardA11y ? ariaLabelConfig["node.a11yDescription.default"] : ariaLabelConfig["node.a11yDescription.keyboardDisabled"] }), (0, import_jsx_runtime4.jsx)("div", { id: `${ARIA_EDGE_DESC_KEY}-${rfId}`, style: style2, children: ariaLabelConfig["edge.a11yDescription.default"] }), !disableKeyboardA11y && (0, import_jsx_runtime4.jsx)(AriaLiveMessage, { rfId })] });
 }
-var Panel = (0, import_react22.forwardRef)(({ position = "top-left", children: children2, className, style: style3, ...rest }, ref) => {
+var Panel = (0, import_react23.forwardRef)(({ position = "top-left", children: children2, className, style: style3, ...rest }, ref) => {
   const positionClasses = `${position}`.split("-");
   return (0, import_jsx_runtime4.jsx)("div", { className: cc(["react-flow__panel", className, ...positionClasses]), style: style3, ref, ...rest, children: children2 });
 });
 Panel.displayName = "Panel";
 var link = `https://reactflow.dev${false ? "?utm_source=attribution" : "/attribution"}`;
 function Attribution({ proOptions, position = "bottom-right" }) {
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (false) {
       return;
     }
@@ -38148,7 +38341,7 @@ function areEqual$1(a, b2) {
 function SelectionListenerInner({ onSelectionChange }) {
   const store = useStoreApi();
   const { selectedNodes, selectedEdges } = useStore(selector$l, areEqual$1);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     const params = { nodes: selectedNodes, edges: selectedEdges };
     onSelectionChange?.(params);
     store.getState().onSelectionChangeHandlers.forEach((fn) => fn(params));
@@ -38253,15 +38446,15 @@ var initPrevValues2 = {
 function StoreUpdater(props) {
   const { setNodes, setEdges, setMinZoom, setMaxZoom, setTranslateExtent, setNodeExtent, reset: reset2, setDefaultNodesAndEdges } = useStore(selector$k, shallow$1);
   const store = useStoreApi();
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     setDefaultNodesAndEdges(props.defaultNodes, props.defaultEdges);
     return () => {
       previousFields.current = initPrevValues2;
       reset2();
     };
   }, []);
-  const previousFields = (0, import_react22.useRef)(initPrevValues2);
-  (0, import_react22.useEffect)(
+  const previousFields = (0, import_react23.useRef)(initPrevValues2);
+  (0, import_react23.useEffect)(
     () => {
       for (const fieldName of fieldsToTrack) {
         const fieldValue = props[fieldName];
@@ -38305,8 +38498,8 @@ function getMediaQuery() {
   return window.matchMedia("(prefers-color-scheme: dark)");
 }
 function useColorModeClass(colorMode) {
-  const [colorModeClass, setColorModeClass] = (0, import_react22.useState)(colorMode === "system" ? null : colorMode);
-  (0, import_react22.useEffect)(() => {
+  const [colorModeClass, setColorModeClass] = (0, import_react23.useState)(colorMode === "system" ? null : colorMode);
+  (0, import_react23.useEffect)(() => {
     if (colorMode !== "system") {
       setColorModeClass(colorMode);
       return;
@@ -38323,10 +38516,10 @@ function useColorModeClass(colorMode) {
 }
 var defaultDoc = typeof document !== "undefined" ? document : null;
 function useKeyPress(keyCode = null, options = { target: defaultDoc, actInsideInputWithModifier: true }) {
-  const [keyPressed, setKeyPressed] = (0, import_react22.useState)(false);
-  const modifierPressed = (0, import_react22.useRef)(false);
-  const pressedKeys = (0, import_react22.useRef)(/* @__PURE__ */ new Set([]));
-  const [keyCodes, keysToWatch] = (0, import_react22.useMemo)(() => {
+  const [keyPressed, setKeyPressed] = (0, import_react23.useState)(false);
+  const modifierPressed = (0, import_react23.useRef)(false);
+  const pressedKeys = (0, import_react23.useRef)(/* @__PURE__ */ new Set([]));
+  const [keyCodes, keysToWatch] = (0, import_react23.useMemo)(() => {
     if (keyCode !== null) {
       const keyCodeArr = Array.isArray(keyCode) ? keyCode : [keyCode];
       const keys3 = keyCodeArr.filter((kc) => typeof kc === "string").map((kc) => kc.replace(/\+/g, "\n").replace("\n\n", "\n+").split("\n"));
@@ -38335,7 +38528,7 @@ function useKeyPress(keyCode = null, options = { target: defaultDoc, actInsideIn
     }
     return [[], []];
   }, [keyCode]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     const target = options?.target ?? defaultDoc;
     const actInsideInputWithModifier = options?.actInsideInputWithModifier ?? true;
     if (keyCode !== null) {
@@ -38395,7 +38588,7 @@ function useKeyOrCode(eventCode, keysToWatch) {
 }
 var useViewportHelper = () => {
   const store = useStoreApi();
-  return (0, import_react22.useMemo)(() => {
+  return (0, import_react23.useMemo)(() => {
     return {
       zoomIn: async (options) => {
         const { panZoom } = store.getState();
@@ -38619,12 +38812,12 @@ function addEdge2(edgeParams, edges, options = {}) {
 var isNode = (element) => isNodeBase(element);
 var isEdge = (element) => isEdgeBase(element);
 function fixedForwardRef(render2) {
-  return (0, import_react22.forwardRef)(render2);
+  return (0, import_react23.forwardRef)(render2);
 }
-var useIsomorphicLayoutEffect2 = typeof window !== "undefined" ? import_react22.useLayoutEffect : import_react22.useEffect;
+var useIsomorphicLayoutEffect2 = typeof window !== "undefined" ? import_react23.useLayoutEffect : import_react23.useEffect;
 function useQueue(runQueue) {
-  const [serial, setSerial] = (0, import_react22.useState)(BigInt(0));
-  const [queue] = (0, import_react22.useState)(() => createQueue(() => setSerial((n) => n + BigInt(1))));
+  const [serial, setSerial] = (0, import_react23.useState)(BigInt(0));
+  const [queue] = (0, import_react23.useState)(() => createQueue(() => setSerial((n) => n + BigInt(1))));
   useIsomorphicLayoutEffect2(() => {
     const queueItems = queue.get();
     if (queueItems.length) {
@@ -38647,10 +38840,10 @@ function createQueue(cb) {
     }
   };
 }
-var BatchContext = (0, import_react22.createContext)(null);
+var BatchContext = (0, import_react23.createContext)(null);
 function BatchProvider({ children: children2 }) {
   const store = useStoreApi();
-  const nodeQueueHandler = (0, import_react22.useCallback)((queueItems) => {
+  const nodeQueueHandler = (0, import_react23.useCallback)((queueItems) => {
     const { nodes = [], setNodes, hasDefaultNodes, onNodesChange, nodeLookup, fitViewQueued, onNodesChangeMiddlewareMap } = store.getState();
     let next = nodes;
     for (const payload of queueItems) {
@@ -38678,7 +38871,7 @@ function BatchProvider({ children: children2 }) {
     }
   }, []);
   const nodeQueue = useQueue(nodeQueueHandler);
-  const edgeQueueHandler = (0, import_react22.useCallback)((queueItems) => {
+  const edgeQueueHandler = (0, import_react23.useCallback)((queueItems) => {
     const { edges = [], setEdges, hasDefaultEdges, onEdgesChange, edgeLookup } = store.getState();
     let next = edges;
     for (const payload of queueItems) {
@@ -38694,11 +38887,11 @@ function BatchProvider({ children: children2 }) {
     }
   }, []);
   const edgeQueue = useQueue(edgeQueueHandler);
-  const value = (0, import_react22.useMemo)(() => ({ nodeQueue, edgeQueue }), []);
+  const value = (0, import_react23.useMemo)(() => ({ nodeQueue, edgeQueue }), []);
   return (0, import_jsx_runtime4.jsx)(BatchContext.Provider, { value, children: children2 });
 }
 function useBatchContext() {
-  const batchContext = (0, import_react22.useContext)(BatchContext);
+  const batchContext = (0, import_react23.useContext)(BatchContext);
   if (!batchContext) {
     throw new Error("useBatchContext must be used within a BatchProvider");
   }
@@ -38710,7 +38903,7 @@ function useReactFlow() {
   const store = useStoreApi();
   const batchContext = useBatchContext();
   const viewportInitialized = useStore(selector$j);
-  const generalHelper = (0, import_react22.useMemo)(() => {
+  const generalHelper = (0, import_react23.useMemo)(() => {
     const getInternalNode = (id2) => store.getState().nodeLookup.get(id2);
     const setNodes = (payload) => {
       batchContext.nodeQueue.push(payload);
@@ -38867,7 +39060,7 @@ function useReactFlow() {
       }
     };
   }, []);
-  return (0, import_react22.useMemo)(() => {
+  return (0, import_react23.useMemo)(() => {
     return {
       ...generalHelper,
       ...viewportHelper,
@@ -38882,20 +39075,20 @@ function useGlobalKeyHandler({ deleteKeyCode, multiSelectionKeyCode }) {
   const { deleteElements } = useReactFlow();
   const deleteKeyPressed = useKeyPress(deleteKeyCode, { actInsideInputWithModifier: false });
   const multiSelectionKeyPressed = useKeyPress(multiSelectionKeyCode, { target: win$1 });
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (deleteKeyPressed) {
       const { edges, nodes } = store.getState();
       deleteElements({ nodes: nodes.filter(selected), edges: edges.filter(selected) });
       store.setState({ nodesSelectionActive: false });
     }
   }, [deleteKeyPressed]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     store.setState({ multiSelectionActive: multiSelectionKeyPressed });
   }, [multiSelectionKeyPressed]);
 }
 function useResizeHandler(domNode) {
   const store = useStoreApi();
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     const updateDimensions = () => {
       if (!domNode.current || !(domNode.current.checkVisibility?.() ?? true)) {
         return false;
@@ -38934,18 +39127,18 @@ var selector$i = (s) => ({
 });
 function ZoomPane({ onPaneContextMenu, zoomOnScroll = true, zoomOnPinch = true, panOnScroll = false, panActivationKeyPressed, panOnScrollSpeed = 0.5, panOnScrollMode = PanOnScrollMode.Free, zoomOnDoubleClick = true, panOnDrag = true, defaultViewport: defaultViewport2, translateExtent, minZoom, maxZoom, zoomActivationKeyCode, preventScrolling = true, children: children2, noWheelClassName, noPanClassName, onViewportChange, isControlledViewport, paneClickDistance, selectionOnDrag }) {
   const store = useStoreApi();
-  const zoomPane = (0, import_react22.useRef)(null);
+  const zoomPane = (0, import_react23.useRef)(null);
   const { userSelectionActive, lib, connectionInProgress } = useStore(selector$i, shallow$1);
   const zoomActivationKeyPressed = useKeyPress(zoomActivationKeyCode);
-  const panZoom = (0, import_react22.useRef)();
+  const panZoom = (0, import_react23.useRef)();
   useResizeHandler(zoomPane);
-  const onTransformChange = (0, import_react22.useCallback)((transform2) => {
+  const onTransformChange = (0, import_react23.useCallback)((transform2) => {
     onViewportChange?.({ x: transform2[0], y: transform2[1], zoom: transform2[2] });
     if (!isControlledViewport) {
       store.setState({ transform: transform2 });
     }
   }, [onViewportChange, isControlledViewport]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (zoomPane.current) {
       panZoom.current = XYPanZoom({
         domNode: zoomPane.current,
@@ -38981,7 +39174,7 @@ function ZoomPane({ onPaneContextMenu, zoomOnScroll = true, zoomOnPinch = true, 
       };
     }
   }, []);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     panZoom.current?.update({
       onPaneContextMenu,
       zoomOnScroll,
@@ -39058,18 +39251,18 @@ var selector$g = (s) => ({
   autoPanSpeed: s.autoPanSpeed
 });
 function Pane({ isSelecting, selectionKeyPressed, selectionMode = SelectionMode.Full, panOnDrag, autoPanOnSelection, paneClickDistance, selectionOnDrag, onSelectionStart, onSelectionEnd, onPaneClick, onPaneContextMenu, onPaneScroll, onPaneMouseEnter, onPaneMouseMove, onPaneMouseLeave, children: children2 }) {
-  const autoPanId = (0, import_react22.useRef)(0);
+  const autoPanId = (0, import_react23.useRef)(0);
   const store = useStoreApi();
   const { userSelectionActive, elementsSelectable, dragging, panBy: panBy2, autoPanSpeed } = useStore(selector$g, shallow$1);
   const isSelectionEnabled = elementsSelectable && (isSelecting || userSelectionActive);
-  const container = (0, import_react22.useRef)(null);
-  const containerBounds = (0, import_react22.useRef)();
-  const selectedNodeIds = (0, import_react22.useRef)(/* @__PURE__ */ new Set());
-  const selectedEdgeIds = (0, import_react22.useRef)(/* @__PURE__ */ new Set());
-  const connectionEndedOnPane = (0, import_react22.useRef)(false);
-  const selectionInProgress = (0, import_react22.useRef)(false);
-  const position = (0, import_react22.useRef)({ x: 0, y: 0 });
-  const autoPanStarted = (0, import_react22.useRef)(false);
+  const container = (0, import_react23.useRef)(null);
+  const containerBounds = (0, import_react23.useRef)();
+  const selectedNodeIds = (0, import_react23.useRef)(/* @__PURE__ */ new Set());
+  const selectedEdgeIds = (0, import_react23.useRef)(/* @__PURE__ */ new Set());
+  const connectionEndedOnPane = (0, import_react23.useRef)(false);
+  const selectionInProgress = (0, import_react23.useRef)(false);
+  const position = (0, import_react23.useRef)({ x: 0, y: 0 });
+  const autoPanStarted = (0, import_react23.useRef)(false);
   const onClick = (event) => {
     if (selectionInProgress.current || connectionEndedOnPane.current || store.getState().connection.inProgress) {
       selectionInProgress.current = false;
@@ -39193,7 +39386,7 @@ function Pane({ isSelecting, selectionKeyPressed, selectionMode = SelectionMode.
     autoPanId.current = 0;
     autoPanStarted.current = false;
   };
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     return () => cleanupAutoPan();
   }, []);
   const onPointerMove = (event) => {
@@ -39270,9 +39463,9 @@ function handleNodeClick({ id: id2, store, unselect = false, nodeRef }) {
 }
 function useDrag({ nodeRef, disabled = false, noDragClassName, handleSelector, nodeId, isSelectable, nodeClickDistance }) {
   const store = useStoreApi();
-  const [dragging, setDragging] = (0, import_react22.useState)(false);
-  const xyDrag = (0, import_react22.useRef)();
-  (0, import_react22.useEffect)(() => {
+  const [dragging, setDragging] = (0, import_react23.useState)(false);
+  const xyDrag = (0, import_react23.useRef)();
+  (0, import_react23.useEffect)(() => {
     if (disabled) {
       return;
     }
@@ -39297,7 +39490,7 @@ function useDrag({ nodeRef, disabled = false, noDragClassName, handleSelector, n
       xyDrag.current = void 0;
     };
   }, [disabled, store, nodeRef]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (disabled || !nodeRef.current || !xyDrag.current) {
       return;
     }
@@ -39315,7 +39508,7 @@ function useDrag({ nodeRef, disabled = false, noDragClassName, handleSelector, n
 var selectedAndDraggable = (nodesDraggable) => (n) => n.selected && (n.draggable || nodesDraggable && typeof n.draggable === "undefined");
 function useMoveSelectedNodes() {
   const store = useStoreApi();
-  const moveSelectedNodes = (0, import_react22.useCallback)((params) => {
+  const moveSelectedNodes = (0, import_react23.useCallback)((params) => {
     const { nodeExtent, snapToGrid, snapGrid, nodesDraggable, onError, updateNodePositions, nodeLookup, nodeOrigin } = store.getState();
     const nodeUpdates = /* @__PURE__ */ new Map();
     const isSelected = selectedAndDraggable(nodesDraggable);
@@ -39350,11 +39543,11 @@ function useMoveSelectedNodes() {
   }, []);
   return moveSelectedNodes;
 }
-var NodeIdContext = (0, import_react22.createContext)(null);
+var NodeIdContext = (0, import_react23.createContext)(null);
 var Provider = NodeIdContext.Provider;
 NodeIdContext.Consumer;
 var useNodeId = () => {
-  const nodeId = (0, import_react22.useContext)(NodeIdContext);
+  const nodeId = (0, import_react23.useContext)(NodeIdContext);
   return nodeId;
 };
 var selector$f = (s) => ({
@@ -39362,13 +39555,13 @@ var selector$f = (s) => ({
   noPanClassName: s.noPanClassName,
   rfId: s.rfId
 });
-var HandleConfigContext = (0, import_react22.createContext)(null);
+var HandleConfigContext = (0, import_react23.createContext)(null);
 function HandleConfigProvider({ children: children2 }) {
   const config = useStore(selector$f, shallow$1);
   return (0, import_jsx_runtime4.jsx)(HandleConfigContext.Provider, { value: config, children: children2 });
 }
 function useHandleConfig() {
-  const config = (0, import_react22.useContext)(HandleConfigContext);
+  const config = (0, import_react23.useContext)(HandleConfigContext);
   if (!config) {
     throw new Error("useHandleConfig must be used within a HandleConfigProvider");
   }
@@ -39522,7 +39715,7 @@ function HandleComponent({ type = "source", position = Position.Top, isValidConn
     }
   ]), onMouseDown: onPointerDown2, onTouchStart: onPointerDown2, onClick: connectOnClick ? onClick : void 0, ref, ...rest, children: children2 });
 }
-var Handle = (0, import_react22.memo)(fixedForwardRef(HandleComponent));
+var Handle = (0, import_react23.memo)(fixedForwardRef(HandleComponent));
 function InputNode({ data, isConnectable, sourcePosition = Position.Bottom }) {
   return (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [data?.label, (0, import_jsx_runtime4.jsx)(Handle, { type: "source", position: sourcePosition, isConnectable })] });
 }
@@ -39574,8 +39767,8 @@ function NodesSelection({ onSelectionContextMenu, noPanClassName, disableKeyboar
   const store = useStoreApi();
   const { width, height, transformString, userSelectionActive } = useStore(selector$e, shallow$1);
   const moveSelectedNodes = useMoveSelectedNodes();
-  const nodeRef = (0, import_react22.useRef)(null);
-  (0, import_react22.useEffect)(() => {
+  const nodeRef = (0, import_react23.useRef)(null);
+  (0, import_react23.useEffect)(() => {
     if (!disableKeyboardA11y) {
       nodeRef.current?.focus({
         preventScroll: true
@@ -39626,18 +39819,18 @@ function FlowRendererComponent({ children: children2, onPaneClick, onPaneMouseEn
   return (0, import_jsx_runtime4.jsx)(ZoomPane, { onPaneContextMenu, elementsSelectable, zoomOnScroll, zoomOnPinch, panOnScroll, panActivationKeyPressed, panOnScrollSpeed, panOnScrollMode, zoomOnDoubleClick, panOnDrag: !selectionKeyPressed && panOnDrag, defaultViewport: defaultViewport2, translateExtent, minZoom, maxZoom, zoomActivationKeyCode, preventScrolling, noWheelClassName, noPanClassName, onViewportChange, isControlledViewport, paneClickDistance, selectionOnDrag: _selectionOnDrag, children: (0, import_jsx_runtime4.jsxs)(Pane, { onSelectionStart, onSelectionEnd, onPaneClick, onPaneMouseEnter, onPaneMouseMove, onPaneMouseLeave, onPaneContextMenu, onPaneScroll, panOnDrag, autoPanOnSelection, isSelecting: !!isSelecting, selectionMode, selectionKeyPressed, paneClickDistance, selectionOnDrag: _selectionOnDrag, children: [children2, nodesSelectionActive && (0, import_jsx_runtime4.jsx)(NodesSelection, { onSelectionContextMenu, noPanClassName, disableKeyboardA11y })] }) });
 }
 FlowRendererComponent.displayName = "FlowRenderer";
-var FlowRenderer = (0, import_react22.memo)(FlowRendererComponent);
+var FlowRenderer = (0, import_react23.memo)(FlowRendererComponent);
 var selector$c = (onlyRenderVisible) => (s) => {
   return onlyRenderVisible ? getNodesInside(s.nodeLookup, { x: 0, y: 0, width: s.width, height: s.height }, s.transform, true).map((node) => node.id) : Array.from(s.nodeLookup.keys());
 };
 function useVisibleNodeIds(onlyRenderVisible) {
-  const nodeIds = useStore((0, import_react22.useCallback)(selector$c(onlyRenderVisible), [onlyRenderVisible]), shallow$1);
+  const nodeIds = useStore((0, import_react23.useCallback)(selector$c(onlyRenderVisible), [onlyRenderVisible]), shallow$1);
   return nodeIds;
 }
 var selector$b = (s) => s.updateNodeInternals;
 function useResizeObserver() {
   const updateNodeInternals2 = useStore(selector$b);
-  const [resizeObserver] = (0, import_react22.useState)(() => {
+  const [resizeObserver] = (0, import_react23.useState)(() => {
     if (typeof ResizeObserver === "undefined") {
       return null;
     }
@@ -39654,7 +39847,7 @@ function useResizeObserver() {
       updateNodeInternals2(updates);
     });
   });
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     return () => {
       resizeObserver?.disconnect();
     };
@@ -39663,13 +39856,13 @@ function useResizeObserver() {
 }
 function useNodeObserver({ node, nodeType, hasDimensions, resizeObserver }) {
   const store = useStoreApi();
-  const nodeRef = (0, import_react22.useRef)(null);
-  const observedNode = (0, import_react22.useRef)(null);
-  const prevSourcePosition = (0, import_react22.useRef)(node.sourcePosition);
-  const prevTargetPosition = (0, import_react22.useRef)(node.targetPosition);
-  const prevType = (0, import_react22.useRef)(nodeType);
+  const nodeRef = (0, import_react23.useRef)(null);
+  const observedNode = (0, import_react23.useRef)(null);
+  const prevSourcePosition = (0, import_react23.useRef)(node.sourcePosition);
+  const prevTargetPosition = (0, import_react23.useRef)(node.targetPosition);
+  const prevType = (0, import_react23.useRef)(nodeType);
   const isInitialized = hasDimensions && !!node.internals.handleBounds;
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (nodeRef.current && !node.hidden && (!isInitialized || observedNode.current !== nodeRef.current)) {
       if (observedNode.current) {
         resizeObserver?.unobserve(observedNode.current);
@@ -39678,7 +39871,7 @@ function useNodeObserver({ node, nodeType, hasDimensions, resizeObserver }) {
       observedNode.current = nodeRef.current;
     }
   }, [isInitialized, node.hidden]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     return () => {
       if (observedNode.current) {
         resizeObserver?.unobserve(observedNode.current);
@@ -39686,7 +39879,7 @@ function useNodeObserver({ node, nodeType, hasDimensions, resizeObserver }) {
       }
     };
   }, []);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (nodeRef.current) {
       const typeChanged = prevType.current !== nodeType;
       const sourcePosChanged = prevSourcePosition.current !== node.sourcePosition;
@@ -39826,7 +40019,7 @@ function NodeWrapper({ id: id2, onClick, onMouseEnter, onMouseMove, onMouseLeave
     ...inlineDimensions
   }, "data-id": id2, "data-testid": `rf__node-${id2}`, onMouseEnter: onMouseEnterHandler, onMouseMove: onMouseMoveHandler, onMouseLeave: onMouseLeaveHandler, onContextMenu: onContextMenuHandler, onClick: onSelectNodeHandler, onDoubleClick: onDoubleClickHandler, onKeyDown: isFocusable ? onKeyDown : void 0, tabIndex: isFocusable ? 0 : void 0, onFocus: isFocusable ? onFocus : void 0, role: node.ariaRole ?? (isFocusable ? "group" : void 0), "aria-roledescription": "node", "aria-describedby": disableKeyboardA11y ? void 0 : `${ARIA_NODE_DESC_KEY}-${rfId}`, "aria-label": node.ariaLabel, ...node.domAttributes, children: (0, import_jsx_runtime4.jsx)(Provider, { value: id2, children: (0, import_jsx_runtime4.jsx)(NodeComponent, { id: id2, data: node.data, type: nodeType, positionAbsoluteX: internals.positionAbsolute.x, positionAbsoluteY: internals.positionAbsolute.y, selected: node.selected ?? false, selectable: isSelectable, draggable: isDraggable, deletable: node.deletable ?? true, isConnectable, sourcePosition: node.sourcePosition, targetPosition: node.targetPosition, dragging, dragHandle: node.dragHandle, zIndex: internals.z, parentId: node.parentId, ...nodeDimensions }) }) });
 }
-var NodeWrapper$1 = (0, import_react22.memo)(NodeWrapper);
+var NodeWrapper$1 = (0, import_react23.memo)(NodeWrapper);
 var selector$a = (s) => ({
   nodesConnectable: s.nodesConnectable,
   nodesFocusable: s.nodesFocusable,
@@ -39869,9 +40062,9 @@ function NodeRendererComponent(props) {
   }) });
 }
 NodeRendererComponent.displayName = "NodeRenderer";
-var NodeRenderer = (0, import_react22.memo)(NodeRendererComponent);
+var NodeRenderer = (0, import_react23.memo)(NodeRendererComponent);
 function useVisibleEdgeIds(onlyRenderVisible) {
-  const edgeIds = useStore((0, import_react22.useCallback)((s) => {
+  const edgeIds = useStore((0, import_react23.useCallback)((s) => {
     if (!onlyRenderVisible) {
       return s.edges.map((edge) => edge.id);
     }
@@ -39915,7 +40108,7 @@ var MarkerSymbols = {
 };
 function useMarkerSymbol(type) {
   const store = useStoreApi();
-  const symbol = (0, import_react22.useMemo)(() => {
+  const symbol = (0, import_react23.useMemo)(() => {
     const symbolExists = Object.prototype.hasOwnProperty.call(MarkerSymbols, type);
     if (!symbolExists) {
       store.getState().onError?.("009", errorMessages["error009"](type));
@@ -39935,7 +40128,7 @@ var Marker = ({ id: id2, type, color: color2, width = 12.5, height = 12.5, marke
 var MarkerDefinitions = ({ defaultColor, rfId }) => {
   const edges = useStore((s) => s.edges);
   const defaultEdgeOptions = useStore((s) => s.defaultEdgeOptions);
-  const markers = (0, import_react22.useMemo)(() => {
+  const markers = (0, import_react23.useMemo)(() => {
     const markers2 = createMarkerIds(edges, {
       id: rfId,
       defaultColor,
@@ -39950,12 +40143,12 @@ var MarkerDefinitions = ({ defaultColor, rfId }) => {
   return (0, import_jsx_runtime4.jsx)("svg", { className: "react-flow__marker", "aria-hidden": "true", children: (0, import_jsx_runtime4.jsx)("defs", { children: markers.map((marker) => (0, import_jsx_runtime4.jsx)(Marker, { id: marker.id, type: marker.type, color: marker.color, width: marker.width, height: marker.height, markerUnits: marker.markerUnits, strokeWidth: marker.strokeWidth, orient: marker.orient }, marker.id)) }) });
 };
 MarkerDefinitions.displayName = "MarkerDefinitions";
-var MarkerDefinitions$1 = (0, import_react22.memo)(MarkerDefinitions);
+var MarkerDefinitions$1 = (0, import_react23.memo)(MarkerDefinitions);
 function EdgeTextComponent({ x: x2, y: y2, label: label2, labelStyle, labelShowBg = true, labelBgStyle, labelBgPadding = [2, 4], labelBgBorderRadius = 2, children: children2, className, ...rest }) {
-  const [edgeTextBbox, setEdgeTextBbox] = (0, import_react22.useState)({ x: 1, y: 0, width: 0, height: 0 });
+  const [edgeTextBbox, setEdgeTextBbox] = (0, import_react23.useState)({ x: 1, y: 0, width: 0, height: 0 });
   const edgeTextClasses = cc(["react-flow__edge-textwrapper", className]);
-  const edgeTextRef = (0, import_react22.useRef)(null);
-  (0, import_react22.useEffect)(() => {
+  const edgeTextRef = (0, import_react23.useRef)(null);
+  (0, import_react23.useEffect)(() => {
     if (edgeTextRef.current) {
       const textBbox = edgeTextRef.current.getBBox();
       setEdgeTextBbox({
@@ -39972,7 +40165,7 @@ function EdgeTextComponent({ x: x2, y: y2, label: label2, labelStyle, labelShowB
   return (0, import_jsx_runtime4.jsxs)("g", { transform: `translate(${x2 - edgeTextBbox.width / 2} ${y2 - edgeTextBbox.height / 2})`, className: edgeTextClasses, visibility: edgeTextBbox.width ? "visible" : "hidden", ...rest, children: [labelShowBg && (0, import_jsx_runtime4.jsx)("rect", { width: edgeTextBbox.width + 2 * labelBgPadding[0], x: -labelBgPadding[0], y: -labelBgPadding[1], height: edgeTextBbox.height + 2 * labelBgPadding[1], className: "react-flow__edge-textbg", style: labelBgStyle, rx: labelBgBorderRadius, ry: labelBgBorderRadius }), (0, import_jsx_runtime4.jsx)("text", { className: "react-flow__edge-text", y: edgeTextBbox.height / 2, dy: "0.3em", ref: edgeTextRef, style: labelStyle, children: label2 }), children2] });
 }
 EdgeTextComponent.displayName = "EdgeText";
-var EdgeText = (0, import_react22.memo)(EdgeTextComponent);
+var EdgeText = (0, import_react23.memo)(EdgeTextComponent);
 function BaseEdge({ path, labelX, labelY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, interactionWidth = 20, ...props }) {
   return (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [(0, import_jsx_runtime4.jsx)("path", { ...props, d: path, fill: "none", className: cc(["react-flow__edge-path", props.className]) }), interactionWidth ? (0, import_jsx_runtime4.jsx)("path", { d: path, fill: "none", strokeOpacity: 0, strokeWidth: interactionWidth, className: "react-flow__edge-interaction" }) : null, label2 && isNumeric(labelX) && isNumeric(labelY) ? (0, import_jsx_runtime4.jsx)(EdgeText, { x: labelX, y: labelY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius }) : null] });
 }
@@ -40016,7 +40209,7 @@ function getSimpleBezierPath({ sourceX, sourceY, sourcePosition = Position.Botto
   ];
 }
 function createSimpleBezierEdge(params) {
-  return (0, import_react22.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, interactionWidth }) => {
+  return (0, import_react23.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, interactionWidth }) => {
     const [path, labelX, labelY] = getSimpleBezierPath({
       sourceX,
       sourceY,
@@ -40034,7 +40227,7 @@ var SimpleBezierEdgeInternal = createSimpleBezierEdge({ isInternal: true });
 SimpleBezierEdge.displayName = "SimpleBezierEdge";
 SimpleBezierEdgeInternal.displayName = "SimpleBezierEdgeInternal";
 function createSmoothStepEdge(params) {
-  return (0, import_react22.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, sourcePosition = Position.Bottom, targetPosition = Position.Top, markerEnd, markerStart, pathOptions, interactionWidth }) => {
+  return (0, import_react23.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, sourcePosition = Position.Bottom, targetPosition = Position.Top, markerEnd, markerStart, pathOptions, interactionWidth }) => {
     const [path, labelX, labelY] = getSmoothStepPath({
       sourceX,
       sourceY,
@@ -40055,9 +40248,9 @@ var SmoothStepEdgeInternal = createSmoothStepEdge({ isInternal: true });
 SmoothStepEdge.displayName = "SmoothStepEdge";
 SmoothStepEdgeInternal.displayName = "SmoothStepEdgeInternal";
 function createStepEdge(params) {
-  return (0, import_react22.memo)(({ id: id2, ...props }) => {
+  return (0, import_react23.memo)(({ id: id2, ...props }) => {
     const _id = params.isInternal ? void 0 : id2;
-    return (0, import_jsx_runtime4.jsx)(SmoothStepEdge, { ...props, id: _id, pathOptions: (0, import_react22.useMemo)(() => ({ borderRadius: 0, offset: props.pathOptions?.offset }), [props.pathOptions?.offset]) });
+    return (0, import_jsx_runtime4.jsx)(SmoothStepEdge, { ...props, id: _id, pathOptions: (0, import_react23.useMemo)(() => ({ borderRadius: 0, offset: props.pathOptions?.offset }), [props.pathOptions?.offset]) });
   });
 }
 var StepEdge = createStepEdge({ isInternal: false });
@@ -40065,7 +40258,7 @@ var StepEdgeInternal = createStepEdge({ isInternal: true });
 StepEdge.displayName = "StepEdge";
 StepEdgeInternal.displayName = "StepEdgeInternal";
 function createStraightEdge(params) {
-  return (0, import_react22.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, interactionWidth }) => {
+  return (0, import_react23.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, interactionWidth }) => {
     const [path, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
     const _id = params.isInternal ? void 0 : id2;
     return (0, import_jsx_runtime4.jsx)(BaseEdge, { id: _id, path, labelX, labelY, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, interactionWidth });
@@ -40076,7 +40269,7 @@ var StraightEdgeInternal = createStraightEdge({ isInternal: true });
 StraightEdge.displayName = "StraightEdge";
 StraightEdgeInternal.displayName = "StraightEdgeInternal";
 function createBezierEdge(params) {
-  return (0, import_react22.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, sourcePosition = Position.Bottom, targetPosition = Position.Top, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, pathOptions, interactionWidth }) => {
+  return (0, import_react23.memo)(({ id: id2, sourceX, sourceY, targetX, targetY, sourcePosition = Position.Bottom, targetPosition = Position.Top, label: label2, labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius, style: style3, markerEnd, markerStart, pathOptions, interactionWidth }) => {
     const [path, labelX, labelY] = getBezierPath({
       sourceX,
       sourceY,
@@ -40192,11 +40385,11 @@ function EdgeWrapper({ id: id2, edgesFocusable, edgesReconnectable, elementsSele
   const isFocusable = !!(edge.focusable || edgesFocusable && typeof edge.focusable === "undefined");
   const isReconnectable = typeof onReconnect !== "undefined" && (edge.reconnectable || edgesReconnectable && typeof edge.reconnectable === "undefined");
   const isSelectable = !!(edge.selectable || elementsSelectable && typeof edge.selectable === "undefined");
-  const edgeRef = (0, import_react22.useRef)(null);
-  const [updateHover, setUpdateHover] = (0, import_react22.useState)(false);
-  const [reconnecting, setReconnecting] = (0, import_react22.useState)(false);
+  const edgeRef = (0, import_react23.useRef)(null);
+  const [updateHover, setUpdateHover] = (0, import_react23.useState)(false);
+  const [reconnecting, setReconnecting] = (0, import_react23.useState)(false);
   const store = useStoreApi();
-  const { zIndex = edge.zIndex, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition } = useStore((0, import_react22.useCallback)((store2) => {
+  const { zIndex = edge.zIndex, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition } = useStore((0, import_react23.useCallback)((store2) => {
     const sourceNode = store2.nodeLookup.get(edge.source);
     const targetNode = store2.nodeLookup.get(edge.target);
     if (!sourceNode || !targetNode) {
@@ -40224,8 +40417,8 @@ function EdgeWrapper({ id: id2, edgesFocusable, edgesReconnectable, elementsSele
       zIndex: zIndex2
     };
   }, [edge.source, edge.target, edge.sourceHandle, edge.targetHandle, edge.selected, edge.zIndex, onError]), shallow$1);
-  const markerStartUrl = (0, import_react22.useMemo)(() => edge.markerStart ? `url('#${getMarkerId(edge.markerStart, rfId)}')` : void 0, [edge.markerStart, rfId]);
-  const markerEndUrl = (0, import_react22.useMemo)(() => edge.markerEnd ? `url('#${getMarkerId(edge.markerEnd, rfId)}')` : void 0, [edge.markerEnd, rfId]);
+  const markerStartUrl = (0, import_react23.useMemo)(() => edge.markerStart ? `url('#${getMarkerId(edge.markerStart, rfId)}')` : void 0, [edge.markerStart, rfId]);
+  const markerEndUrl = (0, import_react23.useMemo)(() => edge.markerEnd ? `url('#${getMarkerId(edge.markerEnd, rfId)}')` : void 0, [edge.markerEnd, rfId]);
   if (edge.hidden || sourceX === null || sourceY === null || targetX === null || targetY === null) {
     return null;
   }
@@ -40285,7 +40478,7 @@ function EdgeWrapper({ id: id2, edgesFocusable, edgesReconnectable, elementsSele
     }
   ]), onClick: onEdgeClick, onDoubleClick: onEdgeDoubleClick, onContextMenu: onEdgeContextMenu, onMouseEnter: onEdgeMouseEnter, onMouseMove: onEdgeMouseMove, onMouseLeave: onEdgeMouseLeave, onKeyDown: isFocusable ? onKeyDown : void 0, tabIndex: isFocusable ? 0 : void 0, role: edge.ariaRole ?? (isFocusable ? "group" : "img"), "aria-roledescription": "edge", "data-id": id2, "data-testid": `rf__edge-${id2}`, "aria-label": edge.ariaLabel === null ? void 0 : edge.ariaLabel || `Edge from ${edge.source} to ${edge.target}`, "aria-describedby": isFocusable ? `${ARIA_EDGE_DESC_KEY}-${rfId}` : void 0, ref: edgeRef, ...edge.domAttributes, children: [!reconnecting && (0, import_jsx_runtime4.jsx)(EdgeComponent, { id: id2, source: edge.source, target: edge.target, type: edge.type, selected: edge.selected, animated: edge.animated, selectable: isSelectable, deletable: edge.deletable ?? true, label: edge.label, labelStyle: edge.labelStyle, labelShowBg: edge.labelShowBg, labelBgStyle: edge.labelBgStyle, labelBgPadding: edge.labelBgPadding, labelBgBorderRadius: edge.labelBgBorderRadius, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data: edge.data, style: edge.style, sourceHandleId: edge.sourceHandle, targetHandleId: edge.targetHandle, markerStart: markerStartUrl, markerEnd: markerEndUrl, pathOptions: "pathOptions" in edge ? edge.pathOptions : void 0, interactionWidth: edge.interactionWidth }), isReconnectable && (0, import_jsx_runtime4.jsx)(EdgeUpdateAnchors, { edge, isReconnectable, reconnectRadius, onReconnect, onReconnectStart, onReconnectEnd, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, setUpdateHover, setReconnecting })] }) });
 }
-var EdgeWrapper$1 = (0, import_react22.memo)(EdgeWrapper);
+var EdgeWrapper$1 = (0, import_react23.memo)(EdgeWrapper);
 var selector$9 = (s) => ({
   edgesFocusable: s.edgesFocusable,
   edgesReconnectable: s.edgesReconnectable,
@@ -40301,12 +40494,12 @@ function EdgeRendererComponent({ defaultMarkerColor, onlyRenderVisibleElements, 
   })] });
 }
 EdgeRendererComponent.displayName = "EdgeRenderer";
-var EdgeRenderer = (0, import_react22.memo)(EdgeRendererComponent);
+var EdgeRenderer = (0, import_react23.memo)(EdgeRendererComponent);
 var toTransformString = (transform2) => `translate(${transform2[0]}px,${transform2[1]}px) scale(${transform2[2]})`;
 function Viewport({ children: children2 }) {
   const store = useStoreApi();
-  const viewportRef = (0, import_react22.useRef)(null);
-  const [initialTransform] = (0, import_react22.useState)(() => store.getState().transform);
+  const viewportRef = (0, import_react23.useRef)(null);
+  const [initialTransform] = (0, import_react23.useState)(() => store.getState().transform);
   useIsomorphicLayoutEffect2(() => {
     let prevTransform = null;
     const applyTransform = () => {
@@ -40326,8 +40519,8 @@ function Viewport({ children: children2 }) {
 }
 function useOnInitHandler(onInit) {
   const rfInstance = useReactFlow();
-  const isInitialized = (0, import_react22.useRef)(false);
-  (0, import_react22.useEffect)(() => {
+  const isInitialized = (0, import_react23.useRef)(false);
+  (0, import_react23.useEffect)(() => {
     if (!isInitialized.current && rfInstance.viewportInitialized && onInit) {
       setTimeout(() => onInit(rfInstance), 1);
       isInitialized.current = true;
@@ -40338,7 +40531,7 @@ var selector$8 = (state) => state.panZoom?.syncViewport;
 function useViewportSync(viewport) {
   const syncViewport = useStore(selector$8);
   const store = useStoreApi();
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (viewport) {
       syncViewport?.(viewport);
       store.setState({ transform: [viewport.x, viewport.y, viewport.zoom] });
@@ -40419,9 +40612,9 @@ var ConnectionLine = ({ style: style3, type = ConnectionLineType.Bezier, CustomC
 ConnectionLine.displayName = "ConnectionLine";
 var emptyTypes = {};
 function useNodeOrEdgeTypesWarning(nodeOrEdgeTypes = emptyTypes) {
-  const typesRef = (0, import_react22.useRef)(nodeOrEdgeTypes);
+  const typesRef = (0, import_react23.useRef)(nodeOrEdgeTypes);
   const store = useStoreApi();
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (true) {
       const usedKeys = /* @__PURE__ */ new Set([...Object.keys(typesRef.current), ...Object.keys(nodeOrEdgeTypes)]);
       for (const key of usedKeys) {
@@ -40436,8 +40629,8 @@ function useNodeOrEdgeTypesWarning(nodeOrEdgeTypes = emptyTypes) {
 }
 function useStylesLoadedWarning() {
   const store = useStoreApi();
-  const checked = (0, import_react22.useRef)(false);
-  (0, import_react22.useEffect)(() => {
+  const checked = (0, import_react23.useRef)(false);
+  (0, import_react23.useEffect)(() => {
     if (true) {
       if (!checked.current) {
         const pane = document.querySelector(".react-flow__pane");
@@ -40458,7 +40651,7 @@ function GraphViewComponent({ nodeTypes, edgeTypes, onInit, onNodeClick, onEdgeC
   return (0, import_jsx_runtime4.jsx)(FlowRenderer, { onPaneClick, onPaneMouseEnter, onPaneMouseMove, onPaneMouseLeave, onPaneContextMenu, onPaneScroll, paneClickDistance, deleteKeyCode, selectionKeyCode, selectionOnDrag, selectionMode, onSelectionStart, onSelectionEnd, multiSelectionKeyCode, panActivationKeyCode, zoomActivationKeyCode, elementsSelectable, zoomOnScroll, zoomOnPinch, zoomOnDoubleClick, panOnScroll, panOnScrollSpeed, panOnScrollMode, panOnDrag, autoPanOnSelection, defaultViewport: defaultViewport2, translateExtent, minZoom, maxZoom, onSelectionContextMenu, preventScrolling, noDragClassName, noWheelClassName, noPanClassName, disableKeyboardA11y, onViewportChange, isControlledViewport: !!viewport, children: (0, import_jsx_runtime4.jsxs)(Viewport, { children: [(0, import_jsx_runtime4.jsx)(EdgeRenderer, { edgeTypes, onEdgeClick, onEdgeDoubleClick, onReconnect, onReconnectStart, onReconnectEnd, onlyRenderVisibleElements, onEdgeContextMenu, onEdgeMouseEnter, onEdgeMouseMove, onEdgeMouseLeave, reconnectRadius, defaultMarkerColor, noPanClassName, disableKeyboardA11y, rfId }), (0, import_jsx_runtime4.jsx)(ConnectionLineWrapper, { style: connectionLineStyle, type: connectionLineType, component: connectionLineComponent, containerStyle: connectionLineContainerStyle }), (0, import_jsx_runtime4.jsx)("div", { className: "react-flow__edgelabel-renderer" }), (0, import_jsx_runtime4.jsx)(NodeRenderer, { nodeTypes, onNodeClick, onNodeDoubleClick, onNodeMouseEnter, onNodeMouseMove, onNodeMouseLeave, onNodeContextMenu, nodeClickDistance, onlyRenderVisibleElements, noPanClassName, noDragClassName, disableKeyboardA11y, nodeExtent, rfId, nodesDraggable }), (0, import_jsx_runtime4.jsx)("div", { className: "react-flow__viewport-portal" })] }) });
 }
 GraphViewComponent.displayName = "GraphView";
-var GraphView = (0, import_react22.memo)(GraphViewComponent);
+var GraphView = (0, import_react23.memo)(GraphViewComponent);
 var devWarn = createDevWarn("React Flow", "https://reactflow.dev/");
 var getInitialState = ({ nodes, edges, defaultNodes, defaultEdges, width, height, fitView, fitViewOptions, minZoom = 0.5, maxZoom = 2, nodeOrigin, nodeExtent, zIndexMode = "basic" } = {}) => {
   const nodeLookup = /* @__PURE__ */ new Map();
@@ -40850,7 +41043,7 @@ var createStore2 = ({ nodes, edges, defaultNodes, defaultEdges, width, height, f
   };
 }, Object.is);
 function ReactFlowProvider({ initialNodes: nodes, initialEdges: edges, defaultNodes, defaultEdges, initialWidth: width, initialHeight: height, initialMinZoom: minZoom, initialMaxZoom: maxZoom, initialFitViewOptions: fitViewOptions, fitView, nodeOrigin, nodeExtent, zIndexMode, children: children2 }) {
-  const [store] = (0, import_react22.useState)(() => createStore2({
+  const [store] = (0, import_react23.useState)(() => createStore2({
     nodes,
     edges,
     defaultNodes,
@@ -40868,7 +41061,7 @@ function ReactFlowProvider({ initialNodes: nodes, initialEdges: edges, defaultNo
   return (0, import_jsx_runtime4.jsx)(Provider$1, { value: store, children: (0, import_jsx_runtime4.jsx)(BatchProvider, { children: (0, import_jsx_runtime4.jsx)(HandleConfigProvider, { children: children2 }) }) });
 }
 function Wrapper({ children: children2, nodes, edges, defaultNodes, defaultEdges, width, height, fitView, fitViewOptions, minZoom, maxZoom, nodeOrigin, nodeExtent, zIndexMode }) {
-  const isWrapped = (0, import_react22.useContext)(StoreContext);
+  const isWrapped = (0, import_react23.useContext)(StoreContext);
   if (isWrapped) {
     return (0, import_jsx_runtime4.jsx)(import_jsx_runtime4.Fragment, { children: children2 });
   }
@@ -40884,7 +41077,7 @@ var wrapperStyle = {
 function ReactFlow({ nodes, edges, defaultNodes, defaultEdges, className, nodeTypes, edgeTypes, onNodeClick, onEdgeClick, onInit, onMove, onMoveStart, onMoveEnd, onConnect, onConnectStart, onConnectEnd, onClickConnectStart, onClickConnectEnd, onNodeMouseEnter, onNodeMouseMove, onNodeMouseLeave, onNodeContextMenu, onNodeDoubleClick, onNodeDragStart, onNodeDrag, onNodeDragStop, onNodesDelete, onEdgesDelete, onDelete, onSelectionChange, onSelectionDragStart, onSelectionDrag, onSelectionDragStop, onSelectionContextMenu, onSelectionStart, onSelectionEnd, onBeforeDelete, connectionMode, connectionLineType = ConnectionLineType.Bezier, connectionLineStyle, connectionLineComponent, connectionLineContainerStyle, deleteKeyCode = "Backspace", selectionKeyCode = "Shift", selectionOnDrag = false, selectionMode = SelectionMode.Full, panActivationKeyCode = "Space", multiSelectionKeyCode = isMacOs() ? "Meta" : "Control", zoomActivationKeyCode = isMacOs() ? "Meta" : "Control", snapToGrid, snapGrid, onlyRenderVisibleElements = false, selectNodesOnDrag, nodesDraggable, autoPanOnNodeFocus, nodesConnectable, nodesFocusable, nodeOrigin = defaultNodeOrigin, edgesFocusable, edgesReconnectable, elementsSelectable = true, defaultViewport: defaultViewport$1 = defaultViewport, minZoom = 0.5, maxZoom = 2, translateExtent = infiniteExtent, preventScrolling = true, nodeExtent, defaultMarkerColor = "#b1b1b7", zoomOnScroll = true, zoomOnPinch = true, panOnScroll = false, panOnScrollSpeed = 0.5, panOnScrollMode = PanOnScrollMode.Free, zoomOnDoubleClick = true, panOnDrag = true, onPaneClick, onPaneMouseEnter, onPaneMouseMove, onPaneMouseLeave, onPaneScroll, onPaneContextMenu, paneClickDistance = 1, nodeClickDistance = 0, children: children2, onReconnect, onReconnectStart, onReconnectEnd, onEdgeContextMenu, onEdgeDoubleClick, onEdgeMouseEnter, onEdgeMouseMove, onEdgeMouseLeave, reconnectRadius = 10, onNodesChange, onEdgesChange, noDragClassName = "nodrag", noWheelClassName = "nowheel", noPanClassName = "nopan", fitView, fitViewOptions, connectOnClick, attributionPosition, proOptions, defaultEdgeOptions, elevateNodesOnSelect = true, elevateEdgesOnSelect = false, disableKeyboardA11y = false, autoPanOnConnect, autoPanOnNodeDrag, autoPanOnSelection = true, autoPanSpeed, connectionRadius, isValidConnection, onError, style: style3, id: id2, nodeDragThreshold, connectionDragThreshold, viewport, onViewportChange, width, height, colorMode = "light", debug, onScroll, ariaLabelConfig, zIndexMode = "basic", ...rest }, ref) {
   const rfId = id2 || "1";
   const colorModeClassName = useColorModeClass(colorMode);
-  const wrapperOnScroll = (0, import_react22.useCallback)((e) => {
+  const wrapperOnScroll = (0, import_react23.useCallback)((e) => {
     e.currentTarget.scrollTo({ top: 0, left: 0, behavior: "instant" });
     onScroll?.(e);
   }, [onScroll]);
@@ -40925,7 +41118,7 @@ function BackgroundComponent({
   className,
   patternClassName
 }) {
-  const ref = (0, import_react22.useRef)(null);
+  const ref = (0, import_react23.useRef)(null);
   const { transform: transform2, patternId } = useStore(selector$3, shallow$1);
   const patternSize = size || defaultSize[variant];
   const isDots = variant === BackgroundVariant.Dots;
@@ -40948,7 +41141,7 @@ function BackgroundComponent({
   }, ref, "data-testid": "rf__background", children: [(0, import_jsx_runtime4.jsx)("pattern", { id: _patternId, x: transform2[0] % scaledGap[0], y: transform2[1] % scaledGap[1], width: scaledGap[0], height: scaledGap[1], patternUnits: "userSpaceOnUse", patternTransform: `translate(-${scaledOffset[0]},-${scaledOffset[1]})`, children: isDots ? (0, import_jsx_runtime4.jsx)(DotPattern, { radius: scaledSize / 2, className: patternClassName }) : (0, import_jsx_runtime4.jsx)(LinePattern, { dimensions: patternDimensions, lineWidth, variant, className: patternClassName }) }), (0, import_jsx_runtime4.jsx)("rect", { x: "0", y: "0", width: "100%", height: "100%", fill: `url(#${_patternId})` })] });
 }
 BackgroundComponent.displayName = "Background";
-var Background = (0, import_react22.memo)(BackgroundComponent);
+var Background = (0, import_react23.memo)(BackgroundComponent);
 function PlusIcon() {
   return (0, import_jsx_runtime4.jsx)("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 32 32", children: (0, import_jsx_runtime4.jsx)("path", { d: "M32 18.133H18.133V32h-4.266V18.133H0v-4.266h13.867V0h4.266v13.867H32z" }) });
 }
@@ -41001,7 +41194,7 @@ function ControlsComponent({ style: style3, showZoom = true, showFitView = true,
   return (0, import_jsx_runtime4.jsxs)(Panel, { className: cc(["react-flow__controls", orientationClass, className]), position, style: style3, "data-testid": "rf__controls", "aria-label": ariaLabel ?? ariaLabelConfig["controls.ariaLabel"], children: [showZoom && (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [(0, import_jsx_runtime4.jsx)(ControlButton, { onClick: onZoomInHandler, className: "react-flow__controls-zoomin", title: ariaLabelConfig["controls.zoomIn.ariaLabel"], "aria-label": ariaLabelConfig["controls.zoomIn.ariaLabel"], disabled: maxZoomReached, children: (0, import_jsx_runtime4.jsx)(PlusIcon, {}) }), (0, import_jsx_runtime4.jsx)(ControlButton, { onClick: onZoomOutHandler, className: "react-flow__controls-zoomout", title: ariaLabelConfig["controls.zoomOut.ariaLabel"], "aria-label": ariaLabelConfig["controls.zoomOut.ariaLabel"], disabled: minZoomReached, children: (0, import_jsx_runtime4.jsx)(MinusIcon, {}) })] }), showFitView && (0, import_jsx_runtime4.jsx)(ControlButton, { className: "react-flow__controls-fitview", onClick: onFitViewHandler, title: ariaLabelConfig["controls.fitView.ariaLabel"], "aria-label": ariaLabelConfig["controls.fitView.ariaLabel"], children: (0, import_jsx_runtime4.jsx)(FitViewIcon, {}) }), showInteractive && (0, import_jsx_runtime4.jsx)(ControlButton, { className: "react-flow__controls-interactive", onClick: onToggleInteractivity, title: ariaLabelConfig["controls.interactive.ariaLabel"], "aria-label": ariaLabelConfig["controls.interactive.ariaLabel"], children: isInteractive ? (0, import_jsx_runtime4.jsx)(UnlockIcon, {}) : (0, import_jsx_runtime4.jsx)(LockIcon, {}) }), children2] });
 }
 ControlsComponent.displayName = "Controls";
-var Controls = (0, import_react22.memo)(ControlsComponent);
+var Controls = (0, import_react23.memo)(ControlsComponent);
 function MiniMapNodeComponent({ id: id2, x: x2, y: y2, width, height, style: style3, color: color2, strokeColor, strokeWidth, className, borderRadius, shapeRendering, selected: selected2, onClick }) {
   const { background, backgroundColor } = style3 || {};
   const fill = color2 || background || backgroundColor;
@@ -41011,7 +41204,7 @@ function MiniMapNodeComponent({ id: id2, x: x2, y: y2, width, height, style: sty
     strokeWidth
   }, shapeRendering, onClick: onClick ? (event) => onClick(event, id2) : void 0 });
 }
-var MiniMapNode = (0, import_react22.memo)(MiniMapNodeComponent);
+var MiniMapNode = (0, import_react23.memo)(MiniMapNodeComponent);
 var selectorNodeIds = (s) => s.nodes.map((node) => node.id);
 var getAttrFunction = (func) => func instanceof Function ? func : () => func;
 function MiniMapNodes({
@@ -41065,8 +41258,8 @@ function NodeComponentWrapperInner({ id: id2, nodeColorFunc, nodeStrokeColorFunc
   }
   return (0, import_jsx_runtime4.jsx)(NodeComponent, { x: x2, y: y2, width, height, style: node.style, selected: !!node.selected, className: nodeClassNameFunc(node), color: nodeColorFunc(node), borderRadius: nodeBorderRadius, strokeColor: nodeStrokeColorFunc(node), strokeWidth: nodeStrokeWidth, shapeRendering, onClick, id: node.id });
 }
-var NodeComponentWrapper = (0, import_react22.memo)(NodeComponentWrapperInner);
-var MiniMapNodes$1 = (0, import_react22.memo)(MiniMapNodes);
+var NodeComponentWrapper = (0, import_react23.memo)(NodeComponentWrapperInner);
+var MiniMapNodes$1 = (0, import_react23.memo)(MiniMapNodes);
 var defaultWidth = 200;
 var defaultHeight = 150;
 var filterHidden = (node) => !node.hidden;
@@ -41126,7 +41319,7 @@ function MiniMapComponent({
   offsetScale = 5
 }) {
   const store = useStoreApi();
-  const svg = (0, import_react22.useRef)(null);
+  const svg = (0, import_react23.useRef)(null);
   const { boundingRect, panZoom, viewBB, rfId, translateExtent, flowWidth, flowHeight, ariaLabelConfig } = useStore(selector$1, areEqual);
   const elementWidth = style3?.width ?? defaultWidth;
   const elementHeight = style3?.height ?? defaultHeight;
@@ -41141,10 +41334,10 @@ function MiniMapComponent({
   const width = viewWidth + offset * 2;
   const height = viewHeight + offset * 2;
   const labelledBy = `${ARIA_LABEL_KEY}-${rfId}`;
-  const viewScaleRef = (0, import_react22.useRef)(0);
-  const minimapInstance = (0, import_react22.useRef)();
+  const viewScaleRef = (0, import_react23.useRef)(0);
+  const minimapInstance = (0, import_react23.useRef)();
   viewScaleRef.current = viewScale;
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     const currentPanZoom = store.getState().panZoom;
     if (svg.current && currentPanZoom) {
       minimapInstance.current = XYMinimap({
@@ -41158,7 +41351,7 @@ function MiniMapComponent({
       };
     }
   }, [panZoom]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     minimapInstance.current?.update({
       translateExtent,
       width: flowWidth,
@@ -41173,7 +41366,7 @@ function MiniMapComponent({
     const [x3, y3] = minimapInstance.current?.pointer(event) || [0, 0];
     onClick(event, { x: x3, y: y3 });
   } : void 0;
-  const nodeClickHandler = (0, import_react22.useCallback)((event, nodeId) => {
+  const nodeClickHandler = (0, import_react23.useCallback)((event, nodeId) => {
     const node = store.getState().nodeLookup.get(nodeId).internals.userNode;
     onNodeClick?.(event, node);
   }, [onNodeClick]);
@@ -41192,7 +41385,7 @@ function MiniMapComponent({
         M${viewBB.x},${viewBB.y}h${viewBB.width}v${viewBB.height}h${-viewBB.width}z`, fillRule: "evenodd", pointerEvents: "none" })] }) });
 }
 MiniMapComponent.displayName = "MiniMap";
-var MiniMap = (0, import_react22.memo)(MiniMapComponent);
+var MiniMap = (0, import_react23.memo)(MiniMapComponent);
 var scaleSelector = (calculateScale) => (store) => calculateScale ? `${Math.max(1 / store.transform[2], 1)}` : void 0;
 var defaultPositions = {
   [ResizeControlVariant.Line]: "right",
@@ -41202,12 +41395,12 @@ function ResizeControl({ nodeId, position, variant = ResizeControlVariant.Handle
   const contextNodeId = useNodeId();
   const id2 = typeof nodeId === "string" ? nodeId : contextNodeId;
   const store = useStoreApi();
-  const resizeControlRef = (0, import_react22.useRef)(null);
+  const resizeControlRef = (0, import_react23.useRef)(null);
   const isHandleControl = variant === ResizeControlVariant.Handle;
-  const scale = useStore((0, import_react22.useCallback)(scaleSelector(isHandleControl && autoScale), [isHandleControl, autoScale]), shallow$1);
-  const resizer = (0, import_react22.useRef)(null);
+  const scale = useStore((0, import_react23.useCallback)(scaleSelector(isHandleControl && autoScale), [isHandleControl, autoScale]), shallow$1);
+  const resizer = (0, import_react23.useRef)(null);
   const controlPosition = position ?? defaultPositions[variant];
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (!resizeControlRef.current || !id2) {
       return;
     }
@@ -41334,7 +41527,7 @@ function ResizeControl({ nodeId, position, variant = ResizeControlVariant.Handle
     ...color2 && { [isHandleControl ? "backgroundColor" : "borderColor"]: color2 }
   }, children: children2 });
 }
-var NodeResizeControl = (0, import_react22.memo)(ResizeControl);
+var NodeResizeControl = (0, import_react23.memo)(ResizeControl);
 function NodeResizer({ nodeId, isVisible = true, handleClassName, handleStyle, lineClassName, lineStyle, color: color2, minWidth = 10, minHeight = 10, maxWidth = Number.MAX_VALUE, maxHeight = Number.MAX_VALUE, keepAspectRatio = false, autoScale = true, shouldResize, onResizeStart, onResize, onResizeEnd }) {
   if (!isVisible) {
     return null;
@@ -41369,7 +41562,7 @@ var storeSelector = (state) => ({
 });
 function NodeToolbar({ nodeId, children: children2, className, style: style3, isVisible, position = Position.Top, offset = 10, align = "center", ...rest }) {
   const contextNodeId = useNodeId();
-  const nodesSelector = (0, import_react22.useCallback)((state) => {
+  const nodesSelector = (0, import_react23.useCallback)((state) => {
     const nodeIds = Array.isArray(nodeId) ? nodeId : [nodeId || contextNodeId || ""];
     const internalNodes = nodeIds.reduce((res, id2) => {
       const node = state.nodeLookup.get(id2);
@@ -41399,63 +41592,63 @@ function NodeToolbar({ nodeId, children: children2, className, style: style3, is
 }
 
 // src/canvas-chrome.jsx
-var import_react23 = __toESM(require("react"), 1);
+var import_react24 = __toESM(require("react"), 1);
 var ICONS = {
-  select: /* @__PURE__ */ import_react23.default.createElement("path", { d: "m5 3 13 10-7 1-3 7L5 3Z" }),
-  hand: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M8 12V5a1.5 1.5 0 0 1 3 0v6-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v5c0 5-3 8-7 8-3 0-4-1-6-4l-3-5a1.6 1.6 0 0 1 2.6-1.8L8 13" })),
-  text: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M5 5h14M12 5v15M8 20h8M5 5v3M19 5v3" })),
-  note: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M5 3h14a2 2 0 0 1 2 2v10l-6 6H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M15 21v-6h6M7 8h10M7 12h7" })),
-  rectangle: /* @__PURE__ */ import_react23.default.createElement("rect", { x: "4", y: "5", width: "16", height: "14", rx: "1.5" }),
-  ellipse: /* @__PURE__ */ import_react23.default.createElement("ellipse", { cx: "12", cy: "12", rx: "9", ry: "7" }),
-  material: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M4 7h6l2 2h8v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7Z" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M4 7V5a1 1 0 0 1 1-1h5l2 3M12 12v5M9.5 14.5h5" })),
-  plus: /* @__PURE__ */ import_react23.default.createElement("path", { d: "M12 5v14M5 12h14" }),
-  minus: /* @__PURE__ */ import_react23.default.createElement("path", { d: "M5 12h14" }),
-  fit: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "8", y: "8", width: "8", height: "8", rx: "1" })),
-  arrange: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("rect", { x: "3", y: "4", width: "7", height: "6", rx: "1" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "14", y: "4", width: "7", height: "6", rx: "1" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "3", y: "14", width: "7", height: "6", rx: "1" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "14", y: "14", width: "7", height: "6", rx: "1" })),
-  focus: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M8 12h8M12 8v8" })),
-  map: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M9 3v16M15 5v16" })),
-  undo: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "m8 5-5 5 5 5M3 10h11a6 6 0 0 1 0 12" })),
-  redo: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "m16 5 5 5-5 5M21 10H10a6 6 0 0 0 0 12" })),
-  refresh: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M20 11a8 8 0 0 0-14-5L3 9M3 3v6h6M4 13a8 8 0 0 0 14 5l3-3M15 15h6v6" })),
-  inspect: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M14 4v16M6 8h5M6 12h5M6 16h3" })),
-  ai: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2Z" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7L19 2Z" })),
-  group: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "7", y: "7", width: "10", height: "10", rx: "1" })),
-  ungroup: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M14 3h7v7M3 14v7h7" })),
-  align: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M5 3v18" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "8", y: "5", width: "13", height: "5", rx: "1" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "8", y: "14", width: "8", height: "5", rx: "1" })),
-  left: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M4 3v18M8 7h12M8 12h8M8 17h12" })),
-  top: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M3 4h18M7 8v12M12 8v8M17 8v12" })),
-  distribute: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M3 4v16M21 4v16" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "7", y: "8", width: "3", height: "8", rx: ".5" }), /* @__PURE__ */ import_react23.default.createElement("rect", { x: "14", y: "8", width: "3", height: "8", rx: ".5" })),
-  chevron: /* @__PURE__ */ import_react23.default.createElement("path", { d: "m8 10 4 4 4-4" }),
-  duplicate: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("rect", { x: "8", y: "8", width: "13", height: "13", rx: "2" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M16 5V3H3v13h2" })),
-  trash: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" })),
-  check: /* @__PURE__ */ import_react23.default.createElement("path", { d: "m5 12 4 4 10-10" }),
-  loading: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "M20 12a8 8 0 1 1-8-8" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M12 1v6l4-3-4-3Z" })),
-  warning: /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("path", { d: "m12 3 10 18H2L12 3Z" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "M12 9v5M12 17h.01" })),
-  close: /* @__PURE__ */ import_react23.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" })
+  select: /* @__PURE__ */ import_react24.default.createElement("path", { d: "m5 3 13 10-7 1-3 7L5 3Z" }),
+  hand: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M8 12V5a1.5 1.5 0 0 1 3 0v6-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v5c0 5-3 8-7 8-3 0-4-1-6-4l-3-5a1.6 1.6 0 0 1 2.6-1.8L8 13" })),
+  text: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M5 5h14M12 5v15M8 20h8M5 5v3M19 5v3" })),
+  note: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M5 3h14a2 2 0 0 1 2 2v10l-6 6H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M15 21v-6h6M7 8h10M7 12h7" })),
+  rectangle: /* @__PURE__ */ import_react24.default.createElement("rect", { x: "4", y: "5", width: "16", height: "14", rx: "1.5" }),
+  ellipse: /* @__PURE__ */ import_react24.default.createElement("ellipse", { cx: "12", cy: "12", rx: "9", ry: "7" }),
+  material: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M4 7h6l2 2h8v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7Z" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M4 7V5a1 1 0 0 1 1-1h5l2 3M12 12v5M9.5 14.5h5" })),
+  plus: /* @__PURE__ */ import_react24.default.createElement("path", { d: "M12 5v14M5 12h14" }),
+  minus: /* @__PURE__ */ import_react24.default.createElement("path", { d: "M5 12h14" }),
+  fit: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "8", y: "8", width: "8", height: "8", rx: "1" })),
+  arrange: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("rect", { x: "3", y: "4", width: "7", height: "6", rx: "1" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "14", y: "4", width: "7", height: "6", rx: "1" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "3", y: "14", width: "7", height: "6", rx: "1" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "14", y: "14", width: "7", height: "6", rx: "1" })),
+  focus: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M8 12h8M12 8v8" })),
+  map: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M9 3v16M15 5v16" })),
+  undo: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "m8 5-5 5 5 5M3 10h11a6 6 0 0 1 0 12" })),
+  redo: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "m16 5 5 5-5 5M21 10H10a6 6 0 0 0 0 12" })),
+  refresh: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M20 11a8 8 0 0 0-14-5L3 9M3 3v6h6M4 13a8 8 0 0 0 14 5l3-3M15 15h6v6" })),
+  inspect: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M14 4v16M6 8h5M6 12h5M6 16h3" })),
+  ai: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2Z" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7L19 2Z" })),
+  group: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "7", y: "7", width: "10", height: "10", rx: "1" })),
+  ungroup: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M14 3h7v7M3 14v7h7" })),
+  align: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M5 3v18" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "8", y: "5", width: "13", height: "5", rx: "1" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "8", y: "14", width: "8", height: "5", rx: "1" })),
+  left: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M4 3v18M8 7h12M8 12h8M8 17h12" })),
+  top: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M3 4h18M7 8v12M12 8v8M17 8v12" })),
+  distribute: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M3 4v16M21 4v16" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "7", y: "8", width: "3", height: "8", rx: ".5" }), /* @__PURE__ */ import_react24.default.createElement("rect", { x: "14", y: "8", width: "3", height: "8", rx: ".5" })),
+  chevron: /* @__PURE__ */ import_react24.default.createElement("path", { d: "m8 10 4 4 4-4" }),
+  duplicate: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("rect", { x: "8", y: "8", width: "13", height: "13", rx: "2" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M16 5V3H3v13h2" })),
+  trash: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" })),
+  check: /* @__PURE__ */ import_react24.default.createElement("path", { d: "m5 12 4 4 10-10" }),
+  loading: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "M20 12a8 8 0 1 1-8-8" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M12 1v6l4-3-4-3Z" })),
+  warning: /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("path", { d: "m12 3 10 18H2L12 3Z" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "M12 9v5M12 17h.01" })),
+  close: /* @__PURE__ */ import_react24.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" })
 };
 function CanvasIcon({ name: name2, size = 18, className = "" }) {
-  return /* @__PURE__ */ import_react23.default.createElement("svg", { className: `wcc-studio-icon ${className}`, width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.65", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, ICONS[name2] || ICONS.rectangle);
+  return /* @__PURE__ */ import_react24.default.createElement("svg", { className: `wcc-studio-icon ${className}`, width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.65", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, ICONS[name2] || ICONS.rectangle);
 }
 function CanvasSearch({ width, panelOpen, hidden, query, onQuery, nodes, onSelect, allRelations, onRelations, onOpen }) {
-  const [open, setOpen] = (0, import_react23.useState)(false);
-  const [focused, setFocused] = (0, import_react23.useState)(false);
-  const input = (0, import_react23.useRef)(null);
+  const [open, setOpen] = (0, import_react24.useState)(false);
+  const [focused, setFocused] = (0, import_react24.useState)(false);
+  const input = (0, import_react24.useRef)(null);
   const compact = width <= 700 || panelOpen && width < 920;
   const expanded = !compact || open && !panelOpen;
   const matches3 = query.trim() ? nodes.filter((node) => node.type === "content" && `${node.data.title} ${node.data.content || ""}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 20) : [];
-  (0, import_react23.useEffect)(() => {
+  (0, import_react24.useEffect)(() => {
     if (open && !hidden) input.current?.focus();
   }, [open, hidden]);
-  (0, import_react23.useEffect)(() => {
+  (0, import_react24.useEffect)(() => {
     if (panelOpen) setOpen(false);
   }, [panelOpen]);
-  (0, import_react23.useEffect)(() => {
+  (0, import_react24.useEffect)(() => {
     if (hidden) {
       setOpen(false);
       setFocused(false);
     }
   }, [hidden]);
-  return /* @__PURE__ */ import_react23.default.createElement(
+  return /* @__PURE__ */ import_react24.default.createElement(
     "div",
     {
       className: `wtt-canvas-search${expanded ? " is-expanded" : " is-compact"}`,
@@ -41477,25 +41670,25 @@ function CanvasSearch({ width, panelOpen, hidden, query, onQuery, nodes, onSelec
         }
       }
     },
-    expanded ? /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("input", { ref: input, "aria-label": "\u641C\u7D22\u753B\u5E03\u5185\u5BB9", placeholder: "\u67E5\u627E\u5361\u7247\u2026", value: query, onFocus: () => setFocused(true), onChange: (event) => {
+    expanded ? /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, null, /* @__PURE__ */ import_react24.default.createElement("input", { ref: input, "aria-label": "\u641C\u7D22\u753B\u5E03\u5185\u5BB9", placeholder: "\u67E5\u627E\u5361\u7247\u2026", value: query, onFocus: () => setFocused(true), onChange: (event) => {
       onQuery(event.target.value);
       setFocused(true);
-    } }), query && /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u6E05\u7A7A\u641C\u7D22", onClick: () => {
+    } }), query && /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u6E05\u7A7A\u641C\u7D22", onClick: () => {
       onQuery("");
       input.current?.focus();
-    } }, "\xD7"), /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", "aria-pressed": !allRelations, title: allRelations ? "\u70B9\u51FB\u6DE1\u5316\u4E0E\u6240\u9009\u5361\u7247\u65E0\u5173\u7684\u8FDE\u7EBF" : "\u70B9\u51FB\u663E\u793A\u5168\u90E8\u8FDE\u7EBF", onClick: onRelations }, allRelations ? "\u8FDE\u7EBF\uFF1A\u5168\u90E8" : "\u8FDE\u7EBF\uFF1A\u76F8\u5173"), focused && query.trim() && /* @__PURE__ */ import_react23.default.createElement("div", { role: "listbox", "aria-label": "\u753B\u5E03\u641C\u7D22\u7ED3\u679C" }, matches3.length ? matches3.map((node) => /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", role: "option", "aria-selected": false, key: node.id, onMouseDown: (event) => event.preventDefault(), onClick: () => {
+    } }, "\xD7"), /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", "aria-pressed": !allRelations, title: allRelations ? "\u70B9\u51FB\u6DE1\u5316\u4E0E\u6240\u9009\u5361\u7247\u65E0\u5173\u7684\u8FDE\u7EBF" : "\u70B9\u51FB\u663E\u793A\u5168\u90E8\u8FDE\u7EBF", onClick: onRelations }, allRelations ? "\u8FDE\u7EBF\uFF1A\u5168\u90E8" : "\u8FDE\u7EBF\uFF1A\u76F8\u5173"), focused && query.trim() && /* @__PURE__ */ import_react24.default.createElement("div", { role: "listbox", "aria-label": "\u753B\u5E03\u641C\u7D22\u7ED3\u679C" }, matches3.length ? matches3.map((node) => /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", role: "option", "aria-selected": false, key: node.id, onMouseDown: (event) => event.preventDefault(), onClick: () => {
       onSelect(node);
       onQuery("");
       setFocused(false);
-    } }, node.data.title)) : /* @__PURE__ */ import_react23.default.createElement("p", { role: "status" }, "\u6CA1\u627E\u5230\u76F8\u5173\u5361\u7247\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\u3002"))) : /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u641C\u7D22\u753B\u5E03\u5185\u5BB9", title: "\u67E5\u627E\u5361\u7247\u4E0E\u6587\u5B57", onClick: () => {
+    } }, node.data.title)) : /* @__PURE__ */ import_react24.default.createElement("p", { role: "status" }, "\u6CA1\u627E\u5230\u76F8\u5173\u5361\u7247\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\u3002"))) : /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u641C\u7D22\u753B\u5E03\u5185\u5BB9", title: "\u67E5\u627E\u5361\u7247\u4E0E\u6587\u5B57", onClick: () => {
       onOpen?.();
       setOpen(true);
-    } }, /* @__PURE__ */ import_react23.default.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true" }, /* @__PURE__ */ import_react23.default.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ import_react23.default.createElement("path", { d: "m16 16 5 5" })))
+    } }, /* @__PURE__ */ import_react24.default.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true" }, /* @__PURE__ */ import_react24.default.createElement("circle", { cx: "10.5", cy: "10.5", r: "6.5" }), /* @__PURE__ */ import_react24.default.createElement("path", { d: "m16 16 5 5" })))
   );
 }
 function ToolButton({ icon, label: label2, shortcut, active, onClick, disabled, children: children2, className = "" }) {
   const title = shortcut ? `${label2} \xB7 ${shortcut}` : label2;
-  return /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", className: `wcc-studio-button ${active ? "is-active" : ""} ${className}`, title, "aria-label": label2, "aria-pressed": active === void 0 ? void 0 : active, disabled: disabled || !onClick, onClick }, icon && /* @__PURE__ */ import_react23.default.createElement(CanvasIcon, { name: icon }), children2, /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-tooltip", "aria-hidden": "true" }, label2, shortcut && /* @__PURE__ */ import_react23.default.createElement("kbd", null, shortcut)));
+  return /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", className: `wcc-studio-button ${active ? "is-active" : ""} ${className}`, title, "aria-label": label2, "aria-pressed": active === void 0 ? void 0 : active, disabled: disabled || !onClick, onClick }, icon && /* @__PURE__ */ import_react24.default.createElement(CanvasIcon, { name: icon }), children2, /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-tooltip", "aria-hidden": "true" }, label2, shortcut && /* @__PURE__ */ import_react24.default.createElement("kbd", null, shortcut)));
 }
 var TOOLS = [
   ["select", "\u9009\u62E9\u4E0E\u79FB\u52A8", "V"],
@@ -41508,7 +41701,7 @@ var TOOLS = [
 var zoomPercent = (state) => Math.round(state.transform[2] * 100);
 function ZoomValue({ onReset }) {
   const zoom = useStore(zoomPercent);
-  return /* @__PURE__ */ import_react23.default.createElement(
+  return /* @__PURE__ */ import_react24.default.createElement(
     UiButton,
     {
       variant: "custom",
@@ -41568,7 +41761,7 @@ function CanvasChrome({
     else if (!["select", "hand"].includes(value)) onAddElement?.(value);
   };
   const controlsDisabled = Boolean(busy);
-  return /* @__PURE__ */ import_react23.default.createElement("div", { className: `wcc-studio-chrome${sidebar ? " is-panel-open" : ""}` }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-tools wcc-studio-surface", role: "toolbar", "aria-label": "\u767D\u677F\u5DE5\u5177", "aria-orientation": "vertical" }, TOOLS.map(([value, label2, shortcut], index2) => /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, { key: value }, index2 === 2 && /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-divider is-horizontal", "aria-hidden": "true" }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: value, label: label2, shortcut, active: tool === value, disabled: controlsDisabled, onClick: onTool || !["select", "hand"].includes(value) && onAddElement ? () => chooseTool(value) : void 0 }))), /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-divider is-horizontal", "aria-hidden": "true" }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "material", label: "\u6DFB\u52A0\u7D20\u6750", onClick: onAddMaterial, disabled: controlsDisabled })), /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-status-dock wcc-studio-surface", role: "toolbar", "aria-label": "\u753B\u5E03\u64CD\u4F5C" }, /* @__PURE__ */ import_react23.default.createElement("span", { className: `wcc-studio-save-status is-${saveStatus}`, role: "status", "aria-live": "polite", title: status[0] }, /* @__PURE__ */ import_react23.default.createElement(CanvasIcon, { name: status[1], size: 14, className: saveStatus === "saving" ? "is-spinning" : "" }), /* @__PURE__ */ import_react23.default.createElement("span", null, status[0])), (saveStatus === "failed" || saveStatus === "conflict") && onRetry && /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-studio-retry", onClick: onRetry, disabled: controlsDisabled }, saveStatus === "conflict" ? "\u91CD\u65B0\u52A0\u8F7D" : "\u91CD\u8BD5"), /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "undo", label: "\u64A4\u9500\u5E03\u5C40", shortcut: "\u2318/Ctrl Z", onClick: onUndo, disabled: !canUndo || controlsDisabled }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "redo", label: "\u91CD\u505A\u5E03\u5C40", shortcut: "\u2318/Ctrl Shift Z", onClick: onRedo, disabled: !canRedo || controlsDisabled }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "refresh", label: "\u5237\u65B0\u753B\u5E03", onClick: onRefresh, disabled: controlsDisabled }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "inspect", label: "\u5185\u5BB9\u8BE6\u60C5", active: typeof sidebar === "string" ? sidebar === "inspect" : void 0, onClick: onInspect, className: "wcc-studio-panel-button" }, /* @__PURE__ */ import_react23.default.createElement("span", null, "\u5185\u5BB9")), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "material", label: "\u521B\u4F5C\u4EFB\u52A1", active: sidebar === "tasks", onClick: onTasks, className: "wcc-studio-panel-button" }, /* @__PURE__ */ import_react23.default.createElement("span", null, runningCount ? `\u8FD0\u884C ${runningCount}` : "\u4EFB\u52A1", pendingCount ? ` \xB7 \u5F85\u529E ${pendingCount}` : "")), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "inspect", label: "\u8D44\u4EA7\u770B\u677F", onClick: onAssets, className: "wcc-studio-panel-button" }, /* @__PURE__ */ import_react23.default.createElement("span", null, "\u8D44\u4EA7")), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "ai", label: "AI \u521B\u4F5C", active: typeof sidebar === "string" ? sidebar === "ai" : void 0, onClick: onAI, className: "wcc-studio-panel-button is-ai" }, /* @__PURE__ */ import_react23.default.createElement("span", null, "AI \u521B\u4F5C"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-zoom-dock wcc-studio-surface", role: "toolbar", "aria-label": "\u753B\u5E03\u7F29\u653E\u4E0E\u5BFC\u822A" }, /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "minus", label: "\u7F29\u5C0F\u753B\u5E03", onClick: onZoomOut }), /* @__PURE__ */ import_react23.default.createElement(ZoomValue, { onReset: onZoom100 }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "plus", label: "\u653E\u5927\u753B\u5E03", onClick: onZoomIn }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "fit", label: "\u67E5\u770B\u5168\u90E8\u5361\u7247", onClick: onFitAll }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "focus", label: "\u5B9A\u4F4D\u6240\u9009\u5361\u7247", onClick: onFitSelected, disabled: !hasSelection2 }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "map", label: "\u663E\u793A\u5C0F\u5730\u56FE", active: showMap, onClick: onToggleMap }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "arrange", label: "\u5FEB\u901F\u6392\u7248", onClick: onArrange, disabled: !canArrange || controlsDisabled }, /* @__PURE__ */ import_react23.default.createElement("span", null, "\u6392\u7248"))), /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-navigation-hint", "aria-hidden": "true" }, "\u53CC\u6307\u6ED1\u52A8\uFF0F\u6EDA\u8F6E\u5E73\u79FB", /* @__PURE__ */ import_react23.default.createElement("span", null, "\xB7"), "\u634F\u5408\uFF0F\uFF0B\uFF0D\u7F29\u653E"));
+  return /* @__PURE__ */ import_react24.default.createElement("div", { className: `wcc-studio-chrome${sidebar ? " is-panel-open" : ""}` }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-tools wcc-studio-surface", role: "toolbar", "aria-label": "\u767D\u677F\u5DE5\u5177", "aria-orientation": "vertical" }, TOOLS.map(([value, label2, shortcut], index2) => /* @__PURE__ */ import_react24.default.createElement(import_react24.default.Fragment, { key: value }, index2 === 2 && /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-divider is-horizontal", "aria-hidden": "true" }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: value, label: label2, shortcut, active: tool === value, disabled: controlsDisabled, onClick: onTool || !["select", "hand"].includes(value) && onAddElement ? () => chooseTool(value) : void 0 }))), /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-divider is-horizontal", "aria-hidden": "true" }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "material", label: "\u6DFB\u52A0\u7D20\u6750", onClick: onAddMaterial, disabled: controlsDisabled })), /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-status-dock wcc-studio-surface", role: "toolbar", "aria-label": "\u753B\u5E03\u64CD\u4F5C" }, /* @__PURE__ */ import_react24.default.createElement("span", { className: `wcc-studio-save-status is-${saveStatus}`, role: "status", "aria-live": "polite", title: status[0] }, /* @__PURE__ */ import_react24.default.createElement(CanvasIcon, { name: status[1], size: 14, className: saveStatus === "saving" ? "is-spinning" : "" }), /* @__PURE__ */ import_react24.default.createElement("span", null, status[0])), (saveStatus === "failed" || saveStatus === "conflict") && onRetry && /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-studio-retry", onClick: onRetry, disabled: controlsDisabled }, saveStatus === "conflict" ? "\u91CD\u65B0\u52A0\u8F7D" : "\u91CD\u8BD5"), /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "undo", label: "\u64A4\u9500\u5E03\u5C40", shortcut: "\u2318/Ctrl Z", onClick: onUndo, disabled: !canUndo || controlsDisabled }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "redo", label: "\u91CD\u505A\u5E03\u5C40", shortcut: "\u2318/Ctrl Shift Z", onClick: onRedo, disabled: !canRedo || controlsDisabled }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "refresh", label: "\u5237\u65B0\u753B\u5E03", onClick: onRefresh, disabled: controlsDisabled }), /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "inspect", label: "\u5185\u5BB9\u8BE6\u60C5", active: typeof sidebar === "string" ? sidebar === "inspect" : void 0, onClick: onInspect, className: "wcc-studio-panel-button" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "\u5185\u5BB9")), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "material", label: "\u521B\u4F5C\u4EFB\u52A1", active: sidebar === "tasks", onClick: onTasks, className: "wcc-studio-panel-button" }, /* @__PURE__ */ import_react24.default.createElement("span", null, runningCount ? `\u8FD0\u884C ${runningCount}` : "\u4EFB\u52A1", pendingCount ? ` \xB7 \u5F85\u529E ${pendingCount}` : "")), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "inspect", label: "\u8D44\u4EA7\u770B\u677F", onClick: onAssets, className: "wcc-studio-panel-button" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "\u8D44\u4EA7")), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "ai", label: "AI \u521B\u4F5C", active: typeof sidebar === "string" ? sidebar === "ai" : void 0, onClick: onAI, className: "wcc-studio-panel-button is-ai" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "AI \u521B\u4F5C"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-zoom-dock wcc-studio-surface", role: "toolbar", "aria-label": "\u753B\u5E03\u7F29\u653E\u4E0E\u5BFC\u822A" }, /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "minus", label: "\u7F29\u5C0F\u753B\u5E03", onClick: onZoomOut }), /* @__PURE__ */ import_react24.default.createElement(ZoomValue, { onReset: onZoom100 }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "plus", label: "\u653E\u5927\u753B\u5E03", onClick: onZoomIn }), /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "fit", label: "\u67E5\u770B\u5168\u90E8\u5361\u7247", onClick: onFitAll }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "focus", label: "\u5B9A\u4F4D\u6240\u9009\u5361\u7247", onClick: onFitSelected, disabled: !hasSelection2 }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "map", label: "\u663E\u793A\u5C0F\u5730\u56FE", active: showMap, onClick: onToggleMap }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "arrange", label: "\u5FEB\u901F\u6392\u7248", onClick: onArrange, disabled: !canArrange || controlsDisabled }, /* @__PURE__ */ import_react24.default.createElement("span", null, "\u6392\u7248"))), /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-navigation-hint", "aria-hidden": "true" }, "\u53CC\u6307\u6ED1\u52A8\uFF0F\u6EDA\u8F6E\u5E73\u79FB", /* @__PURE__ */ import_react24.default.createElement("span", null, "\xB7"), "\u634F\u5408\uFF0F\uFF0B\uFF0D\u7F29\u653E"));
 }
 function SelectionActions({
   x: x2,
@@ -41589,16 +41782,16 @@ function SelectionActions({
   onDelete,
   canDelete = false
 }) {
-  const [alignOpen, setAlignOpen] = (0, import_react23.useState)(false);
+  const [alignOpen, setAlignOpen] = (0, import_react24.useState)(false);
   const style3 = x2 === void 0 ? void 0 : { left: x2, top: y2 ?? 86 };
-  return /* @__PURE__ */ import_react23.default.createElement("div", { className: `wcc-studio-selection wcc-studio-surface${x2 === void 0 ? "" : " is-positioned"}`, style: style3, role: "toolbar", "aria-label": `\u5DF2\u9009 ${selectedCount} \u4E2A\u5BF9\u8C61\u7684\u64CD\u4F5C`, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-selection-count" }, selectedCount, " \u9879"), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "inspect", label: "\u67E5\u770B\u5185\u5BB9", onClick: onInspect }), /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "ai", label: "\u4EA4\u7ED9 AI", onClick: onAI, className: "is-ai" }, /* @__PURE__ */ import_react23.default.createElement("span", null, "\u4EA4\u7ED9 AI")), canPromote && /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "material", label: "\u4FDD\u5B58\u4E3A\u7D20\u6750", onClick: onPromote, disabled: busy }), /* @__PURE__ */ import_react23.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), canGroup && /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "group", label: "\u7F16\u7EC4", shortcut: "\u2318/Ctrl G", onClick: onGroup, disabled: busy }), canUngroup && /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "ungroup", label: "\u89E3\u9664\u5206\u7EC4", shortcut: "\u2318/Ctrl Shift G", onClick: onUngroup, disabled: busy }), selectedCount > 1 && /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-align-wrap" }, /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "align", label: "\u5BF9\u9F50\u4E0E\u5206\u5E03", active: alignOpen, onClick: () => setAlignOpen((value) => !value), disabled: busy || !onAlign }), alignOpen && /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-align-menu", role: "menu", "aria-label": "\u5BF9\u9F50\u4E0E\u5206\u5E03" }, [["left", "\u5DE6\u5BF9\u9F50"], ["top", "\u9876\u90E8\u5BF9\u9F50"], ["horizontal", "\u6C34\u5E73\u7B49\u8DDD"]].map(([value, label2]) => /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", key: value, role: "menuitem", onClick: () => {
+  return /* @__PURE__ */ import_react24.default.createElement("div", { className: `wcc-studio-selection wcc-studio-surface${x2 === void 0 ? "" : " is-positioned"}`, style: style3, role: "toolbar", "aria-label": `\u5DF2\u9009 ${selectedCount} \u4E2A\u5BF9\u8C61\u7684\u64CD\u4F5C`, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-selection-count" }, selectedCount, " \u9879"), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "inspect", label: "\u67E5\u770B\u5185\u5BB9", onClick: onInspect }), /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "ai", label: "\u4EA4\u7ED9 AI", onClick: onAI, className: "is-ai" }, /* @__PURE__ */ import_react24.default.createElement("span", null, "\u4EA4\u7ED9 AI")), canPromote && /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "material", label: "\u4FDD\u5B58\u4E3A\u7D20\u6750", onClick: onPromote, disabled: busy }), /* @__PURE__ */ import_react24.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), canGroup && /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "group", label: "\u7F16\u7EC4", shortcut: "\u2318/Ctrl G", onClick: onGroup, disabled: busy }), canUngroup && /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "ungroup", label: "\u89E3\u9664\u5206\u7EC4", shortcut: "\u2318/Ctrl Shift G", onClick: onUngroup, disabled: busy }), selectedCount > 1 && /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-align-wrap" }, /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "align", label: "\u5BF9\u9F50\u4E0E\u5206\u5E03", active: alignOpen, onClick: () => setAlignOpen((value) => !value), disabled: busy || !onAlign }), alignOpen && /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-align-menu", role: "menu", "aria-label": "\u5BF9\u9F50\u4E0E\u5206\u5E03" }, [["left", "\u5DE6\u5BF9\u9F50"], ["top", "\u9876\u90E8\u5BF9\u9F50"], ["horizontal", "\u6C34\u5E73\u7B49\u8DDD"]].map(([value, label2]) => /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", key: value, role: "menuitem", onClick: () => {
     onAlign?.(value);
     setAlignOpen(false);
-  }, disabled: busy || value === "horizontal" && selectedCount < 3 }, /* @__PURE__ */ import_react23.default.createElement(CanvasIcon, { name: value === "horizontal" ? "distribute" : value, size: 16 }), /* @__PURE__ */ import_react23.default.createElement("span", null, label2))))), canDuplicate && /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "duplicate", label: "\u590D\u5236\u767D\u677F\u5143\u7D20", shortcut: "\u2318/Ctrl D", onClick: onDuplicate, disabled: busy }), canDelete && /* @__PURE__ */ import_react23.default.createElement(ToolButton, { icon: "trash", label: "\u5220\u9664\u8282\u70B9", onClick: onDelete, disabled: busy }));
+  }, disabled: busy || value === "horizontal" && selectedCount < 3 }, /* @__PURE__ */ import_react24.default.createElement(CanvasIcon, { name: value === "horizontal" ? "distribute" : value, size: 16 }), /* @__PURE__ */ import_react24.default.createElement("span", null, label2))))), canDuplicate && /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "duplicate", label: "\u590D\u5236\u767D\u677F\u5143\u7D20", shortcut: "\u2318/Ctrl D", onClick: onDuplicate, disabled: busy }), canDelete && /* @__PURE__ */ import_react24.default.createElement(ToolButton, { icon: "trash", label: "\u5220\u9664\u8282\u70B9", onClick: onDelete, disabled: busy }));
 }
 function CanvasContextMenu({ x: x2 = 0, y: y2 = 0, onClose, items = [] }) {
-  const menu = (0, import_react23.useRef)(null);
-  (0, import_react23.useEffect)(() => {
+  const menu = (0, import_react24.useRef)(null);
+  (0, import_react24.useEffect)(() => {
     menu.current?.querySelector("button:not(:disabled)")?.focus();
   }, [x2, y2]);
   function navigate(event) {
@@ -41615,19 +41808,19 @@ function CanvasContextMenu({ x: x2 = 0, y: y2 = 0, onClose, items = [] }) {
     const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
     buttons[next]?.focus();
   }
-  return /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-menu-layer", onPointerDown: (event) => {
+  return /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-menu-layer", onPointerDown: (event) => {
     if (event.target === event.currentTarget) onClose?.();
   }, onContextMenu: (event) => {
     event.preventDefault();
     if (event.target === event.currentTarget) onClose?.();
-  } }, /* @__PURE__ */ import_react23.default.createElement("div", { className: "wcc-studio-context-menu wcc-studio-surface", ref: menu, style: { left: x2, top: y2 }, role: "menu", "aria-label": "\u753B\u5E03\u53F3\u952E\u83DC\u5355", onKeyDown: navigate, onPointerDown: (event) => event.stopPropagation() }, items.map((item, index2) => item.separator ? /* @__PURE__ */ import_react23.default.createElement("span", { key: `separator-${index2}`, className: "wcc-studio-menu-divider", role: "separator" }) : /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", key: `${item.label}-${index2}`, disabled: item.disabled || !item.onClick, onClick: () => {
+  } }, /* @__PURE__ */ import_react24.default.createElement("div", { className: "wcc-studio-context-menu wcc-studio-surface", ref: menu, style: { left: x2, top: y2 }, role: "menu", "aria-label": "\u753B\u5E03\u53F3\u952E\u83DC\u5355", onKeyDown: navigate, onPointerDown: (event) => event.stopPropagation() }, items.map((item, index2) => item.separator ? /* @__PURE__ */ import_react24.default.createElement("span", { key: `separator-${index2}`, className: "wcc-studio-menu-divider", role: "separator" }) : /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", key: `${item.label}-${index2}`, disabled: item.disabled || !item.onClick, onClick: () => {
     item.onClick();
     onClose?.();
-  } }, item.icon && /* @__PURE__ */ import_react23.default.createElement(CanvasIcon, { name: item.icon, size: 16 }), /* @__PURE__ */ import_react23.default.createElement("span", null, item.label), item.shortcut && /* @__PURE__ */ import_react23.default.createElement("kbd", null, item.shortcut)))));
+  } }, item.icon && /* @__PURE__ */ import_react24.default.createElement(CanvasIcon, { name: item.icon, size: 16 }), /* @__PURE__ */ import_react24.default.createElement("span", null, item.label), item.shortcut && /* @__PURE__ */ import_react24.default.createElement("kbd", null, item.shortcut)))));
 }
 
 // src/whiteboard-nodes.jsx
-var import_react25 = __toESM(require("react"), 1);
+var import_react26 = __toESM(require("react"), 1);
 var COLOURS = {
   cream: { label: "\u7C73\u9EC4", paper: "#fff4cb", line: "#eadba7" },
   blue: { label: "\u6D45\u84DD", paper: "#e6efff", line: "#bdcfee" },
@@ -41637,25 +41830,25 @@ var COLOURS = {
 };
 var KINDS2 = { text: "\u6587\u5B57", note: "\u4FBF\u7B7E", shape: "\u56FE\u5F62" };
 var stop = (event) => event.stopPropagation();
-var WhiteboardNode = (0, import_react25.memo)(function WhiteboardNode2({ id: id2, data, selected: selected2, isConnectable }) {
-  const [editing, setEditing] = (0, import_react25.useState)(false);
-  const [draft, setDraft] = (0, import_react25.useState)(data.text || "");
-  const editor = (0, import_react25.useRef)(null);
-  const closed = (0, import_react25.useRef)(null);
-  const autoEditStarted = (0, import_react25.useRef)(false);
-  const editingRef = (0, import_react25.useRef)(false);
+var WhiteboardNode = (0, import_react26.memo)(function WhiteboardNode2({ id: id2, data, selected: selected2, isConnectable }) {
+  const [editing, setEditing] = (0, import_react26.useState)(false);
+  const [draft, setDraft] = (0, import_react26.useState)(data.text || "");
+  const editor = (0, import_react26.useRef)(null);
+  const closed = (0, import_react26.useRef)(null);
+  const autoEditStarted = (0, import_react26.useRef)(false);
+  const editingRef = (0, import_react26.useRef)(false);
   const kind = KINDS2[data.elementKind] ? data.elementKind : "note";
   const text2 = typeof data.text === "string" ? data.text : "";
   const colour = COLOURS[data.colour] || COLOURS.cream;
   const ellipse = kind === "shape" && data.shape === "ellipse";
   const label2 = KINDS2[kind];
-  (0, import_react25.useEffect)(() => {
+  (0, import_react26.useEffect)(() => {
     if (!editing) setDraft(text2);
   }, [text2, editing]);
-  (0, import_react25.useEffect)(() => () => {
+  (0, import_react26.useEffect)(() => () => {
     if (editingRef.current) data.onEditEnd?.();
   }, []);
-  (0, import_react25.useEffect)(() => {
+  (0, import_react26.useEffect)(() => {
     if (!data.autoEdit || autoEditStarted.current) return;
     autoEditStarted.current = true;
     data.onEditStart?.();
@@ -41664,7 +41857,7 @@ var WhiteboardNode = (0, import_react25.memo)(function WhiteboardNode2({ id: id2
     setDraft(text2);
     setEditing(true);
   }, [data.autoEdit]);
-  (0, import_react25.useEffect)(() => {
+  (0, import_react26.useEffect)(() => {
     if (!editing) return;
     editor.current?.focus();
     editor.current?.setSelectionRange(draft.length, draft.length);
@@ -41699,7 +41892,7 @@ var WhiteboardNode = (0, import_react25.memo)(function WhiteboardNode2({ id: id2
       finishEdit(true);
     }
   }
-  return /* @__PURE__ */ import_react25.default.createElement(
+  return /* @__PURE__ */ import_react26.default.createElement(
     "article",
     {
       className: `wcc-element wcc-element-${kind}${ellipse ? " is-ellipse" : ""}${selected2 ? " is-selected" : ""}${editing ? " is-editing" : ""}`,
@@ -41708,7 +41901,7 @@ var WhiteboardNode = (0, import_react25.memo)(function WhiteboardNode2({ id: id2
       style: { "--wcc-element-paper": colour.paper, "--wcc-element-line": colour.line },
       onDoubleClick: beginEdit
     },
-    /* @__PURE__ */ import_react25.default.createElement(
+    /* @__PURE__ */ import_react26.default.createElement(
       NodeResizer,
       {
         nodeId: id2,
@@ -41724,9 +41917,9 @@ var WhiteboardNode = (0, import_react25.memo)(function WhiteboardNode2({ id: id2
         onResizeEnd: (_event, { width, height }) => data.onChange?.(id2, { width, height })
       }
     ),
-    /* @__PURE__ */ import_react25.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable: isConnectable && !editing, "aria-label": `\u8FDE\u63A5\u5230${label2}` }),
-    /* @__PURE__ */ import_react25.default.createElement("div", { className: "wcc-element-grip", "aria-label": `\u62D6\u52A8${label2}` }, /* @__PURE__ */ import_react25.default.createElement("span", { className: "wcc-element-grip-lines", "aria-hidden": "true" }), /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-element-edit nodrag nopan", "aria-label": `\u7F16\u8F91${label2}\u6587\u5B57`, onPointerDown: stop, onClick: beginEdit }, "\u7F16\u8F91")),
-    editing ? /* @__PURE__ */ import_react25.default.createElement(
+    /* @__PURE__ */ import_react26.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable: isConnectable && !editing, "aria-label": `\u8FDE\u63A5\u5230${label2}` }),
+    /* @__PURE__ */ import_react26.default.createElement("div", { className: "wcc-element-grip", "aria-label": `\u62D6\u52A8${label2}` }, /* @__PURE__ */ import_react26.default.createElement("span", { className: "wcc-element-grip-lines", "aria-hidden": "true" }), /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-element-edit nodrag nopan", "aria-label": `\u7F16\u8F91${label2}\u6587\u5B57`, onPointerDown: stop, onClick: beginEdit }, "\u7F16\u8F91")),
+    editing ? /* @__PURE__ */ import_react26.default.createElement(
       "textarea",
       {
         ref: editor,
@@ -41745,13 +41938,13 @@ var WhiteboardNode = (0, import_react25.memo)(function WhiteboardNode2({ id: id2
         onWheel: stop,
         spellCheck: false
       }
-    ) : /* @__PURE__ */ import_react25.default.createElement("div", { className: `wcc-element-content${text2 ? "" : " is-empty"}` }, text2 || `\u53CC\u51FB\u8F93\u5165${label2 === "\u56FE\u5F62" ? "\u6587\u5B57" : label2}`),
-    /* @__PURE__ */ import_react25.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable: isConnectable && !editing, "aria-label": `\u4ECE${label2}\u8FDE\u7EBF` })
+    ) : /* @__PURE__ */ import_react26.default.createElement("div", { className: `wcc-element-content${text2 ? "" : " is-empty"}` }, text2 || `\u53CC\u51FB\u8F93\u5165${label2 === "\u56FE\u5F62" ? "\u6587\u5B57" : label2}`),
+    /* @__PURE__ */ import_react26.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable: isConnectable && !editing, "aria-label": `\u4ECE${label2}\u8FDE\u7EBF` })
   );
 });
 function WhiteboardStyleControls({ element, onChange }) {
   const kind = element.elementKind || element.kind;
-  return /* @__PURE__ */ import_react25.default.createElement("div", { className: "wcc-element-style-controls", "aria-label": "\u767D\u677F\u5143\u7D20\u6837\u5F0F" }, /* @__PURE__ */ import_react25.default.createElement("div", { className: "wcc-element-colours", role: "group", "aria-label": "\u5143\u7D20\u989C\u8272" }, Object.entries(COLOURS).map(([key, colour]) => /* @__PURE__ */ import_react25.default.createElement(
+  return /* @__PURE__ */ import_react26.default.createElement("div", { className: "wcc-element-style-controls", "aria-label": "\u767D\u677F\u5143\u7D20\u6837\u5F0F" }, /* @__PURE__ */ import_react26.default.createElement("div", { className: "wcc-element-colours", role: "group", "aria-label": "\u5143\u7D20\u989C\u8272" }, Object.entries(COLOURS).map(([key, colour]) => /* @__PURE__ */ import_react26.default.createElement(
     UiButton,
     {
       variant: "custom",
@@ -41764,8 +41957,8 @@ function WhiteboardStyleControls({ element, onChange }) {
       style: { "--wcc-swatch": colour.paper, "--wcc-swatch-line": colour.line },
       onClick: () => onChange({ colour: key })
     },
-    /* @__PURE__ */ import_react25.default.createElement("span", { "aria-hidden": "true" })
-  ))), kind === "shape" && /* @__PURE__ */ import_react25.default.createElement("div", { className: "wcc-element-shape-controls", role: "group", "aria-label": "\u56FE\u5F62\u5F62\u72B6" }, /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u77E9\u5F62", "aria-pressed": element.shape !== "ellipse", onClick: () => onChange({ shape: "rectangle" }) }, "\u77E9\u5F62"), /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u692D\u5706", "aria-pressed": element.shape === "ellipse", onClick: () => onChange({ shape: "ellipse" }) }, "\u692D\u5706")));
+    /* @__PURE__ */ import_react26.default.createElement("span", { "aria-hidden": "true" })
+  ))), kind === "shape" && /* @__PURE__ */ import_react26.default.createElement("div", { className: "wcc-element-shape-controls", role: "group", "aria-label": "\u56FE\u5F62\u5F62\u72B6" }, /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u77E9\u5F62", "aria-pressed": element.shape !== "ellipse", onClick: () => onChange({ shape: "rectangle" }) }, "\u77E9\u5F62"), /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u692D\u5706", "aria-pressed": element.shape === "ellipse", onClick: () => onChange({ shape: "ellipse" }) }, "\u692D\u5706")));
 }
 
 // src/canvas-history.mjs
@@ -41811,7 +42004,7 @@ function createLayoutHistory(limit = 50) {
 // src/canvas-arrangement.mjs
 var GAP = 48;
 var LIMIT = 1e6;
-function arrangeCardBlocks(blocks, fixed) {
+function arrangeGrid(blocks, fixed) {
   if (!blocks.length) return /* @__PURE__ */ new Map();
   const ordered = [...blocks].sort((a, b2) => a.y - b2.y || a.x - b2.x || a.id.localeCompare(b2.id));
   const columns = Math.min(8, Math.ceil(Math.sqrt(ordered.length)));
@@ -41847,9 +42040,151 @@ function arrangeCardBlocks(blocks, fixed) {
   }
   return positions;
 }
+var readingOrder = (a, b2) => a.y - b2.y || a.x - b2.x || a.id.localeCompare(b2.id);
+function sourceRanks(nodes, edges) {
+  const next = new Map(nodes.map((node) => [node.id, []]));
+  for (const edge of edges) next.get(edge.source).push(edge.target);
+  const index2 = /* @__PURE__ */ new Map(), low = /* @__PURE__ */ new Map(), stack = [], active = /* @__PURE__ */ new Set(), groups = [];
+  function visit(id2) {
+    index2.set(id2, index2.size);
+    low.set(id2, index2.get(id2));
+    stack.push(id2);
+    active.add(id2);
+    for (const child of next.get(id2)) {
+      if (!index2.has(child)) {
+        visit(child);
+        low.set(id2, Math.min(low.get(id2), low.get(child)));
+      } else if (active.has(child)) low.set(id2, Math.min(low.get(id2), index2.get(child)));
+    }
+    if (low.get(id2) === index2.get(id2)) {
+      const group = [];
+      let member;
+      do {
+        member = stack.pop();
+        active.delete(member);
+        group.push(member);
+      } while (member !== id2);
+      groups.push(group);
+    }
+  }
+  for (const node of nodes) if (!index2.has(node.id)) visit(node.id);
+  const owner = new Map(groups.flatMap((group, n) => group.map((id2) => [id2, n])));
+  const children2 = groups.map(() => /* @__PURE__ */ new Set()), incoming = groups.map(() => 0), ranks = groups.map(() => 0);
+  for (const edge of edges) {
+    const from2 = owner.get(edge.source), to = owner.get(edge.target);
+    if (from2 !== to && !children2[from2].has(to)) {
+      children2[from2].add(to);
+      incoming[to]++;
+    }
+  }
+  const queue = incoming.flatMap((count2, n) => count2 === 0 ? [n] : []);
+  for (let i = 0; i < queue.length; i++) for (const child of children2[queue[i]]) {
+    ranks[child] = Math.max(ranks[child], ranks[queue[i]] + 1);
+    if (--incoming[child] === 0) queue.push(child);
+  }
+  return new Map(nodes.map((node) => [node.id, ranks[owner.get(node.id)]]));
+}
+function relatedFamilies(blocks, edges) {
+  const byId = new Map(blocks.map((block) => [block.id, block]));
+  const neighbors = new Map(blocks.map((block) => [block.id, []]));
+  for (const edge of edges) {
+    neighbors.get(edge.source).push(edge.target);
+    neighbors.get(edge.target).push(edge.source);
+  }
+  const visited = /* @__PURE__ */ new Set(), families = [];
+  for (const block of [...blocks].sort(readingOrder)) {
+    if (visited.has(block.id)) continue;
+    const ids = [block.id];
+    visited.add(block.id);
+    for (let i = 0; i < ids.length; i++) for (const id2 of neighbors.get(ids[i])) if (!visited.has(id2)) {
+      visited.add(id2);
+      ids.push(id2);
+    }
+    const members = new Set(ids), nodes = ids.map((id2) => byId.get(id2));
+    const relations = edges.filter((edge) => members.has(edge.source));
+    const sources = relations.filter((edge) => edge.provenance);
+    const ranks = sourceRanks(nodes, sources.length ? sources : relations);
+    if (sources.length) {
+      const ranked = new Set(sources.flatMap((edge) => [edge.source, edge.target])), queue = [...ranked];
+      for (let i = 0; i < queue.length; i++) for (const id2 of neighbors.get(queue[i])) if (!ranked.has(id2)) {
+        ranks.set(id2, ranks.get(queue[i]));
+        ranked.add(id2);
+        queue.push(id2);
+      }
+    }
+    const layers = [];
+    for (const node of nodes) (layers[ranks.get(node.id)] ||= []).push(node);
+    families.push({ nodes, relations, ranks, layers: layers.filter(Boolean) });
+  }
+  return families;
+}
+function arrangeCardBlocks(blocks, fixed, relations = []) {
+  const known = new Set(blocks.map((block) => block.id));
+  const edges = relations.filter((edge) => edge.source !== edge.target && known.has(edge.source) && known.has(edge.target));
+  if (!edges.length) return arrangeGrid(blocks, fixed);
+  const families = relatedFamilies(blocks, edges), connected = families.filter((family) => family.relations.length);
+  const isolated = families.filter((family) => !family.relations.length).flatMap((family) => family.nodes).sort(readingOrder);
+  const spans = connected.map((family) => family.layers.reduce((width, layer) => width + Math.max(...layer.map((node) => node.width)) + 80, -80));
+  if (isolated.length) spans.push(Math.max(...isolated.map((node) => node.width)) * Math.min(8, Math.ceil(Math.sqrt(isolated.length))) + GAP * 7);
+  const span = Math.max(...spans);
+  if (span > 2 * LIMIT || blocks.some((node) => node.width > 2 * LIMIT || node.height > 2 * LIMIT)) throw new Error("\u6392\u7248\u8D85\u51FA\u753B\u5E03\u5750\u6807\u8303\u56F4\uFF0C\u8BF7\u7F29\u5C0F\u5206\u7EC4\u8DE8\u5EA6\u540E\u91CD\u8BD5\u3002");
+  const left = Math.max(-LIMIT, Math.min(...blocks.map((node) => node.x), LIMIT - span));
+  const totalHeight = blocks.reduce((height, node) => height + node.height + GAP * 2, 0);
+  let top = Math.max(-LIMIT, Math.min(...blocks.map((node) => node.y), LIMIT - totalHeight));
+  const positions = /* @__PURE__ */ new Map(), obstacles = [...fixed].sort((a, b2) => a.y - b2.y);
+  const place = (node, x2, start2) => {
+    let y2 = start2;
+    for (const box of obstacles) if (x2 < box.x + box.width + GAP && x2 + node.width + GAP > box.x && y2 < box.y + box.height + GAP && y2 + node.height + GAP > box.y) y2 = box.y + box.height + GAP;
+    if (y2 + node.height > LIMIT || x2 + node.width > LIMIT) throw new Error("\u6392\u7248\u8D85\u51FA\u753B\u5E03\u5750\u6807\u8303\u56F4\uFF0C\u8BF7\u7F29\u5C0F\u5206\u7EC4\u8DE8\u5EA6\u540E\u91CD\u8BD5\u3002");
+    positions.set(node.id, { x: x2, y: y2 });
+    return y2 + node.height + GAP;
+  };
+  for (const family of connected) {
+    let x2 = left;
+    for (const layer of family.layers) {
+      const desired = (node) => {
+        const parents = family.relations.filter((edge) => edge.target === node.id).map((edge) => edge.source);
+        const placed = parents.map((id2) => {
+          const parent = family.nodes.find((value) => value.id === id2), position = positions.get(id2);
+          return position && position.y + parent.height / 2;
+        }).filter((value) => value !== void 0);
+        return placed.length ? placed.reduce((a, b2) => a + b2, 0) / placed.length : top + node.height / 2;
+      };
+      layer.sort((a, b2) => desired(a) - desired(b2) || readingOrder(a, b2));
+      let y2 = top;
+      for (const node of layer) {
+        y2 = Math.max(y2, desired(node) - node.height / 2);
+        y2 = place(node, x2, y2);
+      }
+      x2 += Math.max(...layer.map((node) => node.width)) + 80;
+    }
+    const byId = new Map(family.nodes.map((node) => [node.id, node]));
+    const sourceEdges = family.relations.some((edge) => edge.provenance) ? family.relations.filter((edge) => edge.provenance) : family.relations;
+    for (let level = family.layers.length - 2; level >= 0; level--) {
+      let y2 = top;
+      for (const node of family.layers[level]) {
+        const children2 = sourceEdges.filter((edge) => edge.source === node.id && family.ranks.get(edge.target) > family.ranks.get(node.id)).map((edge) => ({ ...positions.get(edge.target), height: byId.get(edge.target).height }));
+        const desired = children2.length ? (Math.min(...children2.map((child) => child.y)) + Math.max(...children2.map((child) => child.y + child.height)) - node.height) / 2 : positions.get(node.id).y;
+        y2 = place(node, positions.get(node.id).x, Math.max(y2, desired));
+      }
+    }
+    let lift3 = Math.max(0, Math.min(...family.nodes.map((node) => positions.get(node.id).y)) - top);
+    for (const node of family.nodes) {
+      const position = positions.get(node.id);
+      for (const box of obstacles) if (position.x < box.x + box.width + GAP && position.x + node.width + GAP > box.x && box.y + box.height + GAP <= position.y) lift3 = Math.min(lift3, position.y - box.y - box.height - GAP);
+    }
+    if (lift3 > 0) for (const node of family.nodes) positions.get(node.id).y -= lift3;
+    top = Math.max(...family.nodes.map((node) => positions.get(node.id).y + node.height)) + GAP * 2;
+  }
+  if (isolated.length) {
+    const occupied = [...fixed, ...blocks.filter((node) => positions.has(node.id)).map((node) => ({ ...node, ...positions.get(node.id) }))];
+    for (const [id2, position] of arrangeGrid(isolated.map((node, n) => ({ ...node, x: left, y: top + n })), occupied)) positions.set(id2, position);
+  }
+  return positions;
+}
 
 // src/outline-desk.jsx
-var import_react27 = __toESM(require("react"), 1);
+var import_react28 = __toESM(require("react"), 1);
 
 // src/text-diff.mjs
 function normalizeLineEndings(value) {
@@ -41925,20 +42260,20 @@ var versionName = (version2) => `v${String(version2?.number ?? "?").padStart(3, 
 var lineAt = (text2, offset) => text2.slice(0, offset).split("\n").length;
 function Difference({ result }) {
   if (!result) return null;
-  return /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-diff", "aria-label": "\u5B8C\u6574\u5927\u7EB2\u5DEE\u5F02" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-diff-summary" }, /* @__PURE__ */ import_react27.default.createElement("span", null, result.removed || result.added ? /* @__PURE__ */ import_react27.default.createElement(import_react27.default.Fragment, null, /* @__PURE__ */ import_react27.default.createElement("b", { className: "is-added" }, "+", result.added, " \u884C"), /* @__PURE__ */ import_react27.default.createElement("b", { className: "is-deleted" }, "\u2212", result.removed, " \u884C")) : "\u4E24\u4EFD\u6B63\u6587\u76F8\u540C"), /* @__PURE__ */ import_react27.default.createElement("span", null, result.mode === "blocks" ? "\u5185\u5BB9\u8F83\u957F\u6216\u5DEE\u5F02\u8F83\u591A\uFF0C\u6309\u5B8C\u6574\u533A\u5757\u5C55\u793A\uFF0C\u672A\u7701\u7565\u6B63\u6587\u3002" : "\u5DE6\u4FA7\u4E3A\u539F\u884C\u53F7\uFF0C\u53F3\u4FA7\u4E3A\u65B0\u884C\u53F7\uFF1B\u4FDD\u7559\u5168\u6587\u4E0E\u7A7A\u884C\u3002")), /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-diff-body", tabIndex: 0 }, result.blocks.map((block, index2) => result.mode === "blocks" ? /* @__PURE__ */ import_react27.default.createElement("section", { key: index2, className: `wcc-outline-diff-block is-${block.type}`, "aria-label": block.type === "equal" ? "\u672A\u4FEE\u6539\u533A\u5757" : block.type === "delete" ? "\u5220\u9664\u533A\u5757" : "\u65B0\u589E\u533A\u5757" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-block-heading" }, block.type === "equal" ? "\u672A\u4FEE\u6539" : block.type === "delete" ? "\u2212 \u5220\u9664" : "+ \u65B0\u589E", /* @__PURE__ */ import_react27.default.createElement("span", null, block.type !== "add" ? `\u539F ${block.oldStart}\u2013${block.oldStart + block.lines.length - 1} \u884C` : "", block.type === "equal" ? " \xB7 " : "", block.type !== "delete" ? `\u65B0 ${block.newStart}\u2013${block.newStart + block.lines.length - 1} \u884C` : "")), /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-block-content" }, /* @__PURE__ */ import_react27.default.createElement("pre", { className: "wcc-outline-block-gutter", "aria-hidden": "true" }, block.lines.map((_2, i) => (block.type === "add" ? block.newStart : block.oldStart) + i).join("\n")), /* @__PURE__ */ import_react27.default.createElement("pre", null, block.lines.join("\n") || "\u200B"))) : block.lines.map((line, offset) => /* @__PURE__ */ import_react27.default.createElement("div", { key: `${index2}-${offset}`, className: `wcc-outline-diff-line is-${block.type}` }, /* @__PURE__ */ import_react27.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "add" ? "" : block.oldStart + offset), /* @__PURE__ */ import_react27.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "delete" ? "" : block.newStart + offset), /* @__PURE__ */ import_react27.default.createElement("span", { className: "wcc-outline-line-mark", "aria-hidden": "true" }, block.type === "add" ? "+" : block.type === "delete" ? "\u2212" : ""), /* @__PURE__ */ import_react27.default.createElement("pre", null, line || "\u200B"))))));
+  return /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-diff", "aria-label": "\u5B8C\u6574\u5927\u7EB2\u5DEE\u5F02" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-diff-summary" }, /* @__PURE__ */ import_react28.default.createElement("span", null, result.removed || result.added ? /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, /* @__PURE__ */ import_react28.default.createElement("b", { className: "is-added" }, "+", result.added, " \u884C"), /* @__PURE__ */ import_react28.default.createElement("b", { className: "is-deleted" }, "\u2212", result.removed, " \u884C")) : "\u4E24\u4EFD\u6B63\u6587\u76F8\u540C"), /* @__PURE__ */ import_react28.default.createElement("span", null, result.mode === "blocks" ? "\u5185\u5BB9\u8F83\u957F\u6216\u5DEE\u5F02\u8F83\u591A\uFF0C\u6309\u5B8C\u6574\u533A\u5757\u5C55\u793A\uFF0C\u672A\u7701\u7565\u6B63\u6587\u3002" : "\u5DE6\u4FA7\u4E3A\u539F\u884C\u53F7\uFF0C\u53F3\u4FA7\u4E3A\u65B0\u884C\u53F7\uFF1B\u4FDD\u7559\u5168\u6587\u4E0E\u7A7A\u884C\u3002")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-diff-body", tabIndex: 0 }, result.blocks.map((block, index2) => result.mode === "blocks" ? /* @__PURE__ */ import_react28.default.createElement("section", { key: index2, className: `wcc-outline-diff-block is-${block.type}`, "aria-label": block.type === "equal" ? "\u672A\u4FEE\u6539\u533A\u5757" : block.type === "delete" ? "\u5220\u9664\u533A\u5757" : "\u65B0\u589E\u533A\u5757" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-block-heading" }, block.type === "equal" ? "\u672A\u4FEE\u6539" : block.type === "delete" ? "\u2212 \u5220\u9664" : "+ \u65B0\u589E", /* @__PURE__ */ import_react28.default.createElement("span", null, block.type !== "add" ? `\u539F ${block.oldStart}\u2013${block.oldStart + block.lines.length - 1} \u884C` : "", block.type === "equal" ? " \xB7 " : "", block.type !== "delete" ? `\u65B0 ${block.newStart}\u2013${block.newStart + block.lines.length - 1} \u884C` : "")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-block-content" }, /* @__PURE__ */ import_react28.default.createElement("pre", { className: "wcc-outline-block-gutter", "aria-hidden": "true" }, block.lines.map((_2, i) => (block.type === "add" ? block.newStart : block.oldStart) + i).join("\n")), /* @__PURE__ */ import_react28.default.createElement("pre", null, block.lines.join("\n") || "\u200B"))) : block.lines.map((line, offset) => /* @__PURE__ */ import_react28.default.createElement("div", { key: `${index2}-${offset}`, className: `wcc-outline-diff-line is-${block.type}` }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "add" ? "" : block.oldStart + offset), /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "delete" ? "" : block.newStart + offset), /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-outline-line-mark", "aria-hidden": "true" }, block.type === "add" ? "+" : block.type === "delete" ? "\u2212" : ""), /* @__PURE__ */ import_react28.default.createElement("pre", null, line || "\u200B"))))));
 }
 function OutlineDesk({ version: version2, versions = [], value, onChange, onClose, onSave, onExport, onPassage, downloadHref, busy = false, error }) {
-  const editor = (0, import_react27.useRef)(null);
-  const id2 = (0, import_react27.useId)();
-  const [view, setView] = (0, import_react27.useState)("edit");
-  const [comparison, setComparison] = (0, import_react27.useState)("draft");
-  const [leftId, setLeftId] = (0, import_react27.useState)("");
-  const [rightId, setRightId] = (0, import_react27.useState)("");
-  const [selection2, setSelection] = (0, import_react27.useState)(null);
+  const editor = (0, import_react28.useRef)(null);
+  const id2 = (0, import_react28.useId)();
+  const [view, setView] = (0, import_react28.useState)("edit");
+  const [comparison, setComparison] = (0, import_react28.useState)("draft");
+  const [leftId, setLeftId] = (0, import_react28.useState)("");
+  const [rightId, setRightId] = (0, import_react28.useState)("");
+  const [selection2, setSelection] = (0, import_react28.useState)(null);
   const source = normalizeLineEndings(version2?.markdown);
   const draft = normalizeLineEndings(value ?? version2?.markdown);
   const dirty = draft !== source;
-  const savedVersions = (0, import_react27.useMemo)(() => {
+  const savedVersions = (0, import_react28.useMemo)(() => {
     const unique = new Map(versions.filter((item) => item && typeof item.markdown === "string").map((item) => [item.id, item]));
     if (version2 && typeof version2.markdown === "string") unique.set(version2.id, version2);
     return [...unique.values()].sort((a, b2) => a.number - b2.number);
@@ -41947,9 +42282,9 @@ function OutlineDesk({ version: version2, versions = [], value, onChange, onClos
   const leftVersion = savedVersions.find((item) => item.id === leftId) || previousVersion || savedVersions.find((item) => item.id !== version2?.id) || version2;
   const rightVersion = savedVersions.find((item) => item.id === rightId) || version2;
   const passage = selection2 && version2 ? savedPassage(source, draft, selection2.start, selection2.end) : null;
-  const result = (0, import_react27.useMemo)(() => view === "compare" ? diffLines(comparison === "draft" ? source : leftVersion?.markdown, comparison === "draft" ? draft : rightVersion?.markdown) : null, [view, comparison, source, draft, leftVersion, rightVersion]);
+  const result = (0, import_react28.useMemo)(() => view === "compare" ? diffLines(comparison === "draft" ? source : leftVersion?.markdown, comparison === "draft" ? draft : rightVersion?.markdown) : null, [view, comparison, source, draft, leftVersion, rightVersion]);
   const selectionMessage = dirty ? "\u5F53\u524D\u6709\u672A\u4FDD\u5B58\u4FEE\u6539\uFF0C\u5148\u4FDD\u5B58\u65B0\u7248\u672C\u518D\u9009\u62E9\u7247\u6BB5\u3002" : passage ? `\u5DF2\u9009\u62E9\u7B2C ${lineAt(source, passage.start)}\u2013${lineAt(source, passage.end - 1)} \u884C \xB7 ${passage.quote.length} \u5B57\u7B26` : "\u5728\u6B63\u6587\u4E2D\u9009\u62E9\u7247\u6BB5\uFF0C\u518D\u4EA4\u7ED9 AI\u3002";
-  (0, import_react27.useEffect)(() => {
+  (0, import_react28.useEffect)(() => {
     setSelection(null);
   }, [version2?.id, source]);
   function readSelection() {
@@ -41963,17 +42298,17 @@ function OutlineDesk({ version: version2, versions = [], value, onChange, onClos
       if (dirty && draft.trim() && !busy) onSave?.();
     }
   }
-  return /* @__PURE__ */ import_react27.default.createElement("section", { className: "wcc-outline-desk", "aria-label": "\u5927\u7EB2\u4E13\u6CE8\u7F16\u8F91", onKeyDown: keyboard, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react27.default.createElement(PanelHeader, { title: `\u5927\u7EB2\u7F16\u8F91 \xB7 ${versionName(version2)}`, subtitle: dirty ? "\u672A\u4FDD\u5B58\u8349\u7A3F" : "\u5DF2\u4FDD\u5B58\u7248\u672C", downloadHref, downloadLabel: "\u4E0B\u8F7D\u5DF2\u4FDD\u5B58\u7684 Word", onClose, closeLabel: "\u5173\u95ED\u4E13\u6CE8\u7F16\u8F91" }), /* @__PURE__ */ import_react27.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", onClick: () => {
+  return /* @__PURE__ */ import_react28.default.createElement("section", { className: "wcc-outline-desk", "aria-label": "\u5927\u7EB2\u4E13\u6CE8\u7F16\u8F91", onKeyDown: keyboard, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react28.default.createElement(PanelHeader, { title: `\u5927\u7EB2\u7F16\u8F91 \xB7 ${versionName(version2)}`, subtitle: dirty ? "\u672A\u4FDD\u5B58\u8349\u7A3F" : "\u5DF2\u4FDD\u5B58\u7248\u672C", downloadHref, downloadLabel: "\u4E0B\u8F7D\u5DF2\u4FDD\u5B58\u7684 Word", onClose, closeLabel: "\u5173\u95ED\u4E13\u6CE8\u7F16\u8F91" }), /* @__PURE__ */ import_react28.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "quiet", onClick: () => {
     setView("edit");
     if (passage && !busy) onPassage?.(passage);
-  }, disabled: !!busy || dirty || !passage || !onPassage, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u9009\u62E9\u7247\u6BB5\u4EA4\u7ED9 AI" : "\u5C06\u5DF2\u4FDD\u5B58\u7248\u672C\u7684\u6240\u9009\u7247\u6BB5\u4EA4\u7ED9 AI" }, "\u9009\u6BB5\u4EA4\u7ED9 AI \u2197"), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", onClick: onExport, disabled: !!busy || dirty || !version2 || !onExport, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u5BFC\u51FA Word" : `\u5BFC\u51FA ${versionName(version2)} \u5BF9\u5E94\u7684 Word` }, "\u5BFC\u51FA Word"), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "primary", className: "wcc-outline-save", onClick: onSave, disabled: !!busy || !dirty || !draft.trim() || !onSave }, busy ? "\u5904\u7406\u4E2D\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react27.default.createElement("nav", { className: "wcc-outline-desk-nav", "aria-label": "\u5927\u7EB2\u5DE5\u4F5C\u89C6\u56FE" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-view-switch" }, /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", className: view === "edit" ? "is-active" : "", "aria-pressed": view === "edit", onClick: () => setView("edit") }, "\u7F16\u8F91\u5927\u7EB2"), /* @__PURE__ */ import_react27.default.createElement(UiButton, { variant: "quiet", className: view === "compare" ? "is-active" : "", "aria-pressed": view === "compare", onClick: () => setView("compare") }, "\u5168\u6587\u6BD4\u8F83")), /* @__PURE__ */ import_react27.default.createElement("span", null, draft.length.toLocaleString(), " \u5B57\u7B26 \xB7 ", draft.split("\n").length.toLocaleString(), " \u884C")), error && /* @__PURE__ */ import_react27.default.createElement(UserError, { className: "wcc-outline-desk-error", error: error instanceof Error ? error.message : String(error) }), view === "edit" ? /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-editor-area" }, /* @__PURE__ */ import_react27.default.createElement("label", { htmlFor: `${id2}-editor`, className: "wcc-outline-editor-label" }, /* @__PURE__ */ import_react27.default.createElement("span", null, versionName(version2), " \u7684\u7F16\u8F91\u8349\u7A3F"), /* @__PURE__ */ import_react27.default.createElement("span", null, "Markdown \xB7 \u2318 / Ctrl + S \u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react27.default.createElement("textarea", { ref: editor, id: `${id2}-editor`, className: "wcc-outline-desk-textarea", "aria-describedby": `${id2}-selection`, value: draft, onChange: (event) => {
+  }, disabled: !!busy || dirty || !passage || !onPassage, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u9009\u62E9\u7247\u6BB5\u4EA4\u7ED9 AI" : "\u5C06\u5DF2\u4FDD\u5B58\u7248\u672C\u7684\u6240\u9009\u7247\u6BB5\u4EA4\u7ED9 AI" }, "\u9009\u6BB5\u4EA4\u7ED9 AI \u2197"), /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "quiet", onClick: onExport, disabled: !!busy || dirty || !version2 || !onExport, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u5BFC\u51FA Word" : `\u5BFC\u51FA ${versionName(version2)} \u5BF9\u5E94\u7684 Word` }, "\u5BFC\u51FA Word"), /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "primary", className: "wcc-outline-save", onClick: onSave, disabled: !!busy || !dirty || !draft.trim() || !onSave }, busy ? "\u5904\u7406\u4E2D\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react28.default.createElement("nav", { className: "wcc-outline-desk-nav", "aria-label": "\u5927\u7EB2\u5DE5\u4F5C\u89C6\u56FE" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-view-switch" }, /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "quiet", className: view === "edit" ? "is-active" : "", "aria-pressed": view === "edit", onClick: () => setView("edit") }, "\u7F16\u8F91\u5927\u7EB2"), /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "quiet", className: view === "compare" ? "is-active" : "", "aria-pressed": view === "compare", onClick: () => setView("compare") }, "\u5168\u6587\u6BD4\u8F83")), /* @__PURE__ */ import_react28.default.createElement("span", null, draft.length.toLocaleString(), " \u5B57\u7B26 \xB7 ", draft.split("\n").length.toLocaleString(), " \u884C")), error && /* @__PURE__ */ import_react28.default.createElement(UserError, { className: "wcc-outline-desk-error", error: error instanceof Error ? error.message : String(error) }), view === "edit" ? /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-editor-area" }, /* @__PURE__ */ import_react28.default.createElement("label", { htmlFor: `${id2}-editor`, className: "wcc-outline-editor-label" }, /* @__PURE__ */ import_react28.default.createElement("span", null, versionName(version2), " \u7684\u7F16\u8F91\u8349\u7A3F"), /* @__PURE__ */ import_react28.default.createElement("span", null, "Markdown \xB7 \u2318 / Ctrl + S \u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react28.default.createElement("textarea", { ref: editor, id: `${id2}-editor`, className: "wcc-outline-desk-textarea", "aria-describedby": `${id2}-selection`, value: draft, onChange: (event) => {
     setSelection(null);
     onChange?.(event.target.value);
-  }, onSelect: readSelection, onKeyUp: readSelection, onMouseUp: readSelection, readOnly: !!busy, spellCheck: false, placeholder: "\u5728\u8FD9\u91CC\u7F16\u8F91\u5B8C\u6574\u8BFE\u7A0B\u5927\u7EB2" })) : /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-comparison" }, /* @__PURE__ */ import_react27.default.createElement("div", { className: "wcc-outline-compare-controls" }, /* @__PURE__ */ import_react27.default.createElement("label", null, /* @__PURE__ */ import_react27.default.createElement("span", null, "\u6BD4\u8F83\u5185\u5BB9"), /* @__PURE__ */ import_react27.default.createElement("select", { value: comparison, onChange: (event) => setComparison(event.target.value) }, /* @__PURE__ */ import_react27.default.createElement("option", { value: "draft" }, "\u5F53\u524D\u7248\u672C \u2192 \u5F53\u524D\u8349\u7A3F"), /* @__PURE__ */ import_react27.default.createElement("option", { value: "versions" }, "\u4E24\u4E2A\u5DF2\u4FDD\u5B58\u7248\u672C"))), comparison === "versions" ? /* @__PURE__ */ import_react27.default.createElement(import_react27.default.Fragment, null, /* @__PURE__ */ import_react27.default.createElement("label", null, /* @__PURE__ */ import_react27.default.createElement("span", null, "\u539F\u7248\u672C"), /* @__PURE__ */ import_react27.default.createElement("select", { value: leftVersion?.id || "", onChange: (event) => setLeftId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react27.default.createElement("option", { key: item.id, value: item.id }, versionName(item))))), /* @__PURE__ */ import_react27.default.createElement("span", { className: "wcc-outline-compare-arrow", "aria-hidden": "true" }, "\u2192"), /* @__PURE__ */ import_react27.default.createElement("label", null, /* @__PURE__ */ import_react27.default.createElement("span", null, "\u65B0\u7248\u672C"), /* @__PURE__ */ import_react27.default.createElement("select", { value: rightVersion?.id || "", onChange: (event) => setRightId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react27.default.createElement("option", { key: item.id, value: item.id }, versionName(item)))))) : /* @__PURE__ */ import_react27.default.createElement("span", { className: "wcc-outline-compare-description" }, versionName(version2), " \u2192 \u5F53\u524D\u8349\u7A3F")), /* @__PURE__ */ import_react27.default.createElement(Difference, { result })), /* @__PURE__ */ import_react27.default.createElement("footer", { className: `wcc-outline-desk-footer${dirty ? " is-dirty" : ""}`, id: `${id2}-selection` }, /* @__PURE__ */ import_react27.default.createElement("span", null, selectionMessage), /* @__PURE__ */ import_react27.default.createElement("span", null, dirty ? "\u4FEE\u6539\u53EA\u5728\u5F53\u524D\u9875\u9762\uFF1B\u70B9\u51FB\u4FDD\u5B58\u751F\u6210\u72EC\u7ACB\u7248\u672C\u3002" : "\u7248\u672C\u539F\u6587\u4FDD\u7559\uFF0C\u4FEE\u6539\u53E6\u5B58\u4E3A\u65B0\u7248\u672C\u3002")));
+  }, onSelect: readSelection, onKeyUp: readSelection, onMouseUp: readSelection, readOnly: !!busy, spellCheck: false, placeholder: "\u5728\u8FD9\u91CC\u7F16\u8F91\u5B8C\u6574\u8BFE\u7A0B\u5927\u7EB2" })) : /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-comparison" }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-outline-compare-controls" }, /* @__PURE__ */ import_react28.default.createElement("label", null, /* @__PURE__ */ import_react28.default.createElement("span", null, "\u6BD4\u8F83\u5185\u5BB9"), /* @__PURE__ */ import_react28.default.createElement("select", { value: comparison, onChange: (event) => setComparison(event.target.value) }, /* @__PURE__ */ import_react28.default.createElement("option", { value: "draft" }, "\u5F53\u524D\u7248\u672C \u2192 \u5F53\u524D\u8349\u7A3F"), /* @__PURE__ */ import_react28.default.createElement("option", { value: "versions" }, "\u4E24\u4E2A\u5DF2\u4FDD\u5B58\u7248\u672C"))), comparison === "versions" ? /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, /* @__PURE__ */ import_react28.default.createElement("label", null, /* @__PURE__ */ import_react28.default.createElement("span", null, "\u539F\u7248\u672C"), /* @__PURE__ */ import_react28.default.createElement("select", { value: leftVersion?.id || "", onChange: (event) => setLeftId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react28.default.createElement("option", { key: item.id, value: item.id }, versionName(item))))), /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-outline-compare-arrow", "aria-hidden": "true" }, "\u2192"), /* @__PURE__ */ import_react28.default.createElement("label", null, /* @__PURE__ */ import_react28.default.createElement("span", null, "\u65B0\u7248\u672C"), /* @__PURE__ */ import_react28.default.createElement("select", { value: rightVersion?.id || "", onChange: (event) => setRightId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react28.default.createElement("option", { key: item.id, value: item.id }, versionName(item)))))) : /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-outline-compare-description" }, versionName(version2), " \u2192 \u5F53\u524D\u8349\u7A3F")), /* @__PURE__ */ import_react28.default.createElement(Difference, { result })), /* @__PURE__ */ import_react28.default.createElement("footer", { className: `wcc-outline-desk-footer${dirty ? " is-dirty" : ""}`, id: `${id2}-selection` }, /* @__PURE__ */ import_react28.default.createElement("span", null, selectionMessage), /* @__PURE__ */ import_react28.default.createElement("span", null, dirty ? "\u4FEE\u6539\u53EA\u5728\u5F53\u524D\u9875\u9762\uFF1B\u70B9\u51FB\u4FDD\u5B58\u751F\u6210\u72EC\u7ACB\u7248\u672C\u3002" : "\u7248\u672C\u539F\u6587\u4FDD\u7559\uFF0C\u4FEE\u6539\u53E6\u5B58\u4E3A\u65B0\u7248\u672C\u3002")));
 }
 
 // src/source-reader.jsx
-var import_react28 = __toESM(require("react"), 1);
+var import_react29 = __toESM(require("react"), 1);
 var SOURCE_STATES = {
   ready: "\u6765\u6E90\u53EF\u7528",
   available: "\u6765\u6E90\u53EF\u7528",
@@ -41988,7 +42323,7 @@ var SOURCE_STATES = {
 function normalizeText(value) {
   return String(value ?? "").replace(/\r\n?/g, "\n");
 }
-function messageOf(value) {
+function messageOf2(value) {
   return value instanceof Error ? value.message : String(value);
 }
 function sourceState(value) {
@@ -42007,20 +42342,20 @@ function describeRange(text2, start2, end) {
   return first2 === last ? `\u7B2C ${first2} \u884C` : `\u7B2C ${first2}\u2013${last} \u884C`;
 }
 function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDraftChange, busy = false, error = "" }) {
-  const id2 = (0, import_react28.useId)();
-  const readerRef = (0, import_react28.useRef)(null);
-  const identityRef = (0, import_react28.useRef)("");
-  const submittingRef = (0, import_react28.useRef)(false);
+  const id2 = (0, import_react29.useId)();
+  const readerRef = (0, import_react29.useRef)(null);
+  const identityRef = (0, import_react29.useRef)("");
+  const submittingRef = (0, import_react29.useRef)(false);
   const identity4 = `${card?.id || ""}:${card?.sourceHash || ""}`;
-  const draftRef = (0, import_react28.useRef)(draft);
+  const draftRef = (0, import_react29.useRef)(draft);
   draftRef.current = draft;
-  const [selection2, setSelection] = (0, import_react28.useState)(() => draft?.identity === identity4 ? draft.selection : null);
-  const [title, setTitle] = (0, import_react28.useState)(() => draft?.identity === identity4 ? draft.title : "");
-  const [annotation, setAnnotation] = (0, import_react28.useState)(() => draft?.identity === identity4 ? draft.annotation : "");
-  const [saving, setSaving] = (0, import_react28.useState)(false);
-  const [localError, setLocalError] = (0, import_react28.useState)("");
-  const [notice, setNotice] = (0, import_react28.useState)("");
-  const content = (0, import_react28.useMemo)(() => normalizeText(card?.content), [card?.content]);
+  const [selection2, setSelection] = (0, import_react29.useState)(() => draft?.identity === identity4 ? draft.selection : null);
+  const [title, setTitle] = (0, import_react29.useState)(() => draft?.identity === identity4 ? draft.title : "");
+  const [annotation, setAnnotation] = (0, import_react29.useState)(() => draft?.identity === identity4 ? draft.annotation : "");
+  const [saving, setSaving] = (0, import_react29.useState)(false);
+  const [localError, setLocalError] = (0, import_react29.useState)("");
+  const [notice, setNotice] = (0, import_react29.useState)("");
+  const content = (0, import_react29.useMemo)(() => normalizeText(card?.content), [card?.content]);
   identityRef.current = identity4;
   const excerpt = card?.kind === "excerpt" ? card.excerptInfo : null;
   const readable = ["material", "excerpt", "outline", "artifact"].includes(card?.kind);
@@ -42029,7 +42364,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
   const canExcerpt = textAvailable && intact && !!card?.sourceHash;
   const pending = !!busy || saving;
   const start2 = initialRange?.start, end = initialRange?.end;
-  (0, import_react28.useEffect)(() => {
+  (0, import_react29.useEffect)(() => {
     const saved = draftRef.current?.identity === identity4 ? draftRef.current : null;
     setSelection(saved?.selection || null);
     setTitle(saved?.title ?? (card?.title ? `${card.title} \xB7 \u6458\u5F55` : ""));
@@ -42042,7 +42377,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
   function rememberDraft(patch) {
     onDraftChange?.({ identity: identity4, selection: selection2, title, annotation, saved: false, ...patch });
   }
-  (0, import_react28.useEffect)(() => {
+  (0, import_react29.useEffect)(() => {
     if (!textAvailable || !validRange(content, start2, end)) return;
     const reader = readerRef.current;
     if (!reader) return;
@@ -42092,7 +42427,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
       rememberDraft({ annotation: "", saved: true });
       setNotice("\u6458\u5F55\u5DF2\u4FDD\u5B58\u3002");
     } catch (cause) {
-      if (identityRef.current === savedIdentity) setLocalError(messageOf(cause));
+      if (identityRef.current === savedIdentity) setLocalError(messageOf2(cause));
     } finally {
       if (identityRef.current === savedIdentity) {
         submittingRef.current = false;
@@ -42101,7 +42436,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
     }
   }
   if (!card) return null;
-  return /* @__PURE__ */ import_react28.default.createElement("section", { className: "wcc-source-reader", "aria-label": "\u539F\u6587\u9605\u8BFB\u4E0E\u6458\u5F55", "aria-busy": pending }, excerpt && /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-excerpt-origin" }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-source-kicker" }, "\u6458\u5F55\u6765\u6E90"), /* @__PURE__ */ import_react28.default.createElement("strong", null, excerpt.sourceTitle || "\u6765\u6E90\u672A\u547D\u540D"), /* @__PURE__ */ import_react28.default.createElement("span", null, excerpt.rangeLabel || (Number.isInteger(excerpt.start) && Number.isInteger(excerpt.end) ? `\u539F\u6587\u8303\u56F4 ${excerpt.start}\u2013${excerpt.end}` : "\u6765\u6E90\u4F4D\u7F6E\u672A\u63D0\u4F9B")), /* @__PURE__ */ import_react28.default.createElement("p", { className: ["ready", "available"].includes(excerpt.sourceStatus) ? "" : "is-warning" }, sourceState(excerpt.sourceStatus)), onOpenSource && /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => onOpenSource(excerpt), disabled: pending || !excerpt.sourceCardId }, "\u67E5\u770B\u539F\u6587\u4F4D\u7F6E \u2192"), /* @__PURE__ */ import_react28.default.createElement("small", null, "\u6458\u5F55\u548C\u6CE8\u91CA\u5DF2\u72EC\u7ACB\u4FDD\u5B58\uFF0C\u539F\u6587\u4EE5\u540E\u4FEE\u6539\u4E5F\u4E0D\u4F1A\u5F71\u54CD\u8FD9\u4EFD\u6458\u5F55\u3002")), /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react28.default.createElement("label", { htmlFor: `${id2}-text` }, excerpt ? "\u6458\u5F55\u539F\u6587" : card.kind === "outline" ? "\u5DF2\u4FDD\u5B58\u5927\u7EB2\u539F\u6587" : "\u7D20\u6750\u539F\u6587"), textAvailable && /* @__PURE__ */ import_react28.default.createElement("span", null, content.split("\n").length, " \u884C \xB7 ", content.length, " \u5B57\u7B26")), textAvailable ? /* @__PURE__ */ import_react28.default.createElement(import_react28.default.Fragment, null, /* @__PURE__ */ import_react28.default.createElement(
+  return /* @__PURE__ */ import_react29.default.createElement("section", { className: "wcc-source-reader", "aria-label": "\u539F\u6587\u9605\u8BFB\u4E0E\u6458\u5F55", "aria-busy": pending }, excerpt && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-excerpt-origin" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "wcc-source-kicker" }, "\u6458\u5F55\u6765\u6E90"), /* @__PURE__ */ import_react29.default.createElement("strong", null, excerpt.sourceTitle || "\u6765\u6E90\u672A\u547D\u540D"), /* @__PURE__ */ import_react29.default.createElement("span", null, excerpt.rangeLabel || (Number.isInteger(excerpt.start) && Number.isInteger(excerpt.end) ? `\u539F\u6587\u8303\u56F4 ${excerpt.start}\u2013${excerpt.end}` : "\u6765\u6E90\u4F4D\u7F6E\u672A\u63D0\u4F9B")), /* @__PURE__ */ import_react29.default.createElement("p", { className: ["ready", "available"].includes(excerpt.sourceStatus) ? "" : "is-warning" }, sourceState(excerpt.sourceStatus)), onOpenSource && /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => onOpenSource(excerpt), disabled: pending || !excerpt.sourceCardId }, "\u67E5\u770B\u539F\u6587\u4F4D\u7F6E \u2192"), /* @__PURE__ */ import_react29.default.createElement("small", null, "\u6458\u5F55\u548C\u6CE8\u91CA\u5DF2\u72EC\u7ACB\u4FDD\u5B58\uFF0C\u539F\u6587\u4EE5\u540E\u4FEE\u6539\u4E5F\u4E0D\u4F1A\u5F71\u54CD\u8FD9\u4EFD\u6458\u5F55\u3002")), /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react29.default.createElement("label", { htmlFor: `${id2}-text` }, excerpt ? "\u6458\u5F55\u539F\u6587" : card.kind === "outline" ? "\u5DF2\u4FDD\u5B58\u5927\u7EB2\u539F\u6587" : "\u7D20\u6750\u539F\u6587"), textAvailable && /* @__PURE__ */ import_react29.default.createElement("span", null, content.split("\n").length, " \u884C \xB7 ", content.length, " \u5B57\u7B26")), textAvailable ? /* @__PURE__ */ import_react29.default.createElement(import_react29.default.Fragment, null, /* @__PURE__ */ import_react29.default.createElement(
     "textarea",
     {
       id: `${id2}-text`,
@@ -42114,20 +42449,20 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
       onSelect: readSelection,
       "aria-describedby": `${id2}-selection`
     }
-  ), /* @__PURE__ */ import_react28.default.createElement("p", { className: "wcc-reader-selection", id: `${id2}-selection`, "aria-live": "polite" }, selection2 ? `${describeRange(content, selection2.start, selection2.end)} \xB7 \u5DF2\u9009 ${selection2.quote.length} \u5B57\u7B26` : "\u5728\u539F\u6587\u4E2D\u62D6\u9009\uFF0C\u6216\u7528 Shift + \u65B9\u5411\u952E\u9009\u62E9\u7247\u6BB5\u3002")) : /* @__PURE__ */ import_react28.default.createElement("p", { className: "wcc-inline-warning" }, card.extracted === false ? "\u8BE5\u6587\u4EF6\u5C1A\u672A\u63D0\u53D6\u6B63\u6587\uFF0C\u5F53\u524D\u4E0D\u80FD\u8BFB\u53D6\u6216\u6458\u5F55\u3002" : "\u5F53\u524D\u5361\u7247\u6CA1\u6709\u53EF\u7528\u7684\u5DF2\u4FDD\u5B58\u6B63\u6587\u3002"), excerpt && /* @__PURE__ */ import_react28.default.createElement("section", { className: "wcc-reader-annotation", "aria-label": "\u6CE8\u91CA" }, /* @__PURE__ */ import_react28.default.createElement("span", { className: "wcc-source-kicker" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react28.default.createElement("p", null, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")), textAvailable && !intact && /* @__PURE__ */ import_react28.default.createElement("p", { className: "wcc-inline-warning" }, sourceState(card.status), "\u3002\u4FDD\u7559\u7684\u6B63\u6587\u53EF\u4F9B\u6838\u5BF9\uFF1B\u6838\u5BF9\u5E76\u53E6\u5B58\u53EF\u7528\u6765\u6E90\u540E\u518D\u6458\u5F55\u3002"), textAvailable && intact && !card.sourceHash && /* @__PURE__ */ import_react28.default.createElement("p", { className: "wcc-inline-warning" }, "\u6682\u65F6\u65E0\u6CD5\u6838\u5BF9\u6765\u6E90\u3002\u8BF7\u5237\u65B0\u5185\u5BB9\u540E\u518D\u4FDD\u5B58\u6458\u5F55\u3002"), canExcerpt && /* @__PURE__ */ import_react28.default.createElement("form", { className: "wcc-excerpt-form", onSubmit: saveExcerpt }, /* @__PURE__ */ import_react28.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react28.default.createElement("strong", null, "\u53E6\u5B58\u4E3A\u6458\u5F55\u5361"), /* @__PURE__ */ import_react28.default.createElement("span", null, "\u53EF\u56DE\u5230\u539F\u6587\u4F4D\u7F6E")), selection2?.quote.trim() && /* @__PURE__ */ import_react28.default.createElement("blockquote", { className: "wcc-excerpt-selection" }, selection2.quote), /* @__PURE__ */ import_react28.default.createElement("label", { htmlFor: `${id2}-title` }, "\u6458\u5F55\u540D\u79F0", /* @__PURE__ */ import_react28.default.createElement("input", { id: `${id2}-title`, value: title, onChange: (event) => {
+  ), /* @__PURE__ */ import_react29.default.createElement("p", { className: "wcc-reader-selection", id: `${id2}-selection`, "aria-live": "polite" }, selection2 ? `${describeRange(content, selection2.start, selection2.end)} \xB7 \u5DF2\u9009 ${selection2.quote.length} \u5B57\u7B26` : "\u5728\u539F\u6587\u4E2D\u62D6\u9009\uFF0C\u6216\u7528 Shift + \u65B9\u5411\u952E\u9009\u62E9\u7247\u6BB5\u3002")) : /* @__PURE__ */ import_react29.default.createElement("p", { className: "wcc-inline-warning" }, card.extracted === false ? "\u8BE5\u6587\u4EF6\u5C1A\u672A\u63D0\u53D6\u6B63\u6587\uFF0C\u5F53\u524D\u4E0D\u80FD\u8BFB\u53D6\u6216\u6458\u5F55\u3002" : "\u5F53\u524D\u5361\u7247\u6CA1\u6709\u53EF\u7528\u7684\u5DF2\u4FDD\u5B58\u6B63\u6587\u3002"), excerpt && /* @__PURE__ */ import_react29.default.createElement("section", { className: "wcc-reader-annotation", "aria-label": "\u6CE8\u91CA" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "wcc-source-kicker" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react29.default.createElement("p", null, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")), textAvailable && !intact && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wcc-inline-warning" }, sourceState(card.status), "\u3002\u4FDD\u7559\u7684\u6B63\u6587\u53EF\u4F9B\u6838\u5BF9\uFF1B\u6838\u5BF9\u5E76\u53E6\u5B58\u53EF\u7528\u6765\u6E90\u540E\u518D\u6458\u5F55\u3002"), textAvailable && intact && !card.sourceHash && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wcc-inline-warning" }, "\u6682\u65F6\u65E0\u6CD5\u6838\u5BF9\u6765\u6E90\u3002\u8BF7\u5237\u65B0\u5185\u5BB9\u540E\u518D\u4FDD\u5B58\u6458\u5F55\u3002"), canExcerpt && /* @__PURE__ */ import_react29.default.createElement("form", { className: "wcc-excerpt-form", onSubmit: saveExcerpt }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react29.default.createElement("strong", null, "\u53E6\u5B58\u4E3A\u6458\u5F55\u5361"), /* @__PURE__ */ import_react29.default.createElement("span", null, "\u53EF\u56DE\u5230\u539F\u6587\u4F4D\u7F6E")), selection2?.quote.trim() && /* @__PURE__ */ import_react29.default.createElement("blockquote", { className: "wcc-excerpt-selection" }, selection2.quote), /* @__PURE__ */ import_react29.default.createElement("label", { htmlFor: `${id2}-title` }, "\u6458\u5F55\u540D\u79F0", /* @__PURE__ */ import_react29.default.createElement("input", { id: `${id2}-title`, value: title, onChange: (event) => {
     setTitle(event.target.value);
     rememberDraft({ title: event.target.value });
-  }, disabled: pending, required: true })), /* @__PURE__ */ import_react28.default.createElement("label", { htmlFor: `${id2}-annotation` }, "\u6CE8\u91CA ", /* @__PURE__ */ import_react28.default.createElement("small", null, "\u5355\u72EC\u4FDD\u5B58\uFF0C\u4E0D\u6DF7\u5165\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react28.default.createElement("textarea", { id: `${id2}-annotation`, rows: 3, value: annotation, onChange: (event) => {
+  }, disabled: pending, required: true })), /* @__PURE__ */ import_react29.default.createElement("label", { htmlFor: `${id2}-annotation` }, "\u6CE8\u91CA ", /* @__PURE__ */ import_react29.default.createElement("small", null, "\u5355\u72EC\u4FDD\u5B58\uFF0C\u4E0D\u6DF7\u5165\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react29.default.createElement("textarea", { id: `${id2}-annotation`, rows: 3, value: annotation, onChange: (event) => {
     setAnnotation(event.target.value);
     rememberDraft({ annotation: event.target.value });
-  }, placeholder: "\u8865\u5145\u7528\u9014\u6216\u8BF4\u660E", disabled: pending })), /* @__PURE__ */ import_react28.default.createElement(UiButton, { variant: "primary", className: "wcc-primary", type: "submit", disabled: pending || !selection2?.quote.trim() || !title.trim() || !onExcerpt }, saving || busy === "excerpt" ? "\u6B63\u5728\u4FDD\u5B58\u6458\u5F55\u2026" : "\u4FDD\u5B58\u6458\u5F55\u5361")), (error || localError) && /* @__PURE__ */ import_react28.default.createElement(UserError, { className: "wcc-error", error: messageOf(error || localError) }), notice && /* @__PURE__ */ import_react28.default.createElement("p", { className: "wcc-reader-notice", role: "status" }, notice));
+  }, placeholder: "\u8865\u5145\u7528\u9014\u6216\u8BF4\u660E", disabled: pending })), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "primary", className: "wcc-primary", type: "submit", disabled: pending || !selection2?.quote.trim() || !title.trim() || !onExcerpt }, saving || busy === "excerpt" ? "\u6B63\u5728\u4FDD\u5B58\u6458\u5F55\u2026" : "\u4FDD\u5B58\u6458\u5F55\u5361")), (error || localError) && /* @__PURE__ */ import_react29.default.createElement(UserError, { className: "wcc-error", error: messageOf2(error || localError) }), notice && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wcc-reader-notice", role: "status" }, notice));
 }
 
 // src/course-tasks.jsx
-var import_react31 = __toESM(require("react"), 1);
+var import_react32 = __toESM(require("react"), 1);
 
 // src/reference-prompt-input.jsx
-var import_react29 = __toESM(require("react"), 1);
+var import_react30 = __toESM(require("react"), 1);
 
 // src/reference-mention.mjs
 var QUERY_CHARACTER = /[^\s@＠「」“”"'，。！？；：、,!?;()[\]{}<>]/u;
@@ -42163,13 +42498,13 @@ function ReferencePromptInput({
   value,
   ...props
 }) {
-  const id2 = (0, import_react29.useId)();
-  const ownInput = (0, import_react29.useRef)(null), list = (0, import_react29.useRef)(null), choosing = (0, import_react29.useRef)(false);
+  const id2 = (0, import_react30.useId)();
+  const ownInput = (0, import_react30.useRef)(null), list = (0, import_react30.useRef)(null), choosing = (0, import_react30.useRef)(false);
   const input = textareaRef || ownInput;
-  const [range, setRange2] = (0, import_react29.useState)(null);
-  const [active, setActive] = (0, import_react29.useState)(0);
-  const [files, setFiles] = (0, import_react29.useState)(null);
-  const [error, setError] = (0, import_react29.useState)("");
+  const [range, setRange2] = (0, import_react30.useState)(null);
+  const [active, setActive] = (0, import_react30.useState)(0);
+  const [files, setFiles] = (0, import_react30.useState)(null);
+  const [error, setError] = (0, import_react30.useState)("");
   const query = range?.query;
   const term = query?.normalize("NFC").toLowerCase();
   const matching = (referenceOptions || []).filter((option) => option.searchText.includes(term || ""));
@@ -42178,7 +42513,7 @@ function ReferencePromptInput({
   const candidates = [...matching.slice(0, 24), ...(projectResults?.entries || []).filter((entry) => !paths.has(entry.path) && (!acceptProjectFile || acceptProjectFile(entry))).map((entry) => ({ key: entry.path, label: entry.name, detail: entry.path, mentionLabel: entry.path, projectFile: entry.path }))];
   const selected2 = Math.min(active, candidates.length - 1);
   const open = Boolean(range && !disabled);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (query === void 0 || !searchReferences || disabled) return;
     const controller = new AbortController();
     const timer2 = setTimeout(async () => {
@@ -42194,10 +42529,10 @@ function ReferencePromptInput({
       controller.abort();
     };
   }, [query, searchReferences, disabled]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     setActive(0);
   }, [query]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     const panel = list.current;
     const option = panel?.children[selected2];
     if (!option) return;
@@ -42234,9 +42569,9 @@ function ReferencePromptInput({
       choosing.current = false;
     }
   }
-  return /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-reference-prompt", onBlur: (event) => {
+  return /* @__PURE__ */ import_react30.default.createElement("div", { className: "wcc-reference-prompt", onBlur: (event) => {
     if (!event.currentTarget.contains(event.relatedTarget)) setRange2(null);
-  } }, /* @__PURE__ */ import_react29.default.createElement(
+  } }, /* @__PURE__ */ import_react30.default.createElement(
     "textarea",
     {
       ...props,
@@ -42285,7 +42620,7 @@ function ReferencePromptInput({
         }
       }
     }
-  ), open && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-creation-skill-picker wcc-reference-mention" }, /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, "\u5F15\u7528\u8D44\u6599"), /* @__PURE__ */ import_react29.default.createElement("div", { ref: list, className: "wcc-creation-skill-options", id: `${id2}-references`, role: "listbox", "aria-label": "\u53EF\u5F15\u7528\u7684\u6587\u4EF6\u4E0E\u5361\u7247" }, candidates.map((option, index2) => /* @__PURE__ */ import_react29.default.createElement(
+  ), open && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wcc-creation-skill-picker wcc-reference-mention" }, /* @__PURE__ */ import_react30.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, "\u5F15\u7528\u8D44\u6599"), /* @__PURE__ */ import_react30.default.createElement("div", { ref: list, className: "wcc-creation-skill-options", id: `${id2}-references`, role: "listbox", "aria-label": "\u53EF\u5F15\u7528\u7684\u6587\u4EF6\u4E0E\u5361\u7247" }, candidates.map((option, index2) => /* @__PURE__ */ import_react30.default.createElement(
     UiButton,
     {
       variant: "custom",
@@ -42300,13 +42635,13 @@ function ReferencePromptInput({
       onMouseEnter: () => setActive(index2),
       onClick: () => void choose(option)
     },
-    /* @__PURE__ */ import_react29.default.createElement("strong", null, option.label),
-    /* @__PURE__ */ import_react29.default.createElement("span", null, option.detail)
-  ))), searchReferences && !projectResults ? /* @__PURE__ */ import_react29.default.createElement("small", { role: "status" }, "\u641C\u7D22\u9879\u76EE\u6587\u4EF6\u2026") : projectResults?.error ? /* @__PURE__ */ import_react29.default.createElement("small", { role: "status" }, "\u9879\u76EE\u6587\u4EF6\u641C\u7D22\u5931\u8D25\uFF0C\u53EF\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002", projectResults.error) : !candidates.length ? /* @__PURE__ */ import_react29.default.createElement("small", { role: "status" }, "\u6CA1\u6709\u5339\u914D\u8D44\u6599\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u6216\u70B9\u300C\u6DFB\u52A0\u300D\u3002") : projectResults?.truncated && /* @__PURE__ */ import_react29.default.createElement("small", null, "\u7ED3\u679C\u6709\u9650\uFF0C\u8F93\u5165\u66F4\u5177\u4F53\u7684\u540D\u79F0\uFF0C\u6216\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002")), error && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, error));
+    /* @__PURE__ */ import_react30.default.createElement("strong", null, option.label),
+    /* @__PURE__ */ import_react30.default.createElement("span", null, option.detail)
+  ))), searchReferences && !projectResults ? /* @__PURE__ */ import_react30.default.createElement("small", { role: "status" }, "\u641C\u7D22\u9879\u76EE\u6587\u4EF6\u2026") : projectResults?.error ? /* @__PURE__ */ import_react30.default.createElement("small", { role: "status" }, "\u9879\u76EE\u6587\u4EF6\u641C\u7D22\u5931\u8D25\uFF0C\u53EF\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002", projectResults.error) : !candidates.length ? /* @__PURE__ */ import_react30.default.createElement("small", { role: "status" }, "\u6CA1\u6709\u5339\u914D\u8D44\u6599\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u6216\u70B9\u300C\u6DFB\u52A0\u300D\u3002") : projectResults?.truncated && /* @__PURE__ */ import_react30.default.createElement("small", null, "\u7ED3\u679C\u6709\u9650\uFF0C\u8F93\u5165\u66F4\u5177\u4F53\u7684\u540D\u79F0\uFF0C\u6216\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002")), error && /* @__PURE__ */ import_react30.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, error));
 }
 
 // src/media-creation.jsx
-var import_react30 = __toESM(require("react"), 1);
+var import_react31 = __toESM(require("react"), 1);
 function mediaJobPending(job) {
   return ["queued", "submitting", "processing", "downloading", "registering"].includes(job?.status);
 }
@@ -42321,17 +42656,17 @@ function mediaSizeLabel(file) {
 }
 function Choice({ label: label2, value, choices, onChange, disabled }) {
   const entries = [.../* @__PURE__ */ new Set([...choices || [], ...value === void 0 ? [] : [value]])];
-  return /* @__PURE__ */ import_react30.default.createElement("label", null, label2, /* @__PURE__ */ import_react30.default.createElement("select", { "aria-label": label2, value: value ?? "", disabled, onChange: (event) => onChange(event.target.value) }, entries.map((entry) => /* @__PURE__ */ import_react30.default.createElement("option", { key: entry, value: entry }, entry))));
+  return /* @__PURE__ */ import_react31.default.createElement("label", null, label2, /* @__PURE__ */ import_react31.default.createElement("select", { "aria-label": label2, value: value ?? "", disabled, onChange: (event) => onChange(event.target.value) }, entries.map((entry) => /* @__PURE__ */ import_react31.default.createElement("option", { key: entry, value: entry }, entry))));
 }
 function ApiMediaPrompt({ type, instruction, onChange, options, onOptionsChange, providers, providerId, onProviderChange, capabilities, loading, error, onRefresh, onOpenSettings, onSubmit, disabled, mentionProps }) {
   providers = providers.filter((provider) => !provider.type || provider.type === type);
   const models = capabilities?.models?.filter((model) => model.type === type) || [];
   const selected2 = models.find((model) => model.id === options.model);
   const set3 = (key, value) => onOptionsChange?.({ ...options, [key]: value });
-  return /* @__PURE__ */ import_react30.default.createElement("div", { className: "wcc-media-creation" }, /* @__PURE__ */ import_react30.default.createElement(ReferencePromptInput, { "aria-label": "\u521B\u4F5C\u63D0\u793A\u8BCD", value: instruction, rows: 2, disabled, onValueChange: onChange, onSubmit, placeholder: "\u63CF\u8FF0\u5185\u5BB9\uFF0C@ \u5F15\u7528\u8D44\u6599", ...mentionProps }), providers.length > 0 && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wcc-media-options" }, /* @__PURE__ */ import_react30.default.createElement("label", null, "API \u670D\u52A1", /* @__PURE__ */ import_react30.default.createElement("select", { "aria-label": "API \u670D\u52A1", value: providerId || "", disabled, onChange: (event) => onProviderChange?.(event.target.value) }, /* @__PURE__ */ import_react30.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u670D\u52A1"), providers.map((provider) => /* @__PURE__ */ import_react30.default.createElement("option", { key: provider.id, value: provider.id }, provider.label)))), /* @__PURE__ */ import_react30.default.createElement("label", null, "\u751F\u6210\u6A21\u578B", /* @__PURE__ */ import_react30.default.createElement("select", { "aria-label": "\u751F\u6210\u6A21\u578B", value: options.model || "", disabled: disabled || !models.length, onChange: (event) => {
+  return /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-media-creation" }, /* @__PURE__ */ import_react31.default.createElement(ReferencePromptInput, { "aria-label": "\u521B\u4F5C\u63D0\u793A\u8BCD", value: instruction, rows: 2, disabled, onValueChange: onChange, onSubmit, placeholder: "\u63CF\u8FF0\u5185\u5BB9\uFF0C@ \u5F15\u7528\u8D44\u6599", ...mentionProps }), providers.length > 0 && /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-media-options" }, /* @__PURE__ */ import_react31.default.createElement("label", null, "API \u670D\u52A1", /* @__PURE__ */ import_react31.default.createElement("select", { "aria-label": "API \u670D\u52A1", value: providerId || "", disabled, onChange: (event) => onProviderChange?.(event.target.value) }, /* @__PURE__ */ import_react31.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u670D\u52A1"), providers.map((provider) => /* @__PURE__ */ import_react31.default.createElement("option", { key: provider.id, value: provider.id }, provider.label)))), /* @__PURE__ */ import_react31.default.createElement("label", null, "\u751F\u6210\u6A21\u578B", /* @__PURE__ */ import_react31.default.createElement("select", { "aria-label": "\u751F\u6210\u6A21\u578B", value: options.model || "", disabled: disabled || !models.length, onChange: (event) => {
     const model = models.find((item) => item.id === event.target.value);
     onOptionsChange?.({ model: model.id, ...Object.fromEntries([["ratio", model.ratios], ["resolution", model.resolutions], ["size", model.sizes], ["quality", model.qualities], ["duration", model.durations]].filter(([, list]) => list?.length).map(([key, list]) => [key, list[0]])) });
-  } }, /* @__PURE__ */ import_react30.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u6A21\u578B"), models.map((model) => /* @__PURE__ */ import_react30.default.createElement("option", { key: model.id, value: model.id }, model.name || model.id)))), selected2?.sizes?.length > 0 && /* @__PURE__ */ import_react30.default.createElement(Choice, { label: "\u753B\u9762\u5C3A\u5BF8", value: options.size, choices: selected2.sizes, disabled, onChange: (value) => set3("size", value) }), selected2?.qualities?.length > 0 && /* @__PURE__ */ import_react30.default.createElement(Choice, { label: "\u751F\u6210\u8D28\u91CF", value: options.quality, choices: selected2.qualities, disabled, onChange: (value) => set3("quality", value) }), selected2?.ratios?.length > 0 && /* @__PURE__ */ import_react30.default.createElement(Choice, { label: "\u753B\u9762\u6BD4\u4F8B", value: options.ratio, choices: selected2.ratios, disabled, onChange: (value) => set3("ratio", value) }), selected2?.resolutions?.length > 0 && /* @__PURE__ */ import_react30.default.createElement(Choice, { label: "\u5206\u8FA8\u7387", value: options.resolution, choices: selected2.resolutions, disabled, onChange: (value) => set3("resolution", value) }), type === "video" && selected2?.durations?.length > 0 && /* @__PURE__ */ import_react30.default.createElement(Choice, { label: "\u89C6\u9891\u65F6\u957F\uFF08\u79D2\uFF09", value: options.duration, choices: selected2.durations, disabled, onChange: (value) => set3("duration", Number(value)) })), error && /* @__PURE__ */ import_react30.default.createElement(UserError, { className: "wcc-creation-error", error }), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: disabled || !onOpenSettings, onClick: onOpenSettings }, "API \u8BBE\u7F6E"), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: loading || disabled, onClick: () => void onRefresh?.() }, loading ? "\u68C0\u6D4B\u4E2D\u2026" : "\u5237\u65B0 API \u670D\u52A1"));
+  } }, /* @__PURE__ */ import_react31.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u6A21\u578B"), models.map((model) => /* @__PURE__ */ import_react31.default.createElement("option", { key: model.id, value: model.id }, model.name || model.id)))), selected2?.sizes?.length > 0 && /* @__PURE__ */ import_react31.default.createElement(Choice, { label: "\u753B\u9762\u5C3A\u5BF8", value: options.size, choices: selected2.sizes, disabled, onChange: (value) => set3("size", value) }), selected2?.qualities?.length > 0 && /* @__PURE__ */ import_react31.default.createElement(Choice, { label: "\u751F\u6210\u8D28\u91CF", value: options.quality, choices: selected2.qualities, disabled, onChange: (value) => set3("quality", value) }), selected2?.ratios?.length > 0 && /* @__PURE__ */ import_react31.default.createElement(Choice, { label: "\u753B\u9762\u6BD4\u4F8B", value: options.ratio, choices: selected2.ratios, disabled, onChange: (value) => set3("ratio", value) }), selected2?.resolutions?.length > 0 && /* @__PURE__ */ import_react31.default.createElement(Choice, { label: "\u5206\u8FA8\u7387", value: options.resolution, choices: selected2.resolutions, disabled, onChange: (value) => set3("resolution", value) }), type === "video" && selected2?.durations?.length > 0 && /* @__PURE__ */ import_react31.default.createElement(Choice, { label: "\u89C6\u9891\u65F6\u957F\uFF08\u79D2\uFF09", value: options.duration, choices: selected2.durations, disabled, onChange: (value) => set3("duration", Number(value)) })), error && /* @__PURE__ */ import_react31.default.createElement(UserError, { className: "wcc-creation-error", error }), /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: disabled || !onOpenSettings, onClick: onOpenSettings }, "API \u8BBE\u7F6E"), /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: loading || disabled, onClick: () => void onRefresh?.() }, loading ? "\u68C0\u6D4B\u4E2D\u2026" : "\u5237\u65B0 API \u670D\u52A1"));
 }
 
 // src/course-tasks.jsx
@@ -42365,7 +42700,7 @@ var REQUIREMENT_FIELDS = {
   participants: "\u53C2\u8BAD\u5BF9\u8C61",
   notes: "\u5907\u6CE8"
 };
-function messageOf2(value) {
+function messageOf3(value) {
   return value instanceof Error ? value.message : String(value);
 }
 function textOf(value) {
@@ -42381,34 +42716,34 @@ function timeLabel(value) {
 }
 function SourceSnapshot({ source }) {
   const excerpt = source.kind === "excerpt" ? source.excerptInfo || source : null;
-  return /* @__PURE__ */ import_react31.default.createElement("details", { className: "wcc-task-source", open: source.kind === "excerpt" }, /* @__PURE__ */ import_react31.default.createElement("summary", null, /* @__PURE__ */ import_react31.default.createElement("span", null, SOURCE_KINDS[source.kind] || "\u6765\u6E90"), source.title || source.cardId), source.noteTruncated && /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-inline-warning" }, typeof source.noteTruncated === "string" ? source.noteTruncated : "\u672C\u6B21\u4EFB\u52A1\u7684\u6765\u6E90\u6B63\u6587\u4EC5\u5305\u542B\u8282\u9009\u3002"), excerpt ? /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, null, (excerpt.sourceTitle || excerpt.rangeLabel) && /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-task-source-origin" }, excerpt.sourceTitle, excerpt.rangeLabel ? ` \xB7 ${excerpt.rangeLabel}` : ""), /* @__PURE__ */ import_react31.default.createElement("span", { className: "wcc-task-field-label" }, "\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react31.default.createElement("pre", null, excerpt.quote ?? source.content ?? "\u539F\u6587\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react31.default.createElement("span", { className: "wcc-task-field-label" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react31.default.createElement("pre", { className: "wcc-task-annotation" }, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")) : /* @__PURE__ */ import_react31.default.createElement("pre", null, source.content || "\u8BE5\u6765\u6E90\u672A\u63D0\u4F9B\u53EF\u7528\u6B63\u6587\u3002"), (source.path || source.hash || source.sourceHash) && /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-source-meta" }, source.path && /* @__PURE__ */ import_react31.default.createElement("span", null, "\u6587\u4EF6\uFF1A", /* @__PURE__ */ import_react31.default.createElement("code", null, source.path)), (source.hash || source.sourceHash) && /* @__PURE__ */ import_react31.default.createElement("span", null, "\u6765\u6E90\u6821\u9A8C\uFF1A", /* @__PURE__ */ import_react31.default.createElement("code", null, source.hash || source.sourceHash))));
+  return /* @__PURE__ */ import_react32.default.createElement("details", { className: "wcc-task-source", open: source.kind === "excerpt" }, /* @__PURE__ */ import_react32.default.createElement("summary", null, /* @__PURE__ */ import_react32.default.createElement("span", null, SOURCE_KINDS[source.kind] || "\u6765\u6E90"), source.title || source.cardId), source.noteTruncated && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-inline-warning" }, typeof source.noteTruncated === "string" ? source.noteTruncated : "\u672C\u6B21\u4EFB\u52A1\u7684\u6765\u6E90\u6B63\u6587\u4EC5\u5305\u542B\u8282\u9009\u3002"), excerpt ? /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, (excerpt.sourceTitle || excerpt.rangeLabel) && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-source-origin" }, excerpt.sourceTitle, excerpt.rangeLabel ? ` \xB7 ${excerpt.rangeLabel}` : ""), /* @__PURE__ */ import_react32.default.createElement("span", { className: "wcc-task-field-label" }, "\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react32.default.createElement("pre", null, excerpt.quote ?? source.content ?? "\u539F\u6587\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react32.default.createElement("span", { className: "wcc-task-field-label" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react32.default.createElement("pre", { className: "wcc-task-annotation" }, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")) : /* @__PURE__ */ import_react32.default.createElement("pre", null, source.content || "\u8BE5\u6765\u6E90\u672A\u63D0\u4F9B\u53EF\u7528\u6B63\u6587\u3002"), (source.path || source.hash || source.sourceHash) && /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-source-meta" }, source.path && /* @__PURE__ */ import_react32.default.createElement("span", null, "\u6587\u4EF6\uFF1A", /* @__PURE__ */ import_react32.default.createElement("code", null, source.path)), (source.hash || source.sourceHash) && /* @__PURE__ */ import_react32.default.createElement("span", null, "\u6765\u6E90\u6821\u9A8C\uFF1A", /* @__PURE__ */ import_react32.default.createElement("code", null, source.hash || source.sourceHash))));
 }
 function TaskInput({ input }) {
-  if (!input) return /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD9\u6B21\u4EFB\u52A1\u6CA1\u6709\u4FDD\u5B58\u8F93\u5165\u8D44\u6599\u3002");
+  if (!input) return /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD9\u6B21\u4EFB\u52A1\u6CA1\u6709\u4FDD\u5B58\u8F93\u5165\u8D44\u6599\u3002");
   const requirement = input.requirement || {};
   const skill = input.skill;
-  return /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-input" }, /* @__PURE__ */ import_react31.default.createElement("details", { className: "wcc-task-requirement" }, /* @__PURE__ */ import_react31.default.createElement("summary", null, "\u521B\u5EFA\u4EFB\u52A1\u65F6\u7684\u80CC\u666F"), /* @__PURE__ */ import_react31.default.createElement("dl", null, Object.entries(requirement).filter(([key, value]) => value != null && value !== "" && !["id", "createdAt", "updatedAt"].includes(key)).map(([key, value]) => /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, { key }, /* @__PURE__ */ import_react31.default.createElement("dt", null, REQUIREMENT_FIELDS[key] || key), /* @__PURE__ */ import_react31.default.createElement("dd", null, textOf(value)))))), input.selection && /* @__PURE__ */ import_react31.default.createElement("section", { className: "wcc-task-selection" }, /* @__PURE__ */ import_react31.default.createElement("span", { className: "wcc-task-field-label" }, "\u672C\u6B21\u9009\u6BB5", input.selection.rangeLabel ? ` \xB7 ${input.selection.rangeLabel}` : ""), /* @__PURE__ */ import_react31.default.createElement("pre", null, input.selection.quote), /* @__PURE__ */ import_react31.default.createElement("small", null, "\u6765\u81EA ", input.sources?.find((source) => source.cardId === input.selection.sourceCardId)?.title || input.selection.sourceCardId)), !!input.sources?.length && /* @__PURE__ */ import_react31.default.createElement("section", { "aria-label": "\u672C\u6B21\u5F15\u7528\u7684\u8D44\u6599" }, /* @__PURE__ */ import_react31.default.createElement("h4", null, "\u5F15\u7528\u8D44\u6599 \xB7 ", input.sources.length), input.sources.map((source, index2) => /* @__PURE__ */ import_react31.default.createElement(SourceSnapshot, { key: `${source.cardId || source.id || index2}:${source.hash || ""}`, source }))), /* @__PURE__ */ import_react31.default.createElement("section", { className: "wcc-task-instruction" }, /* @__PURE__ */ import_react31.default.createElement("h4", null, "\u521B\u4F5C\u8981\u6C42"), /* @__PURE__ */ import_react31.default.createElement("pre", null, input.instruction || "\u672A\u586B\u5199\u521B\u4F5C\u8981\u6C42\u3002")), input.media && /* @__PURE__ */ import_react31.default.createElement("section", null, /* @__PURE__ */ import_react31.default.createElement("h4", null, "\u751F\u6210\u53C2\u6570"), /* @__PURE__ */ import_react31.default.createElement("dl", null, [["\u6A21\u578B", input.media.model], ["\u6BD4\u4F8B", input.media.ratio], ["\u5206\u8FA8\u7387", input.media.resolution], ["\u65F6\u957F\uFF08\u79D2\uFF09", input.media.duration]].filter(([, value]) => value != null).map(([label2, value]) => /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, { key: label2 }, /* @__PURE__ */ import_react31.default.createElement("dt", null, label2), /* @__PURE__ */ import_react31.default.createElement("dd", null, String(value)))))), input.effectivePrompt && /* @__PURE__ */ import_react31.default.createElement("details", null, /* @__PURE__ */ import_react31.default.createElement("summary", null, "\u5B9E\u9645\u53D1\u9001\u7684\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react31.default.createElement("pre", null, input.effectivePrompt)), skill && /* @__PURE__ */ import_react31.default.createElement("details", { className: "wcc-task-skill" }, /* @__PURE__ */ import_react31.default.createElement("summary", null, "\u6240\u7528\u6280\u80FD"), /* @__PURE__ */ import_react31.default.createElement("pre", null, textOf(skill))));
+  return /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-input" }, /* @__PURE__ */ import_react32.default.createElement("details", { className: "wcc-task-requirement" }, /* @__PURE__ */ import_react32.default.createElement("summary", null, "\u521B\u5EFA\u4EFB\u52A1\u65F6\u7684\u80CC\u666F"), /* @__PURE__ */ import_react32.default.createElement("dl", null, Object.entries(requirement).filter(([key, value]) => value != null && value !== "" && !["id", "createdAt", "updatedAt"].includes(key)).map(([key, value]) => /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, { key }, /* @__PURE__ */ import_react32.default.createElement("dt", null, REQUIREMENT_FIELDS[key] || key), /* @__PURE__ */ import_react32.default.createElement("dd", null, textOf(value)))))), input.selection && /* @__PURE__ */ import_react32.default.createElement("section", { className: "wcc-task-selection" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "wcc-task-field-label" }, "\u672C\u6B21\u9009\u6BB5", input.selection.rangeLabel ? ` \xB7 ${input.selection.rangeLabel}` : ""), /* @__PURE__ */ import_react32.default.createElement("pre", null, input.selection.quote), /* @__PURE__ */ import_react32.default.createElement("small", null, "\u6765\u81EA ", input.sources?.find((source) => source.cardId === input.selection.sourceCardId)?.title || input.selection.sourceCardId)), !!input.sources?.length && /* @__PURE__ */ import_react32.default.createElement("section", { "aria-label": "\u672C\u6B21\u5F15\u7528\u7684\u8D44\u6599" }, /* @__PURE__ */ import_react32.default.createElement("h4", null, "\u5F15\u7528\u8D44\u6599 \xB7 ", input.sources.length), input.sources.map((source, index2) => /* @__PURE__ */ import_react32.default.createElement(SourceSnapshot, { key: `${source.cardId || source.id || index2}:${source.hash || ""}`, source }))), /* @__PURE__ */ import_react32.default.createElement("section", { className: "wcc-task-instruction" }, /* @__PURE__ */ import_react32.default.createElement("h4", null, "\u521B\u4F5C\u8981\u6C42"), /* @__PURE__ */ import_react32.default.createElement("pre", null, input.instruction || "\u672A\u586B\u5199\u521B\u4F5C\u8981\u6C42\u3002")), input.media && /* @__PURE__ */ import_react32.default.createElement("section", null, /* @__PURE__ */ import_react32.default.createElement("h4", null, "\u751F\u6210\u53C2\u6570"), /* @__PURE__ */ import_react32.default.createElement("dl", null, [["\u6A21\u578B", input.media.model], ["\u6BD4\u4F8B", input.media.ratio], ["\u5206\u8FA8\u7387", input.media.resolution], ["\u65F6\u957F\uFF08\u79D2\uFF09", input.media.duration]].filter(([, value]) => value != null).map(([label2, value]) => /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, { key: label2 }, /* @__PURE__ */ import_react32.default.createElement("dt", null, label2), /* @__PURE__ */ import_react32.default.createElement("dd", null, String(value)))))), input.effectivePrompt && /* @__PURE__ */ import_react32.default.createElement("details", null, /* @__PURE__ */ import_react32.default.createElement("summary", null, "\u5B9E\u9645\u53D1\u9001\u7684\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react32.default.createElement("pre", null, input.effectivePrompt)), skill && /* @__PURE__ */ import_react32.default.createElement("details", { className: "wcc-task-skill" }, /* @__PURE__ */ import_react32.default.createElement("summary", null, "\u6240\u7528\u6280\u80FD"), /* @__PURE__ */ import_react32.default.createElement("pre", null, textOf(skill))));
 }
 function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenArtifact, onOpenSession, onResumeMediaTask, getDownloadHref, getFileDownloadHref, busy = false }) {
-  const [selectedId, setSelectedId] = (0, import_react31.useState)(null);
-  const [detail, setDetail] = (0, import_react31.useState)(null);
-  const [loading, setLoading] = (0, import_react31.useState)(false);
-  const [error, setError] = (0, import_react31.useState)("");
-  const [retry, setRetry] = (0, import_react31.useState)(0);
-  const [resumes, setResumes] = (0, import_react31.useState)({});
-  const [filter2, setFilter] = (0, import_react31.useState)("all");
+  const [selectedId, setSelectedId] = (0, import_react32.useState)(null);
+  const [detail, setDetail] = (0, import_react32.useState)(null);
+  const [loading, setLoading] = (0, import_react32.useState)(false);
+  const [error, setError] = (0, import_react32.useState)("");
+  const [retry, setRetry] = (0, import_react32.useState)(0);
+  const [resumes, setResumes] = (0, import_react32.useState)({});
+  const [filter2, setFilter] = (0, import_react32.useState)("all");
   const visibleTasks = tasks.filter((task2) => filter2 === "all" || filter2 === "running" && task2.runtimeState?.phase === "generating" || filter2 === "pending" && pendingTaskIds.includes(task2.id) || filter2 === "review" && task2.status === "output" || filter2 === "failed" && (task2.runtimeState?.phase === "failed" || ["failed", "unknown"].includes(task2.status)));
-  const requestRef = (0, import_react31.useRef)(0);
-  const loadRef = (0, import_react31.useRef)(loadTask);
+  const requestRef = (0, import_react32.useRef)(0);
+  const loadRef = (0, import_react32.useRef)(loadTask);
   loadRef.current = loadTask;
   const selected2 = visibleTasks.find((task2) => task2.id === selectedId) || visibleTasks[0] || null;
   const activeId = selected2?.id;
   const updatedAt = selected2?.updatedAt;
   const canLoad = typeof loadTask === "function";
-  (0, import_react31.useEffect)(() => {
+  (0, import_react32.useEffect)(() => {
     if (selectedId && !tasks.some((task2) => task2.id === selectedId)) setSelectedId(null);
   }, [tasks, selectedId]);
-  (0, import_react31.useEffect)(() => {
+  (0, import_react32.useEffect)(() => {
     const request = ++requestRef.current;
     let disposed = false;
     setDetail(null);
@@ -42426,7 +42761,7 @@ function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenArtifact
       if (!next || next.id !== activeId) throw new Error("\u4EFB\u52A1\u8BE6\u60C5\u4E0E\u5F53\u524D\u4EFB\u52A1\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u3002");
       setDetail(next);
     }).catch((cause) => {
-      if (!disposed && requestRef.current === request) setError(messageOf2(cause));
+      if (!disposed && requestRef.current === request) setError(messageOf3(cause));
     }).finally(() => {
       if (!disposed && requestRef.current === request) setLoading(false);
     });
@@ -42445,10 +42780,10 @@ function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenArtifact
       setResumes((previous) => ({ ...previous, [id2]: {} }));
       setRetry((value) => value + 1);
     } catch (cause) {
-      setResumes((previous) => ({ ...previous, [id2]: { error: messageOf2(cause) } }));
+      setResumes((previous) => ({ ...previous, [id2]: { error: messageOf3(cause) } }));
     }
   }
-  return /* @__PURE__ */ import_react31.default.createElement("section", { className: "wcc-course-tasks", "aria-label": "\u521B\u4F5C\u4EFB\u52A1", "aria-busy": loading }, /* @__PURE__ */ import_react31.default.createElement("header", { className: "wcc-tasks-heading" }, /* @__PURE__ */ import_react31.default.createElement("div", null, /* @__PURE__ */ import_react31.default.createElement("h2", null, "\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react31.default.createElement("p", null, "\u5728\u8FD9\u91CC\u67E5\u770B\u751F\u6210\u8FDB\u5EA6\u3001\u56DE\u7B54 AI \u7684\u95EE\u9898\u548C\u6253\u5F00\u6210\u679C\u6587\u4EF6\u3002")), /* @__PURE__ */ import_react31.default.createElement("span", null, tasks.length)), /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-filters", role: "group", "aria-label": "\u7B5B\u9009\u521B\u4F5C\u4EFB\u52A1" }, [["all", "\u5168\u90E8"], ["running", "\u8FD0\u884C\u4E2D"], ["pending", "\u5F85\u786E\u8BA4"], ["review", "\u5F85\u5BA1\u9605"], ["failed", "\u5F02\u5E38"]].map(([value, label2]) => /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "custom", key: value, type: "button", "aria-pressed": filter2 === value, onClick: () => setFilter(value) }, label2))), !!tasks.length && !visibleTasks.length && /* @__PURE__ */ import_react31.default.createElement("p", { role: "status" }, "\u6B64\u7B5B\u9009\u4E0B\u6CA1\u6709\u4EFB\u52A1\u3002"), !tasks.length ? /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-tasks-empty" }, /* @__PURE__ */ import_react31.default.createElement("span", { "aria-hidden": "true" }, "\u2637"), /* @__PURE__ */ import_react31.default.createElement("p", null, "\u8FD8\u6CA1\u6709\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react31.default.createElement("small", null, "\u70B9\u51FB\u5361\u7247\u586B\u5199\u8981\u6C42\uFF0C\u5373\u53EF\u5F00\u59CB\u521B\u4F5C\uFF1B\u624B\u52A8\u4FDD\u5B58\u7684\u65B0\u7248\u672C\u4E5F\u4F1A\u8BB0\u5F55\u5728\u8FD9\u91CC\u3002")) : /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, null, /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-list", "aria-label": "\u9009\u62E9\u4EFB\u52A1" }, visibleTasks.map((item) => /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "custom", type: "button", key: item.id, className: `wcc-task-list-item${item.id === activeId ? " is-active" : ""}`, "aria-pressed": item.id === activeId, onClick: () => setSelectedId(item.id) }, /* @__PURE__ */ import_react31.default.createElement("span", { className: "wcc-task-list-top" }, /* @__PURE__ */ import_react31.default.createElement("span", null, item.kind === "manual" ? "\u4EBA\u5DE5\u4FEE\u8BA2" : item.kind === "media" ? "AI \u5A92\u4F53\u751F\u6210" : "AI \u521B\u4F5C"), /* @__PURE__ */ import_react31.default.createElement("time", { dateTime: item.createdAt }, timeLabel(item.createdAt))), /* @__PURE__ */ import_react31.default.createElement("strong", null, taskName(item)), /* @__PURE__ */ import_react31.default.createElement("span", { className: `wcc-task-status is-${item.status}` }, STATUS[item.status] || item.status || "\u72B6\u6001\u672A\u63D0\u4F9B", item.artifacts?.length ? ` \xB7 ${item.artifacts.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "", item.files?.length ? ` \xB7 ${item.files.length} \u4E2A\u6587\u4EF6` : "")))), task && /* @__PURE__ */ import_react31.default.createElement("article", { className: "wcc-task-detail", "aria-label": "\u4EFB\u52A1\u8BE6\u60C5" }, /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-detail-heading" }, /* @__PURE__ */ import_react31.default.createElement("span", { className: `wcc-task-status is-${task.status}` }, STATUS[task.status] || task.status || "\u72B6\u6001\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-text-button", onClick: () => setRetry((value) => value + 1), disabled: loading || !canLoad }, "\u5237\u65B0\u8BE6\u60C5")), /* @__PURE__ */ import_react31.default.createElement("h3", null, taskName(task)), task.status === "accepted" && /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-task-state-note" }, "\u8BF7\u6C42\u5DF2\u63D0\u4EA4\uFF0C\u5C1A\u672A\u767B\u8BB0\u53EF\u5BA1\u9605\u7684\u6210\u679C\u6587\u4EF6\u3002"), task.status === "submitting" && /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-task-state-note" }, "\u6B63\u5728\u786E\u8BA4\u662F\u5426\u63D0\u4EA4\u6210\u529F\u3002\u5148\u7B49\u5F85\u7ED3\u679C\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002"), task.status === "unknown" && /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-inline-warning" }, task.kind === "media" ? "\u5373\u68A6\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5\u3002\u672C\u4EFB\u52A1\u4E0D\u4F1A\u81EA\u52A8\u91CD\u65B0\u751F\u6210\uFF0C\u8BF7\u5148\u5728\u5373\u68A6\u6838\u5BF9\u751F\u6210\u8BB0\u5F55\u3002" : "\u53D1\u9001\u7ED3\u679C\u5C1A\u672A\u6838\u5B9E\u3002\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u6838\u5BF9\u540E\u518D\u51B3\u5B9A\u4E0B\u4E00\u6B65\u3002"), task.mediaJob?.canResume && onResumeMediaTask && /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-task-session", disabled: busy || resumeState.pending, onClick: () => void resumeMedia(task.id) }, resumeState.pending ? "\u67E5\u8BE2\u4E2D\u2026" : "\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0F\u91CD\u65B0\u53D6\u56DE\u6587\u4EF6"), resumeState.error && /* @__PURE__ */ import_react31.default.createElement(UserError, { className: "wcc-error", error: resumeState.error }), task.error && /* @__PURE__ */ import_react31.default.createElement(UserError, { className: "wcc-error", error: textOf(task.error) }), task.sessionId && /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "quiet", className: "wcc-task-session", type: "button", disabled: !!busy || !onOpenSession, onClick: () => onOpenSession(task.sessionId) }, "\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD \u2192"), /* @__PURE__ */ import_react31.default.createElement("section", { className: "wcc-task-artifacts", "aria-label": "\u4EFB\u52A1\u6210\u679C\u6587\u4EF6" }, /* @__PURE__ */ import_react31.default.createElement("h4", null, "\u672C\u6B21\u6210\u679C\u6587\u4EF6 \xB7 ", (task.artifacts?.length || 0) + (task.files?.length || 0)), task.artifacts?.length ? task.artifacts.map((artifact) => /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-artifact", key: artifact.versionId }, /* @__PURE__ */ import_react31.default.createElement("strong", null, "\u5927\u7EB2 ", versionLabel(artifact)), /* @__PURE__ */ import_react31.default.createElement("div", null, /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !artifact.markdownPath || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "outline" }) }, "\u6253\u5F00\u5927\u7EB2"), artifact.wordPath ? getDownloadHref ? /* @__PURE__ */ import_react31.default.createElement("a", { className: "wcc-task-download", href: getDownloadHref(artifact.versionId), download: true }, "\u4E0B\u8F7D Word") : /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "word" }) }, "\u67E5\u770B Word") : /* @__PURE__ */ import_react31.default.createElement("span", null, "Word \u672A\u751F\u6210")), /* @__PURE__ */ import_react31.default.createElement("details", null, /* @__PURE__ */ import_react31.default.createElement("summary", null, "\u7248\u672C\u6587\u4EF6"), artifact.markdownPath && /* @__PURE__ */ import_react31.default.createElement("code", null, artifact.markdownPath), artifact.wordPath && /* @__PURE__ */ import_react31.default.createElement("code", null, artifact.wordPath)))) : !task.files?.length && /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD8\u6CA1\u6709\u4FDD\u5B58\u6210\u679C\u6587\u4EF6\uFF0C\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u67E5\u770B\u8FDB\u5EA6\u3002"), task.files?.map((file) => /* @__PURE__ */ import_react31.default.createElement("div", { className: "wcc-task-artifact", key: file.id }, /* @__PURE__ */ import_react31.default.createElement("strong", null, FILE_KINDS[file.kind] || "\u6210\u679C\u6587\u4EF6", " \xB7 ", file.title), /* @__PURE__ */ import_react31.default.createElement("div", null, /* @__PURE__ */ import_react31.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ artifactId: file.id, kind: "artifact" }) }, "\u5728\u753B\u5E03\u67E5\u770B"), getFileDownloadHref && /* @__PURE__ */ import_react31.default.createElement("a", { className: "wcc-task-download", href: getFileDownloadHref(file.id), download: true }, "\u4E0B\u8F7D\u6587\u4EF6")), /* @__PURE__ */ import_react31.default.createElement("details", null, /* @__PURE__ */ import_react31.default.createElement("summary", null, "\u6587\u4EF6\u4E0E\u6280\u672F\u68C0\u67E5"), /* @__PURE__ */ import_react31.default.createElement("code", null, file.path), mediaSizeLabel(file) && /* @__PURE__ */ import_react31.default.createElement("small", null, "\u5B9E\u9645\u6587\u4EF6\uFF1A", mediaSizeLabel(file)), /* @__PURE__ */ import_react31.default.createElement("small", null, file.kind === "pptx" ? "\u5DF2\u901A\u8FC7\u53EF\u7F16\u8F91\u6027\u68C0\u67E5\uFF1B\u6559\u5B66\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002" : "\u5DF2\u6838\u5BF9\u5B9E\u9645\u6587\u4EF6\u683C\u5F0F\u4E0E\u5B8C\u6574\u6027\uFF1B\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002"))))), /* @__PURE__ */ import_react31.default.createElement("section", { className: "wcc-task-input-section", "aria-label": "\u4EFB\u52A1\u8F93\u5165" }, /* @__PURE__ */ import_react31.default.createElement("h4", null, "\u4EFB\u52A1\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599"), loading ? /* @__PURE__ */ import_react31.default.createElement("p", { className: "wcc-task-muted", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599\u2026") : error ? /* @__PURE__ */ import_react31.default.createElement(UserError, { className: "wcc-error", error }) : /* @__PURE__ */ import_react31.default.createElement(TaskInput, { input: detail?.id === activeId ? detail.input : selected2.input })), /* @__PURE__ */ import_react31.default.createElement("details", { className: "wcc-task-identifiers" }, /* @__PURE__ */ import_react31.default.createElement("summary", null, "\u4EFB\u52A1\u6807\u8BC6\u4E0E\u65F6\u95F4"), /* @__PURE__ */ import_react31.default.createElement("dl", null, /* @__PURE__ */ import_react31.default.createElement("dt", null, "\u4EFB\u52A1 ID"), /* @__PURE__ */ import_react31.default.createElement("dd", null, task.id), task.requestId && /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, null, /* @__PURE__ */ import_react31.default.createElement("dt", null, "\u8BF7\u6C42 ID"), /* @__PURE__ */ import_react31.default.createElement("dd", null, task.requestId)), task.sessionId && /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, null, /* @__PURE__ */ import_react31.default.createElement("dt", null, "\u4F1A\u8BDD ID"), /* @__PURE__ */ import_react31.default.createElement("dd", null, task.sessionId)), task.createdAt && /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, null, /* @__PURE__ */ import_react31.default.createElement("dt", null, "\u521B\u5EFA"), /* @__PURE__ */ import_react31.default.createElement("dd", null, task.createdAt)), task.updatedAt && /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, null, /* @__PURE__ */ import_react31.default.createElement("dt", null, "\u66F4\u65B0"), /* @__PURE__ */ import_react31.default.createElement("dd", null, task.updatedAt)))))));
+  return /* @__PURE__ */ import_react32.default.createElement("section", { className: "wcc-course-tasks", "aria-label": "\u521B\u4F5C\u4EFB\u52A1", "aria-busy": loading }, /* @__PURE__ */ import_react32.default.createElement("header", { className: "wcc-tasks-heading" }, /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("h2", null, "\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react32.default.createElement("p", null, "\u5728\u8FD9\u91CC\u67E5\u770B\u751F\u6210\u8FDB\u5EA6\u3001\u56DE\u7B54 AI \u7684\u95EE\u9898\u548C\u6253\u5F00\u6210\u679C\u6587\u4EF6\u3002")), /* @__PURE__ */ import_react32.default.createElement("span", null, tasks.length)), /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-filters", role: "group", "aria-label": "\u7B5B\u9009\u521B\u4F5C\u4EFB\u52A1" }, [["all", "\u5168\u90E8"], ["running", "\u8FD0\u884C\u4E2D"], ["pending", "\u5F85\u786E\u8BA4"], ["review", "\u5F85\u5BA1\u9605"], ["failed", "\u5F02\u5E38"]].map(([value, label2]) => /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "custom", key: value, type: "button", "aria-pressed": filter2 === value, onClick: () => setFilter(value) }, label2))), !!tasks.length && !visibleTasks.length && /* @__PURE__ */ import_react32.default.createElement("p", { role: "status" }, "\u6B64\u7B5B\u9009\u4E0B\u6CA1\u6709\u4EFB\u52A1\u3002"), !tasks.length ? /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-tasks-empty" }, /* @__PURE__ */ import_react32.default.createElement("span", { "aria-hidden": "true" }, "\u2637"), /* @__PURE__ */ import_react32.default.createElement("p", null, "\u8FD8\u6CA1\u6709\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react32.default.createElement("small", null, "\u70B9\u51FB\u5361\u7247\u586B\u5199\u8981\u6C42\uFF0C\u5373\u53EF\u5F00\u59CB\u521B\u4F5C\uFF1B\u624B\u52A8\u4FDD\u5B58\u7684\u65B0\u7248\u672C\u4E5F\u4F1A\u8BB0\u5F55\u5728\u8FD9\u91CC\u3002")) : /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-list", "aria-label": "\u9009\u62E9\u4EFB\u52A1" }, visibleTasks.map((item) => /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "custom", type: "button", key: item.id, className: `wcc-task-list-item${item.id === activeId ? " is-active" : ""}`, "aria-pressed": item.id === activeId, onClick: () => setSelectedId(item.id) }, /* @__PURE__ */ import_react32.default.createElement("span", { className: "wcc-task-list-top" }, /* @__PURE__ */ import_react32.default.createElement("span", null, item.kind === "manual" ? "\u4EBA\u5DE5\u4FEE\u8BA2" : item.kind === "media" ? "AI \u5A92\u4F53\u751F\u6210" : "AI \u521B\u4F5C"), /* @__PURE__ */ import_react32.default.createElement("time", { dateTime: item.createdAt }, timeLabel(item.createdAt))), /* @__PURE__ */ import_react32.default.createElement("strong", null, taskName(item)), /* @__PURE__ */ import_react32.default.createElement("span", { className: `wcc-task-status is-${item.status}` }, STATUS[item.status] || item.status || "\u72B6\u6001\u672A\u63D0\u4F9B", item.artifacts?.length ? ` \xB7 ${item.artifacts.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "", item.files?.length ? ` \xB7 ${item.files.length} \u4E2A\u6587\u4EF6` : "")))), task && /* @__PURE__ */ import_react32.default.createElement("article", { className: "wcc-task-detail", "aria-label": "\u4EFB\u52A1\u8BE6\u60C5" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-detail-heading" }, /* @__PURE__ */ import_react32.default.createElement("span", { className: `wcc-task-status is-${task.status}` }, STATUS[task.status] || task.status || "\u72B6\u6001\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-text-button", onClick: () => setRetry((value) => value + 1), disabled: loading || !canLoad }, "\u5237\u65B0\u8BE6\u60C5")), /* @__PURE__ */ import_react32.default.createElement("h3", null, taskName(task)), task.status === "accepted" && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-state-note" }, "\u8BF7\u6C42\u5DF2\u63D0\u4EA4\uFF0C\u5C1A\u672A\u767B\u8BB0\u53EF\u5BA1\u9605\u7684\u6210\u679C\u6587\u4EF6\u3002"), task.status === "submitting" && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-state-note" }, "\u6B63\u5728\u786E\u8BA4\u662F\u5426\u63D0\u4EA4\u6210\u529F\u3002\u5148\u7B49\u5F85\u7ED3\u679C\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002"), task.status === "unknown" && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-inline-warning" }, task.kind === "media" ? "\u5373\u68A6\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5\u3002\u672C\u4EFB\u52A1\u4E0D\u4F1A\u81EA\u52A8\u91CD\u65B0\u751F\u6210\uFF0C\u8BF7\u5148\u5728\u5373\u68A6\u6838\u5BF9\u751F\u6210\u8BB0\u5F55\u3002" : "\u53D1\u9001\u7ED3\u679C\u5C1A\u672A\u6838\u5B9E\u3002\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u6838\u5BF9\u540E\u518D\u51B3\u5B9A\u4E0B\u4E00\u6B65\u3002"), task.mediaJob?.canResume && onResumeMediaTask && /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-task-session", disabled: busy || resumeState.pending, onClick: () => void resumeMedia(task.id) }, resumeState.pending ? "\u67E5\u8BE2\u4E2D\u2026" : "\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0F\u91CD\u65B0\u53D6\u56DE\u6587\u4EF6"), resumeState.error && /* @__PURE__ */ import_react32.default.createElement(UserError, { className: "wcc-error", error: resumeState.error }), task.error && /* @__PURE__ */ import_react32.default.createElement(UserError, { className: "wcc-error", error: textOf(task.error) }), task.sessionId && /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", className: "wcc-task-session", type: "button", disabled: !!busy || !onOpenSession, onClick: () => onOpenSession(task.sessionId) }, "\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD \u2192"), /* @__PURE__ */ import_react32.default.createElement("section", { className: "wcc-task-artifacts", "aria-label": "\u4EFB\u52A1\u6210\u679C\u6587\u4EF6" }, /* @__PURE__ */ import_react32.default.createElement("h4", null, "\u672C\u6B21\u6210\u679C\u6587\u4EF6 \xB7 ", (task.artifacts?.length || 0) + (task.files?.length || 0)), task.artifacts?.length ? task.artifacts.map((artifact) => /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-artifact", key: artifact.versionId }, /* @__PURE__ */ import_react32.default.createElement("strong", null, "\u5927\u7EB2 ", versionLabel(artifact)), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !artifact.markdownPath || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "outline" }) }, "\u6253\u5F00\u5927\u7EB2"), artifact.wordPath ? getDownloadHref ? /* @__PURE__ */ import_react32.default.createElement("a", { className: "wcc-task-download", href: getDownloadHref(artifact.versionId), download: true }, "\u4E0B\u8F7D Word") : /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "word" }) }, "\u67E5\u770B Word") : /* @__PURE__ */ import_react32.default.createElement("span", null, "Word \u672A\u751F\u6210")), /* @__PURE__ */ import_react32.default.createElement("details", null, /* @__PURE__ */ import_react32.default.createElement("summary", null, "\u7248\u672C\u6587\u4EF6"), artifact.markdownPath && /* @__PURE__ */ import_react32.default.createElement("code", null, artifact.markdownPath), artifact.wordPath && /* @__PURE__ */ import_react32.default.createElement("code", null, artifact.wordPath)))) : !task.files?.length && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD8\u6CA1\u6709\u4FDD\u5B58\u6210\u679C\u6587\u4EF6\uFF0C\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u67E5\u770B\u8FDB\u5EA6\u3002"), task.files?.map((file) => /* @__PURE__ */ import_react32.default.createElement("div", { className: "wcc-task-artifact", key: file.id }, /* @__PURE__ */ import_react32.default.createElement("strong", null, FILE_KINDS[file.kind] || "\u6210\u679C\u6587\u4EF6", " \xB7 ", file.title), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ artifactId: file.id, kind: "artifact" }) }, "\u5728\u753B\u5E03\u67E5\u770B"), getFileDownloadHref && /* @__PURE__ */ import_react32.default.createElement("a", { className: "wcc-task-download", href: getFileDownloadHref(file.id), download: true }, "\u4E0B\u8F7D\u6587\u4EF6")), /* @__PURE__ */ import_react32.default.createElement("details", null, /* @__PURE__ */ import_react32.default.createElement("summary", null, "\u6587\u4EF6\u4E0E\u6280\u672F\u68C0\u67E5"), /* @__PURE__ */ import_react32.default.createElement("code", null, file.path), mediaSizeLabel(file) && /* @__PURE__ */ import_react32.default.createElement("small", null, "\u5B9E\u9645\u6587\u4EF6\uFF1A", mediaSizeLabel(file)), /* @__PURE__ */ import_react32.default.createElement("small", null, file.kind === "pptx" ? "\u5DF2\u901A\u8FC7\u53EF\u7F16\u8F91\u6027\u68C0\u67E5\uFF1B\u6559\u5B66\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002" : "\u5DF2\u6838\u5BF9\u5B9E\u9645\u6587\u4EF6\u683C\u5F0F\u4E0E\u5B8C\u6574\u6027\uFF1B\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002"))))), /* @__PURE__ */ import_react32.default.createElement("section", { className: "wcc-task-input-section", "aria-label": "\u4EFB\u52A1\u8F93\u5165" }, /* @__PURE__ */ import_react32.default.createElement("h4", null, "\u4EFB\u52A1\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599"), loading ? /* @__PURE__ */ import_react32.default.createElement("p", { className: "wcc-task-muted", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599\u2026") : error ? /* @__PURE__ */ import_react32.default.createElement(UserError, { className: "wcc-error", error }) : /* @__PURE__ */ import_react32.default.createElement(TaskInput, { input: detail?.id === activeId ? detail.input : selected2.input })), /* @__PURE__ */ import_react32.default.createElement("details", { className: "wcc-task-identifiers" }, /* @__PURE__ */ import_react32.default.createElement("summary", null, "\u4EFB\u52A1\u6807\u8BC6\u4E0E\u65F6\u95F4"), /* @__PURE__ */ import_react32.default.createElement("dl", null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u4EFB\u52A1 ID"), /* @__PURE__ */ import_react32.default.createElement("dd", null, task.id), task.requestId && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u8BF7\u6C42 ID"), /* @__PURE__ */ import_react32.default.createElement("dd", null, task.requestId)), task.sessionId && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u4F1A\u8BDD ID"), /* @__PURE__ */ import_react32.default.createElement("dd", null, task.sessionId)), task.createdAt && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u521B\u5EFA"), /* @__PURE__ */ import_react32.default.createElement("dd", null, task.createdAt)), task.updatedAt && /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, null, /* @__PURE__ */ import_react32.default.createElement("dt", null, "\u66F4\u65B0"), /* @__PURE__ */ import_react32.default.createElement("dd", null, task.updatedAt)))))));
 }
 
 // src/skill-presentation.mjs
@@ -42456,7 +42791,7 @@ var skillLabel = (skill) => (skill.label || "").trim() || skill.name;
 var skillSearchText = (skill) => `${skillLabel(skill)} ${skill.name} ${skill.description || ""}`.toLowerCase();
 
 // src/card-creation.jsx
-var import_react37 = __toESM(require("react"), 1);
+var import_react38 = __toESM(require("react"), 1);
 
 // src/skill-commands.mjs
 var SKILL_TOKEN = /(^|\s)\/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)/g;
@@ -42485,47 +42820,47 @@ function skillQueryAtCursor(text2, cursor) {
 }
 
 // src/skill-settings.jsx
-var import_react33 = __toESM(require("react"), 1);
+var import_react34 = __toESM(require("react"), 1);
 
 // src/project-picker.jsx
-var import_react32 = __toESM(require("react"), 1);
-function messageOf3(error) {
+var import_react33 = __toESM(require("react"), 1);
+function messageOf4(error) {
   return error?.rpcError?.message || (error instanceof Error ? error.message : String(error));
 }
 function FolderIcon({ className = "" }) {
-  return /* @__PURE__ */ import_react32.default.createElement("svg", { className, width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /* @__PURE__ */ import_react32.default.createElement("path", { d: "M3 7.5V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" }), /* @__PURE__ */ import_react32.default.createElement("path", { d: "M3 9h18" }));
+  return /* @__PURE__ */ import_react33.default.createElement("svg", { className, width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /* @__PURE__ */ import_react33.default.createElement("path", { d: "M3 7.5V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" }), /* @__PURE__ */ import_react33.default.createElement("path", { d: "M3 9h18" }));
 }
 function projectName(project) {
   return project.name || project.path?.split(/[\\/]/).filter(Boolean).pop() || project.path;
 }
 function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenProject, onClose, busy = false, purpose = "project" }) {
   const isSkill = purpose === "skill";
-  const titleId = (0, import_react32.useId)();
-  const hintId = (0, import_react32.useId)();
-  const pathId = (0, import_react32.useId)();
-  const dialog = (0, import_react32.useRef)(null);
-  const mounted = (0, import_react32.useRef)(false);
-  const controller = (0, import_react32.useRef)(null);
-  const scan = (0, import_react32.useRef)(0);
-  const inputRevision = (0, import_react32.useRef)(0);
-  const opening = (0, import_react32.useRef)(false);
-  const browseRef = (0, import_react32.useRef)(browseDirectory);
-  const openRef = (0, import_react32.useRef)(onOpenProject);
-  const initialPath = (0, import_react32.useRef)(currentProject?.path);
-  const [path, setPath] = (0, import_react32.useState)(currentProject?.path || "");
-  const [listing, setListing] = (0, import_react32.useState)(null);
-  const [loading, setLoading] = (0, import_react32.useState)(true);
-  const [browseError, setBrowseError] = (0, import_react32.useState)("");
-  const [openError, setOpenError] = (0, import_react32.useState)("");
-  const [openingPath, setOpeningPath] = (0, import_react32.useState)("");
-  const [showHidden, setShowHidden] = (0, import_react32.useState)(false);
+  const titleId = (0, import_react33.useId)();
+  const hintId = (0, import_react33.useId)();
+  const pathId = (0, import_react33.useId)();
+  const dialog = (0, import_react33.useRef)(null);
+  const mounted = (0, import_react33.useRef)(false);
+  const controller = (0, import_react33.useRef)(null);
+  const scan = (0, import_react33.useRef)(0);
+  const inputRevision = (0, import_react33.useRef)(0);
+  const opening = (0, import_react33.useRef)(false);
+  const browseRef = (0, import_react33.useRef)(browseDirectory);
+  const openRef = (0, import_react33.useRef)(onOpenProject);
+  const initialPath = (0, import_react33.useRef)(currentProject?.path);
+  const [path, setPath] = (0, import_react33.useState)(currentProject?.path || "");
+  const [listing, setListing] = (0, import_react33.useState)(null);
+  const [loading, setLoading] = (0, import_react33.useState)(true);
+  const [browseError, setBrowseError] = (0, import_react33.useState)("");
+  const [openError, setOpenError] = (0, import_react33.useState)("");
+  const [openingPath, setOpeningPath] = (0, import_react33.useState)("");
+  const [showHidden, setShowHidden] = (0, import_react33.useState)(false);
   browseRef.current = browseDirectory;
   openRef.current = onOpenProject;
   const working = busy || Boolean(openingPath);
   const entries = (listing?.entries || []).filter((entry) => showHidden || !entry.hidden);
   const parent = listing?.crumbs?.length > 1 ? listing.crumbs[listing.crumbs.length - 2] : null;
   const chosenPath = path.trim();
-  (0, import_react32.useEffect)(() => {
+  (0, import_react33.useEffect)(() => {
     mounted.current = true;
     dialog.current?.showModal();
     void navigate(initialPath.current);
@@ -42554,7 +42889,7 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
       setListing(next);
       if (revision === inputRevision.current) setPath(next.path);
     } catch (error) {
-      if (mounted.current && ticket === scan.current && !request.signal.aborted) setBrowseError(messageOf3(error));
+      if (mounted.current && ticket === scan.current && !request.signal.aborted) setBrowseError(messageOf4(error));
     } finally {
       if (mounted.current && ticket === scan.current) setLoading(false);
     }
@@ -42573,7 +42908,7 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
     try {
       await openRef.current(target.trim());
     } catch (error) {
-      if (mounted.current) setOpenError(messageOf3(error));
+      if (mounted.current) setOpenError(messageOf4(error));
     } finally {
       opening.current = false;
       if (mounted.current) setOpeningPath("");
@@ -42584,7 +42919,7 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
     setPath(value);
     setOpenError("");
   }
-  return /* @__PURE__ */ import_react32.default.createElement(
+  return /* @__PURE__ */ import_react33.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -42601,8 +42936,8 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
         if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
       }
     },
-    /* @__PURE__ */ import_react32.default.createElement(DialogHeader, { title: isSkill ? "\u9009\u62E9\u6280\u80FD\u6587\u4EF6\u5939" : "\u9009\u62E9\u9879\u76EE\u6587\u4EF6\u5939", titleId, descriptionId: hintId, description: isSkill ? "\u9009\u62E9\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\uFF0C\u53EA\u5EFA\u7ACB\u5173\u8054\uFF0C\u4E0D\u590D\u5236\u6587\u4EF6\u3002" : "\u8FD9\u4E2A\u6587\u4EF6\u5939\u7528\u4E8E\u4FDD\u5B58\u9879\u76EE\u8D44\u6599\u3001\u4EFB\u52A1\u548C\u6210\u679C\u6587\u4EF6\u3002", onClose, closeLabel: isSkill ? "\u5173\u95ED\u6587\u4EF6\u5939\u9009\u62E9" : "\u5173\u95ED\u9879\u76EE\u9009\u62E9", busy: working }),
-    /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-pp-body" }, /* @__PURE__ */ import_react32.default.createElement("aside", { hidden: isSkill, className: "wtt-pp-recent", "aria-label": "\u6700\u8FD1\u9879\u76EE" }, /* @__PURE__ */ import_react32.default.createElement("h3", null, "\u6700\u8FD1\u9879\u76EE"), projects.length ? /* @__PURE__ */ import_react32.default.createElement("ul", null, projects.map((project) => /* @__PURE__ */ import_react32.default.createElement("li", { key: project.id || project.path }, /* @__PURE__ */ import_react32.default.createElement(
+    /* @__PURE__ */ import_react33.default.createElement(DialogHeader, { title: isSkill ? "\u9009\u62E9\u6280\u80FD\u6587\u4EF6\u5939" : "\u9009\u62E9\u9879\u76EE\u6587\u4EF6\u5939", titleId, descriptionId: hintId, description: isSkill ? "\u9009\u62E9\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\uFF0C\u53EA\u5EFA\u7ACB\u5173\u8054\uFF0C\u4E0D\u590D\u5236\u6587\u4EF6\u3002" : "\u8FD9\u4E2A\u6587\u4EF6\u5939\u7528\u4E8E\u4FDD\u5B58\u9879\u76EE\u8D44\u6599\u3001\u4EFB\u52A1\u548C\u6210\u679C\u6587\u4EF6\u3002", onClose, closeLabel: isSkill ? "\u5173\u95ED\u6587\u4EF6\u5939\u9009\u62E9" : "\u5173\u95ED\u9879\u76EE\u9009\u62E9", busy: working }),
+    /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-pp-body" }, /* @__PURE__ */ import_react33.default.createElement("aside", { hidden: isSkill, className: "wtt-pp-recent", "aria-label": "\u6700\u8FD1\u9879\u76EE" }, /* @__PURE__ */ import_react33.default.createElement("h3", null, "\u6700\u8FD1\u9879\u76EE"), projects.length ? /* @__PURE__ */ import_react33.default.createElement("ul", null, projects.map((project) => /* @__PURE__ */ import_react33.default.createElement("li", { key: project.id || project.path }, /* @__PURE__ */ import_react33.default.createElement(
       UiButton,
       {
         variant: "custom",
@@ -42613,25 +42948,25 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
         disabled: working,
         onClick: () => void openProject(project.path)
       },
-      /* @__PURE__ */ import_react32.default.createElement("span", { className: "wtt-pp-project-name" }, /* @__PURE__ */ import_react32.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react32.default.createElement("strong", null, projectName(project))),
-      /* @__PURE__ */ import_react32.default.createElement("span", { className: "wtt-pp-project-path" }, project.path),
-      project.id === currentProject?.id && /* @__PURE__ */ import_react32.default.createElement("span", { className: "wtt-pp-current-label" }, "\u5F53\u524D\u9879\u76EE")
-    )))) : /* @__PURE__ */ import_react32.default.createElement("p", { className: "wtt-pp-recent-empty" }, "\u6253\u5F00\u8FC7\u7684\u9879\u76EE\u4F1A\u7559\u5728\u8FD9\u91CC\uFF0C\u65B9\u4FBF\u968F\u65F6\u5207\u6362\u3002")), /* @__PURE__ */ import_react32.default.createElement("section", { className: "wtt-pp-browser", "aria-label": "\u6D4F\u89C8\u672C\u673A\u6587\u4EF6\u5939" }, /* @__PURE__ */ import_react32.default.createElement("form", { className: "wtt-pp-path-form", onSubmit: (event) => {
+      /* @__PURE__ */ import_react33.default.createElement("span", { className: "wtt-pp-project-name" }, /* @__PURE__ */ import_react33.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react33.default.createElement("strong", null, projectName(project))),
+      /* @__PURE__ */ import_react33.default.createElement("span", { className: "wtt-pp-project-path" }, project.path),
+      project.id === currentProject?.id && /* @__PURE__ */ import_react33.default.createElement("span", { className: "wtt-pp-current-label" }, "\u5F53\u524D\u9879\u76EE")
+    )))) : /* @__PURE__ */ import_react33.default.createElement("p", { className: "wtt-pp-recent-empty" }, "\u6253\u5F00\u8FC7\u7684\u9879\u76EE\u4F1A\u7559\u5728\u8FD9\u91CC\uFF0C\u65B9\u4FBF\u968F\u65F6\u5207\u6362\u3002")), /* @__PURE__ */ import_react33.default.createElement("section", { className: "wtt-pp-browser", "aria-label": "\u6D4F\u89C8\u672C\u673A\u6587\u4EF6\u5939" }, /* @__PURE__ */ import_react33.default.createElement("form", { className: "wtt-pp-path-form", onSubmit: (event) => {
       event.preventDefault();
       if (!working && chosenPath) void navigate(chosenPath);
-    } }, /* @__PURE__ */ import_react32.default.createElement("label", { htmlFor: pathId }, "\u6587\u4EF6\u5939\u8DEF\u5F84"), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement("input", { id: pathId, autoFocus: true, value: path, disabled: working, onChange: (event) => changePath(event.target.value), spellCheck: false, autoComplete: "off", placeholder: "\u7C98\u8D34\u672C\u673A\u6587\u4EF6\u5939\u7684\u5B8C\u6574\u8DEF\u5F84" }), /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "submit", disabled: working || !chosenPath }, "\u524D\u5F80"))), /* @__PURE__ */ import_react32.default.createElement("nav", { className: "wtt-pp-navigation", "aria-label": "\u76EE\u5F55\u5BFC\u822A" }, /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !parent || working || loading, onClick: () => void navigate(parent.path), "aria-label": "\u4E0A\u4E00\u7EA7\u76EE\u5F55", title: "\u4E0A\u4E00\u7EA7\u76EE\u5F55" }, "\u2191"), /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !listing?.home || working || loading, onClick: () => void navigate(listing.home) }, "\u6211\u7684\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-pp-crumbs" }, (listing?.crumbs || []).map((crumb, index2) => /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, { key: crumb.path }, index2 > 0 && /* @__PURE__ */ import_react32.default.createElement("span", { "aria-hidden": "true" }, "/"), /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", title: crumb.path, disabled: working || loading, "aria-current": index2 === listing.crumbs.length - 1 ? "location" : void 0, onClick: () => void navigate(crumb.path) }, crumb.name))))), browseError && /* @__PURE__ */ import_react32.default.createElement(UserError, { className: "wtt-pp-error", error: browseError }), /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-pp-directory-list", "aria-busy": loading }, loading ? /* @__PURE__ */ import_react32.default.createElement("p", { className: "wtt-pp-directory-state", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u76EE\u5F55\u2026") : listing ? entries.length ? /* @__PURE__ */ import_react32.default.createElement("ul", { "aria-label": "\u5B50\u6587\u4EF6\u5939" }, entries.map((entry) => /* @__PURE__ */ import_react32.default.createElement("li", { key: entry.path }, /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, title: entry.path, "aria-label": `\u8FDB\u5165\u6587\u4EF6\u5939 ${entry.name}`, onClick: () => void navigate(entry.path) }, /* @__PURE__ */ import_react32.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react32.default.createElement("span", null, entry.name), /* @__PURE__ */ import_react32.default.createElement("span", { className: "wtt-pp-enter", "aria-hidden": "true" }, "\u203A"))))) : /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-pp-directory-state" }, /* @__PURE__ */ import_react32.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react32.default.createElement("p", null, showHidden ? "\u6B64\u76EE\u5F55\u6CA1\u6709\u5B50\u6587\u4EF6\u5939\u3002" : "\u6B64\u76EE\u5F55\u6CA1\u6709\u53EF\u89C1\u7684\u5B50\u6587\u4EF6\u5939\u3002"), /* @__PURE__ */ import_react32.default.createElement("span", null, isSkill ? "\u53EF\u76F4\u63A5\u9009\u62E9\u5F53\u524D\u76EE\u5F55\u3002" : "\u53EF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u76EE\u5F55\u4F5C\u4E3A\u9879\u76EE\u3002")) : /* @__PURE__ */ import_react32.default.createElement("p", { className: "wtt-pp-directory-state" }, isSkill ? "\u8F93\u5165\u6280\u80FD\u6587\u4EF6\u5939\u8DEF\u5F84\u3002" : "\u9009\u62E9\u6700\u8FD1\u9879\u76EE\uFF0C\u6216\u8F93\u5165\u6587\u4EF6\u5939\u8DEF\u5F84\u3002")), /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-pp-browser-footer" }, /* @__PURE__ */ import_react32.default.createElement("label", null, /* @__PURE__ */ import_react32.default.createElement("input", { type: "checkbox", checked: showHidden, disabled: working, onChange: (event) => setShowHidden(event.target.checked) }), "\u663E\u793A\u9690\u85CF\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react32.default.createElement("span", null, loading ? "" : `${entries.length} \u4E2A\u6587\u4EF6\u5939`)), listing?.truncated && /* @__PURE__ */ import_react32.default.createElement("p", { className: "wtt-pp-truncated" }, "\u6B64\u76EE\u5F55\u5185\u5BB9\u8F83\u591A\uFF0C\u5217\u8868\u53EA\u663E\u793A\u90E8\u5206\u6587\u4EF6\u5939\uFF1B\u53EF\u8F93\u5165\u5B8C\u6574\u8DEF\u5F84\u524D\u5F80\u3002"))),
-    openError && /* @__PURE__ */ import_react32.default.createElement(UserError, { className: "wtt-pp-error wtt-pp-open-error", error: openError }),
-    /* @__PURE__ */ import_react32.default.createElement(DialogFooter, { className: "wtt-pp-actions" }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-pp-selection" }, /* @__PURE__ */ import_react32.default.createElement("span", null, isSkill ? "\u5C06\u6DFB\u52A0\u7684\u6280\u80FD\u6587\u4EF6\u5939" : "\u5C06\u4F7F\u7528\u7684\u9879\u76EE\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react32.default.createElement("code", null, openingPath || chosenPath || "\u8BF7\u9009\u62E9\u6587\u4EF6\u5939")), /* @__PURE__ */ import_react32.default.createElement("div", null, /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "primary", type: "button", className: "wtt-pp-open", disabled: working || !chosenPath, onClick: () => void openProject(chosenPath) }, working ? "\u5904\u7406\u4E2D\u2026" : isSkill ? "\u4F7F\u7528\u6B64\u6587\u4EF6\u5939" : "\u6253\u5F00\u6B64\u6587\u4EF6\u5939")))
+    } }, /* @__PURE__ */ import_react33.default.createElement("label", { htmlFor: pathId }, "\u6587\u4EF6\u5939\u8DEF\u5F84"), /* @__PURE__ */ import_react33.default.createElement("div", null, /* @__PURE__ */ import_react33.default.createElement("input", { id: pathId, autoFocus: true, value: path, disabled: working, onChange: (event) => changePath(event.target.value), spellCheck: false, autoComplete: "off", placeholder: "\u7C98\u8D34\u672C\u673A\u6587\u4EF6\u5939\u7684\u5B8C\u6574\u8DEF\u5F84" }), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "submit", disabled: working || !chosenPath }, "\u524D\u5F80"))), /* @__PURE__ */ import_react33.default.createElement("nav", { className: "wtt-pp-navigation", "aria-label": "\u76EE\u5F55\u5BFC\u822A" }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !parent || working || loading, onClick: () => void navigate(parent.path), "aria-label": "\u4E0A\u4E00\u7EA7\u76EE\u5F55", title: "\u4E0A\u4E00\u7EA7\u76EE\u5F55" }, "\u2191"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !listing?.home || working || loading, onClick: () => void navigate(listing.home) }, "\u6211\u7684\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-pp-crumbs" }, (listing?.crumbs || []).map((crumb, index2) => /* @__PURE__ */ import_react33.default.createElement(import_react33.default.Fragment, { key: crumb.path }, index2 > 0 && /* @__PURE__ */ import_react33.default.createElement("span", { "aria-hidden": "true" }, "/"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", title: crumb.path, disabled: working || loading, "aria-current": index2 === listing.crumbs.length - 1 ? "location" : void 0, onClick: () => void navigate(crumb.path) }, crumb.name))))), browseError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wtt-pp-error", error: browseError }), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-pp-directory-list", "aria-busy": loading }, loading ? /* @__PURE__ */ import_react33.default.createElement("p", { className: "wtt-pp-directory-state", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u76EE\u5F55\u2026") : listing ? entries.length ? /* @__PURE__ */ import_react33.default.createElement("ul", { "aria-label": "\u5B50\u6587\u4EF6\u5939" }, entries.map((entry) => /* @__PURE__ */ import_react33.default.createElement("li", { key: entry.path }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, title: entry.path, "aria-label": `\u8FDB\u5165\u6587\u4EF6\u5939 ${entry.name}`, onClick: () => void navigate(entry.path) }, /* @__PURE__ */ import_react33.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react33.default.createElement("span", null, entry.name), /* @__PURE__ */ import_react33.default.createElement("span", { className: "wtt-pp-enter", "aria-hidden": "true" }, "\u203A"))))) : /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-pp-directory-state" }, /* @__PURE__ */ import_react33.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react33.default.createElement("p", null, showHidden ? "\u6B64\u76EE\u5F55\u6CA1\u6709\u5B50\u6587\u4EF6\u5939\u3002" : "\u6B64\u76EE\u5F55\u6CA1\u6709\u53EF\u89C1\u7684\u5B50\u6587\u4EF6\u5939\u3002"), /* @__PURE__ */ import_react33.default.createElement("span", null, isSkill ? "\u53EF\u76F4\u63A5\u9009\u62E9\u5F53\u524D\u76EE\u5F55\u3002" : "\u53EF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u76EE\u5F55\u4F5C\u4E3A\u9879\u76EE\u3002")) : /* @__PURE__ */ import_react33.default.createElement("p", { className: "wtt-pp-directory-state" }, isSkill ? "\u8F93\u5165\u6280\u80FD\u6587\u4EF6\u5939\u8DEF\u5F84\u3002" : "\u9009\u62E9\u6700\u8FD1\u9879\u76EE\uFF0C\u6216\u8F93\u5165\u6587\u4EF6\u5939\u8DEF\u5F84\u3002")), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-pp-browser-footer" }, /* @__PURE__ */ import_react33.default.createElement("label", null, /* @__PURE__ */ import_react33.default.createElement("input", { type: "checkbox", checked: showHidden, disabled: working, onChange: (event) => setShowHidden(event.target.checked) }), "\u663E\u793A\u9690\u85CF\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react33.default.createElement("span", null, loading ? "" : `${entries.length} \u4E2A\u6587\u4EF6\u5939`)), listing?.truncated && /* @__PURE__ */ import_react33.default.createElement("p", { className: "wtt-pp-truncated" }, "\u6B64\u76EE\u5F55\u5185\u5BB9\u8F83\u591A\uFF0C\u5217\u8868\u53EA\u663E\u793A\u90E8\u5206\u6587\u4EF6\u5939\uFF1B\u53EF\u8F93\u5165\u5B8C\u6574\u8DEF\u5F84\u524D\u5F80\u3002"))),
+    openError && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wtt-pp-error wtt-pp-open-error", error: openError }),
+    /* @__PURE__ */ import_react33.default.createElement(DialogFooter, { className: "wtt-pp-actions" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-pp-selection" }, /* @__PURE__ */ import_react33.default.createElement("span", null, isSkill ? "\u5C06\u6DFB\u52A0\u7684\u6280\u80FD\u6587\u4EF6\u5939" : "\u5C06\u4F7F\u7528\u7684\u9879\u76EE\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react33.default.createElement("code", null, openingPath || chosenPath || "\u8BF7\u9009\u62E9\u6587\u4EF6\u5939")), /* @__PURE__ */ import_react33.default.createElement("div", null, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "primary", type: "button", className: "wtt-pp-open", disabled: working || !chosenPath, onClick: () => void openProject(chosenPath) }, working ? "\u5904\u7406\u4E2D\u2026" : isSkill ? "\u4F7F\u7528\u6B64\u6587\u4EF6\u5939" : "\u6253\u5F00\u6B64\u6587\u4EF6\u5939")))
   );
 }
 
 // src/skill-settings.jsx
-var messageOf4 = (error) => error?.rpcError?.message || error?.message || String(error);
+var messageOf5 = (error) => error?.rpcError?.message || error?.message || String(error);
 function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSave, onPreference, onClose }) {
-  const id2 = (0, import_react33.useId)(), dialog = (0, import_react33.useRef)(null), searchRef = (0, import_react33.useRef)(null), locked = (0, import_react33.useRef)(false);
-  const [search, setSearch] = (0, import_react33.useState)(""), [saving, setSaving] = (0, import_react33.useState)(false), [localError, setLocalError] = (0, import_react33.useState)("");
-  const [folderOpen, setFolderOpen] = (0, import_react33.useState)(false), [notice, setNotice] = (0, import_react33.useState)("");
-  (0, import_react33.useEffect)(() => {
+  const id2 = (0, import_react34.useId)(), dialog = (0, import_react34.useRef)(null), searchRef = (0, import_react34.useRef)(null), locked = (0, import_react34.useRef)(false);
+  const [search, setSearch] = (0, import_react34.useState)(""), [saving, setSaving] = (0, import_react34.useState)(false), [localError, setLocalError] = (0, import_react34.useState)("");
+  const [folderOpen, setFolderOpen] = (0, import_react34.useState)(false), [notice, setNotice] = (0, import_react34.useState)("");
+  (0, import_react34.useEffect)(() => {
     if (open && !dialog.current.open) {
       dialog.current.showModal();
       setSearch("");
@@ -42659,7 +42994,7 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
       await action();
       setNotice(success);
     } catch (cause) {
-      setLocalError(messageOf4(cause));
+      setLocalError(messageOf5(cause));
       throw cause;
     } finally {
       locked.current = false;
@@ -42684,7 +43019,7 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
       setFolderOpen(false);
     }, "\u6280\u80FD\u6587\u4EF6\u5939\u5DF2\u6DFB\u52A0\uFF0C\u5217\u8868\u5DF2\u66F4\u65B0\u3002");
   }
-  return /* @__PURE__ */ import_react33.default.createElement(import_react33.default.Fragment, null, /* @__PURE__ */ import_react33.default.createElement(
+  return /* @__PURE__ */ import_react34.default.createElement(import_react34.default.Fragment, null, /* @__PURE__ */ import_react34.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -42699,9 +43034,9 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => event.stopPropagation()
     },
-    /* @__PURE__ */ import_react33.default.createElement(DialogHeader, { title: "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", titleId: `${id2}-title`, description: "\u70B9\u661F\u6807\u5373\u53EF\u4FDD\u5B58\uFF0C\u6240\u6709\u9879\u76EE\u5171\u7528\u3002\u5E38\u7528\u6309\u94AE\u53EF\u81EA\u5B9A\u4E49\u540D\u79F0\u3002", onClose, closeLabel: "\u5173\u95ED\u6280\u80FD\u8BBE\u7F6E", busy: saving }),
-    /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-skill-settings-body" }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-skill-search-row" }, /* @__PURE__ */ import_react33.default.createElement("input", { ref: searchRef, "aria-label": "\u641C\u7D22\u672C\u673A\u6280\u80FD", type: "search", value: search, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u4E2D\u6587\u5FEB\u6377\u540D\u6216\u8BF4\u660E" }), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => void change(onRefresh, "\u6280\u80FD\u5217\u8868\u5DF2\u5237\u65B0\u3002").catch(() => {
-    }) }, "\u5237\u65B0")), /* @__PURE__ */ import_react33.default.createElement("p", { className: "wcc-skill-count" }, skills.length, " \u4E2A\u53EF\u7528\u6280\u80FD \xB7 ", favorites.size, " \u4E2A\u5E38\u7528", saving ? " \xB7 \u4FDD\u5B58\u4E2D\u2026" : ""), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-skill-quick-list", "aria-label": "\u672C\u673A\u6280\u80FD\u5217\u8868" }, entries.map((skill) => /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-skill-quick-item", key: skill.name }, /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-skill-star", "aria-label": `${favorites.has(skill.name) ? "\u53D6\u6D88\u5E38\u7528" : "\u8BBE\u4E3A\u5E38\u7528"}\uFF1A${skillLabel(skill)}`, "aria-pressed": favorites.has(skill.name), disabled: busy || skill.unavailable && !favorites.has(skill.name), onClick: () => void preference({ name: skill.name, favorite: !favorites.has(skill.name) }, favorites.has(skill.name) ? "\u5DF2\u53D6\u6D88\u5E38\u7528\u3002" : "\u5DF2\u8BBE\u4E3A\u5E38\u7528\uFF0C\u56DE\u5230\u8F93\u5165\u6846\u5373\u53EF\u4F7F\u7528\u3002") }, favorites.has(skill.name) ? "\u2605" : "\u2606"), /* @__PURE__ */ import_react33.default.createElement("div", { className: "wcc-skill-quick-copy" }, /* @__PURE__ */ import_react33.default.createElement("strong", null, skillLabel(skill)), /* @__PURE__ */ import_react33.default.createElement("span", null, skill.unavailable ? "\u672C\u673A\u6682\u672A\u627E\u5230\uFF0C\u53EF\u53D6\u6D88\u5E38\u7528\u6216\u68C0\u67E5\u6587\u4EF6\u5939\u3002" : skill.description || "\u6682\u65E0\u8BF4\u660E"), favorites.has(skill.name) && /* @__PURE__ */ import_react33.default.createElement("label", { className: "wcc-skill-alias" }, "\u5FEB\u6377\u540D\u79F0", /* @__PURE__ */ import_react33.default.createElement(
+    /* @__PURE__ */ import_react34.default.createElement(DialogHeader, { title: "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", titleId: `${id2}-title`, description: "\u70B9\u661F\u6807\u5373\u53EF\u4FDD\u5B58\uFF0C\u6240\u6709\u9879\u76EE\u5171\u7528\u3002\u5E38\u7528\u6309\u94AE\u53EF\u81EA\u5B9A\u4E49\u540D\u79F0\u3002", onClose, closeLabel: "\u5173\u95ED\u6280\u80FD\u8BBE\u7F6E", busy: saving }),
+    /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-skill-settings-body" }, /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-skill-search-row" }, /* @__PURE__ */ import_react34.default.createElement("input", { ref: searchRef, "aria-label": "\u641C\u7D22\u672C\u673A\u6280\u80FD", type: "search", value: search, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u4E2D\u6587\u5FEB\u6377\u540D\u6216\u8BF4\u660E" }), /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => void change(onRefresh, "\u6280\u80FD\u5217\u8868\u5DF2\u5237\u65B0\u3002").catch(() => {
+    }) }, "\u5237\u65B0")), /* @__PURE__ */ import_react34.default.createElement("p", { className: "wcc-skill-count" }, skills.length, " \u4E2A\u53EF\u7528\u6280\u80FD \xB7 ", favorites.size, " \u4E2A\u5E38\u7528", saving ? " \xB7 \u4FDD\u5B58\u4E2D\u2026" : ""), /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-skill-quick-list", "aria-label": "\u672C\u673A\u6280\u80FD\u5217\u8868" }, entries.map((skill) => /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-skill-quick-item", key: skill.name }, /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-skill-star", "aria-label": `${favorites.has(skill.name) ? "\u53D6\u6D88\u5E38\u7528" : "\u8BBE\u4E3A\u5E38\u7528"}\uFF1A${skillLabel(skill)}`, "aria-pressed": favorites.has(skill.name), disabled: busy || skill.unavailable && !favorites.has(skill.name), onClick: () => void preference({ name: skill.name, favorite: !favorites.has(skill.name) }, favorites.has(skill.name) ? "\u5DF2\u53D6\u6D88\u5E38\u7528\u3002" : "\u5DF2\u8BBE\u4E3A\u5E38\u7528\uFF0C\u56DE\u5230\u8F93\u5165\u6846\u5373\u53EF\u4F7F\u7528\u3002") }, favorites.has(skill.name) ? "\u2605" : "\u2606"), /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-skill-quick-copy" }, /* @__PURE__ */ import_react34.default.createElement("strong", null, skillLabel(skill)), /* @__PURE__ */ import_react34.default.createElement("span", null, skill.unavailable ? "\u672C\u673A\u6682\u672A\u627E\u5230\uFF0C\u53EF\u53D6\u6D88\u5E38\u7528\u6216\u68C0\u67E5\u6587\u4EF6\u5939\u3002" : skill.description || "\u6682\u65E0\u8BF4\u660E"), favorites.has(skill.name) && /* @__PURE__ */ import_react34.default.createElement("label", { className: "wcc-skill-alias" }, "\u5FEB\u6377\u540D\u79F0", /* @__PURE__ */ import_react34.default.createElement(
       "input",
       {
         key: `${skill.name}:${skill.label || ""}`,
@@ -42724,16 +43059,16 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
           if (label2 !== (skill.label || "")) void preference({ name: skill.name, label: label2 }, "\u5FEB\u6377\u540D\u79F0\u5DF2\u4FDD\u5B58\u3002");
         }
       }
-    )), /* @__PURE__ */ import_react33.default.createElement("details", null, /* @__PURE__ */ import_react33.default.createElement("summary", null, "\u67E5\u770B\u540D\u79F0\u4E0E\u6765\u6E90"), /* @__PURE__ */ import_react33.default.createElement("code", null, "/", skill.name), skill.path && /* @__PURE__ */ import_react33.default.createElement("code", null, skill.path), /* @__PURE__ */ import_react33.default.createElement("small", null, skill.origin || "\u672C\u673A\u6682\u672A\u627E\u5230"))))), !entries.length && /* @__PURE__ */ import_react33.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u672C\u673A\u6280\u80FD\u2026" : search ? "\u6CA1\u627E\u5230\u76F8\u5173\u6280\u80FD\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\u3002" : "\u8FD8\u6CA1\u6709\u53EF\u7528\u6280\u80FD\u3002\u6DFB\u52A0\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\u540E\u518D\u8BD5\u3002")), /* @__PURE__ */ import_react33.default.createElement("details", { className: "wcc-skill-folders" }, /* @__PURE__ */ import_react33.default.createElement("summary", null, "\u6280\u80FD\u6587\u4EF6\u5939 \xB7 \u81EA\u52A8\u53D1\u73B0\u4E0E\u81EA\u5B9A\u4E49"), /* @__PURE__ */ import_react33.default.createElement("p", null, "\u81EA\u52A8\u8BFB\u53D6\u5DF2\u5B58\u5728\u7684\u5E38\u89C1\u76EE\u5F55\uFF0C\u5E76\u4FDD\u7559 DSH \u7684\u9879\u76EE\u6280\u80FD\u6765\u6E90\u3002"), (catalog?.automaticDirectories || []).map((directory) => /* @__PURE__ */ import_react33.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react33.default.createElement("code", null, directory), /* @__PURE__ */ import_react33.default.createElement("small", null, "\u81EA\u52A8\u53D1\u73B0"))), settings.directories.map((directory) => /* @__PURE__ */ import_react33.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react33.default.createElement("code", null, directory), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, "aria-label": `\u79FB\u9664\u6280\u80FD\u76EE\u5F55 ${directory}`, onClick: () => void change(() => onSave({ ...settings, directories: settings.directories.filter((item) => item !== directory) }), "\u5DF2\u79FB\u9664\u5173\u8054\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559\u3002").catch(() => {
-    }) }, "\u79FB\u9664\u5173\u8054"))), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => setFolderOpen(true) }, "\u6DFB\u52A0\u6280\u80FD\u6587\u4EF6\u5939")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react33.default.createElement("details", { className: "wcc-skill-settings-warnings" }, /* @__PURE__ */ import_react33.default.createElement("summary", null, "\u6765\u6E90\u63D0\u793A \xB7 ", catalog.warnings.length, " \u9879"), /* @__PURE__ */ import_react33.default.createElement("ul", null, catalog.warnings.map((warning, index2) => /* @__PURE__ */ import_react33.default.createElement("li", { key: index2 }, warning)))), (localError || error) && /* @__PURE__ */ import_react33.default.createElement(UserError, { className: "wcc-skill-settings-error", error: localError || error })),
-    /* @__PURE__ */ import_react33.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react33.default.createElement("span", { role: "status" }, notice || "\u66F4\u6539\u81EA\u52A8\u4FDD\u5B58"), /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: saving, onClick: onClose }, "\u5B8C\u6210"))
-  ), open && folderOpen && /* @__PURE__ */ import_react33.default.createElement(ProjectPicker, { purpose: "skill", currentProject: { path: settings.directories[0] || catalog?.automaticDirectories?.[0] }, browseDirectory, onOpenProject: addDirectory, onClose: () => setFolderOpen(false), busy: saving }));
+    )), /* @__PURE__ */ import_react34.default.createElement("details", null, /* @__PURE__ */ import_react34.default.createElement("summary", null, "\u67E5\u770B\u540D\u79F0\u4E0E\u6765\u6E90"), /* @__PURE__ */ import_react34.default.createElement("code", null, "/", skill.name), skill.path && /* @__PURE__ */ import_react34.default.createElement("code", null, skill.path), /* @__PURE__ */ import_react34.default.createElement("small", null, skill.origin || "\u672C\u673A\u6682\u672A\u627E\u5230"))))), !entries.length && /* @__PURE__ */ import_react34.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u672C\u673A\u6280\u80FD\u2026" : search ? "\u6CA1\u627E\u5230\u76F8\u5173\u6280\u80FD\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\u3002" : "\u8FD8\u6CA1\u6709\u53EF\u7528\u6280\u80FD\u3002\u6DFB\u52A0\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\u540E\u518D\u8BD5\u3002")), /* @__PURE__ */ import_react34.default.createElement("details", { className: "wcc-skill-folders" }, /* @__PURE__ */ import_react34.default.createElement("summary", null, "\u6280\u80FD\u6587\u4EF6\u5939 \xB7 \u81EA\u52A8\u53D1\u73B0\u4E0E\u81EA\u5B9A\u4E49"), /* @__PURE__ */ import_react34.default.createElement("p", null, "\u81EA\u52A8\u8BFB\u53D6\u5DF2\u5B58\u5728\u7684\u5E38\u89C1\u76EE\u5F55\uFF0C\u5E76\u4FDD\u7559 DSH \u7684\u9879\u76EE\u6280\u80FD\u6765\u6E90\u3002"), (catalog?.automaticDirectories || []).map((directory) => /* @__PURE__ */ import_react34.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react34.default.createElement("code", null, directory), /* @__PURE__ */ import_react34.default.createElement("small", null, "\u81EA\u52A8\u53D1\u73B0"))), settings.directories.map((directory) => /* @__PURE__ */ import_react34.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react34.default.createElement("code", null, directory), /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, "aria-label": `\u79FB\u9664\u6280\u80FD\u76EE\u5F55 ${directory}`, onClick: () => void change(() => onSave({ ...settings, directories: settings.directories.filter((item) => item !== directory) }), "\u5DF2\u79FB\u9664\u5173\u8054\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559\u3002").catch(() => {
+    }) }, "\u79FB\u9664\u5173\u8054"))), /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => setFolderOpen(true) }, "\u6DFB\u52A0\u6280\u80FD\u6587\u4EF6\u5939")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react34.default.createElement("details", { className: "wcc-skill-settings-warnings" }, /* @__PURE__ */ import_react34.default.createElement("summary", null, "\u6765\u6E90\u63D0\u793A \xB7 ", catalog.warnings.length, " \u9879"), /* @__PURE__ */ import_react34.default.createElement("ul", null, catalog.warnings.map((warning, index2) => /* @__PURE__ */ import_react34.default.createElement("li", { key: index2 }, warning)))), (localError || error) && /* @__PURE__ */ import_react34.default.createElement(UserError, { className: "wcc-skill-settings-error", error: localError || error })),
+    /* @__PURE__ */ import_react34.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react34.default.createElement("span", { role: "status" }, notice || "\u66F4\u6539\u81EA\u52A8\u4FDD\u5B58"), /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: saving, onClick: onClose }, "\u5B8C\u6210"))
+  ), open && folderOpen && /* @__PURE__ */ import_react34.default.createElement(ProjectPicker, { purpose: "skill", currentProject: { path: settings.directories[0] || catalog?.automaticDirectories?.[0] }, browseDirectory, onOpenProject: addDirectory, onClose: () => setFolderOpen(false), busy: saving }));
 }
 
 // src/model-selection.jsx
-var import_react34 = __toESM(require("react"), 1);
+var import_react35 = __toESM(require("react"), 1);
 function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false }) {
-  const id2 = (0, import_react34.useId)();
+  const id2 = (0, import_react35.useId)();
   let normalized = null;
   let catalogError = "";
   if (catalog) {
@@ -42757,33 +43092,33 @@ function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, o
     if (nextModel.reasoning?.defaultEffort) next.reasoningEffort = nextModel.reasoning.defaultEffort;
     onChange?.(next);
   }
-  const fields = /* @__PURE__ */ import_react34.default.createElement(import_react34.default.Fragment, null, /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-model-selection-heading" }, /* @__PURE__ */ import_react34.default.createElement("span", null, "\u521B\u4F5C\u6A21\u578B"), /* @__PURE__ */ import_react34.default.createElement("div", null, onRefresh && /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onRefresh, disabled: loading, "aria-label": "\u5237\u65B0\u6A21\u578B\u76EE\u5F55" }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), onOpenSettings && /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"))), /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-model-selection-fields" }, /* @__PURE__ */ import_react34.default.createElement("label", { htmlFor: `${id2}-provider` }, "\u63D0\u4F9B\u5546", /* @__PURE__ */ import_react34.default.createElement("select", { id: `${id2}-provider`, "aria-label": "\u6A21\u578B\u63D0\u4F9B\u5546", value: current?.provider || "", disabled, onChange: (event) => {
+  const fields = /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement("div", { className: "wcc-model-selection-heading" }, /* @__PURE__ */ import_react35.default.createElement("span", null, "\u521B\u4F5C\u6A21\u578B"), /* @__PURE__ */ import_react35.default.createElement("div", null, onRefresh && /* @__PURE__ */ import_react35.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onRefresh, disabled: loading, "aria-label": "\u5237\u65B0\u6A21\u578B\u76EE\u5F55" }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), onOpenSettings && /* @__PURE__ */ import_react35.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"))), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wcc-model-selection-fields" }, /* @__PURE__ */ import_react35.default.createElement("label", { htmlFor: `${id2}-provider` }, "\u63D0\u4F9B\u5546", /* @__PURE__ */ import_react35.default.createElement("select", { id: `${id2}-provider`, "aria-label": "\u6A21\u578B\u63D0\u4F9B\u5546", value: current?.provider || "", disabled, onChange: (event) => {
     const next = groups.find((group) => group.id === event.target.value);
     chooseModel(next, next?.models[0]);
-  } }, !current && /* @__PURE__ */ import_react34.default.createElement("option", { value: "" }, loading ? "\u6B63\u5728\u8BFB\u53D6\u2026" : "\u9009\u62E9\u63D0\u4F9B\u5546"), current && !provider && /* @__PURE__ */ import_react34.default.createElement("option", { value: current.provider, disabled: true }, current.provider, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), groups.map((group) => /* @__PURE__ */ import_react34.default.createElement("option", { key: group.id, value: group.id }, group.name)))), /* @__PURE__ */ import_react34.default.createElement("label", { htmlFor: `${id2}-model` }, "\u6A21\u578B", /* @__PURE__ */ import_react34.default.createElement("select", { id: `${id2}-model`, "aria-label": "\u521B\u4F5C\u6A21\u578B", value: current?.model || "", disabled: disabled || !provider, onChange: (event) => chooseModel(provider, provider?.models.find((item) => item.id === event.target.value)) }, !current && /* @__PURE__ */ import_react34.default.createElement("option", { value: "" }, "\u9009\u62E9\u6A21\u578B"), current && !model && /* @__PURE__ */ import_react34.default.createElement("option", { value: current.model, disabled: true }, current.model, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), provider?.models.map((item) => /* @__PURE__ */ import_react34.default.createElement("option", { key: item.id, value: item.id }, item.name)))), (efforts.length > 0 || current?.reasoningEffort) && /* @__PURE__ */ import_react34.default.createElement("label", { htmlFor: `${id2}-effort` }, "\u63A8\u7406\u7B49\u7EA7", /* @__PURE__ */ import_react34.default.createElement("select", { id: `${id2}-effort`, "aria-label": "\u6A21\u578B\u63A8\u7406\u7B49\u7EA7", disabled: disabled || !model, value: current?.reasoningEffort || "", onChange: (event) => {
+  } }, !current && /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, loading ? "\u6B63\u5728\u8BFB\u53D6\u2026" : "\u9009\u62E9\u63D0\u4F9B\u5546"), current && !provider && /* @__PURE__ */ import_react35.default.createElement("option", { value: current.provider, disabled: true }, current.provider, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), groups.map((group) => /* @__PURE__ */ import_react35.default.createElement("option", { key: group.id, value: group.id }, group.name)))), /* @__PURE__ */ import_react35.default.createElement("label", { htmlFor: `${id2}-model` }, "\u6A21\u578B", /* @__PURE__ */ import_react35.default.createElement("select", { id: `${id2}-model`, "aria-label": "\u521B\u4F5C\u6A21\u578B", value: current?.model || "", disabled: disabled || !provider, onChange: (event) => chooseModel(provider, provider?.models.find((item) => item.id === event.target.value)) }, !current && /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, "\u9009\u62E9\u6A21\u578B"), current && !model && /* @__PURE__ */ import_react35.default.createElement("option", { value: current.model, disabled: true }, current.model, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), provider?.models.map((item) => /* @__PURE__ */ import_react35.default.createElement("option", { key: item.id, value: item.id }, item.name)))), (efforts.length > 0 || current?.reasoningEffort) && /* @__PURE__ */ import_react35.default.createElement("label", { htmlFor: `${id2}-effort` }, "\u63A8\u7406\u7B49\u7EA7", /* @__PURE__ */ import_react35.default.createElement("select", { id: `${id2}-effort`, "aria-label": "\u6A21\u578B\u63A8\u7406\u7B49\u7EA7", disabled: disabled || !model, value: current?.reasoningEffort || "", onChange: (event) => {
     const next = { provider: current.provider, model: current.model };
     if (event.target.value) next.reasoningEffort = event.target.value;
     onChange?.(next);
-  } }, /* @__PURE__ */ import_react34.default.createElement("option", { value: "" }, "\u6A21\u578B\u9ED8\u8BA4"), current?.reasoningEffort && !efforts.some((item) => item.id === current.reasoningEffort) && /* @__PURE__ */ import_react34.default.createElement("option", { value: current.reasoningEffort, disabled: true }, current.reasoningEffort, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), efforts.map((item) => /* @__PURE__ */ import_react34.default.createElement("option", { key: item.id, value: item.id }, EFFORT_LABELS[item.id] || item.name))))), /* @__PURE__ */ import_react34.default.createElement("p", { className: "wcc-model-selection-hint" }, "\u7528\u4E8E\u4E4B\u540E\u53D1\u8D77\u7684\u521B\u4F5C\uFF1B\u5DF2\u6709\u4EFB\u52A1\u7EE7\u7EED\u4F7F\u7528\u521B\u5EFA\u65F6\u7684\u6A21\u578B\u3002"));
+  } }, /* @__PURE__ */ import_react35.default.createElement("option", { value: "" }, "\u6A21\u578B\u9ED8\u8BA4"), current?.reasoningEffort && !efforts.some((item) => item.id === current.reasoningEffort) && /* @__PURE__ */ import_react35.default.createElement("option", { value: current.reasoningEffort, disabled: true }, current.reasoningEffort, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), efforts.map((item) => /* @__PURE__ */ import_react35.default.createElement("option", { key: item.id, value: item.id }, EFFORT_LABELS[item.id] || item.name))))), /* @__PURE__ */ import_react35.default.createElement("p", { className: "wcc-model-selection-hint" }, "\u7528\u4E8E\u4E4B\u540E\u53D1\u8D77\u7684\u521B\u4F5C\uFF1B\u5DF2\u6709\u4EFB\u52A1\u7EE7\u7EED\u4F7F\u7528\u521B\u5EFA\u65F6\u7684\u6A21\u578B\u3002"));
   const modelLabel = loading ? "\u8BFB\u53D6\u6A21\u578B\u2026" : model?.name || current?.model || "\u9009\u62E9\u6A21\u578B";
   const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : "\u9ED8\u8BA4";
   const modelState = failure ? "\u52A0\u8F7D\u5931\u8D25" : !loading && !groups.length ? "\u672A\u914D\u7F6E" : unavailable ? "\u4E0D\u53EF\u7528" : normalized?.failures.length ? "\u90E8\u5206\u4E0D\u53EF\u7528" : "";
-  const diagnostics = /* @__PURE__ */ import_react34.default.createElement(import_react34.default.Fragment, null, failure && /* @__PURE__ */ import_react34.default.createElement(UserError, { className: "wcc-model-selection-error", error: failure }), !loading && !failure && !groups.length && /* @__PURE__ */ import_react34.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B\uFF0C\u8BF7\u6253\u5F00\u6A21\u578B\u8BBE\u7F6E\u6DFB\u52A0\u63D0\u4F9B\u5546\u3002"), unavailable && (groups.length > 0 || !compact) && /* @__PURE__ */ import_react34.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u8FD9\u4E2A\u6A21\u578B\u76EE\u524D\u4E0D\u53EF\u7528\u3002\u8BF7\u68C0\u67E5\u8FDE\u63A5\u8BBE\u7F6E\uFF0C\u6216\u4E3A\u65B0\u4EFB\u52A1\u9009\u62E9\u5176\u4ED6\u6A21\u578B\u3002"), normalized?.failures.map((item, index2) => /* @__PURE__ */ import_react34.default.createElement("p", { className: "wcc-model-selection-error", key: `${item.id}-${index2}`, role: "status" }, item.name, "\uFF1A", item.message)));
-  return /* @__PURE__ */ import_react34.default.createElement("section", { className: `wcc-model-selection${compact ? " is-compact" : ""}`, "aria-label": "\u521B\u4F5C\u6A21\u578B", "aria-busy": loading }, compact ? /* @__PURE__ */ import_react34.default.createElement("details", { className: "wcc-model-selection-disclosure", onKeyDown: (event) => {
+  const diagnostics = /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, failure && /* @__PURE__ */ import_react35.default.createElement(UserError, { className: "wcc-model-selection-error", error: failure }), !loading && !failure && !groups.length && /* @__PURE__ */ import_react35.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B\uFF0C\u8BF7\u6253\u5F00\u6A21\u578B\u8BBE\u7F6E\u6DFB\u52A0\u63D0\u4F9B\u5546\u3002"), unavailable && (groups.length > 0 || !compact) && /* @__PURE__ */ import_react35.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u8FD9\u4E2A\u6A21\u578B\u76EE\u524D\u4E0D\u53EF\u7528\u3002\u8BF7\u68C0\u67E5\u8FDE\u63A5\u8BBE\u7F6E\uFF0C\u6216\u4E3A\u65B0\u4EFB\u52A1\u9009\u62E9\u5176\u4ED6\u6A21\u578B\u3002"), normalized?.failures.map((item, index2) => /* @__PURE__ */ import_react35.default.createElement("p", { className: "wcc-model-selection-error", key: `${item.id}-${index2}`, role: "status" }, item.name, "\uFF1A", item.message)));
+  return /* @__PURE__ */ import_react35.default.createElement("section", { className: `wcc-model-selection${compact ? " is-compact" : ""}`, "aria-label": "\u521B\u4F5C\u6A21\u578B", "aria-busy": loading }, compact ? /* @__PURE__ */ import_react35.default.createElement("details", { className: "wcc-model-selection-disclosure", onKeyDown: (event) => {
     if (event.key === "Escape" && event.currentTarget.open) {
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.open = false;
       event.currentTarget.querySelector("summary")?.focus();
     }
-  } }, /* @__PURE__ */ import_react34.default.createElement("summary", { "aria-label": [`\u521B\u4F5C\u6A21\u578B\uFF1A${modelLabel}`, effortLabel, modelState].filter(Boolean).join(" \xB7 "), title: [provider?.name || current?.provider, modelLabel, `\u63A8\u7406\uFF1A${effortLabel}`, !onChange && "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A"].filter(Boolean).join(" \xB7 ") }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "wcc-model-selection-current" }, modelLabel), /* @__PURE__ */ import_react34.default.createElement("span", { className: "wcc-model-selection-effort" }, "\xB7 ", effortLabel), modelState && /* @__PURE__ */ import_react34.default.createElement("span", { className: "wcc-model-selection-state" }, modelState), !onChange && current && /* @__PURE__ */ import_react34.default.createElement("span", { className: "wcc-model-selection-state" }, "\u5DF2\u9501\u5B9A"), /* @__PURE__ */ import_react34.default.createElement("span", { className: "wcc-model-selection-chevron", "aria-hidden": "true" }, "\u2304")), /* @__PURE__ */ import_react34.default.createElement("div", { className: "wcc-model-selection-expanded" }, fields, diagnostics)) : /* @__PURE__ */ import_react34.default.createElement(import_react34.default.Fragment, null, fields, diagnostics));
+  } }, /* @__PURE__ */ import_react35.default.createElement("summary", { "aria-label": [`\u521B\u4F5C\u6A21\u578B\uFF1A${modelLabel}`, effortLabel, modelState].filter(Boolean).join(" \xB7 "), title: [provider?.name || current?.provider, modelLabel, `\u63A8\u7406\uFF1A${effortLabel}`, !onChange && "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A"].filter(Boolean).join(" \xB7 ") }, /* @__PURE__ */ import_react35.default.createElement("span", { className: "wcc-model-selection-current" }, modelLabel), /* @__PURE__ */ import_react35.default.createElement("span", { className: "wcc-model-selection-effort" }, "\xB7 ", effortLabel), modelState && /* @__PURE__ */ import_react35.default.createElement("span", { className: "wcc-model-selection-state" }, modelState), !onChange && current && /* @__PURE__ */ import_react35.default.createElement("span", { className: "wcc-model-selection-state" }, "\u5DF2\u9501\u5B9A"), /* @__PURE__ */ import_react35.default.createElement("span", { className: "wcc-model-selection-chevron", "aria-hidden": "true" }, "\u2304")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wcc-model-selection-expanded" }, fields, diagnostics)) : /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, fields, diagnostics));
 }
 
 // src/task-input-summary.jsx
-var import_react35 = __toESM(require("react"), 1);
+var import_react36 = __toESM(require("react"), 1);
 function TaskInputSummary({ instruction, references, skills, model, engine, renderFile }) {
   const effort = model?.reasoningEffort;
-  return /* @__PURE__ */ import_react35.default.createElement("details", { className: "wcc-task-input-summary" }, /* @__PURE__ */ import_react35.default.createElement("summary", null, /* @__PURE__ */ import_react35.default.createElement("span", null, "\u521B\u4F5C\u8BE6\u60C5"), references.length > 0 && /* @__PURE__ */ import_react35.default.createElement("small", null, references.length, " \u4EFD\u5F15\u7528")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wcc-task-input-body" }, /* @__PURE__ */ import_react35.default.createElement("pre", null, instruction || "\u8FD9\u6B21\u521B\u4F5C\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002"), (skills?.length > 0 || model?.model || engine) && /* @__PURE__ */ import_react35.default.createElement("dl", { className: "wcc-task-input-meta" }, !!skills?.length && /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement("dt", null, "\u4F7F\u7528\u6280\u80FD"), /* @__PURE__ */ import_react35.default.createElement("dd", null, skills.join("\u3001"))), model?.model && /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement("dt", null, "\u4F7F\u7528\u6A21\u578B"), /* @__PURE__ */ import_react35.default.createElement("dd", null, model.model, effort ? ` \xB7 \u63A8\u7406\u7B49\u7EA7 ${EFFORT_LABELS[effort] || effort}` : "")), engine && /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement("dt", null, "\u5236\u4F5C\u65B9\u5F0F"), /* @__PURE__ */ import_react35.default.createElement("dd", null, engine))), references.map((reference) => /* @__PURE__ */ import_react35.default.createElement("details", { key: reference.id }, /* @__PURE__ */ import_react35.default.createElement("summary", null, reference.displayTitle || reference.title || reference.name || "\u5F15\u7528\u8D44\u6599"), (reference.referenceNote || reference.unavailable || ["missing", "modified", "changed"].includes(reference.status)) && /* @__PURE__ */ import_react35.default.createElement("p", { role: "status" }, reference.referenceNote || (reference.status === "missing" ? "\u6587\u4EF6\u5DF2\u7F3A\u5931\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002" : reference.status === "modified" ? "\u6587\u4EF6\u5DF2\u5728\u5916\u90E8\u4FEE\u6539\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002" : "\u6765\u6E90\u5DF2\u53D8\u5316\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002")), renderFile?.(reference), reference.truncated && /* @__PURE__ */ import_react35.default.createElement("p", null, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(reference.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${reference.fullLength} \u5B57\u7B26` : "", "\u3002"), /* @__PURE__ */ import_react35.default.createElement("pre", null, reference.previewText ?? reference.content ?? "\u6B64\u683C\u5F0F\u672A\u63D0\u53D6\u6B63\u6587")))));
+  return /* @__PURE__ */ import_react36.default.createElement("details", { className: "wcc-task-input-summary" }, /* @__PURE__ */ import_react36.default.createElement("summary", null, /* @__PURE__ */ import_react36.default.createElement("span", null, "\u521B\u4F5C\u8BE6\u60C5"), references.length > 0 && /* @__PURE__ */ import_react36.default.createElement("small", null, references.length, " \u4EFD\u5F15\u7528")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wcc-task-input-body" }, /* @__PURE__ */ import_react36.default.createElement("pre", null, instruction || "\u8FD9\u6B21\u521B\u4F5C\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002"), (skills?.length > 0 || model?.model || engine) && /* @__PURE__ */ import_react36.default.createElement("dl", { className: "wcc-task-input-meta" }, !!skills?.length && /* @__PURE__ */ import_react36.default.createElement(import_react36.default.Fragment, null, /* @__PURE__ */ import_react36.default.createElement("dt", null, "\u4F7F\u7528\u6280\u80FD"), /* @__PURE__ */ import_react36.default.createElement("dd", null, skills.join("\u3001"))), model?.model && /* @__PURE__ */ import_react36.default.createElement(import_react36.default.Fragment, null, /* @__PURE__ */ import_react36.default.createElement("dt", null, "\u4F7F\u7528\u6A21\u578B"), /* @__PURE__ */ import_react36.default.createElement("dd", null, model.model, effort ? ` \xB7 \u63A8\u7406\u7B49\u7EA7 ${EFFORT_LABELS[effort] || effort}` : "")), engine && /* @__PURE__ */ import_react36.default.createElement(import_react36.default.Fragment, null, /* @__PURE__ */ import_react36.default.createElement("dt", null, "\u5236\u4F5C\u65B9\u5F0F"), /* @__PURE__ */ import_react36.default.createElement("dd", null, engine))), references.map((reference) => /* @__PURE__ */ import_react36.default.createElement("details", { key: reference.id }, /* @__PURE__ */ import_react36.default.createElement("summary", null, reference.displayTitle || reference.title || reference.name || "\u5F15\u7528\u8D44\u6599"), (reference.referenceNote || reference.unavailable || ["missing", "modified", "changed"].includes(reference.status)) && /* @__PURE__ */ import_react36.default.createElement("p", { role: "status" }, reference.referenceNote || (reference.status === "missing" ? "\u6587\u4EF6\u5DF2\u7F3A\u5931\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002" : reference.status === "modified" ? "\u6587\u4EF6\u5DF2\u5728\u5916\u90E8\u4FEE\u6539\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002" : "\u6765\u6E90\u5DF2\u53D8\u5316\uFF0C\u4ECD\u53EF\u67E5\u770B\u5F15\u7528\u65F6\u7684\u5185\u5BB9\u3002")), renderFile?.(reference), reference.truncated && /* @__PURE__ */ import_react36.default.createElement("p", null, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(reference.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${reference.fullLength} \u5B57\u7B26` : "", "\u3002"), /* @__PURE__ */ import_react36.default.createElement("pre", null, reference.previewText ?? reference.content ?? "\u6B64\u683C\u5F0F\u672A\u63D0\u53D6\u6B63\u6587")))));
 }
 
 // src/pending-card-state.mjs
@@ -43048,7 +43383,7 @@ function reviewImagesFromQuestion(root2, question) {
     const reference = references[index2];
     if (!/\.(png|jpe?g|webp|gif)$/i.test(reference.file)) continue;
     const tail = text2.slice(reference.end, references[index2 + 1]?.start ?? text2.length);
-    const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu);
+    const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：=]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu);
     if (!checksum) continue;
     try {
       const selection2 = conversationFileSelection(root2, reference.file);
@@ -43059,19 +43394,30 @@ function reviewImagesFromQuestion(root2, question) {
   }
   return [...images.values()];
 }
+function reviewImagesFromInteraction(root2, interaction) {
+  const images = /* @__PURE__ */ new Map();
+  for (const question of interaction?.questions || []) {
+    const parts = [question.question, question.detail, ...(question.options || []).flatMap((option) => [option.label, option.description])];
+    for (const part of parts) for (const image of reviewImagesFromQuestion(root2, part)) {
+      if (images.size >= 24) return [...images.values()];
+      images.set(`${image.path}:${image.hash}`, image);
+    }
+  }
+  return [...images.values()];
+}
 
 // src/review-image-gallery.jsx
-var import_react36 = __toESM(require("react"), 1);
+var import_react37 = __toESM(require("react"), 1);
 function CandidateImage({ image, number, href, onOpen }) {
-  const [failed, setFailed] = (0, import_react36.useState)(false), [attempt, setAttempt] = (0, import_react36.useState)(0);
-  return /* @__PURE__ */ import_react36.default.createElement("figure", null, failed ? /* @__PURE__ */ import_react36.default.createElement("div", { className: "wcc-review-image-error" }, /* @__PURE__ */ import_react36.default.createElement("span", { role: "status" }, "\u56FE\u7247\u6682\u65F6\u65E0\u6CD5\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u6587\u4EF6\u4E0E\u6821\u9A8C\u503C\u3002"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", onClick: () => {
+  const [failed, setFailed] = (0, import_react37.useState)(false), [attempt, setAttempt] = (0, import_react37.useState)(0);
+  return /* @__PURE__ */ import_react37.default.createElement("figure", null, failed ? /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-review-image-error" }, /* @__PURE__ */ import_react37.default.createElement("span", { role: "status" }, "\u56FE\u7247\u6682\u65F6\u65E0\u6CD5\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u6587\u4EF6\u4E0E\u6821\u9A8C\u503C\u3002"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { size: "compact", onClick: () => {
     setFailed(false);
     setAttempt((value) => value + 1);
-  } }, "\u91CD\u65B0\u52A0\u8F7D")) : /* @__PURE__ */ import_react36.default.createElement(UiButton, { variant: "custom", className: "wcc-review-image-thumb", "aria-label": `\u653E\u5927\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onClick: onOpen }, /* @__PURE__ */ import_react36.default.createElement("img", { key: attempt, src: href, alt: `\u5019\u9009\u56FE\u7247 ${number}`, loading: "lazy", decoding: "async", onError: () => setFailed(true) })), /* @__PURE__ */ import_react36.default.createElement("figcaption", { title: image.name }, number, " \xB7 ", image.name));
+  } }, "\u91CD\u65B0\u52A0\u8F7D")) : /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", className: "wcc-review-image-thumb", "aria-label": `\u653E\u5927\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onClick: onOpen }, /* @__PURE__ */ import_react37.default.createElement("img", { key: attempt, src: href, alt: `\u5019\u9009\u56FE\u7247 ${number}`, loading: "lazy", decoding: "async", onError: () => setFailed(true) })), /* @__PURE__ */ import_react37.default.createElement("figcaption", { title: image.name }, number, " \xB7 ", image.name));
 }
 function ImageDialog({ image, number, getHref, onClose }) {
-  const dialog = (0, import_react36.useRef)(null), titleId = (0, import_react36.useId)(), [failed, setFailed] = (0, import_react36.useState)(false);
-  (0, import_react36.useEffect)(() => {
+  const dialog = (0, import_react37.useRef)(null), titleId = (0, import_react37.useId)(), [failed, setFailed] = (0, import_react37.useState)(false);
+  (0, import_react37.useEffect)(() => {
     const trigger = document.activeElement, element = dialog.current;
     element.showModal();
     return () => {
@@ -43079,7 +43425,7 @@ function ImageDialog({ image, number, getHref, onClose }) {
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     };
   }, []);
-  return /* @__PURE__ */ import_react36.default.createElement(
+  return /* @__PURE__ */ import_react37.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -43091,7 +43437,7 @@ function ImageDialog({ image, number, getHref, onClose }) {
       },
       onKeyDown: (event) => event.stopPropagation()
     },
-    /* @__PURE__ */ import_react36.default.createElement(
+    /* @__PURE__ */ import_react37.default.createElement(
       PanelHeader,
       {
         title: `\u5019\u9009 ${number} \xB7 ${image.name}`,
@@ -43101,12 +43447,12 @@ function ImageDialog({ image, number, getHref, onClose }) {
         closeLabel: "\u5173\u95ED\u5019\u9009\u56FE\u7247"
       }
     ),
-    /* @__PURE__ */ import_react36.default.createElement("div", { className: "wcc-review-image-full" }, failed ? /* @__PURE__ */ import_react36.default.createElement("p", { role: "alert" }, "\u56FE\u7247\u6682\u65F6\u65E0\u6CD5\u9884\u89C8\uFF0C\u8BF7\u5173\u95ED\u540E\u91CD\u65B0\u6838\u5BF9\u6587\u4EF6\u4E0E\u6821\u9A8C\u503C\u3002") : /* @__PURE__ */ import_react36.default.createElement("img", { src: getHref(image, true), alt: `\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onError: () => setFailed(true) }))
+    /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-review-image-full" }, failed ? /* @__PURE__ */ import_react37.default.createElement("p", { role: "alert" }, "\u56FE\u7247\u6682\u65F6\u65E0\u6CD5\u9884\u89C8\uFF0C\u8BF7\u5173\u95ED\u540E\u91CD\u65B0\u6838\u5BF9\u6587\u4EF6\u4E0E\u6821\u9A8C\u503C\u3002") : /* @__PURE__ */ import_react37.default.createElement("img", { src: getHref(image, true), alt: `\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onError: () => setFailed(true) }))
   );
 }
 function ReviewImageGallery({ images, getHref, onOpen }) {
-  const [all, setAll] = (0, import_react36.useState)(false), [opened, setOpened] = (0, import_react36.useState)(null);
-  return /* @__PURE__ */ import_react36.default.createElement("details", { className: "wcc-review-images", open: true }, /* @__PURE__ */ import_react36.default.createElement("summary", null, "\u5019\u9009\u56FE\u7247 \xB7 ", images.length), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wcc-review-image-grid" }, (all ? images : images.slice(0, 3)).map((image, index2) => /* @__PURE__ */ import_react36.default.createElement(
+  const [all, setAll] = (0, import_react37.useState)(false), [opened, setOpened] = (0, import_react37.useState)(null);
+  return /* @__PURE__ */ import_react37.default.createElement("details", { className: "wcc-review-images", open: true }, /* @__PURE__ */ import_react37.default.createElement("summary", null, "\u5019\u9009\u56FE\u7247 \xB7 ", images.length), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-review-image-grid" }, (all ? images : images.slice(0, 3)).map((image, index2) => /* @__PURE__ */ import_react37.default.createElement(
     CandidateImage,
     {
       key: `${image.path}:${image.hash}`,
@@ -43117,7 +43463,7 @@ function ReviewImageGallery({ images, getHref, onOpen }) {
         if (onOpen(image)) setOpened(index2);
       }
     }
-  ))), images.length > 3 && /* @__PURE__ */ import_react36.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setAll((value) => !value) }, all ? "\u6536\u8D77" : `\u5C55\u5F00\u5176\u4F59 ${images.length - 3} \u5F20`), opened !== null && /* @__PURE__ */ import_react36.default.createElement(ImageDialog, { image: images[opened], number: opened + 1, getHref, onClose: () => setOpened(null) }));
+  ))), images.length > 3 && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setAll((value) => !value) }, all ? "\u6536\u8D77" : `\u5C55\u5F00\u5176\u4F59 ${images.length - 3} \u5F20`), opened !== null && /* @__PURE__ */ import_react37.default.createElement(ImageDialog, { image: images[opened], number: opened + 1, getHref, onClose: () => setOpened(null) }));
 }
 
 // src/card-creation.jsx
@@ -43147,27 +43493,27 @@ function referenceErrorMessage(error) {
 }
 function CreationIcon({ type = "outline", size = 17 }) {
   const paths = {
-    image: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("circle", { cx: "8", cy: "9", r: "1.5" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "m4 18 6-6 4 4 3-3 4 4" })),
-    video: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "m10 8 6 4-6 4Z" })),
-    outline: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "5", y: "3", width: "14", height: "18", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M9 8h6M9 12h6M9 16h4" })),
-    pptx: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "3", y: "4", width: "18", height: "13", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M12 17v4M8 21h8M7 13V9M12 13V7M17 13v-3" })),
-    exercise: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "4", y: "4", width: "16", height: "17", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M9 4V2h6v2M8 10l1.5 1.5L12 9M14 10h3M8 16l1.5 1.5L12 15M14 16h3" })),
-    script: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "M5 4h14v16H5zM9 8h6M9 12h6M9 16h3" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "m3 8-1 1v6l1 1M21 8l1 1v6l-1 1" })),
-    material: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M12 11v6M9 14h6" })),
-    whiteboard: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "M5 3h14v12l-6 6H5Z" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M13 21v-6h6M8 8h8M8 11h5" })),
-    computer: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "3", y: "4", width: "18", height: "13", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M12 17v4M8 21h8M9 10l3-3 3 3M12 7v7" })),
-    excerpt: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "M7 5h12v16H7Z" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M4 17V2h12M10 9h6M10 13h6M10 17h4" })),
-    word: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "M5 3h10l4 4v14H5Z" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M15 3v5h4M8 12l1 5 3-4 3 4 1-5" })),
-    plus: /* @__PURE__ */ import_react37.default.createElement("path", { d: "M12 5v14M5 12h14" }),
-    send: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "m5 11 7-7 7 7M12 5v15" })),
-    close: /* @__PURE__ */ import_react37.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" }),
-    collapse: /* @__PURE__ */ import_react37.default.createElement("path", { d: "m7 14 5-5 5 5" }),
-    expand: /* @__PURE__ */ import_react37.default.createElement("path", { d: "m7 10 5 5 5-5" }),
-    check: /* @__PURE__ */ import_react37.default.createElement("path", { d: "m5 12 4 4L19 6" }),
-    spark: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("path", { d: "m12 3 2 7 7 2-7 2-2 7-2-7-7-2 7-2Z" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "m20 2 .5 2 2 .5-2 .5-.5 2-.5-2-2-.5 2-.5Z" })),
-    lock: /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("rect", { x: "5", y: "10", width: "14", height: "11", rx: "2" }), /* @__PURE__ */ import_react37.default.createElement("path", { d: "M8 10V7a4 4 0 0 1 8 0v3M12 14v3" }))
+    image: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("circle", { cx: "8", cy: "9", r: "1.5" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "m4 18 6-6 4 4 3-3 4 4" })),
+    video: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "m10 8 6 4-6 4Z" })),
+    outline: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "5", y: "3", width: "14", height: "18", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M9 8h6M9 12h6M9 16h4" })),
+    pptx: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "3", y: "4", width: "18", height: "13", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M12 17v4M8 21h8M7 13V9M12 13V7M17 13v-3" })),
+    exercise: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "4", y: "4", width: "16", height: "17", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M9 4V2h6v2M8 10l1.5 1.5L12 9M14 10h3M8 16l1.5 1.5L12 15M14 16h3" })),
+    script: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "M5 4h14v16H5zM9 8h6M9 12h6M9 16h3" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "m3 8-1 1v6l1 1M21 8l1 1v6l-1 1" })),
+    material: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M12 11v6M9 14h6" })),
+    whiteboard: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "M5 3h14v12l-6 6H5Z" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M13 21v-6h6M8 8h8M8 11h5" })),
+    computer: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "3", y: "4", width: "18", height: "13", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M12 17v4M8 21h8M9 10l3-3 3 3M12 7v7" })),
+    excerpt: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "M7 5h12v16H7Z" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M4 17V2h12M10 9h6M10 13h6M10 17h4" })),
+    word: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "M5 3h10l4 4v14H5Z" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M15 3v5h4M8 12l1 5 3-4 3 4 1-5" })),
+    plus: /* @__PURE__ */ import_react38.default.createElement("path", { d: "M12 5v14M5 12h14" }),
+    send: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "m5 11 7-7 7 7M12 5v15" })),
+    close: /* @__PURE__ */ import_react38.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" }),
+    collapse: /* @__PURE__ */ import_react38.default.createElement("path", { d: "m7 14 5-5 5 5" }),
+    expand: /* @__PURE__ */ import_react38.default.createElement("path", { d: "m7 10 5 5 5-5" }),
+    check: /* @__PURE__ */ import_react38.default.createElement("path", { d: "m5 12 4 4L19 6" }),
+    spark: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("path", { d: "m12 3 2 7 7 2-7 2-2 7-2-7-7-2 7-2Z" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "m20 2 .5 2 2 .5-2 .5-.5 2-.5-2-2-.5 2-.5Z" })),
+    lock: /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("rect", { x: "5", y: "10", width: "14", height: "11", rx: "2" }), /* @__PURE__ */ import_react38.default.createElement("path", { d: "M8 10V7a4 4 0 0 1 8 0v3M12 14v3" }))
   };
-  return /* @__PURE__ */ import_react37.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.55", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, paths[type] || paths.outline);
+  return /* @__PURE__ */ import_react38.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.55", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, paths[type] || paths.outline);
 }
 function cardTitle(card) {
   return card?.displayTitle || cardDisplayTitle(card) || `${KIND_LABELS[card?.kind] || "\u8D44\u6599"}${card?.number ? ` v${card.number}` : ""}`;
@@ -43194,16 +43540,16 @@ function selectionLabel(context) {
   return first2 === last ? `\u7B2C ${first2} \u884C` : `\u7B2C ${first2}\u2013${last} \u884C`;
 }
 function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, error, onRefresh, onOpenSettings, onSubmit, mentionProps, footer }) {
-  const id2 = (0, import_react37.useId)();
-  const root2 = (0, import_react37.useRef)(null);
-  const textarea = (0, import_react37.useRef)(null);
-  const search = (0, import_react37.useRef)(null);
-  const options = (0, import_react37.useRef)(null);
-  const selection2 = (0, import_react37.useRef)({ start: instruction.length, end: instruction.length });
-  const [popup, setPopup] = (0, import_react37.useState)(null);
-  const [activeIndex, setActiveIndex] = (0, import_react37.useState)(0);
-  const [refreshing, setRefreshing] = (0, import_react37.useState)(false);
-  const [localError, setLocalError] = (0, import_react37.useState)("");
+  const id2 = (0, import_react38.useId)();
+  const root2 = (0, import_react38.useRef)(null);
+  const textarea = (0, import_react38.useRef)(null);
+  const search = (0, import_react38.useRef)(null);
+  const options = (0, import_react38.useRef)(null);
+  const selection2 = (0, import_react38.useRef)({ start: instruction.length, end: instruction.length });
+  const [popup, setPopup] = (0, import_react38.useState)(null);
+  const [activeIndex, setActiveIndex] = (0, import_react38.useState)(0);
+  const [refreshing, setRefreshing] = (0, import_react38.useState)(false);
+  const [localError, setLocalError] = (0, import_react38.useState)("");
   const skills = [...new Map((catalog?.skills || []).map((skill) => [skill.name, skill])).values()];
   const favoriteNames = new Set(catalog?.settings?.favorites || []);
   const favorites = [...favoriteNames].map((name2) => skills.find((skill) => skill.name === name2)).filter(Boolean);
@@ -43211,7 +43557,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
   const candidates = favoritesOnly ? favorites : skills.filter((skill) => skillSearchText(skill).includes((popup?.query || "").toLowerCase())).sort((a, b2) => Number(favoriteNames.has(b2.name)) - Number(favoriteNames.has(a.name)) || a.name.localeCompare(b2.name));
   const explicitSkills = extractSkillNames(instruction);
   const displayError = localError || (error ? referenceErrorMessage(error) : "");
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!popup) return;
     const dismiss = (event) => {
       if (!root2.current?.contains(event.target)) setPopup(null);
@@ -43219,13 +43565,13 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
     document.addEventListener("pointerdown", dismiss, true);
     return () => document.removeEventListener("pointerdown", dismiss, true);
   }, [Boolean(popup)]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     setActiveIndex(0);
   }, [popup?.query, popup?.all, catalog]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (disabled) setPopup(null);
   }, [disabled]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     const list = options.current;
     const option = list?.querySelector(`[data-skill-index="${activeIndex}"]`);
     if (!option) return;
@@ -43316,7 +43662,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
       setRefreshing(false);
     }
   }
-  return /* @__PURE__ */ import_react37.default.createElement(
+  return /* @__PURE__ */ import_react38.default.createElement(
     "div",
     {
       ref: root2,
@@ -43328,7 +43674,7 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
         if (event.key === "Escape" && !event.defaultPrevented) keyboard(event);
       }
     },
-    /* @__PURE__ */ import_react37.default.createElement(
+    /* @__PURE__ */ import_react38.default.createElement(
       ReferencePromptInput,
       {
         textareaRef: textarea,
@@ -43353,30 +43699,30 @@ function SkillCommandInput({ instruction, onChange, disabled, catalog, loading, 
         ...mentionProps
       }
     ),
-    /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-instruction-toolbar" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", className: "wcc-creation-skill-trigger", disabled, "aria-label": "\u9009\u62E9\u6280\u80FD", "aria-expanded": popup?.mode === "browse", "aria-controls": popup?.mode === "browse" ? `${id2}-skill-picker` : void 0, title: explicitSkills.length ? explicitSkills.join("\u3001") : "\u9009\u62E9\u5E38\u7528\u6280\u80FD\u6216\u641C\u7D22\u5168\u90E8\u6280\u80FD", onMouseDown: (event) => event.preventDefault(), onClick: openPicker }, "\u6280\u80FD", explicitSkills.length > 0 && /* @__PURE__ */ import_react37.default.createElement("span", null, explicitSkills.length), /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: popup?.mode === "browse" ? "collapse" : "expand", size: 13 })), footer),
-    popup && /* @__PURE__ */ import_react37.default.createElement("div", { id: `${id2}-skill-picker`, className: "wcc-creation-skill-picker" }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, popup.mode === "browse" ? /* @__PURE__ */ import_react37.default.createElement("input", { ref: search, role: "combobox", "aria-label": "\u641C\u7D22\u6280\u80FD", "aria-expanded": "true", "aria-controls": `${id2}-skills`, "aria-activedescendant": candidates[activeIndex] ? `${id2}-skill-${activeIndex}` : void 0, value: popup.query, onChange: (event) => setPopup((current) => ({ ...current, query: event.target.value })), onKeyDown: keyboard, placeholder: "\u641C\u7D22\u5168\u90E8\u6280\u80FD" }) : /* @__PURE__ */ import_react37.default.createElement("span", null, "/", popup.query || "\u2026"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: refreshing || loading || !onRefresh, onClick: () => void refresh() }, refreshing || loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-label": "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", onClick: () => {
+    /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-instruction-toolbar" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", className: "wcc-creation-skill-trigger", disabled, "aria-label": "\u9009\u62E9\u6280\u80FD", "aria-expanded": popup?.mode === "browse", "aria-controls": popup?.mode === "browse" ? `${id2}-skill-picker` : void 0, title: explicitSkills.length ? explicitSkills.join("\u3001") : "\u9009\u62E9\u5E38\u7528\u6280\u80FD\u6216\u641C\u7D22\u5168\u90E8\u6280\u80FD", onMouseDown: (event) => event.preventDefault(), onClick: openPicker }, "\u6280\u80FD", explicitSkills.length > 0 && /* @__PURE__ */ import_react38.default.createElement("span", null, explicitSkills.length), /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: popup?.mode === "browse" ? "collapse" : "expand", size: 13 })), footer),
+    popup && /* @__PURE__ */ import_react38.default.createElement("div", { id: `${id2}-skill-picker`, className: "wcc-creation-skill-picker" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, popup.mode === "browse" ? /* @__PURE__ */ import_react38.default.createElement("input", { ref: search, role: "combobox", "aria-label": "\u641C\u7D22\u6280\u80FD", "aria-expanded": "true", "aria-controls": `${id2}-skills`, "aria-activedescendant": candidates[activeIndex] ? `${id2}-skill-${activeIndex}` : void 0, value: popup.query, onChange: (event) => setPopup((current) => ({ ...current, query: event.target.value })), onKeyDown: keyboard, placeholder: "\u641C\u7D22\u5168\u90E8\u6280\u80FD" }) : /* @__PURE__ */ import_react38.default.createElement("span", null, "/", popup.query || "\u2026"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: refreshing || loading || !onRefresh, onClick: () => void refresh() }, refreshing || loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-label": "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", onClick: () => {
       setPopup(null);
       onOpenSettings?.();
-    } }, "\u7BA1\u7406\u5E38\u7528")), popup.mode === "browse" && !popup.query && favorites.length > 0 && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, /* @__PURE__ */ import_react37.default.createElement("span", null, favoritesOnly ? "\u5E38\u7528\u6280\u80FD" : "\u5168\u90E8\u6280\u80FD"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setPopup((current) => ({ ...current, all: !current.all })) }, favoritesOnly ? "\u67E5\u770B\u5168\u90E8" : "\u53EA\u770B\u5E38\u7528")), /* @__PURE__ */ import_react37.default.createElement("div", { ref: options, id: `${id2}-skills`, className: `wcc-creation-skill-options${favoritesOnly ? " is-favorites" : ""}`, role: "listbox", "aria-label": favoritesOnly ? "\u5E38\u7528\u6280\u80FD" : "\u53EF\u9009\u6280\u80FD" }, candidates.map((skill, index2) => /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", id: `${id2}-skill-${index2}`, key: skill.name, "data-skill-index": index2, type: "button", role: "option", title: `/${skill.name}`, tabIndex: -1, "aria-selected": index2 === activeIndex, onMouseDown: (event) => event.preventDefault(), onMouseEnter: () => setActiveIndex(index2), onClick: () => insertSkill(skill) }, /* @__PURE__ */ import_react37.default.createElement("strong", null, skillLabel(skill), !favoritesOnly && favoriteNames.has(skill.name) && /* @__PURE__ */ import_react37.default.createElement("small", null, "\u5E38\u7528")), !favoritesOnly && skill.description && /* @__PURE__ */ import_react37.default.createElement("span", null, skill.description))), !candidates.length && /* @__PURE__ */ import_react37.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u6280\u80FD\u5217\u8868\u2026" : "\u672A\u627E\u5230\u6280\u80FD\uFF0C\u8BD5\u8BD5\u5176\u4ED6\u5173\u952E\u8BCD\u3002")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6709 ", catalog.warnings.length, " \u9879\u6280\u80FD\u6765\u6E90\u63D0\u793A\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u67E5\u770B\u3002")),
-    displayError && /* @__PURE__ */ import_react37.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })
+    } }, "\u7BA1\u7406\u5E38\u7528")), popup.mode === "browse" && !popup.query && favorites.length > 0 && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, /* @__PURE__ */ import_react38.default.createElement("span", null, favoritesOnly ? "\u5E38\u7528\u6280\u80FD" : "\u5168\u90E8\u6280\u80FD"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setPopup((current) => ({ ...current, all: !current.all })) }, favoritesOnly ? "\u67E5\u770B\u5168\u90E8" : "\u53EA\u770B\u5E38\u7528")), /* @__PURE__ */ import_react38.default.createElement("div", { ref: options, id: `${id2}-skills`, className: `wcc-creation-skill-options${favoritesOnly ? " is-favorites" : ""}`, role: "listbox", "aria-label": favoritesOnly ? "\u5E38\u7528\u6280\u80FD" : "\u53EF\u9009\u6280\u80FD" }, candidates.map((skill, index2) => /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", id: `${id2}-skill-${index2}`, key: skill.name, "data-skill-index": index2, type: "button", role: "option", title: `/${skill.name}`, tabIndex: -1, "aria-selected": index2 === activeIndex, onMouseDown: (event) => event.preventDefault(), onMouseEnter: () => setActiveIndex(index2), onClick: () => insertSkill(skill) }, /* @__PURE__ */ import_react38.default.createElement("strong", null, skillLabel(skill), !favoritesOnly && favoriteNames.has(skill.name) && /* @__PURE__ */ import_react38.default.createElement("small", null, "\u5E38\u7528")), !favoritesOnly && skill.description && /* @__PURE__ */ import_react38.default.createElement("span", null, skill.description))), !candidates.length && /* @__PURE__ */ import_react38.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u6280\u80FD\u5217\u8868\u2026" : "\u672A\u627E\u5230\u6280\u80FD\uFF0C\u8BD5\u8BD5\u5176\u4ED6\u5173\u952E\u8BCD\u3002")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6709 ", catalog.warnings.length, " \u9879\u6280\u80FD\u6765\u6E90\u63D0\u793A\uFF0C\u53EF\u5728\u8BBE\u7F6E\u4E2D\u67E5\u770B\u3002")),
+    displayError && /* @__PURE__ */ import_react38.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })
   );
 }
 function ImportedReferenceFile({ card, getHref }) {
-  const [videoError, setVideoError] = (0, import_react37.useState)(false);
+  const [videoError, setVideoError] = (0, import_react38.useState)(false);
   const file = card.importedFile || card.generatedFile;
   const href = getHref(card);
   const preview = getHref(card, true);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     setVideoError(false);
   }, [preview]);
-  return /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-imported-file" }, /* @__PURE__ */ import_react37.default.createElement("a", { href, download: file.name || true }, "\u4E0B\u8F7D", card.generatedFile ? "\u751F\u6210\u6587\u4EF6" : "\u539F\u6587\u4EF6", file.name ? ` \xB7 ${file.name}` : ""), mediaSizeLabel(file) && /* @__PURE__ */ import_react37.default.createElement("small", null, "\u5B9E\u9645\u6587\u4EF6\uFF1A", mediaSizeLabel(file)), file.mime?.startsWith("image/") && (card.sourceStatus || card.status) === "ready" && /* @__PURE__ */ import_react37.default.createElement("img", { className: "wcc-creation-imported-preview", src: preview, alt: `\u6587\u4EF6\u9884\u89C8\uFF1A${cardTitle(card)}`, loading: "lazy", decoding: "async" }), file.mime?.startsWith("video/") && !card.referenceNote?.includes("\u8F6C\u5199") && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u89C6\u9891\u6587\u4EF6\uFF0C\u5C1A\u672A\u8F6C\u5199\u6216\u89E3\u6790\u753B\u9762\u3002"), file.mime?.startsWith("video/") && (card.sourceStatus || card.status) === "ready" && /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("video", { className: "wcc-creation-imported-video", src: preview, controls: true, preload: "metadata", playsInline: true, "aria-label": `\u89C6\u9891\u9884\u89C8\uFF1A${cardTitle(card)}`, onError: () => setVideoError(true), onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown: (event) => event.stopPropagation() }), videoError && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-preview-note", role: "status" }, "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u89C6\u9891\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u5728\u672C\u673A\u67E5\u770B\u3002")));
+  return /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-imported-file" }, /* @__PURE__ */ import_react38.default.createElement("a", { href, download: file.name || true }, "\u4E0B\u8F7D", card.generatedFile ? "\u751F\u6210\u6587\u4EF6" : "\u539F\u6587\u4EF6", file.name ? ` \xB7 ${file.name}` : ""), mediaSizeLabel(file) && /* @__PURE__ */ import_react38.default.createElement("small", null, "\u5B9E\u9645\u6587\u4EF6\uFF1A", mediaSizeLabel(file)), file.mime?.startsWith("image/") && (card.sourceStatus || card.status) === "ready" && /* @__PURE__ */ import_react38.default.createElement("img", { className: "wcc-creation-imported-preview", src: preview, alt: `\u6587\u4EF6\u9884\u89C8\uFF1A${cardTitle(card)}`, loading: "lazy", decoding: "async" }), file.mime?.startsWith("video/") && !card.referenceNote?.includes("\u8F6C\u5199") && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u89C6\u9891\u6587\u4EF6\uFF0C\u5C1A\u672A\u8F6C\u5199\u6216\u89E3\u6790\u753B\u9762\u3002"), file.mime?.startsWith("video/") && (card.sourceStatus || card.status) === "ready" && /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("video", { className: "wcc-creation-imported-video", src: preview, controls: true, preload: "metadata", playsInline: true, "aria-label": `\u89C6\u9891\u9884\u89C8\uFF1A${cardTitle(card)}`, onError: () => setVideoError(true), onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown: (event) => event.stopPropagation() }), videoError && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-preview-note", role: "status" }, "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u89C6\u9891\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u5728\u672C\u673A\u67E5\u770B\u3002")));
 }
 function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onAction, onClose }) {
-  const menu = (0, import_react37.useRef)(null);
-  const previousFocus = (0, import_react37.useRef)(null);
-  const closeRef = (0, import_react37.useRef)(onClose);
+  const menu = (0, import_react38.useRef)(null);
+  const previousFocus = (0, import_react38.useRef)(null);
+  const closeRef = (0, import_react38.useRef)(onClose);
   closeRef.current = onClose;
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     previousFocus.current = document.activeElement;
     const first2 = menu.current?.querySelector("button:not(:disabled)");
     (first2 || menu.current)?.focus();
@@ -43409,7 +43755,7 @@ function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onActi
     const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : event.key === "ArrowDown" ? (index2 + 1) % buttons.length : (index2 - 1 + buttons.length) % buttons.length;
     buttons[next].focus();
   }
-  return /* @__PURE__ */ import_react37.default.createElement(
+  return /* @__PURE__ */ import_react38.default.createElement(
     "div",
     {
       ref: menu,
@@ -43423,8 +43769,8 @@ function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onActi
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: keyboard
     },
-    /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-create-menu-caption" }, caption || "\u7528\u8FD9\u5F20\u5361\u521B\u4F5C"),
-    items.map((item) => /* @__PURE__ */ import_react37.default.createElement(
+    /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-create-menu-caption" }, caption || "\u7528\u8FD9\u5F20\u5361\u521B\u4F5C"),
+    items.map((item) => /* @__PURE__ */ import_react38.default.createElement(
       UiButton,
       {
         variant: "custom",
@@ -43438,8 +43784,8 @@ function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onActi
           onClose?.();
         }
       },
-      /* @__PURE__ */ import_react37.default.createElement("span", { className: `wcc-create-menu-icon is-${item.id}` }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: item.id, size: 15 })),
-      /* @__PURE__ */ import_react37.default.createElement("span", null, /* @__PURE__ */ import_react37.default.createElement("strong", null, item.label || KIND_LABELS[item.id] || item.id), item.disabled && item.reason && /* @__PURE__ */ import_react37.default.createElement("small", null, item.reason))
+      /* @__PURE__ */ import_react38.default.createElement("span", { className: `wcc-create-menu-icon is-${item.id}` }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: item.id, size: 15 })),
+      /* @__PURE__ */ import_react38.default.createElement("span", null, /* @__PURE__ */ import_react38.default.createElement("strong", null, item.label || KIND_LABELS[item.id] || item.id), item.disabled && item.reason && /* @__PURE__ */ import_react38.default.createElement("small", null, item.reason))
     ))
   );
 }
@@ -43502,38 +43848,38 @@ function CardComposer({
   modelLoading,
   modelError
 }) {
-  const id2 = (0, import_react37.useId)();
-  const composer = (0, import_react37.useRef)(null);
-  const scrollBody = (0, import_react37.useRef)(null);
-  const conversationPanel = (0, import_react37.useRef)(null);
-  const picker = (0, import_react37.useRef)(null);
-  const addButton = (0, import_react37.useRef)(null);
-  const referenceDetails = (0, import_react37.useRef)(/* @__PURE__ */ new Map());
-  const previewTrigger = (0, import_react37.useRef)(null);
-  const [previewOpen, setPreviewOpen] = (0, import_react37.useState)(false);
-  const fileInput = (0, import_react37.useRef)(null);
-  const boardSourceButton = (0, import_react37.useRef)(null);
-  const boardSearch = (0, import_react37.useRef)(null);
-  const mounted = (0, import_react37.useRef)(true);
-  const referenceOperations = (0, import_react37.useRef)(/* @__PURE__ */ new Map());
-  const currentContextKey = (0, import_react37.useRef)(context?.key);
+  const id2 = (0, import_react38.useId)();
+  const composer = (0, import_react38.useRef)(null);
+  const scrollBody = (0, import_react38.useRef)(null);
+  const conversationPanel = (0, import_react38.useRef)(null);
+  const picker = (0, import_react38.useRef)(null);
+  const addButton = (0, import_react38.useRef)(null);
+  const referenceDetails = (0, import_react38.useRef)(/* @__PURE__ */ new Map());
+  const previewTrigger = (0, import_react38.useRef)(null);
+  const [previewOpen, setPreviewOpen] = (0, import_react38.useState)(false);
+  const fileInput = (0, import_react38.useRef)(null);
+  const boardSourceButton = (0, import_react38.useRef)(null);
+  const boardSearch = (0, import_react38.useRef)(null);
+  const mounted = (0, import_react38.useRef)(true);
+  const referenceOperations = (0, import_react38.useRef)(/* @__PURE__ */ new Map());
+  const currentContextKey = (0, import_react38.useRef)(context?.key);
   currentContextKey.current = context?.key;
-  const [referencesOpen, setReferencesOpen] = (0, import_react37.useState)(false);
-  const [referenceSource, setReferenceSource] = (0, import_react37.useState)(null);
-  const [referenceWork, setReferenceWork] = (0, import_react37.useState)(() => /* @__PURE__ */ new Map());
-  const [referenceErrors, setReferenceErrors] = (0, import_react37.useState)(() => /* @__PURE__ */ new Map());
-  const [search, setSearch] = (0, import_react37.useState)("");
-  const [collapsed, setCollapsed] = (0, import_react37.useState)(false);
-  const [skillSettingsOpen, setSkillSettingsOpen] = (0, import_react37.useState)(false);
-  const [conversationOpen, setConversationOpen] = (0, import_react37.useState)(false);
-  const [conversationOpening, setConversationOpening] = (0, import_react37.useState)(null);
-  const [conversationError, setConversationError] = (0, import_react37.useState)(null);
-  const [reviewQuestion, setReviewQuestion] = (0, import_react37.useState)(null);
-  const [revisionEditing, setRevisionEditing] = (0, import_react37.useState)(false);
-  const conversationAutoScope = (0, import_react37.useRef)(null);
-  const [nativeComposerHeight, setNativeComposerHeight] = (0, import_react37.useState)(0);
+  const [referencesOpen, setReferencesOpen] = (0, import_react38.useState)(false);
+  const [referenceSource, setReferenceSource] = (0, import_react38.useState)(null);
+  const [referenceWork, setReferenceWork] = (0, import_react38.useState)(() => /* @__PURE__ */ new Map());
+  const [referenceErrors, setReferenceErrors] = (0, import_react38.useState)(() => /* @__PURE__ */ new Map());
+  const [search, setSearch] = (0, import_react38.useState)("");
+  const [collapsed, setCollapsed] = (0, import_react38.useState)(false);
+  const [skillSettingsOpen, setSkillSettingsOpen] = (0, import_react38.useState)(false);
+  const [conversationOpen, setConversationOpen] = (0, import_react38.useState)(false);
+  const [conversationOpening, setConversationOpening] = (0, import_react38.useState)(null);
+  const [conversationError, setConversationError] = (0, import_react38.useState)(null);
+  const [reviewQuestion, setReviewQuestion] = (0, import_react38.useState)(null);
+  const [revisionEditing, setRevisionEditing] = (0, import_react38.useState)(false);
+  const conversationAutoScope = (0, import_react38.useRef)(null);
+  const [nativeComposerHeight, setNativeComposerHeight] = (0, import_react38.useState)(0);
   const conversationScope = `${context?.key || ""}:${context?.sessionId || ""}`;
-  const liveConversationScope = (0, import_react37.useRef)(conversationScope);
+  const liveConversationScope = (0, import_react38.useRef)(conversationScope);
   liveConversationScope.current = conversationScope;
   const outputType = context?.outputType || creationTypes[0]?.id || "outline";
   const headingCard = context?.targetCard || context?.anchor;
@@ -43616,21 +43962,21 @@ function CardComposer({
   };
   const label2 = recoveringMedia ? "\u53D6\u56DE\u751F\u6210\u7ED3\u679C" : inputLocked ? pendingRetryAllowed(context?.pendingGeneration) && !isMedia ? "\u91CD\u8BD5\u539F\u4EFB\u52A1" : pendingLabel(context?.pendingGeneration) : isAction ? sendLabel || { material: "\u6DFB\u52A0\u7D20\u6750", excerpt: "\u9009\u62E9\u539F\u6587\u6458\u5F55", word: "\u5BFC\u51FA Word" }[outputType] : revising ? "\u751F\u6210\u65B0\u7248\u672C" : `\u751F\u6210${["outline", "exercise", "script"].includes(outputType) ? "\u6587\u672C" : KIND_LABELS[outputType] || "\u6587\u672C"}`;
   const acceptedFiles = Array.isArray(acceptedFileTypes) ? acceptedFileTypes.join(",") : acceptedFileTypes;
-  const submitFooter = !hideSubmit && showInitialInput && /* @__PURE__ */ import_react37.default.createElement("footer", { className: `wcc-creation-submit${isMedia ? " is-media" : ""}` }, isMedia ? recoveringMedia ? /* @__PURE__ */ import_react37.default.createElement("p", null, "\u53D6\u56DE\u539F\u7ED3\u679C\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3002") : /* @__PURE__ */ import_react37.default.createElement("span", null) : /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-footer-model" }, !isAction && (inputLocked && !modelSelection ? /* @__PURE__ */ import_react37.default.createElement("span", { title: "\u7EE7\u7EED\u6CBF\u7528\u539F\u4EFB\u52A1\u4F1A\u8BDD" }, "\u539F\u4EFB\u52A1\u6A21\u578B") : /* @__PURE__ */ import_react37.default.createElement(ModelSelection, { key: `model:${context?.key}`, compact: true, catalog: modelCatalog, selection: modelSelection, onChange: busy || inputLocked ? void 0 : onModelChange, onRefresh: onRefreshModels, onOpenSettings: onOpenModelSettings, loading: modelLoading, error: modelError })), engineSummary && /* @__PURE__ */ import_react37.default.createElement("span", { className: "wcc-creation-engine-summary", "aria-label": `PPT\u5236\u4F5C\u65B9\u5F0F\uFF1A${engineSummary}`, title: engineDetail }, engineSummary)), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-send", disabled: !ready, "aria-label": busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2, "aria-busy": busy, title: `${busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2} \xB7 \u2318 / Ctrl + Enter`, onClick: submit }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "send", size: 18 }), /* @__PURE__ */ import_react37.default.createElement("span", { className: "wcc-send-label" }, busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2)));
-  (0, import_react37.useEffect)(() => {
+  const submitFooter = !hideSubmit && showInitialInput && /* @__PURE__ */ import_react38.default.createElement("footer", { className: `wcc-creation-submit${isMedia ? " is-media" : ""}` }, isMedia ? recoveringMedia ? /* @__PURE__ */ import_react38.default.createElement("p", null, "\u53D6\u56DE\u539F\u7ED3\u679C\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3002") : /* @__PURE__ */ import_react38.default.createElement("span", null) : /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-footer-model" }, !isAction && (inputLocked && !modelSelection ? /* @__PURE__ */ import_react38.default.createElement("span", { title: "\u7EE7\u7EED\u6CBF\u7528\u539F\u4EFB\u52A1\u4F1A\u8BDD" }, "\u539F\u4EFB\u52A1\u6A21\u578B") : /* @__PURE__ */ import_react38.default.createElement(ModelSelection, { key: `model:${context?.key}`, compact: true, catalog: modelCatalog, selection: modelSelection, onChange: busy || inputLocked ? void 0 : onModelChange, onRefresh: onRefreshModels, onOpenSettings: onOpenModelSettings, loading: modelLoading, error: modelError })), engineSummary && /* @__PURE__ */ import_react38.default.createElement("span", { className: "wcc-creation-engine-summary", "aria-label": `PPT\u5236\u4F5C\u65B9\u5F0F\uFF1A${engineSummary}`, title: engineDetail }, engineSummary)), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-send", disabled: !ready, "aria-label": busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2, "aria-busy": busy, title: `${busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2} \xB7 \u2318 / Ctrl + Enter`, onClick: submit }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "send", size: 18 }), /* @__PURE__ */ import_react38.default.createElement("span", { className: "wcc-send-label" }, busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2)));
+  (0, import_react38.useEffect)(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
     };
   }, []);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (visible) setCollapsed(false);
     else {
       setReferencesOpen(false);
       setSkillSettingsOpen(false);
     }
   }, [visible]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!visible) return;
     setCollapsed(false);
     const frame2 = requestAnimationFrame(() => {
@@ -43643,7 +43989,7 @@ function CardComposer({
     });
     return () => cancelAnimationFrame(frame2);
   }, [visible, context?.key, context?.focusRequest]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     setPreviewOpen(false);
     setReferencesOpen(false);
     setReferenceSource(null);
@@ -43651,11 +43997,11 @@ function CardComposer({
     setCollapsed(false);
     setSkillSettingsOpen(false);
   }, [context?.key]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     setConversationOpen(false);
     setRevisionEditing(false);
   }, [context?.key, context?.sessionId]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (scrollBody.current) scrollBody.current.scrollTop = 0;
   }, [visible, collapsed, executionExpanded, conversationScope]);
   function scrollToQuestion(question, showHistory = false) {
@@ -43677,7 +44023,7 @@ function CardComposer({
     if (question?.getAttribute("aria-labelledby") !== reviewQuestion?.questionId || question?.querySelector("h2")?.textContent !== reviewQuestion?.text) return false;
     return reviewImagesFromQuestion(projectRoot, question?.querySelector("h2")?.textContent).some((current) => current.path === image.path && current.hash === image.hash);
   }
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!visible || !executionExpanded || !conversationPanel.current) return;
     const panel = conversationPanel.current;
     let seat = null;
@@ -43715,15 +44061,15 @@ function CardComposer({
       if (frame2 !== null) cancelAnimationFrame(frame2);
     };
   }, [visible, executionExpanded, conversationScope]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (displayError) setCollapsed(false);
   }, [displayError]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!referencesOpen) return;
     const frame2 = requestAnimationFrame(() => (referenceSource === "board" ? boardSearch : boardSourceButton).current?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(frame2);
   }, [referencesOpen, referenceSource]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!referencesOpen) return;
     const dismiss = (event) => {
       if (!picker.current?.contains(event.target) && !addButton.current?.contains(event.target)) setReferencesOpen(false);
@@ -43834,20 +44180,20 @@ function CardComposer({
       if (mounted.current) setConversationOpening((previous) => previous === scope ? null : previous);
     }
   }
-  (0, import_react37.useEffect)(() => {
-    if (visible && context?.openExecutionRequest) void toggleConversation();
+  (0, import_react38.useEffect)(() => {
+    if (visible && context?.openExecutionRequest) void toggleConversation(true);
   }, [context?.openExecutionRequest]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!visible || suspended || !taskMode || !context?.sessionId || conversationAutoScope.current === conversationScope) return;
     conversationAutoScope.current = conversationScope;
     void toggleConversation(true);
   }, [visible, suspended, taskMode, conversationScope]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!revisionEditing || !visible) return;
     const frame2 = requestAnimationFrame(() => composer.current?.querySelector(".wcc-creation-instruction textarea")?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(frame2);
   }, [revisionEditing, visible]);
-  return /* @__PURE__ */ import_react37.default.createElement(
+  return /* @__PURE__ */ import_react38.default.createElement(
     "section",
     {
       ref: composer,
@@ -43871,11 +44217,11 @@ function CardComposer({
         }
       }
     },
-    /* @__PURE__ */ import_react37.default.createElement("header", { className: "wcc-creation-heading" }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-title-row" }, /* @__PURE__ */ import_react37.default.createElement("h3", { id: `${id2}-title`, title: heading }, heading), headingDetail && /* @__PURE__ */ import_react37.default.createElement("span", { className: "wcc-creation-current-type", title: headingDetail, role: stageStatus ? "status" : void 0 }, headingDetail)), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-window-actions" }, onTaskControl && (context?.pendingTaskId || context?.pendingGeneration?.taskId || context?.mediaJob?.taskId) && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: onTaskControl }, "\u4EFB\u52A1\u63A7\u5236"), collapsed && headingCard?.kind === "outline" && onAction && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", className: "wcc-creation-edit", "aria-label": "\u4E13\u6CE8\u7F16\u8F91\u5F53\u524D\u5927\u7EB2", disabled: busy, onClick: () => onAction("edit") }, "\u7F16\u8F91"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", "aria-label": collapsed ? "\u5C55\u5F00\u5361\u7247\u521B\u4F5C\u6846" : "\u6536\u8D77\u5361\u7247\u521B\u4F5C\u6846", "aria-expanded": !collapsed, "aria-controls": `${id2}-body`, onClick: () => {
+    /* @__PURE__ */ import_react38.default.createElement("header", { className: "wcc-creation-heading" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-title-row" }, /* @__PURE__ */ import_react38.default.createElement("h3", { id: `${id2}-title`, title: heading }, heading), headingDetail && /* @__PURE__ */ import_react38.default.createElement("span", { className: "wcc-creation-current-type", title: headingDetail, role: stageStatus ? "status" : void 0 }, headingDetail)), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-window-actions" }, onTaskControl && (context?.pendingTaskId || context?.pendingGeneration?.taskId || context?.mediaJob?.taskId) && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: onTaskControl }, "\u4EFB\u52A1\u63A7\u5236"), collapsed && headingCard?.kind === "outline" && onAction && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", className: "wcc-creation-edit", "aria-label": "\u4E13\u6CE8\u7F16\u8F91\u5F53\u524D\u5927\u7EB2", disabled: busy, onClick: () => onAction("edit") }, "\u7F16\u8F91"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", "aria-label": collapsed ? "\u5C55\u5F00\u5361\u7247\u521B\u4F5C\u6846" : "\u6536\u8D77\u5361\u7247\u521B\u4F5C\u6846", "aria-expanded": !collapsed, "aria-controls": `${id2}-body`, onClick: () => {
       setCollapsed((value) => !value);
       setReferencesOpen(false);
-    } }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: collapsed ? "expand" : "collapse", size: 15 })), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", "aria-label": "\u5173\u95ED\u5361\u7247\u521B\u4F5C\u6846", onClick: onClose }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "close", size: 15 })))),
-    /* @__PURE__ */ import_react37.default.createElement("div", { ref: scrollBody, id: `${id2}-body`, className: "wcc-creation-scroll-body", hidden: collapsed }, (taskMode || reviewingResult) && /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement(
+    } }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: collapsed ? "expand" : "collapse", size: 15 })), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", "aria-label": "\u5173\u95ED\u5361\u7247\u521B\u4F5C\u6846", onClick: onClose }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "close", size: 15 })))),
+    /* @__PURE__ */ import_react38.default.createElement("div", { ref: scrollBody, id: `${id2}-body`, className: "wcc-creation-scroll-body", hidden: collapsed }, (taskMode || reviewingResult) && /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement(
       TaskInputSummary,
       {
         instruction,
@@ -43883,9 +44229,9 @@ function CardComposer({
         skills: (context?.selectedSkills || chosenSkills).map((name2) => skillLabel(skillCatalog?.skills?.find((skill) => skill.name === name2) || { name: name2 })),
         model: context?.modelSelection || (taskMode ? modelSelection : void 0),
         engine: engineSummary,
-        renderFile: getReferenceFileHref ? (reference) => (reference.importedFile || reference.generatedFile) && /* @__PURE__ */ import_react37.default.createElement(ImportedReferenceFile, { card: reference, getHref: getReferenceFileHref }) : void 0
+        renderFile: getReferenceFileHref ? (reference) => (reference.importedFile || reference.generatedFile) && /* @__PURE__ */ import_react38.default.createElement(ImportedReferenceFile, { card: reference, getHref: getReferenceFileHref }) : void 0
       }
-    ), context?.pendingGeneration?.error && /* @__PURE__ */ import_react37.default.createElement(UserError, { className: "wcc-creation-error", error: context.pendingGeneration.error }), displayError && displayError !== context?.pendingGeneration?.error && /* @__PURE__ */ import_react37.default.createElement(UserError, { className: "wcc-creation-error", error: displayError }), canContinue && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react37.default.createElement(
+    ), context?.pendingGeneration?.error && /* @__PURE__ */ import_react38.default.createElement(UserError, { className: "wcc-creation-error", error: context.pendingGeneration.error }), displayError && displayError !== context?.pendingGeneration?.error && /* @__PURE__ */ import_react38.default.createElement(UserError, { className: "wcc-creation-error", error: displayError }), canContinue && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react38.default.createElement(
       UiButton,
       {
         variant: "primary",
@@ -43894,34 +44240,34 @@ function CardComposer({
         onClick: () => void toggleConversation(true, true)
       },
       "\u7EE7\u7EED\u4EFB\u52A1"
-    )), taskMode && pendingRetryAllowed(context.pendingGeneration) && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "primary", disabled: !ready, onClick: submit }, "\u91CD\u8BD5\u539F\u4EFB\u52A1")), taskMode && pendingRetryAllowed(context.pendingGeneration) && reason && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), taskMode && !context?.sessionId && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, context?.pendingGeneration?.status === "unknown" ? "\u63D0\u4EA4\u7ED3\u679C\u5F85\u6838\u5BF9\uFF0C\u8BF7\u4ECE\u521B\u4F5C\u4EFB\u52A1\u67E5\u770B\uFF1B\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002" : "\u5C1A\u672A\u8FDE\u63A5\u539F\u4EFB\u52A1\u5BF9\u8BDD\u3002")), showInitialInput && /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("div", { id: `${id2}-setup`, className: "wcc-creation-main", hidden: collapsed }, context?.recorded === false && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-history-note", role: "status" }, "\u8FD9\u4EFD\u5386\u53F2\u6587\u4EF6\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002\u586B\u5199\u4FEE\u6539\u8981\u6C42\uFF0C\u53EF\u751F\u6210\u65B0\u7248\u672C\u3002"), referenceNotes.map((note) => /* @__PURE__ */ import_react37.default.createElement("p", { key: note, className: "wcc-creation-history-note", role: "status" }, note)), context?.selection && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-selection-scope", role: "status" }, /* @__PURE__ */ import_react37.default.createElement("span", null, "\u4EC5\u5F15\u7528\u6240\u9009\u7247\u6BB5 \xB7 ", selectionLabel(context), " \xB7 ", Array.from(context.selection.quote || "").length, " \u4E2A\u5B57\u7B26"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy || inputLocked || !onAction, onClick: () => onAction("whole-source") }, "\u4F7F\u7528\u6574\u4EFD\u539F\u6587")), /* @__PURE__ */ import_react37.default.createElement("section", { className: `wcc-creation-reference-area${references.length ? "" : " is-empty"}`, "aria-label": "\u5F15\u7528\u8D44\u6599" }, !!references.length && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", className: "wcc-reference-preview-toggle", "aria-label": "\u67E5\u770B\u672C\u6B21\u5F15\u7528\u5185\u5BB9", "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
+    )), taskMode && pendingRetryAllowed(context.pendingGeneration) && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "primary", disabled: !ready, onClick: submit }, "\u91CD\u8BD5\u539F\u4EFB\u52A1")), taskMode && pendingRetryAllowed(context.pendingGeneration) && reason && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), taskMode && !context?.sessionId && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, context?.pendingGeneration?.status === "unknown" ? "\u63D0\u4EA4\u7ED3\u679C\u5F85\u6838\u5BF9\uFF0C\u8BF7\u4ECE\u521B\u4F5C\u4EFB\u52A1\u67E5\u770B\uFF1B\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002" : "\u5C1A\u672A\u8FDE\u63A5\u539F\u4EFB\u52A1\u5BF9\u8BDD\u3002")), showInitialInput && /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("div", { id: `${id2}-setup`, className: "wcc-creation-main", hidden: collapsed }, context?.recorded === false && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-history-note", role: "status" }, "\u8FD9\u4EFD\u5386\u53F2\u6587\u4EF6\u6CA1\u6709\u4FDD\u5B58\u63D0\u793A\u8BCD\u3002\u586B\u5199\u4FEE\u6539\u8981\u6C42\uFF0C\u53EF\u751F\u6210\u65B0\u7248\u672C\u3002"), referenceNotes.map((note) => /* @__PURE__ */ import_react38.default.createElement("p", { key: note, className: "wcc-creation-history-note", role: "status" }, note)), context?.selection && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-selection-scope", role: "status" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "\u4EC5\u5F15\u7528\u6240\u9009\u7247\u6BB5 \xB7 ", selectionLabel(context), " \xB7 ", Array.from(context.selection.quote || "").length, " \u4E2A\u5B57\u7B26"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy || inputLocked || !onAction, onClick: () => onAction("whole-source") }, "\u4F7F\u7528\u6574\u4EFD\u539F\u6587")), /* @__PURE__ */ import_react38.default.createElement("section", { className: `wcc-creation-reference-area${references.length ? "" : " is-empty"}`, "aria-label": "\u5F15\u7528\u8D44\u6599" }, !!references.length && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", className: "wcc-reference-preview-toggle", "aria-label": "\u67E5\u770B\u672C\u6B21\u5F15\u7528\u5185\u5BB9", "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
       previewTrigger.current = event.currentTarget;
       setPreviewOpen((value) => !value);
       setReferencesOpen(false);
-    } }, references.length, " \u4EFD\u5F15\u7528", /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: previewOpen ? "collapse" : "expand", size: 13 })), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-reference-chips" }, references.map((card) => /* @__PURE__ */ import_react37.default.createElement("span", { key: card.id, className: `wcc-creation-reference-chip${unavailableReason(card) ? " is-unavailable" : ""}`, title: `${cardTitle(card)}${unavailableReason(card) || card.referenceNote ? ` \xB7 ${unavailableReason(card) || card.referenceNote}` : ""}` }, /* @__PURE__ */ import_react37.default.createElement("span", { className: "wcc-reference-format" }, referenceFormat(card)), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", className: "wcc-reference-name", type: "button", "aria-label": `\u67E5\u770B\u5F15\u7528 ${cardTitle(card)}`, "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
+    } }, references.length, " \u4EFD\u5F15\u7528", /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: previewOpen ? "collapse" : "expand", size: 13 })), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-reference-chips" }, references.map((card) => /* @__PURE__ */ import_react38.default.createElement("span", { key: card.id, className: `wcc-creation-reference-chip${unavailableReason(card) ? " is-unavailable" : ""}`, title: `${cardTitle(card)}${unavailableReason(card) || card.referenceNote ? ` \xB7 ${unavailableReason(card) || card.referenceNote}` : ""}` }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "wcc-reference-format" }, referenceFormat(card)), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", className: "wcc-reference-name", type: "button", "aria-label": `\u67E5\u770B\u5F15\u7528 ${cardTitle(card)}`, "aria-expanded": previewOpen, "aria-controls": `${id2}-reference-preview`, onClick: (event) => {
       previewTrigger.current = event.currentTarget;
       setPreviewOpen(true);
       setReferencesOpen(false);
       const detail = referenceDetails.current.get(card.id);
       if (detail) detail.open = true;
-    } }, cardTitle(card)), isPinned(card) ? /* @__PURE__ */ import_react37.default.createElement("span", { className: "wcc-creation-reference-lock", title: "\u5DF2\u5173\u8054\u5230\u6765\u6E90\u5361\u7247", role: "img", "aria-label": "\u5DF2\u5173\u8054\u5230\u6765\u6E90\u5361\u7247" }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "lock", size: 11 })) : /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-reference-remove", disabled: referencesBusy, "aria-label": `\u79FB\u9664\u5F15\u7528 ${cardTitle(card)}`, onClick: () => removeReference(card) }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "close", size: 12 }))))), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", ref: addButton, className: "wcc-creation-add-reference", "aria-label": "\u6DFB\u52A0\u5F15\u7528\u8D44\u6599", "aria-expanded": referencesOpen, "aria-controls": `${id2}-references`, disabled: referencesBusy, onClick: () => {
+    } }, cardTitle(card)), isPinned(card) ? /* @__PURE__ */ import_react38.default.createElement("span", { className: "wcc-creation-reference-lock", title: "\u5DF2\u5173\u8054\u5230\u6765\u6E90\u5361\u7247", role: "img", "aria-label": "\u5DF2\u5173\u8054\u5230\u6765\u6E90\u5361\u7247" }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "lock", size: 11 })) : /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-reference-remove", disabled: referencesBusy, "aria-label": `\u79FB\u9664\u5F15\u7528 ${cardTitle(card)}`, onClick: () => removeReference(card) }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "close", size: 12 }))))), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", ref: addButton, className: "wcc-creation-add-reference", "aria-label": "\u6DFB\u52A0\u5F15\u7528\u8D44\u6599", "aria-expanded": referencesOpen, "aria-controls": `${id2}-references`, disabled: referencesBusy, onClick: () => {
       setReferencesOpen((value) => !value);
       setReferenceSource(null);
       setPreviewOpen(false);
-    } }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "plus", size: 14 }), "\u52A0\u5F15\u7528"), /* @__PURE__ */ import_react37.default.createElement("input", { ref: fileInput, type: "file", hidden: true, multiple: true, accept: acceptedFiles || void 0, "aria-label": "\u9009\u62E9\u7535\u8111\u7D20\u6750\u6587\u4EF6", onChange: (event) => void importFiles(event) }), /* @__PURE__ */ import_react37.default.createElement("div", { ref: picker, id: `${id2}-references`, hidden: !referencesOpen, className: "wcc-creation-reference-picker", "aria-label": "\u9009\u62E9\u5F15\u7528\u8D44\u6599" }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-reference-sources", hidden: referenceSource === "board" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", ref: boardSourceButton, type: "button", disabled: referencesBusy, onClick: () => {
+    } }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "plus", size: 14 }), "\u52A0\u5F15\u7528"), /* @__PURE__ */ import_react38.default.createElement("input", { ref: fileInput, type: "file", hidden: true, multiple: true, accept: acceptedFiles || void 0, "aria-label": "\u9009\u62E9\u7535\u8111\u7D20\u6750\u6587\u4EF6", onChange: (event) => void importFiles(event) }), /* @__PURE__ */ import_react38.default.createElement("div", { ref: picker, id: `${id2}-references`, hidden: !referencesOpen, className: "wcc-creation-reference-picker", "aria-label": "\u9009\u62E9\u5F15\u7528\u8D44\u6599" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-reference-sources", hidden: referenceSource === "board" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", ref: boardSourceButton, type: "button", disabled: referencesBusy, onClick: () => {
       setReferenceSource("board");
       setSearch("");
-    } }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "whiteboard", size: 16 }), /* @__PURE__ */ import_react37.default.createElement("span", null, "\u4ECE\u753B\u5E03\u9009\u62E9"), /* @__PURE__ */ import_react37.default.createElement("span", { "aria-hidden": "true" }, "\u203A")), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", disabled: referencesBusy || !onImportFiles, title: !onImportFiles ? "\u7535\u8111\u7D20\u6750\u5BFC\u5165\u5C1A\u672A\u5C31\u7EEA" : "\u6DFB\u52A0\u672C\u673A\u8D44\u6599", onClick: () => fileInput.current?.click() }, /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: "computer", size: 16 }), /* @__PURE__ */ import_react37.default.createElement("span", null, "\u4ECE\u7535\u8111\u6DFB\u52A0"), /* @__PURE__ */ import_react37.default.createElement("span", { "aria-hidden": "true" }, "\u203A"))), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-board-picker", hidden: referenceSource !== "board" }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-reference-picker-heading" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u8FD4\u56DE\u5F15\u7528\u6765\u6E90", disabled: referencesBusy, onClick: () => setReferenceSource(null) }, "\u2039"), /* @__PURE__ */ import_react37.default.createElement("span", null, "\u4ECE\u753B\u5E03\u9009\u62E9")), /* @__PURE__ */ import_react37.default.createElement("input", { ref: boardSearch, "aria-label": "\u641C\u7D22\u5F15\u7528\u8D44\u6599", value: search, disabled: referencesBusy, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u5F53\u524D\u753B\u5E03\u5185\u7684\u8D44\u6599", spellCheck: false }), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-reference-options" }, candidates.map((card) => {
+    } }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "whiteboard", size: 16 }), /* @__PURE__ */ import_react38.default.createElement("span", null, "\u4ECE\u753B\u5E03\u9009\u62E9"), /* @__PURE__ */ import_react38.default.createElement("span", { "aria-hidden": "true" }, "\u203A")), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", disabled: referencesBusy || !onImportFiles, title: !onImportFiles ? "\u7535\u8111\u7D20\u6750\u5BFC\u5165\u5C1A\u672A\u5C31\u7EEA" : "\u6DFB\u52A0\u672C\u673A\u8D44\u6599", onClick: () => fileInput.current?.click() }, /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: "computer", size: 16 }), /* @__PURE__ */ import_react38.default.createElement("span", null, "\u4ECE\u7535\u8111\u6DFB\u52A0"), /* @__PURE__ */ import_react38.default.createElement("span", { "aria-hidden": "true" }, "\u203A"))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-board-picker", hidden: referenceSource !== "board" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-reference-picker-heading" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u8FD4\u56DE\u5F15\u7528\u6765\u6E90", disabled: referencesBusy, onClick: () => setReferenceSource(null) }, "\u2039"), /* @__PURE__ */ import_react38.default.createElement("span", null, "\u4ECE\u753B\u5E03\u9009\u62E9")), /* @__PURE__ */ import_react38.default.createElement("input", { ref: boardSearch, "aria-label": "\u641C\u7D22\u5F15\u7528\u8D44\u6599", value: search, disabled: referencesBusy, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u5F53\u524D\u753B\u5E03\u5185\u7684\u8D44\u6599", spellCheck: false }), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-reference-options" }, candidates.map((card) => {
       const unavailable = unavailableReason(card);
-      return /* @__PURE__ */ import_react37.default.createElement("label", { key: card.id, title: cardTitle(card) }, /* @__PURE__ */ import_react37.default.createElement("input", { type: "checkbox", checked: isChosen(card), disabled: referencesBusy || isPinned(card) || Boolean(unavailable && !isChosen(card)), onChange: () => toggleReference(card) }), /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: card.kind, size: 14 }), /* @__PURE__ */ import_react37.default.createElement("span", null, /* @__PURE__ */ import_react37.default.createElement("strong", null, cardTitle(card)), /* @__PURE__ */ import_react37.default.createElement("small", null, unavailable || card.referenceNote || (isPinned(card) ? "\u6765\u6E90\u5361\u7247 \xB7 \u4FDD\u7559\u5F15\u7528" : KIND_LABELS[card.kind] || "\u8D44\u6599"))));
-    }), !candidates.length && /* @__PURE__ */ import_react37.default.createElement("p", null, search ? "\u6CA1\u6709\u5339\u914D\u7684\u5F15\u7528\u8D44\u6599\u3002" : "\u5F53\u524D\u753B\u5E03\u6CA1\u6709\u53EF\u6DFB\u52A0\u7684\u8D44\u6599\u3002")), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-reference-done", onClick: () => {
+      return /* @__PURE__ */ import_react38.default.createElement("label", { key: card.id, title: cardTitle(card) }, /* @__PURE__ */ import_react38.default.createElement("input", { type: "checkbox", checked: isChosen(card), disabled: referencesBusy || isPinned(card) || Boolean(unavailable && !isChosen(card)), onChange: () => toggleReference(card) }), /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: card.kind, size: 14 }), /* @__PURE__ */ import_react38.default.createElement("span", null, /* @__PURE__ */ import_react38.default.createElement("strong", null, cardTitle(card)), /* @__PURE__ */ import_react38.default.createElement("small", null, unavailable || card.referenceNote || (isPinned(card) ? "\u6765\u6E90\u5361\u7247 \xB7 \u4FDD\u7559\u5F15\u7528" : KIND_LABELS[card.kind] || "\u8D44\u6599"))));
+    }), !candidates.length && /* @__PURE__ */ import_react38.default.createElement("p", null, search ? "\u6CA1\u6709\u5339\u914D\u7684\u5F15\u7528\u8D44\u6599\u3002" : "\u5F53\u524D\u753B\u5E03\u6CA1\u6709\u53EF\u6DFB\u52A0\u7684\u8D44\u6599\u3002")), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-reference-done", onClick: () => {
       setReferencesOpen(false);
       addButton.current?.focus();
-    } }, "\u5B8C\u6210\u9009\u62E9"))), referencePending && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-reference-pending", role: "status" }, activeReferenceWork.kind === "import" ? `\u6B63\u5728\u6DFB\u52A0 ${activeReferenceWork.count} \u4EFD\u7535\u8111\u8D44\u6599\u2026` : activeReferenceWork.kind === "media" ? `\u6B63\u5728\u5BFC\u5165 ${activeReferenceWork.count} \u4EFD${KIND_LABELS[outputType]}\u6587\u4EF6\u2026` : "\u6B63\u5728\u66F4\u65B0\u5F15\u7528\u2026"), !!references.length && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-reference-preview", id: `${id2}-reference-preview`, hidden: !previewOpen }, /* @__PURE__ */ import_react37.default.createElement("div", null, references.map((card) => /* @__PURE__ */ import_react37.default.createElement("details", { key: card.id, ref: (element) => element ? referenceDetails.current.set(card.id, element) : referenceDetails.current.delete(card.id) }, /* @__PURE__ */ import_react37.default.createElement("summary", null, /* @__PURE__ */ import_react37.default.createElement("span", null, referenceFormat(card)), cardTitle(card)), card.truncated && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(card.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${card.fullLength} \u5B57\u7B26` : "", "\u3002"), card.kind === "word" && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6B63\u6587\u6765\u81EA\u6B64 Word \u7ED1\u5B9A\u7684\u5927\u7EB2\u7248\u672C\u3002"), card.referenceNote && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-preview-note" }, card.referenceNote), (card.importedFile || card.generatedFile) && getReferenceFileHref && /* @__PURE__ */ import_react37.default.createElement(ImportedReferenceFile, { card, getHref: getReferenceFileHref }), /* @__PURE__ */ import_react37.default.createElement("pre", null, card.previewText ?? card.content ?? "\u672C\u6B21\u672A\u63D0\u4F9B\u6B63\u6587\u9884\u89C8\u3002"), (card.excerptInfo?.annotation || card.annotation) && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-preview-annotation" }, /* @__PURE__ */ import_react37.default.createElement("span", null, "\u6CE8\u91CA"), /* @__PURE__ */ import_react37.default.createElement("pre", null, card.excerptInfo?.annotation || card.annotation))))))), inputLocked && /* @__PURE__ */ import_react37.default.createElement("div", { className: `wcc-creation-pending-state is-${context?.pendingGeneration?.phase || "unknown"}`, role: "status" }, /* @__PURE__ */ import_react37.default.createElement("strong", null, pendingLabel(context?.pendingGeneration)), /* @__PURE__ */ import_react37.default.createElement("p", null, context?.pendingGeneration?.error || context?.pendingGeneration?.message || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u4F1A\u539F\u4F4D\u66F4\u65B0\u5361\u7247\u3002"), /* @__PURE__ */ import_react37.default.createElement("small", null, "\u4EFB\u52A1\u5DF2\u63D0\u4EA4\u3002\u9700\u8981\u8865\u5145\u8981\u6C42\u6216\u786E\u8BA4\u65F6\uFF0C\u8BF7\u6253\u5F00\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u3002")), mediaCard && !inputLocked && !reviewingResult && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-media-method", role: "group", "aria-label": "\u751F\u6210\u65B9\u5F0F" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": !isMedia, disabled: busy, onClick: () => onGenerationMethodChange?.("skill") }, "Skill \u751F\u6210"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": isMedia, disabled: busy, onClick: () => onGenerationMethodChange?.("api") }, "API \u751F\u6210")), isMedia && inputLocked ? /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-frozen-media" }, /* @__PURE__ */ import_react37.default.createElement("label", null, "\u539F\u63D0\u793A\u8BCD", /* @__PURE__ */ import_react37.default.createElement("textarea", { value: instruction, readOnly: true, rows: 4 })), /* @__PURE__ */ import_react37.default.createElement("p", null, [context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), context?.mediaJob?.error && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-error" }, context.mediaJob.error), context?.mediaJob?.canResume && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onResumeMedia }, "\u67E5\u770B\u8FDB\u5EA6\u6216\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(context?.mediaJob?.status) && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onNewMedia }, "\u786E\u8BA4\u540E\u91CD\u65B0\u751F\u6210")) : isMedia && !legacyMedia ? /* @__PURE__ */ import_react37.default.createElement(ApiMediaPrompt, { type: outputType, instruction, onChange: onInstructionChange, options: mediaOptions, onOptionsChange: onMediaOptionsChange, providers: mediaCapabilities?.providers || [], providerId: context?.providerId, onProviderChange: onMediaProviderChange, onOpenSettings: onOpenMediaSettings, capabilities: activeMediaCapabilities, loading: mediaLoading, error: mediaError, onRefresh: onRefreshMedia, onSubmit: submit, disabled: referencesBusy, mentionProps }) : isAction ? actionContent != null ? /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-action-content" }, actionContent) : /* @__PURE__ */ import_react37.default.createElement("label", { className: "wcc-creation-instruction" }, /* @__PURE__ */ import_react37.default.createElement("span", null, "\u5904\u7406\u8BF4\u660E"), /* @__PURE__ */ import_react37.default.createElement("textarea", { value: instruction, onChange: (event) => onInstructionChange?.(event.target.value), disabled: busy, rows: 4, maxLength: 8e3 })) : /* @__PURE__ */ import_react37.default.createElement(SkillCommandInput, { key: context?.key, instruction, onChange: onInstructionChange, disabled: busy || inputLocked, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onOpenSettings: () => setSkillSettingsOpen(true), onSubmit: submit, mentionProps, footer: submitFooter }), reason && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), displayError && /* @__PURE__ */ import_react37.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })), (isMedia || isAction) && submitFooter), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-creation-conversation-heading", hidden: !hasExecution && !reviewingResult || revisionEditing && !taskMode }, reviewingResult && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => {
+    } }, "\u5B8C\u6210\u9009\u62E9"))), referencePending && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-reference-pending", role: "status" }, activeReferenceWork.kind === "import" ? `\u6B63\u5728\u6DFB\u52A0 ${activeReferenceWork.count} \u4EFD\u7535\u8111\u8D44\u6599\u2026` : activeReferenceWork.kind === "media" ? `\u6B63\u5728\u5BFC\u5165 ${activeReferenceWork.count} \u4EFD${KIND_LABELS[outputType]}\u6587\u4EF6\u2026` : "\u6B63\u5728\u66F4\u65B0\u5F15\u7528\u2026"), !!references.length && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-reference-preview", id: `${id2}-reference-preview`, hidden: !previewOpen }, /* @__PURE__ */ import_react38.default.createElement("div", null, references.map((card) => /* @__PURE__ */ import_react38.default.createElement("details", { key: card.id, ref: (element) => element ? referenceDetails.current.set(card.id, element) : referenceDetails.current.delete(card.id) }, /* @__PURE__ */ import_react38.default.createElement("summary", null, /* @__PURE__ */ import_react38.default.createElement("span", null, referenceFormat(card)), cardTitle(card)), card.truncated && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u672C\u6B21\u5F15\u7528\u4E3A\u8282\u9009", Number.isFinite(card.fullLength) ? `\uFF0C\u539F\u6587\u5171 ${card.fullLength} \u5B57\u7B26` : "", "\u3002"), card.kind === "word" && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-preview-note" }, "\u6B63\u6587\u6765\u81EA\u6B64 Word \u7ED1\u5B9A\u7684\u5927\u7EB2\u7248\u672C\u3002"), card.referenceNote && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-preview-note" }, card.referenceNote), (card.importedFile || card.generatedFile) && getReferenceFileHref && /* @__PURE__ */ import_react38.default.createElement(ImportedReferenceFile, { card, getHref: getReferenceFileHref }), /* @__PURE__ */ import_react38.default.createElement("pre", null, card.previewText ?? card.content ?? "\u672C\u6B21\u672A\u63D0\u4F9B\u6B63\u6587\u9884\u89C8\u3002"), (card.excerptInfo?.annotation || card.annotation) && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-preview-annotation" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "\u6CE8\u91CA"), /* @__PURE__ */ import_react38.default.createElement("pre", null, card.excerptInfo?.annotation || card.annotation))))))), inputLocked && /* @__PURE__ */ import_react38.default.createElement("div", { className: `wcc-creation-pending-state is-${context?.pendingGeneration?.phase || "unknown"}`, role: "status" }, /* @__PURE__ */ import_react38.default.createElement("strong", null, pendingLabel(context?.pendingGeneration)), /* @__PURE__ */ import_react38.default.createElement("p", null, context?.pendingGeneration?.error || context?.pendingGeneration?.message || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u4F1A\u539F\u4F4D\u66F4\u65B0\u5361\u7247\u3002"), /* @__PURE__ */ import_react38.default.createElement("small", null, "\u4EFB\u52A1\u5DF2\u63D0\u4EA4\u3002\u9700\u8981\u8865\u5145\u8981\u6C42\u6216\u786E\u8BA4\u65F6\uFF0C\u8BF7\u6253\u5F00\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u3002")), mediaCard && !inputLocked && !reviewingResult && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-media-method", role: "group", "aria-label": "\u751F\u6210\u65B9\u5F0F" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": !isMedia, disabled: busy, onClick: () => onGenerationMethodChange?.("skill") }, "Skill \u751F\u6210"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": isMedia, disabled: busy, onClick: () => onGenerationMethodChange?.("api") }, "API \u751F\u6210")), isMedia && inputLocked ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-frozen-media" }, /* @__PURE__ */ import_react38.default.createElement("label", null, "\u539F\u63D0\u793A\u8BCD", /* @__PURE__ */ import_react38.default.createElement("textarea", { value: instruction, readOnly: true, rows: 4 })), /* @__PURE__ */ import_react38.default.createElement("p", null, [context?.mediaOptions?.model, context?.mediaOptions?.ratio, context?.mediaOptions?.resolution, context?.mediaOptions?.duration && `${context.mediaOptions.duration} \u79D2`].filter(Boolean).join(" \xB7 ")), context?.mediaJob?.error && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-error" }, context.mediaJob.error), context?.mediaJob?.canResume && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onResumeMedia }, "\u67E5\u770B\u8FDB\u5EA6\u6216\u53D6\u56DE\u6587\u4EF6"), ["unknown", "download_failed", "registration_failed"].includes(context?.mediaJob?.status) && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", disabled: busy, onClick: onNewMedia }, "\u786E\u8BA4\u540E\u91CD\u65B0\u751F\u6210")) : isMedia && !legacyMedia ? /* @__PURE__ */ import_react38.default.createElement(ApiMediaPrompt, { type: outputType, instruction, onChange: onInstructionChange, options: mediaOptions, onOptionsChange: onMediaOptionsChange, providers: mediaCapabilities?.providers || [], providerId: context?.providerId, onProviderChange: onMediaProviderChange, onOpenSettings: onOpenMediaSettings, capabilities: activeMediaCapabilities, loading: mediaLoading, error: mediaError, onRefresh: onRefreshMedia, onSubmit: submit, disabled: referencesBusy, mentionProps }) : isAction ? actionContent != null ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-action-content" }, actionContent) : /* @__PURE__ */ import_react38.default.createElement("label", { className: "wcc-creation-instruction" }, /* @__PURE__ */ import_react38.default.createElement("span", null, "\u5904\u7406\u8BF4\u660E"), /* @__PURE__ */ import_react38.default.createElement("textarea", { value: instruction, onChange: (event) => onInstructionChange?.(event.target.value), disabled: busy, rows: 4, maxLength: 8e3 })) : /* @__PURE__ */ import_react38.default.createElement(SkillCommandInput, { key: context?.key, instruction, onChange: onInstructionChange, disabled: busy || inputLocked, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onOpenSettings: () => setSkillSettingsOpen(true), onSubmit: submit, mentionProps, footer: submitFooter }), reason && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, reason), displayError && /* @__PURE__ */ import_react38.default.createElement(UserError, { className: "wcc-creation-error", error: displayError })), (isMedia || isAction) && submitFooter), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-creation-conversation-heading", hidden: !hasExecution && !reviewingResult || revisionEditing && !taskMode }, reviewingResult && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => {
       setConversationOpen(false);
       setRevisionEditing(true);
       requestAnimationFrame(() => composer.current?.querySelector("textarea")?.focus({ preventScroll: true }));
-    } }, "\u57FA\u4E8E\u6B64\u7248\u4FEE\u6539"), hasExecution && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-expanded": conversationOpen, "aria-controls": `${id2}-conversation`, disabled: conversationOpening === conversationScope, onClick: () => void toggleConversation() }, conversationOpening === conversationScope ? "\u6B63\u5728\u6253\u5F00\u2026" : reviewingResult ? "\u539F\u5BF9\u8BDD" : "\u4EFB\u52A1\u5BF9\u8BDD", /* @__PURE__ */ import_react37.default.createElement(CreationIcon, { type: conversationOpen ? "collapse" : "expand", size: 13 })), executionExpanded && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wcc-review-jumps" }, onOpenReviewDraft && reviewDraft && /* @__PURE__ */ import_react37.default.createElement(
+    } }, "\u57FA\u4E8E\u6B64\u7248\u4FEE\u6539"), hasExecution && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-expanded": conversationOpen, "aria-controls": `${id2}-conversation`, disabled: conversationOpening === conversationScope, onClick: () => void toggleConversation() }, conversationOpening === conversationScope ? "\u6B63\u5728\u6253\u5F00\u2026" : reviewingResult ? "\u539F\u5BF9\u8BDD" : "\u4EFB\u52A1\u5BF9\u8BDD", /* @__PURE__ */ import_react38.default.createElement(CreationIcon, { type: conversationOpen ? "collapse" : "expand", size: 13 })), executionExpanded && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-review-jumps" }, onOpenReviewDraft && reviewDraft && /* @__PURE__ */ import_react38.default.createElement(
       UiButton,
       {
         variant: "quiet",
@@ -43930,7 +44276,7 @@ function CardComposer({
         onClick: openReviewDraft
       },
       "\u67E5\u770B\u5F85\u5BA1\u7A3F"
-    ), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u67E5\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u524D\u5F80\u786E\u8BA4"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react37.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), executionExpanded && visible && !suspended && reviewImages.length > 0 && getReviewImageHref && /* @__PURE__ */ import_react37.default.createElement(
+    ), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u67E5\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u524D\u5F80\u786E\u8BA4"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react38.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), executionExpanded && visible && !suspended && reviewImages.length > 0 && getReviewImageHref && /* @__PURE__ */ import_react38.default.createElement(
       ReviewImageGallery,
       {
         key: `${conversationScope}:${reviewQuestion.questionId}:${reviewQuestion.text}`,
@@ -43938,8 +44284,8 @@ function CardComposer({
         getHref: getReviewImageHref,
         onOpen: canOpenReviewImage
       }
-    ), /* @__PURE__ */ import_react37.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
-    /* @__PURE__ */ import_react37.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) })
+    ), /* @__PURE__ */ import_react38.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
+    /* @__PURE__ */ import_react38.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) })
   );
 }
 
@@ -44085,167 +44431,45 @@ function creationTaskInput(context) {
     ...context.generation ? { generation: { ...context.generation } } : {}
   };
 }
+function creationPositionFree(position, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+  return Number.isFinite(position?.x) && Number.isFinite(position?.y) && Math.abs(position.x) <= 999e3 && Math.abs(position.y) <= 999e3 && !cards.some((card) => position.x < card.position.x + (card.width || CARD_WIDTH) + 24 && position.x + width + 24 > card.position.x && position.y < card.position.y + (card.height || CARD_HEIGHT) + 24 && position.y + height + 24 > card.position.y);
+}
 function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
-  let x2 = Math.min(999e3, Math.max(-999e3, anchor.position.x + (anchor.width || width) + 80));
-  let y2 = Math.min(999e3, Math.max(-999e3, anchor.position.y));
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    if (!cards.some((card) => x2 < card.position.x + (card.width || width) + 20 && x2 + width + 20 > card.position.x && y2 < card.position.y + (card.height || height) + 20 && y2 + height + 20 > card.position.y)) return { x: x2, y: y2 };
-    y2 += height + 48;
-    if (y2 > 999e3) {
-      y2 = Math.max(-999e3, anchor.position.y);
-      x2 = Math.max(-999e3, x2 - width - 80);
+  const min = -999e3, maxX = 999e3 - width, maxY = 999e3 - height;
+  const clamp2 = (value, max) => Math.max(min, Math.min(max, value));
+  const origin = { x: clamp2(anchor.position.x + (anchor.width || CARD_WIDTH) + 80, maxX), y: clamp2(anchor.position.y, maxY) };
+  const columns = /* @__PURE__ */ new Set([origin.x, clamp2(anchor.position.x - width - 80, maxX), min, maxX]);
+  for (const card of cards) {
+    columns.add(clamp2(card.position.x + (card.width || CARD_WIDTH) + 24, maxX));
+    columns.add(clamp2(card.position.x - width - 24, maxX));
+  }
+  let best = null, score = Infinity;
+  for (const x2 of [...columns].sort((a, b2) => Math.abs(a - origin.x) - Math.abs(b2 - origin.x) || b2 - a)) {
+    const distance2 = (x2 - origin.x) ** 2;
+    if (distance2 > score) break;
+    const intervals = cards.filter((card) => x2 < card.position.x + (card.width || CARD_WIDTH) + 24 && x2 + width + 24 > card.position.x).map((card) => [card.position.y - height - 24, card.position.y + (card.height || CARD_HEIGHT) + 24]).sort((a, b2) => a[0] - b2[0]);
+    const merged = [];
+    for (const interval2 of intervals) {
+      const last = merged.at(-1);
+      if (last && interval2[0] < last[1]) last[1] = Math.max(last[1], interval2[1]);
+      else merged.push([...interval2]);
+    }
+    const blocked = merged.find(([top, bottom]) => origin.y > top && origin.y < bottom);
+    const rows = blocked ? [blocked[1], blocked[0]] : [origin.y];
+    for (const y2 of rows) {
+      if (y2 < min || y2 > maxY) continue;
+      const nextScore = distance2 + (y2 - origin.y) ** 2;
+      if (nextScore < score && creationPositionFree({ x: x2, y: y2 }, cards, width, height)) {
+        best = { x: x2, y: y2 };
+        score = nextScore;
+      }
     }
   }
-  return { x: x2, y: y2 };
+  if (!best) throw new Error("\u6765\u6E90\u9644\u8FD1\u6CA1\u6709\u53EF\u7528\u7684\u5361\u7247\u4F4D\u7F6E\uFF0C\u8BF7\u6574\u7406\u753B\u5E03\u540E\u91CD\u8BD5\u3002");
+  return best;
 }
 function visibleCreationPosition(anchor, cards, viewport, size, width = CARD_WIDTH, height = CARD_HEIGHT) {
-  const zoom = viewport.zoom;
-  const left = (16 - viewport.x) / zoom, right = (size.width - 16 - viewport.x) / zoom - width;
-  const top = (96 - viewport.y) / zoom;
-  const bottom = Math.max(top, (size.height - 240 - viewport.y) / zoom - height);
-  if (right < left) return adjacentCreationPosition(anchor, cards, width, height);
-  const clamp2 = (p) => ({ x: Math.max(left, Math.min(right, p.x)), y: Math.max(top, Math.min(bottom, p.y)) });
-  const free = (p) => !cards.some((card) => p.x < card.position.x + (card.width || width) + 16 && p.x + width + 16 > card.position.x && p.y < card.position.y + (card.height || height) + 16 && p.y + height + 16 > card.position.y);
-  const candidates = [
-    adjacentCreationPosition(anchor, cards, width, height),
-    { x: anchor.position.x - width - 80, y: anchor.position.y },
-    { x: anchor.position.x, y: anchor.position.y + (anchor.height || height) + 48 },
-    { x: anchor.position.x, y: anchor.position.y - height - 48 }
-  ];
-  for (const p of candidates.map(clamp2)) if (free(p)) return p;
-  for (let y2 = top; y2 <= bottom; y2 += height + 32) for (let x2 = left; x2 <= right; x2 += width + 32) if (free({ x: x2, y: y2 })) return { x: x2, y: y2 };
-  const fullBottom = (size.height - 16 - viewport.y) / zoom - height;
-  for (let y2 = top; y2 <= fullBottom; y2 += height + 32) for (let x2 = left; x2 <= right; x2 += width + 32) if (free({ x: x2, y: y2 })) return { x: x2, y: y2 };
   return adjacentCreationPosition(anchor, cards, width, height);
-}
-
-// src/output-preview.jsx
-var import_react38 = __toESM(require("react"), 1);
-var fileBlocked = (status) => ["missing", "changed", "modified", "unavailable"].includes(status);
-var messageOf5 = (value) => value?.message || value?.error?.message || value?.error || String(value);
-function useDeckManifest({ artifactId, hash, loadPreview, enabled = true }) {
-  const identity4 = `${artifactId || ""}:${hash || ""}`;
-  const loader = (0, import_react38.useRef)(loadPreview);
-  loader.current = loadPreview;
-  const [attempt, setAttempt] = (0, import_react38.useState)(0);
-  const [result, setResult] = (0, import_react38.useState)(null);
-  const canLoad = Boolean(enabled && artifactId && hash && loadPreview);
-  (0, import_react38.useEffect)(() => {
-    if (!canLoad) return;
-    let disposed = false;
-    const controller = new AbortController();
-    Promise.resolve().then(() => loader.current({ artifactId, hash, signal: controller.signal })).then((manifest) => {
-      if (disposed) return;
-      if (manifest?.artifactId !== artifactId || manifest?.hash !== hash) throw new Error("\u8BFE\u4EF6\u9884\u89C8\u4E0E\u5F53\u524D\u6587\u4EF6\u7248\u672C\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u3002");
-      if (manifest.status !== "ready") throw new Error(messageOf5(manifest.error || "\u6B64\u7248\u672C\u7684\u8BFE\u4EF6\u9884\u89C8\u672A\u80FD\u751F\u6210\u3002"));
-      const pages = manifest.pages;
-      if (!Array.isArray(pages) || !pages.length || manifest.pageCount !== pages.length || pages.some((page) => !Number.isInteger(page.number) || page.number < 1) || new Set(pages.map((page) => page.number)).size !== pages.length) throw new Error("\u8BFE\u4EF6\u9884\u89C8\u9875\u4FE1\u606F\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u91CD\u65B0\u8BFB\u53D6\u3002");
-      setResult({ identity: identity4, attempt, manifest: { ...manifest, pages: [...pages].sort((a, b2) => a.number - b2.number) } });
-    }).catch((cause) => {
-      if (!disposed) setResult({ identity: identity4, attempt, error: messageOf5(cause) });
-    });
-    return () => {
-      disposed = true;
-      controller.abort();
-    };
-  }, [artifactId, hash, canLoad, attempt]);
-  const current = result?.identity === identity4 && result.attempt === attempt ? result : null;
-  return {
-    identity: identity4,
-    attempt,
-    manifest: current?.manifest,
-    error: current?.error,
-    loading: canLoad && !current,
-    unavailable: !canLoad,
-    retry: () => setAttempt((value) => value + 1)
-  };
-}
-function PptCover({ artifactId, hash, loadPreview, getPageHref, src, title, onOpen, disabled, compact }) {
-  const preview = useDeckManifest({ artifactId, hash, loadPreview, enabled: !src && !disabled });
-  const [imageError, setImageError] = (0, import_react38.useState)("");
-  const page = preview.manifest?.pages.find((item) => item.number === preview.manifest.coverPage) || preview.manifest?.pages[0];
-  const image = src || page && getPageHref?.({ artifactId, hash, page: page.number });
-  const imageKey = `${image || ""}:${preview.attempt}`;
-  const failed = imageError === imageKey;
-  return /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", className: "wtt-output-ppt-cover", disabled: disabled || !onOpen, onClick: (event) => {
-    if (!compact || event.detail === 0) {
-      event.stopPropagation();
-      onOpen?.();
-    }
-  }, onDoubleClick: compact ? (event) => {
-    event.stopPropagation();
-    onOpen?.();
-  } : void 0, "aria-label": `${compact ? "\u53CC\u51FB\u9010\u9875\u9884\u89C8" : "\u9010\u9875\u9884\u89C8"}\uFF1A${title || "PPT"}` }, image && !failed ? /* @__PURE__ */ import_react38.default.createElement("img", { key: imageKey, src: image, alt: `${title || "PPT"}\u5C01\u9762`, loading: "lazy", draggable: false, onError: () => setImageError(imageKey) }) : /* @__PURE__ */ import_react38.default.createElement("span", { className: "wtt-output-ppt-placeholder" }, preview.loading ? "\u6B63\u5728\u751F\u6210\u5C01\u9762\u2026" : preview.error ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6253\u5F00\u8BFE\u4EF6\u67E5\u770B" : failed ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528" : "PPT \u8BFE\u4EF6"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "wtt-output-ppt-caption" }, preview.manifest ? `${preview.manifest.pageCount} \u9875 \xB7 ` : "", compact ? "\u53CC\u51FB\u9010\u9875\u67E5\u770B" : "\u9010\u9875\u67E5\u770B"));
-}
-function OutputPreview({
-  type = "text",
-  title,
-  content,
-  extracted = true,
-  mime,
-  src,
-  downloadHref,
-  status = "ready",
-  onOpenDeck,
-  artifactId,
-  hash,
-  loadPreview,
-  getPageHref,
-  compact = false,
-  emptyMessage
-}) {
-  const [mediaError, setMediaError] = (0, import_react38.useState)("");
-  const identity4 = `${type}:${src || ""}`;
-  const unavailable = fileBlocked(status);
-  const failed = mediaError === identity4;
-  const hasText = extracted !== false && typeof content === "string" && content.trim();
-  const previewText = compact && hasText && content.length > 600 ? content.slice(0, 600).replace(/[\uD800-\uDBFF]$/, "") + "\u2026" : content;
-  return /* @__PURE__ */ import_react38.default.createElement("section", { className: `wtt-output-preview is-${type}${compact ? " is-compact" : ""}`, "aria-label": `${title || "\u6210\u679C\u6587\u4EF6"}\u9884\u89C8` }, unavailable ? /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, "\u6B64\u7248\u672C\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u65E0\u6CD5\u6CBF\u7528\u65E7\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u539F\u6587\u4EF6\u3002") : type === "pptx" ? /* @__PURE__ */ import_react38.default.createElement(PptCover, { artifactId, hash, loadPreview, getPageHref, src, title, onOpen: onOpenDeck, compact }) : type === "image" && src && !failed ? /* @__PURE__ */ import_react38.default.createElement("img", { key: identity4, className: "wtt-output-image", src, alt: title || "\u751F\u6210\u56FE\u7247", loading: "lazy", decoding: "async", draggable: false, onError: () => setMediaError(identity4) }) : type === "video" && src && !failed ? /* @__PURE__ */ import_react38.default.createElement(
-    "video",
-    {
-      key: identity4,
-      className: "wtt-output-video nodrag nopan nowheel",
-      src,
-      controls: true,
-      preload: "metadata",
-      playsInline: true,
-      "aria-label": title || "\u751F\u6210\u89C6\u9891",
-      onError: () => setMediaError(identity4),
-      onPointerDown: (event) => event.stopPropagation(),
-      onClick: (event) => event.stopPropagation(),
-      onDoubleClick: (event) => event.stopPropagation(),
-      onKeyDown: (event) => event.stopPropagation()
-    }
-  ) : ["image", "video"].includes(type) ? /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, failed ? type === "video" ? "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u7248\u672C\uFF0C\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002" : "\u6B64\u7248\u672C\u56FE\u7247\u672A\u80FD\u52A0\u8F7D\uFF0C\u53EF\u4E0B\u8F7D\u539F\u56FE\u67E5\u770B\u3002" : emptyMessage || "\u5C1A\u672A\u53D6\u5F97\u53EF\u9884\u89C8\u7684\u6587\u4EF6\u3002") : hasText ? /* @__PURE__ */ import_react38.default.createElement("pre", { className: `wtt-output-text${compact ? "" : " nodrag nowheel"}` }, previewText) : /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-output-preview-note" }, emptyMessage || (extracted === false ? "\u6B64\u683C\u5F0F\u5C1A\u672A\u63D0\u53D6\u53EF\u8BFB\u6B63\u6587\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002" : "\u5C1A\u65E0\u5DF2\u4FDD\u5B58\u7684\u6587\u672C\u6210\u679C\u3002")), !compact && downloadHref && /* @__PURE__ */ import_react38.default.createElement("a", { className: "wtt-output-download", href: downloadHref, download: true, onClick: (event) => event.stopPropagation() }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C"));
-}
-function DeckPreview({ artifactId, hash, title = "\u8BFE\u4EF6\u9884\u89C8", loadPreview, getPageHref, downloadHref, onClose }) {
-  const preview = useDeckManifest({ artifactId, hash, loadPreview });
-  const [selection2, setSelection] = (0, import_react38.useState)(null);
-  const [pageErrors, setPageErrors] = (0, import_react38.useState)(() => /* @__PURE__ */ new Set());
-  const identity4 = `${preview.identity}:${preview.attempt}`;
-  const pages = preview.manifest?.pages || [];
-  const selectedNumber = selection2?.identity === identity4 ? selection2.number : preview.manifest?.coverPage || pages[0]?.number;
-  const currentIndex = Math.max(0, pages.findIndex((page) => page.number === selectedNumber));
-  const current = pages[currentIndex];
-  const pageHref = (page) => getPageHref?.({ artifactId, hash, page: page.number });
-  const choose = (index2) => {
-    if (pages[index2]) setSelection({ identity: identity4, number: pages[index2].number });
-  };
-  const failPage = (number) => setPageErrors((previous) => new Set(previous).add(`${identity4}:${number}`));
-  function onKeyDown(event) {
-    event.stopPropagation();
-    if (event.key === "Escape" && onClose) {
-      event.preventDefault();
-      onClose();
-      return;
-    }
-    if (event.target?.closest("input,textarea,select,video") || !pages.length) return;
-    const target = { ArrowLeft: currentIndex - 1, ArrowRight: currentIndex + 1, Home: 0, End: pages.length - 1 }[event.key];
-    if (target === void 0) return;
-    event.preventDefault();
-    choose(Math.max(0, Math.min(pages.length - 1, target)));
-  }
-  return /* @__PURE__ */ import_react38.default.createElement("aside", { className: "wtt-deck-preview nodrag nopan nowheel", "aria-label": "PPT \u9010\u9875\u9884\u89C8", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown }, /* @__PURE__ */ import_react38.default.createElement(PanelHeader, { title, subtitle: "PPT \xB7 \u5B9E\u9645\u8BFE\u4EF6\u9884\u89C8", downloadHref, onClose, closeLabel: "\u5173\u95ED\u8BFE\u4EF6\u9884\u89C8" }), preview.loading ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-feedback", role: "status" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "wtt-deck-loading", "aria-hidden": "true" }), /* @__PURE__ */ import_react38.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u6B64\u7248\u672C\u7684\u5B9E\u9645\u5E7B\u706F\u7247\u2026"), /* @__PURE__ */ import_react38.default.createElement("small", null, "\u9996\u6B21\u9884\u89C8\u4F1A\u5728\u672C\u673A\u8F6C\u6362\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\u3002")) : preview.error || preview.unavailable ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react38.default.createElement("strong", null, "\u8BFE\u4EF6\u9884\u89C8\u6682\u4E0D\u53EF\u7528"), /* @__PURE__ */ import_react38.default.createElement("p", null, preview.error || "\u5F53\u524D\u6587\u4EF6\u7F3A\u5C11\u9884\u89C8\u4FE1\u606F\u3002"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry, disabled: preview.unavailable }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"), /* @__PURE__ */ import_react38.default.createElement("small", null, "\u6B63\u5F0F PPTX \u4FDD\u7559\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002")) : /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-body" }, /* @__PURE__ */ import_react38.default.createElement("nav", { className: "wtt-deck-thumbnails", "aria-label": "\u5E7B\u706F\u7247\u7F29\u7565\u56FE" }, pages.map((page, index2) => /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", key: `${identity4}:${page.number}`, "aria-label": `\u7B2C ${page.number} \u9875`, "aria-current": index2 === currentIndex ? "page" : void 0, onClick: () => choose(index2) }, /* @__PURE__ */ import_react38.default.createElement("span", null, page.number), /* @__PURE__ */ import_react38.default.createElement("img", { src: pageHref(page), alt: `\u7B2C ${page.number} \u9875\u7F29\u7565\u56FE`, loading: "lazy", decoding: "async", draggable: false })))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-stage" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-page", tabIndex: 0, "aria-label": `\u7B2C ${current?.number || 1} \u9875\uFF0C\u5DE6\u53F3\u952E\u7FFB\u9875` }, current && !pageErrors.has(`${identity4}:${current.number}`) ? /* @__PURE__ */ import_react38.default.createElement("img", { key: `${identity4}:${current.number}`, src: pageHref(current), alt: `${title} \xB7 \u7B2C ${current.number} \u9875`, draggable: false, onError: () => failPage(current.number) }) : /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react38.default.createElement("p", null, "\u6B64\u9875\u9884\u89C8\u52A0\u8F7D\u5931\u8D25\u3002"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"))), /* @__PURE__ */ import_react38.default.createElement("footer", { className: "wtt-deck-navigation" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex - 1), disabled: currentIndex === 0 }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react38.default.createElement("span", { "aria-live": "polite" }, "\u7B2C ", current?.number || 1, " \u9875 / \u5171 ", pages.length, " \u9875"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex + 1), disabled: currentIndex >= pages.length - 1 }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-deck-derived-note" }, "\u6309\u6B64\u7248\u672C PPTX \u6E32\u67D3\uFF1B\u9884\u89C8\u56FE\u4E0D\u66FF\u4EE3\u53EF\u7F16\u8F91\u8BFE\u4EF6\u3002"), !!preview.manifest?.warnings?.length && /* @__PURE__ */ import_react38.default.createElement("details", { className: "wtt-deck-render-notes" }, /* @__PURE__ */ import_react38.default.createElement("summary", null, "\u6E32\u67D3\u63D0\u793A \xB7 ", preview.manifest.warnings.length), preview.manifest.warnings.map((warning, index2) => /* @__PURE__ */ import_react38.default.createElement("p", { key: index2 }, typeof warning === "string" ? warning : [warning.source, warning.message].filter(Boolean).join("\uFF1A")))))));
 }
 
 // src/slide-draft-cover.jsx
@@ -45812,7 +46036,10 @@ function SkillConfirmation({
   onOpenNative,
   onOpenOutput,
   loadDeckPreview,
-  getDeckPageHref
+  getDeckPageHref,
+  projectRoot,
+  getReviewImageHref,
+  renderConversation
 }) {
   const [drafts, setDrafts] = (0, import_react49.useState)(() => draftCache.get(entry.key) || {});
   const [outputs, setOutputs] = (0, import_react49.useState)(null);
@@ -45825,6 +46052,8 @@ function SkillConfirmation({
   const current = currentEntry();
   const stale = current?.key !== entry.key || current?.interaction !== pending || questionFingerprint(current?.interaction) !== questionFingerprint(pending);
   const permission = pending.kind === "approval";
+  const images = !stale && !sent ? reviewImagesFromInteraction(projectRoot, pending) : [];
+  const nativeChat = Boolean(renderConversation && entry.task.sessionId);
   (0, import_react49.useEffect)(() => {
     mounted.current = true;
     let cancelled = false;
@@ -45879,10 +46108,21 @@ function SkillConfirmation({
       }
     },
     /* @__PURE__ */ import_react49.default.createElement(PanelHeader, { title: entry.task.title, subtitle: `\u4EFB\u52A1\u5F85\u786E\u8BA4 \xB7 ${interactionLabel(pending)}`, onClose, closeLabel: "\u7A0D\u540E\u5904\u7406 \u4EFB\u52A1\u5F85\u786E\u8BA4" }),
-    /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-confirmation-body" }, /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-skill-scope" }, "\u56DE\u7B54\u540E\u7EE7\u7EED\u8FD9\u6B21\u4EFB\u52A1\u3002\u672C\u6B21\u786E\u8BA4\u4E0D\u4F1A\u53D1\u9001\u6587\u4EF6\u7ED9\u5BA2\u6237\u3002"), sent ? /* @__PURE__ */ import_react49.default.createElement("p", { role: "status" }, "\u56DE\u7B54\u5DF2\u63D0\u4EA4\u3002\u8BF7\u5173\u95ED\u6D6E\u7A97\u67E5\u770B\u539F\u4EFB\u52A1\u8FDB\u5C55\uFF1B\u8FBE\u5230\u9884\u7B97\u65F6\u9700\u8C03\u6574\u540E\u7EE7\u7EED\u3002") : stale ? /* @__PURE__ */ import_react49.default.createElement("p", { role: "status" }, "\u6B64\u95EE\u9898\u5DF2\u7ED3\u675F\u6216\u5DF2\u66F4\u65B0\u3002\u8BF7\u5173\u95ED\u540E\u6253\u5F00\u5F53\u524D\u5F85\u529E\u3002") : permission ? /* @__PURE__ */ import_react49.default.createElement("p", null, "AI \u9700\u8981\u4F60\u7684\u6388\u6743\u624D\u80FD\u7EE7\u7EED\u3002\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\uFF0C\u67E5\u770B\u5177\u4F53\u64CD\u4F5C\u540E\u51B3\u5B9A\u662F\u5426\u5141\u8BB8\u3002") : (pending.questions || []).map((question) => /* @__PURE__ */ import_react49.default.createElement("fieldset", { key: question.id, disabled }, /* @__PURE__ */ import_react49.default.createElement("legend", null, question.question.length > 240 ? question.header || "\u8BF7\u5BA1\u9605\u540E\u56DE\u7B54" : `${question.header ? `${question.header} \xB7 ` : ""}${question.question}`), question.question.length > 240 && /* @__PURE__ */ import_react49.default.createElement("pre", { className: "wcc-skill-plan" }, question.question), question.detail && /* @__PURE__ */ import_react49.default.createElement("pre", { className: "wcc-skill-plan" }, question.detail), /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-choices" }, (question.options || []).map((option) => /* @__PURE__ */ import_react49.default.createElement("label", { key: option.label }, /* @__PURE__ */ import_react49.default.createElement("input", { type: question.multiSelect ? "checkbox" : "radio", name: `${entry.key}:${question.id}`, checked: (drafts[question.id]?.selected || []).includes(option.label), onChange: (event) => {
+    /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-confirmation-body" }, /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-skill-scope" }, "\u56DE\u7B54\u540E\u7EE7\u7EED\u8FD9\u6B21\u4EFB\u52A1\u3002\u672C\u6B21\u786E\u8BA4\u4E0D\u4F1A\u53D1\u9001\u6587\u4EF6\u7ED9\u5BA2\u6237\u3002"), sent ? /* @__PURE__ */ import_react49.default.createElement("p", { role: "status" }, "\u56DE\u7B54\u5DF2\u63D0\u4EA4\u3002\u8BF7\u5173\u95ED\u6D6E\u7A97\u67E5\u770B\u539F\u4EFB\u52A1\u8FDB\u5C55\uFF1B\u8FBE\u5230\u9884\u7B97\u65F6\u9700\u8C03\u6574\u540E\u7EE7\u7EED\u3002") : stale ? /* @__PURE__ */ import_react49.default.createElement("p", { role: "status" }, "\u6B64\u95EE\u9898\u5DF2\u7ED3\u675F\u6216\u5DF2\u66F4\u65B0\u3002\u8BF7\u5173\u95ED\u540E\u6253\u5F00\u5F53\u524D\u5F85\u529E\u3002") : /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, images.length > 0 && getReviewImageHref && /* @__PURE__ */ import_react49.default.createElement(
+      ReviewImageGallery,
+      {
+        key: `${entry.key}:${questionFingerprint(pending)}`,
+        images,
+        getHref: getReviewImageHref,
+        onOpen: (image) => {
+          const latest = currentEntry();
+          return latest?.key === entry.key && questionFingerprint(latest.interaction) === questionFingerprint(pending) && reviewImagesFromInteraction(projectRoot, latest.interaction).some((value) => value.path === image.path && value.hash === image.hash);
+        }
+      }
+    ), nativeChat ? /* @__PURE__ */ import_react49.default.createElement("section", { className: "wcc-skill-chat", "aria-label": "\u5F53\u524D\u4EFB\u52A1\u539F\u59CB\u5BF9\u8BDD" }, renderConversation(entry.task)) : permission ? /* @__PURE__ */ import_react49.default.createElement("p", null, "AI \u9700\u8981\u4F60\u7684\u6388\u6743\u624D\u80FD\u7EE7\u7EED\u3002\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\uFF0C\u67E5\u770B\u5177\u4F53\u64CD\u4F5C\u540E\u51B3\u5B9A\u662F\u5426\u5141\u8BB8\u3002") : (pending.questions || []).map((question) => /* @__PURE__ */ import_react49.default.createElement("fieldset", { key: question.id, disabled }, /* @__PURE__ */ import_react49.default.createElement("legend", null, question.question.length > 240 ? question.header || "\u8BF7\u5BA1\u9605\u540E\u56DE\u7B54" : `${question.header ? `${question.header} \xB7 ` : ""}${question.question}`), question.question.length > 240 && /* @__PURE__ */ import_react49.default.createElement("pre", { className: "wcc-skill-plan" }, question.question), question.detail && /* @__PURE__ */ import_react49.default.createElement("pre", { className: "wcc-skill-plan" }, question.detail), /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-choices" }, (question.options || []).map((option) => /* @__PURE__ */ import_react49.default.createElement("label", { key: option.label }, /* @__PURE__ */ import_react49.default.createElement("input", { type: question.multiSelect ? "checkbox" : "radio", name: `${entry.key}:${question.id}`, checked: (drafts[question.id]?.selected || []).includes(option.label), onChange: (event) => {
       const selected2 = question.multiSelect ? event.target.checked ? [...drafts[question.id]?.selected || [], option.label] : (drafts[question.id]?.selected || []).filter((label2) => label2 !== option.label) : [option.label];
       edit(question.id, { selected: selected2 });
-    } }), /* @__PURE__ */ import_react49.default.createElement("span", null, /* @__PURE__ */ import_react49.default.createElement("strong", null, option.label), option.description && /* @__PURE__ */ import_react49.default.createElement("small", null, option.description))))), /* @__PURE__ */ import_react49.default.createElement("label", { className: "wcc-skill-custom" }, plan ? "\u4FEE\u6539\u610F\u89C1\uFF0F\u8865\u5145\u8BF4\u660E" : "\u4F60\u7684\u56DE\u7B54\uFF0F\u8865\u5145\u8BF4\u660E", /* @__PURE__ */ import_react49.default.createElement("textarea", { rows: 3, maxLength: 8e3, value: drafts[question.id]?.custom || "", onChange: (event) => edit(question.id, { custom: event.target.value }), placeholder: plan ? "\u6709\u4FEE\u6539\u8981\u6C42\u65F6\u586B\u5199\uFF0C\u518D\u70B9\u300C\u63D0\u4EA4\u4FEE\u6539\u610F\u89C1\u300D" : "\u9009\u62E9\u9009\u9879\uFF0C\u6216\u76F4\u63A5\u586B\u5199\u56DE\u7B54" })))), !permission && /* @__PURE__ */ import_react49.default.createElement("details", { className: "wcc-skill-preview", open: true }, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u672C\u6B21\u5DF2\u4FDD\u5B58\u6587\u4EF6 \xB7 ", outputs?.length ?? "\u8BFB\u53D6\u4E2D"), /* @__PURE__ */ import_react49.default.createElement("p", null, "\u5148\u6838\u5BF9\u4E0B\u9762\u7684\u6587\u4EF6\u7248\u672C\u3002\u5C1A\u672A\u4FDD\u5B58\u6210\u6587\u4EF6\u7684\u65B9\u6848\uFF0C\u8BF7\u770B\u4E0A\u65B9\u5185\u5BB9\u3002"), previewError && /* @__PURE__ */ import_react49.default.createElement("p", { role: "alert" }, "\u9884\u89C8\u8BFB\u53D6\u5931\u8D25\uFF1A", previewError), outputs?.length === 0 && /* @__PURE__ */ import_react49.default.createElement("p", null, "\u8FD8\u6CA1\u6709\u4FDD\u5B58\u6587\u4EF6\u3002\u8BF7\u67E5\u770B\u4E0A\u65B9\u65B9\u6848\uFF0C\u6216\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u4E86\u89E3\u8FDB\u5EA6\u3002"), outputs?.map((output) => /* @__PURE__ */ import_react49.default.createElement("div", { key: output.versionId, className: "wcc-skill-output" }, /* @__PURE__ */ import_react49.default.createElement("strong", null, output.node.title, output.number ? ` \xB7 V${output.number}` : ""), /* @__PURE__ */ import_react49.default.createElement("details", null, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u6587\u4EF6\u4FE1\u606F"), /* @__PURE__ */ import_react49.default.createElement("p", null, output.node.path || output.node.sourcePath), /* @__PURE__ */ import_react49.default.createElement("small", null, "\u6821\u9A8C\u503C\uFF1A", output.node.sourceHash)), /* @__PURE__ */ import_react49.default.createElement(
+    } }), /* @__PURE__ */ import_react49.default.createElement("span", null, /* @__PURE__ */ import_react49.default.createElement("strong", null, option.label), option.description && /* @__PURE__ */ import_react49.default.createElement("small", null, option.description))))), /* @__PURE__ */ import_react49.default.createElement("label", { className: "wcc-skill-custom" }, plan ? "\u4FEE\u6539\u610F\u89C1\uFF0F\u8865\u5145\u8BF4\u660E" : "\u4F60\u7684\u56DE\u7B54\uFF0F\u8865\u5145\u8BF4\u660E", /* @__PURE__ */ import_react49.default.createElement("textarea", { rows: 3, maxLength: 8e3, value: drafts[question.id]?.custom || "", onChange: (event) => edit(question.id, { custom: event.target.value }), placeholder: plan ? "\u6709\u4FEE\u6539\u8981\u6C42\u65F6\u586B\u5199\uFF0C\u518D\u70B9\u300C\u63D0\u4EA4\u4FEE\u6539\u610F\u89C1\u300D" : "\u9009\u62E9\u9009\u9879\uFF0C\u6216\u76F4\u63A5\u586B\u5199\u56DE\u7B54" }))))), !permission && /* @__PURE__ */ import_react49.default.createElement("details", { className: "wcc-skill-preview", open: true }, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u672C\u6B21\u5DF2\u4FDD\u5B58\u6587\u4EF6 \xB7 ", outputs?.length ?? "\u8BFB\u53D6\u4E2D"), /* @__PURE__ */ import_react49.default.createElement("p", null, "\u5148\u6838\u5BF9\u4E0B\u9762\u7684\u6587\u4EF6\u7248\u672C\u3002\u5C1A\u672A\u4FDD\u5B58\u6210\u6587\u4EF6\u7684\u65B9\u6848\uFF0C\u8BF7\u770B\u4E0A\u65B9\u5185\u5BB9\u3002"), previewError && /* @__PURE__ */ import_react49.default.createElement("p", { role: "alert" }, "\u9884\u89C8\u8BFB\u53D6\u5931\u8D25\uFF1A", previewError), outputs?.length === 0 && /* @__PURE__ */ import_react49.default.createElement("p", null, "\u8FD8\u6CA1\u6709\u4FDD\u5B58\u6587\u4EF6\u3002\u8BF7\u67E5\u770B\u4E0A\u65B9\u65B9\u6848\uFF0C\u6216\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u4E86\u89E3\u8FDB\u5EA6\u3002"), outputs?.map((output) => /* @__PURE__ */ import_react49.default.createElement("div", { key: output.versionId, className: "wcc-skill-output" }, /* @__PURE__ */ import_react49.default.createElement("strong", null, output.node.title, output.number ? ` \xB7 V${output.number}` : ""), /* @__PURE__ */ import_react49.default.createElement("details", null, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u6587\u4EF6\u4FE1\u606F"), /* @__PURE__ */ import_react49.default.createElement("p", null, output.node.path || output.node.sourcePath), /* @__PURE__ */ import_react49.default.createElement("small", null, "\u6821\u9A8C\u503C\uFF1A", output.node.sourceHash)), /* @__PURE__ */ import_react49.default.createElement(
       OutputPreview,
       {
         type: output.type,
@@ -45899,7 +46139,7 @@ function SkillConfirmation({
         onOpenDeck: () => onOpenOutput(output)
       }
     )))), error && /* @__PURE__ */ import_react49.default.createElement(UserError, { className: "wcc-skill-error", error })),
-    /* @__PURE__ */ import_react49.default.createElement("footer", null, /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onClose }, "\u7A0D\u540E\u5904\u7406"), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenNative }, "\u6253\u5F00\u4EFB\u52A1"), !permission && !sent && (plan ? /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: disabled || !drafts[pending.questions[0].id]?.custom?.trim(), onClick: () => void submit("modify") }, "\u63D0\u4EA4\u4FEE\u6539\u610F\u89C1"), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "primary", className: "is-primary", type: "button", disabled: disabled || Boolean(drafts[pending.questions[0].id]?.custom?.trim()), onClick: () => void submit("approve") }, sending ? "\u63D0\u4EA4\u4E2D\u2026" : pending.questions[0].intent.approve)) : /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "primary", className: "is-primary", type: "button", disabled, onClick: () => void submit("answer") }, sending ? "\u63D0\u4EA4\u4E2D\u2026" : "\u63D0\u4EA4\u56DE\u7B54")))
+    /* @__PURE__ */ import_react49.default.createElement("footer", null, /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onClose }, "\u7A0D\u540E\u5904\u7406"), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenNative }, "\u56DE\u5230\u5361\u7247\u5BF9\u8BDD"), !nativeChat && !permission && !sent && (plan ? /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: disabled || !drafts[pending.questions[0].id]?.custom?.trim(), onClick: () => void submit("modify") }, "\u63D0\u4EA4\u4FEE\u6539\u610F\u89C1"), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "primary", className: "is-primary", type: "button", disabled: disabled || Boolean(drafts[pending.questions[0].id]?.custom?.trim()), onClick: () => void submit("approve") }, sending ? "\u63D0\u4EA4\u4E2D\u2026" : pending.questions[0].intent.approve)) : /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "primary", className: "is-primary", type: "button", disabled, onClick: () => void submit("answer") }, sending ? "\u63D0\u4EA4\u4E2D\u2026" : "\u63D0\u4EA4\u56DE\u7B54")))
   );
 }
 
@@ -46343,9 +46583,14 @@ var ContentCard = (0, import_react50.memo)(function ContentCard2({ id: id2, data
       hash: data.sourceHash,
       loadPreview: data.loadDeckPreview,
       getPageHref: data.getDeckPageHref,
-      onOpenDeck: data.onOpenDeck
+      onOpenDeck: data.onOpenDeck,
+      onOpenMedia: data.onOpenDetails
     }
-  ) : data.videoPreview ? /* @__PURE__ */ import_react50.default.createElement(import_react50.default.Fragment, null, /* @__PURE__ */ import_react50.default.createElement("video", { className: "wcc-imported-thumbnail nodrag nopan", "aria-label": `\u9884\u89C8\u89C6\u9891\uFF1A${data.title}`, src: data.videoPreview, controls: true, preload: "metadata", playsInline: true, onError: () => setVideoError(true), onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation() }), videoError && /* @__PURE__ */ import_react50.default.createElement("small", null, "\u6B64\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\uFF0C\u53EF\u4E0B\u8F7D\u539F\u4EF6\u3002")) : data.imagePreview ? /* @__PURE__ */ import_react50.default.createElement("img", { className: "wcc-imported-thumbnail", src: data.imagePreview, alt: data.title, loading: "lazy", draggable: false }) : /* @__PURE__ */ import_react50.default.createElement("p", { className: "wcc-card-excerpt" }, data.kind === "requirement" && typeof data.requirementBackground === "string" ? data.requirementBackground.slice(0, 260) || "\u6682\u65E0\u80CC\u666F\u4FE1\u606F\u3002" : data.excerpt || (data.kind === "word" ? "\u9009\u4E2D\u67E5\u770B\u6240\u5C5E\u7248\u672C\u4E0E\u4E0B\u8F7D\u6587\u4EF6\u3002" : data.content?.slice(0, 260)) || "\u9009\u4E2D\u67E5\u770B\u8BE6\u7EC6\u5185\u5BB9\u3002")), (fileDeck || data.slideProject) && /* @__PURE__ */ import_react50.default.createElement("div", { className: "wcc-outcome-actions nodrag nopan", onPointerDown: (e) => e.stopPropagation(), onDoubleClick: (e) => e.stopPropagation() }, fileDeck && /* @__PURE__ */ import_react50.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: (e) => {
+  ) : data.videoPreview ? /* @__PURE__ */ import_react50.default.createElement(import_react50.default.Fragment, null, /* @__PURE__ */ import_react50.default.createElement("video", { className: "wcc-imported-thumbnail nodrag nopan", "aria-label": `\u9884\u89C8\u89C6\u9891\uFF1A${data.title}`, src: data.videoPreview, controls: true, preload: "metadata", playsInline: true, onError: () => setVideoError(true), onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClickCapture: (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    data.onOpenDetails?.();
+  } }), videoError && /* @__PURE__ */ import_react50.default.createElement("small", null, "\u6B64\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\uFF0C\u53EF\u4E0B\u8F7D\u539F\u4EF6\u3002")) : data.imagePreview ? /* @__PURE__ */ import_react50.default.createElement("img", { className: "wcc-imported-thumbnail", src: data.imagePreview, alt: data.title, loading: "lazy", draggable: false }) : /* @__PURE__ */ import_react50.default.createElement("p", { className: "wcc-card-excerpt" }, data.kind === "requirement" && typeof data.requirementBackground === "string" ? data.requirementBackground.slice(0, 260) || "\u6682\u65E0\u80CC\u666F\u4FE1\u606F\u3002" : data.excerpt || (data.kind === "word" ? "\u9009\u4E2D\u67E5\u770B\u6240\u5C5E\u7248\u672C\u4E0E\u4E0B\u8F7D\u6587\u4EF6\u3002" : data.content?.slice(0, 260)) || "\u9009\u4E2D\u67E5\u770B\u8BE6\u7EC6\u5185\u5BB9\u3002")), (fileDeck || data.slideProject) && /* @__PURE__ */ import_react50.default.createElement("div", { className: "wcc-outcome-actions nodrag nopan", onPointerDown: (e) => e.stopPropagation(), onDoubleClick: (e) => e.stopPropagation() }, fileDeck && /* @__PURE__ */ import_react50.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: (e) => {
     e.stopPropagation();
     data.onOpenOutcome?.(fileDeck.sourceRef);
   } }, "\u67E5\u770B PPTX", fileDeck.role === "attachment" ? " \xB7 \u9644\u4EF6" : ""), data.slideProject && /* @__PURE__ */ import_react50.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: (e) => {
@@ -47188,8 +47433,10 @@ function CanvasContent({
       setContextMenu(null);
       setSidebar(false);
       setFocusOpen(false);
-      const nativeFile = showDeck && descriptor.node.path && !/\.(md|txt)$/i.test(descriptor.node.path);
+      const mediaFile = ["image", "video"].includes(cardCapabilities(descriptor.node).format);
+      const nativeFile = showDeck && (mediaFile || descriptor.node.path && !/\.(md|txt)$/i.test(descriptor.node.path));
       if (showDeck && (descriptor.card.type === "pptx" || nativeFile)) {
+        if (mediaFile) closeCreation();
         openOutcomes(descriptor.node, descriptor.version.primaryRef, descriptor.version.id);
         return descriptor;
       }
@@ -47232,6 +47479,19 @@ function CanvasContent({
     delete cache.current.pendingAsset;
     void openOutputCard(card, target.versionId);
   }, [loading, board?.nodes?.length]);
+  function openCardDetails(card) {
+    cancelCardOpen();
+    if (busy || nodeDragging.current) return;
+    if (cardCapabilities(card).editableText.editable) {
+      openTextEditor(card);
+      return;
+    }
+    selectCard(card.id);
+    if (["image", "video"].includes(cardCapabilities(card).format)) closeCreation();
+    if (card.outputCard) void openOutputCard(card, card.outputCard.versionId);
+    else if (card.refId) openOutcomes(card);
+    else openPanel("inspect");
+  }
   function openClickedCard(event, node) {
     cancelCardOpen();
     if (nodeDragging.current) return;
@@ -47271,6 +47531,13 @@ function CanvasContent({
     creationIntent.current += 1;
     cache.current.visible = false;
     setCreationVisible(false);
+  }
+  function dismissOtherCardCreation(event) {
+    const node = event.target.closest?.(".react-flow__node");
+    if (!node) return;
+    const context = creationRef.current;
+    const owner = context?.composerNodeId || context?.anchor.nodeId || context?.anchor.id;
+    if (node.getAttribute("data-id") !== owner) closeCreation();
   }
   function openComposition(descriptor) {
     cancelCardOpen();
@@ -47962,6 +48229,7 @@ function CanvasContent({
           setSidebar(true);
           setTab("inspect");
         },
+        onOpenDetails: () => openCardDetails(node.data),
         onRevealFile: (entry) => void openProjectFileAction("project-file-reveal", entry),
         onOpenExternal: (entry) => void openProjectFileAction("project-file-open", entry),
         onLoadOpenApps: (entry) => request("card-open-applications", { ...entry, requirementId: requirement.id }),
@@ -48175,7 +48443,9 @@ function CanvasContent({
     if (movable.length < 2) return;
     const bounds2 = (node) => ({ id: node.id, ...node.position, ...nodeSize2(node) });
     try {
-      const arranged = arrangeCardBlocks(movable.map(bounds2), fixed.map(bounds2));
+      const roots = new Map(nodesRef.current.map((node) => [node.id, node.parentId || node.id]));
+      const relations = edgesRef.current.map((edge) => ({ ...edge, source: roots.get(edge.source), target: roots.get(edge.target) }));
+      const arranged = arrangeCardBlocks(movable.map(bounds2), fixed.map(bounds2), relations);
       const offsets = new Map(movable.map((node) => [node.id, {
         x: arranged.get(node.id).x - node.position.x,
         y: arranged.get(node.id).y - node.position.y
@@ -48551,6 +48821,13 @@ function CanvasContent({
       if (pendingCard) {
         const context = await openPendingCard(pendingCard);
         if (context && creationRef.current?.key === context.key) await restoreRef.current?.(sessionId);
+        return;
+      }
+      const output = task && (boardRef.current?.nodes || []).find((card) => card.outputCard && (card.outputCard.id === task.outputCardId || card.outputCard.versions?.some((version2) => version2.taskId === task.id)));
+      if (output?.outputCard) {
+        const version2 = output.outputCard.versions.find((item) => item.taskId === task.id);
+        const descriptor = await openOutputCard(output, version2?.id || output.outputCard.versionId, { showDeck: false });
+        if (descriptor && creationRef.current?.sessionId === sessionId) await restoreRef.current?.(sessionId);
         return;
       }
       const restored = await restoreRef.current?.(sessionId);
@@ -49214,6 +49491,7 @@ function CanvasContent({
     }
   }
   function clickPane(event) {
+    closeCreation();
     setContextMenu(null);
     setCreationMenu(null);
     if (tool === "select" || tool === "hand" || event.detail > 1 || busy || loading) return;
@@ -49423,7 +49701,7 @@ function CanvasContent({
     { label: "\u5168\u9009", onClick: selectAllCards, shortcut: "\u2318A" },
     { label: "\u9002\u5E94\u5168\u90E8", onClick: fitAllCards }
   ];
-  return /* @__PURE__ */ import_react50.default.createElement("div", { ref: rootRef, tabIndex: -1, onKeyDown: keyboard, onPointerDownCapture: cancelPaneInsert, onMouseDownCapture: (event) => {
+  return /* @__PURE__ */ import_react50.default.createElement("div", { ref: rootRef, tabIndex: -1, onKeyDown: keyboard, onClickCapture: dismissOtherCardCreation, onPointerDownCapture: cancelPaneInsert, onMouseDownCapture: (event) => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true });
   }, "data-editor-fullscreen": dockOpen && editorFullscreen || void 0, "data-dock-open": dockOpen || void 0, "data-dock-mobile": dock.mobile || void 0, "data-dock-resizing": dock.dragging || void 0, style: { "--wtt-dock-width": `${dock.width}px` }, className: `wtt-course-canvas wcc-studio${sidebar ? "" : " is-sidebar-collapsed"}${deskVisible ? " is-focus-open" : ""} is-tool-${tool}` }, taskControl && /* @__PURE__ */ import_react50.default.createElement(
     TaskControlDialog,
@@ -49511,16 +49789,7 @@ function CanvasContent({
       onPaneClick: clickPane,
       onNodeClick: openClickedCard,
       onNodeDoubleClick: (_event, node) => {
-        cancelCardOpen();
-        if (node.type !== "content" || busy || nodeDragging.current) return;
-        if (cardCapabilities(node.data).editableText.editable) {
-          openTextEditor(node.data);
-          return;
-        }
-        selectCard(node.id);
-        if (node.data.outputCard) void openOutputCard(node.data, node.data.outputCard.versionId);
-        else if (node.data.refId) openOutcomes(node.data);
-        else openPanel("inspect");
+        if (node.type === "content") openCardDetails(node.data);
       },
       onPaneContextMenu: (event) => showContext(event),
       onNodeContextMenu: showContext,
@@ -49905,6 +50174,9 @@ function CanvasContent({
       loadOutputs: loadSkillReviewOutputs,
       verifyOutputs: verifySkillReviewOutputs,
       onClose: () => setSkillReview(null),
+      projectRoot: project?.path,
+      getReviewImageHref: (image, preview) => endpoint2({ reviewImage: image.path, hash: image.hash, ...preview ? { preview: "1" } : {} }).href,
+      renderConversation: renderEditorConversation ? (task) => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: "\u4EFB\u52A1" }) : void 0,
       onOpenNative: () => {
         const sessionId = skillReview.entry.task.sessionId;
         setSkillReview(null);

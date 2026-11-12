@@ -52,7 +52,7 @@ function PptCover({ artifactId, hash, loadPreview, getPageHref, src, title, onOp
 }
 
 export function OutputPreview({ type = 'text', title, content, extracted = true, mime, src, downloadHref, status = 'ready', onOpenDeck,
-  artifactId, hash, loadPreview, getPageHref, compact = false, emptyMessage }) {
+  artifactId, hash, loadPreview, getPageHref, compact = false, emptyMessage, onOpenMedia }) {
   const [mediaError, setMediaError] = useState('')
   const identity = `${type}:${src || ''}`
   const unavailable = fileBlocked(status)
@@ -65,7 +65,7 @@ export function OutputPreview({ type = 'text', title, content, extracted = true,
       : type === 'pptx' ? <PptCover artifactId={artifactId} hash={hash} loadPreview={loadPreview} getPageHref={getPageHref} src={src} title={title} onOpen={onOpenDeck} compact={compact} />
         : type === 'image' && src && !failed ? <img key={identity} className="wtt-output-image" src={src} alt={title || '生成图片'} loading="lazy" decoding="async" draggable={false} onError={() => setMediaError(identity)} />
           : type === 'video' && src && !failed ? <video key={identity} className="wtt-output-video nodrag nopan nowheel" src={src} controls preload="metadata" playsInline aria-label={title || '生成视频'}
-            onError={() => setMediaError(identity)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} />
+            onError={() => setMediaError(identity)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClickCapture={event => { if (compact && onOpenMedia) { event.preventDefault(); event.stopPropagation(); onOpenMedia() } }} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} />
             : ['image', 'video'].includes(type) ? <p className="wtt-output-preview-note" role="status">{failed ? type === 'video' ? '浏览器无法播放此版本，可下载原视频查看。' : '此版本图片未能加载，可下载原图查看。' : emptyMessage || '尚未取得可预览的文件。'}</p>
               : hasText ? <pre className={`wtt-output-text${compact ? '' : ' nodrag nowheel'}`}>{previewText}</pre>
                 : <p className="wtt-output-preview-note">{emptyMessage || (extracted === false ? '此格式尚未提取可读正文，可下载原文件查看。' : '尚无已保存的文本成果。')}</p>}

@@ -1,5 +1,6 @@
 import { createMediaProvider } from './media-provider.mjs';
 import { mediaCredentialRef, mediaServiceProfile } from './media-service-settings.mjs';
+import { isLocalMediaServiceHost } from './media-service-address.mjs';
 
 // Listing is deliberately separate from generation: one bounded GET, no retries or redirects.
 export async function discoverMediaModels(access, { id, profile: draft, apiKey = '' }, config = {}) {
@@ -26,7 +27,7 @@ export async function discoverMediaModels(access, { id, profile: draft, apiKey =
       const url = new URL(`${current.baseURL}/models`);
       if (google) { url.searchParams.set('pageSize', '1000'); if (pageToken) url.searchParams.set('pageToken', pageToken); }
       const response = await transport.request(url.href, { method: 'GET', localOnly: false,
-        allowLocal: ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname), timeoutMs: 15000, maxBytes: 2 * 1024 * 1024,
+        allowLocal: isLocalMediaServiceHost(url.hostname), timeoutMs: 15000, maxBytes: 2 * 1024 * 1024,
         headers: { Accept: 'application/json', ...(secret ? google ? { 'x-goog-api-key': secret } : { Authorization: `Bearer ${secret}` } : {}) } });
       if (response.status < 200 || response.status >= 300) throw new Error(`获取可用模型失败（HTTP ${response.status}）${[401, 403].includes(response.status) ? '，请核对 API 密钥与权限' : '，可手动填写模型 ID'}`);
       let payload;

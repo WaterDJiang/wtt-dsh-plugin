@@ -15,6 +15,7 @@ export function MediaServiceSettings({ operations }) {
   const [credentialEpoch, setCredentialEpoch] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState('');
   const [notice, setNotice] = useState('');
   const [confirm, setConfirm] = useState(null);
   const mobileQuery = useMemo(() => window.matchMedia('(max-width: 640px)'), []);
@@ -39,13 +40,13 @@ export function MediaServiceSettings({ operations }) {
   }, [operations, refSignature, credentialEpoch]);
   async function act(work, message) {
     if (busy) return;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setErrorField(''); setNotice('');
     try { await work(); setNotice(message); setCredentialEpoch(value => value + 1); return true; }
-    catch (cause) { setError(cause.message || String(cause)); return false; }
+    catch (cause) { setError(cause.message || String(cause)); setErrorField(cause.field || ''); return false; }
     finally { setBusy(false); }
   }
   function edit(id, profile) {
-    setApiKey(''); setConfirm(null); setError(''); setNotice('');
+    setApiKey(''); setConfirm(null); setError(''); setErrorField(''); setNotice('');
     setEditor({ id, profile: { ...profile }, revision: snapshot.revision });
   }
   function add() {
@@ -69,11 +70,11 @@ export function MediaServiceSettings({ operations }) {
     </div>)}</div>
     {!Object.keys(profiles).length && !editor && <p>添加图片或视频服务，或引用 DSH 已有的提供商连接。</p>}
     {editor && <MediaServiceEditor key={editor.id} editor={editor} apiKey={apiKey} setApiKey={setApiKey}
-      onChange={profile => setEditor(value => ({ ...value, profile }))} onSave={save}
+      onChange={profile => { setEditor(value => ({ ...value, profile })); setError(''); setErrorField(''); }} onSave={save}
       onCancel={() => { setEditor(null); setApiKey(''); setConfirm(null); }} onClear={() => setConfirm({ kind: 'clear', id: editor.id })}
-      busy={busy} writable={writable} infos={infos} refs={refs} connections={connections} operations={operations} />}
+      busy={busy} writable={writable} infos={infos} refs={refs} connections={connections} operations={operations} addressError={errorField === 'baseURL' ? error : ''} />}
     {confirm && <div className="wtt-media-service-confirm" role="group" aria-label="确认媒体设置操作"><p>{confirm.kind === 'clear' ? '清除此提供商的 API 密钥？环境变量来源仍可能生效。' : '移除此提供商配置？已存 API 密钥保留在 DSH。'}</p><UiButton disabled={busy} onClick={() => void act(() => confirm.kind === 'clear' ? operations.clearCredential(confirm.id) : operations.remove(confirm.id, confirm.revision), confirm.kind === 'clear' ? '已清除 API 密钥；凭据状态已刷新' : '已移除服务配置，密钥保留').then(ok => { if (ok) { setConfirm(null); if (confirm.kind === 'remove') { setEditor(null); setApiKey(''); } } })}>确认{confirm.kind === 'clear' ? '清除 API 密钥' : '移除配置'}</UiButton><UiButton disabled={busy} onClick={() => setConfirm(null)}>取消</UiButton></div>}
-    {error && <UserError error={error} />}{notice && <p role="status">{notice}</p>}
+    {error && errorField !== 'baseURL' && <UserError error={error} />}{notice && <p role="status">{notice}</p>}
   </>;
   return <section className={`wtt-project-workbench wtt-media-service-settings${compact ? ' is-compact' : ''}`} aria-label="图片与视频服务" id="wtt-media-services" tabIndex={-1}>
     {compact ? <><UiButton data-media-settings-open onClick={() => setMobileOpen(true)}>图片与视频服务</UiButton><dialog ref={dialog} className="wtt-project-workbench wtt-media-service-settings wtt-media-service-dialog" aria-labelledby="wtt-media-dialog-title" onCancel={event => { event.preventDefault(); setMobileOpen(false); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setMobileOpen(false); } }}>

@@ -5,6 +5,7 @@ import { Config } from '../src/media-service-config.mjs';
 import { createMediaServiceAccess } from '../src/media-service-host.mjs';
 import { createMediaSettingsOperations } from '../src/media-service-operations.mjs';
 import { configuredCredentialReferences, mediaCredentialRef, mediaServiceProfile } from '../src/media-service-settings.mjs';
+import { MEDIA_PROTOCOLS } from '../src/media-api-catalog.mjs';
 
 const id = 'example';
 const ownRef = mediaCredentialRef(id);
@@ -94,11 +95,50 @@ test('profile validation rejects inline secrets and invalid endpoints, while Con
   const embeddedCredentials = new URL('https://api.test');
   embeddedCredentials.username = 'synthetic-user';
   embeddedCredentials.password = 'synthetic-password';
-  for (const baseURL of ['http://external.test', embeddedCredentials.href, 'https://api.test?key=synthetic']) assert.throws(() => mediaServiceProfile(id, { ...profile, baseURL }), /HTTPS|凭据/);
+  for (const baseURL of ['http://external.test', embeddedCredentials.href, 'https://api.test?key=synthetic']) assert.throws(() => mediaServiceProfile(id, { ...profile, baseURL }), /HTTPS|API 地址/);
   const parsed = Config({ workspaceRoot: '/project', mediaServices: { [id]: profile } });
   assert.equal(parsed.workspaceRoot, '/project');
   assert.equal(parsed.mediaServices.get()[id].apiKeyEnv, ownRef);
   assert.deepEqual(configuredCredentialReferences([], {}).size, 0);
+});
+
+test('explicit LAN HTTP and full generation URLs save a canonical base without credential or metadata exceptions', async () => {
+  const setup = fixture();
+  const baseURL = 'http://192.168.20.30:18000/v1/images/generations';
+  await setup.operations.save(id, { ...profile, protocol: 'jimeng-image', model: 'jimeng-5.0', baseURL }, { apiKey: 'synthetic', expectedRevision: 7 });
+  assert.equal(setup.current().mediaServices[id].baseURL, 'http://192.168.20.30:18000/v1');
+  for (const host of ['10.20.30.40', '172.16.1.2', '172.31.1.2', '192.168.20.30', '127.0.0.2', '[fd12::1]', '[::ffff:c0a8:141e]']) {
+    assert.equal(mediaServiceProfile(id, { ...profile, baseURL: `http://${host}:18000/v1` }).baseURL, `http://${host}:18000/v1`);
+  }
+  for (const host of ['0.0.0.0', '169.254.169.254', '172.32.1.2', '8.8.8.8', '224.0.0.1', '[::]', '[fe80::1]', 'external.test']) {
+    const isolated = fixture();
+    await assert.rejects(isolated.operations.save(id, { ...profile, baseURL: `http://${host}/v1` }, { apiKey: 'must-not-store', expectedRevision: 7 }), error => error.field === 'baseURL');
+    assert.equal(isolated.calls.length, 0, '地址失败不能写入密钥或设置');
+  }
+});
+
+test('known full generation endpoints normalize for each protocol and preserve custom base prefixes', () => {
+  const paths = { 'openai-image': '/images/generations', 'openai-video': '/videos', 'gemini-image': '/interactions', 'gemini-video': '/interactions',
+    'volc-image': '/images/generations', 'volc-video': '/contents/generations/tasks', 'kling-image': '/v1/images/generations', 'kling-video': '/text-to-video/kling-3.0',
+    'minimax-image': '/image_generation', 'minimax-video': '/v2/video_generation', 'wan-image': '/services/aigc/multimodal-generation/generation',
+    'wan-video': '/services/aigc/video-generation/video-synthesis', 'jimeng-image': '/images/generations' };
+  for (const [protocol, suffix] of Object.entries(paths)) {
+    const preset = MEDIA_PROTOCOLS[protocol];
+    const saved = mediaServiceProfile(id, { ...profile, protocol, type: preset.type, model: preset.models[0], baseURL: 'https://gateway.test/proxy' + suffix + '/' });
+    assert.equal(saved.baseURL, 'https://gateway.test/proxy', protocol);
+  }
+});
+
+test('discovery uses the normalized base when the user pasted a full generation endpoint', async () => {
+  const { discoverMediaModels } = await import('../src/media-model-discovery.mjs');
+  await listingServer((request, response) => {
+    assert.equal(request.url, '/v1/models');
+    response.end('{"data":[{"id":"jimeng-5.0"}]}');
+  }, async baseURL => {
+    const access = createMediaServiceAccess({ credentials: { resolve: async () => ({ value: 'synthetic' }) } }, { mediaServices: {} });
+    const found = await discoverMediaModels(access, { id, profile: { ...profile, protocol: 'jimeng-image', model: 'jimeng-5.0', baseURL: baseURL + '/v1/images/generations' } });
+    assert.equal(found.models[0].id, 'jimeng-5.0');
+  });
 });
 
 // A real local listing exercises the same transport as the Host without a paid model call.

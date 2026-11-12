@@ -190,8 +190,8 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
       {textDraft || overview && !selected ? null : fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
         extracted={data.extracted !== false} mime={data.generatedFile?.mime || data.importedFile?.mime} src={data.videoPreview || data.imagePreview}
         status={data.status || 'ready'} downloadHref={data.downloadHref} artifactId={data.artifactKind === 'pptx' ? data.refId : undefined}
-        hash={data.sourceHash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={data.onOpenDeck} />
-        : data.videoPreview ? <><video className="wcc-imported-thumbnail nodrag nopan" aria-label={`预览视频：${data.title}`} src={data.videoPreview} controls preload="metadata" playsInline onError={() => setVideoError(true)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} />{videoError && <small>此浏览器无法播放，可下载原件。</small>}</> : data.imagePreview ? <img className="wcc-imported-thumbnail" src={data.imagePreview} alt={data.title} loading="lazy" draggable={false} /> : <p className="wcc-card-excerpt">{data.kind === 'requirement' && typeof data.requirementBackground === 'string' ? data.requirementBackground.slice(0, 260) || '暂无背景信息。' : data.excerpt || (data.kind === 'word' ? '选中查看所属版本与下载文件。' : data.content?.slice(0, 260)) || '选中查看详细内容。'}</p>}
+        hash={data.sourceHash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={data.onOpenDeck} onOpenMedia={data.onOpenDetails} />
+        : data.videoPreview ? <><video className="wcc-imported-thumbnail nodrag nopan" aria-label={`预览视频：${data.title}`} src={data.videoPreview} controls preload="metadata" playsInline onError={() => setVideoError(true)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClickCapture={event => { event.preventDefault(); event.stopPropagation(); data.onOpenDetails?.() }} />{videoError && <small>此浏览器无法播放，可下载原件。</small>}</> : data.imagePreview ? <img className="wcc-imported-thumbnail" src={data.imagePreview} alt={data.title} loading="lazy" draggable={false} /> : <p className="wcc-card-excerpt">{data.kind === 'requirement' && typeof data.requirementBackground === 'string' ? data.requirementBackground.slice(0, 260) || '暂无背景信息。' : data.excerpt || (data.kind === 'word' ? '选中查看所属版本与下载文件。' : data.content?.slice(0, 260)) || '选中查看详细内容。'}</p>}
     </div>
     {(fileDeck || data.slideProject) && <div className="wcc-outcome-actions nodrag nopan" onPointerDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()}>
       {fileDeck && <UiButton variant="quiet" size="compact" onClick={e=>{e.stopPropagation();data.onOpenOutcome?.(fileDeck.sourceRef)}}>查看 PPTX{fileDeck.role==='attachment'?' · 附件':''}</UiButton>}
@@ -916,8 +916,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       setContextMenu(null)
       setSidebar(false)
       setFocusOpen(false)
-      const nativeFile = showDeck && descriptor.node.path && !/\.(md|txt)$/i.test(descriptor.node.path)
+      const mediaFile = ['image', 'video'].includes(cardCapabilities(descriptor.node).format)
+      const nativeFile = showDeck && (mediaFile || descriptor.node.path && !/\.(md|txt)$/i.test(descriptor.node.path))
       if (showDeck && (descriptor.card.type === 'pptx' || nativeFile)) {
+        if (mediaFile) closeCreation()
         openOutcomes(descriptor.node, descriptor.version.primaryRef, descriptor.version.id)
         return descriptor
       }
@@ -948,6 +950,17 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     delete cache.current.pendingAsset
     void openOutputCard(card, target.versionId)
   }, [loading, board?.nodes?.length])
+
+  function openCardDetails(card) {
+    cancelCardOpen()
+    if (busy || nodeDragging.current) return
+    if (cardCapabilities(card).editableText.editable) { openTextEditor(card); return }
+    selectCard(card.id)
+    if (['image', 'video'].includes(cardCapabilities(card).format)) closeCreation()
+    if (card.outputCard) void openOutputCard(card, card.outputCard.versionId)
+    else if (card.refId) openOutcomes(card)
+    else openPanel('inspect')
+  }
 
   function openClickedCard(event, node) {
     cancelCardOpen()
@@ -984,6 +997,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     creationIntent.current += 1
     cache.current.visible = false
     setCreationVisible(false)
+  }
+
+  function dismissOtherCardCreation(event) {
+    const node = event.target.closest?.('.react-flow__node')
+    if (!node) return
+    const context = creationRef.current
+    const owner = context?.composerNodeId || context?.anchor.nodeId || context?.anchor.id
+    if (node.getAttribute('data-id') !== owner) closeCreation()
   }
 
   function openComposition(descriptor){
@@ -1524,6 +1545,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         ? void openOutputCard(node.data, card.latestVersionId, { showDeck: false }) : void openPendingCard(node.data, { showDeck: false }),
       onTaskControl: () => { const taskId = publishedGeneration?.taskId || node.data.pendingGeneration?.taskId; if (taskId) { selectCard(node.id); closeCreation(); setTaskControl({ taskId }) } },
       onOpenInspect: () => { selectCard(node.id); closeCreation(); setSidebar(true); setTab('inspect') },
+      onOpenDetails: () => openCardDetails(node.data),
       onRevealFile: entry => void openProjectFileAction('project-file-reveal', entry),
       onOpenExternal: entry => void openProjectFileAction('project-file-open', entry),
       onLoadOpenApps: entry => request('card-open-applications', { ...entry, requirementId: requirement.id }),
@@ -1704,7 +1726,9 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (movable.length < 2) return
     const bounds = node => ({ id: node.id, ...node.position, ...nodeSize(node) })
     try {
-      const arranged = arrangeCardBlocks(movable.map(bounds), fixed.map(bounds))
+      const roots = new Map(nodesRef.current.map(node => [node.id, node.parentId || node.id]))
+      const relations = edgesRef.current.map(edge => ({ ...edge, source: roots.get(edge.source), target: roots.get(edge.target) }))
+      const arranged = arrangeCardBlocks(movable.map(bounds), fixed.map(bounds), relations)
       const offsets = new Map(movable.map(node => [node.id, {
         x: arranged.get(node.id).x - node.position.x, y: arranged.get(node.id).y - node.position.y,
       }]))
@@ -2066,6 +2090,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       if (pendingCard) {
         const context = await openPendingCard(pendingCard)
         if (context && creationRef.current?.key === context.key) await restoreRef.current?.(sessionId)
+        return
+      }
+      const output = task && (boardRef.current?.nodes || []).find(card => card.outputCard && (card.outputCard.id === task.outputCardId
+        || card.outputCard.versions?.some(version => version.taskId === task.id)))
+      if (output?.outputCard) {
+        const version = output.outputCard.versions.find(item => item.taskId === task.id)
+        const descriptor = await openOutputCard(output, version?.id || output.outputCard.versionId, { showDeck: false })
+        if (descriptor && creationRef.current?.sessionId === sessionId) await restoreRef.current?.(sessionId)
         return
       }
       const restored = await restoreRef.current?.(sessionId)
@@ -2600,6 +2632,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}finally{if(mounted.current&&epoch===epochRef.current)setBusy('')}
   }
   function clickPane(event) {
+    closeCreation()
     setContextMenu(null)
     setCreationMenu(null)
     if (tool === 'select' || tool === 'hand' || event.detail > 1 || busy || loading) return
@@ -2736,7 +2769,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     { label: '适应全部', onClick: fitAllCards },
   ]
 
-  return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
+  return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}`}>
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
@@ -2779,15 +2812,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           deleteKeyCode={null}
           onPaneClick={clickPane}
           onNodeClick={openClickedCard}
-          onNodeDoubleClick={(_event, node) => {
-            cancelCardOpen()
-            if (node.type !== 'content' || busy || nodeDragging.current) return
-            if (cardCapabilities(node.data).editableText.editable) { openTextEditor(node.data); return }
-            selectCard(node.id)
-            if (node.data.outputCard) void openOutputCard(node.data, node.data.outputCard.versionId)
-            else if (node.data.refId) openOutcomes(node.data)
-            else openPanel('inspect')
-          }}
+          onNodeDoubleClick={(_event, node) => { if (node.type === 'content') openCardDetails(node.data) }}
           onPaneContextMenu={event => showContext(event)} onNodeContextMenu={showContext}
           onSelectionContextMenu={(event, selection) => showContext(event, selection[0])}
           ariaLabelConfig={{
@@ -2978,6 +3003,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         y: 76, maxHeight: Math.max(160, canvasSize.height - 88),
       }}
       loadOutputs={loadSkillReviewOutputs} verifyOutputs={verifySkillReviewOutputs} onClose={() => setSkillReview(null)}
+      projectRoot={project?.path} getReviewImageHref={(image, preview) => endpoint({ reviewImage: image.path, hash: image.hash, ...(preview ? { preview: '1' } : {}) }).href}
+      renderConversation={renderEditorConversation ? task => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: '任务' }) : undefined}
       onOpenNative={() => { const sessionId = skillReview.entry.task.sessionId; setSkillReview(null); void openTaskSession(sessionId).then(() => { if (creationRef.current?.sessionId === sessionId) updateCreation(creationRef.current.key, { openExecutionRequest: crypto.randomUUID() }) }) }}
       loadDeckPreview={loadDeckPreview} getDeckPageHref={getDeckPageHref} onOpenOutput={output => { setSkillDeckPreview({ output, review: skillReview }); setSkillReview(null) }} />}
     {skillDeckPreview && active && <DeckPreview artifactId={skillDeckPreview.output.node.refId} hash={skillDeckPreview.output.node.sourceHash}
