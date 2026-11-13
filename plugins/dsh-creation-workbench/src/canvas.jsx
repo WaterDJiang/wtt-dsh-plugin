@@ -9,7 +9,7 @@ import { UserError } from './user-feedback.jsx'
 import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Background, ConnectionLineType, Handle, MiniMap, NodeResizer, NodeToolbar, Position, ReactFlow, ReactFlowProvider,
-  SelectionMode, applyEdgeChanges, applyNodeChanges, getViewportForBounds, useReactFlow, useStore,
+  SelectionMode, applyEdgeChanges, applyNodeChanges, getViewportForBounds, useReactFlow, useStore, useStoreApi,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './canvas.css'
@@ -23,7 +23,7 @@ import { CourseTasks } from './course-tasks.jsx'
 import { normalizeLineEndings } from './text-diff.mjs'
 import { NodeCreateMenu, CardComposer } from './card-creation.jsx'
 import { mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
-import { CARD_WIDTH, CARD_HEIGHT, createCardContext, createCompositionContext, createRevisionContext, creationSource, updateCreationReferences, creationTaskInput, adjacentCreationPosition, visibleCreationPosition, usableCreationSource } from './creation-context.mjs'
+import { CARD_WIDTH, CARD_HEIGHT, OUTPUT_CARD_SIZE, createCardContext, createCompositionContext, createRevisionContext, creationSource, updateCreationReferences, creationTaskInput, adjacentCreationPosition, visibleCreationPosition, usableCreationSource } from './creation-context.mjs'
 import { OutputPreview, DeckPreview } from './output-preview.jsx'
 import { SlideDraftCover } from './slide-draft-cover.jsx'
 import { AssetBoard } from './asset-board.jsx'
@@ -351,6 +351,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
+  const flowStore = useStoreApi()
   const modelSelectionRef = useRef(modelSelection)
   modelSelectionRef.current = modelSelection
   const [watchedStatuses, setWatchedStatuses] = useState(new Map())
@@ -1067,7 +1068,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     try {
       const node = nodesRef.current.find(item => item.id === card.id)
       const anchor = { ...card, position: node ? absolutePosition(node, nodesRef.current) : card.position || { x: 80, y: 80 }, ...(node ? nodeSize(node) : {}) }
-      const cards = [...nodesRef.current.filter(isObject).map(item => ({ ...item.data, position: absolutePosition(item, nodesRef.current), ...nodeSize(item) })), ...[...cache.current.reservations.values()].map(position => ({ position }))]
+      const cards = [...nodesRef.current.filter(isObject).map(item => ({ ...item.data, position: absolutePosition(item, nodesRef.current), ...nodeSize(item) })), ...[...cache.current.reservations.values()].map(position => ({ position, ...OUTPUT_CARD_SIZE }))]
       const initial = createCardContext({ projectId, projectName: project?.name || '当前项目', projectPath: project?.path || '', requirement, anchor,
         outputType, blank, outputPosition: outputPosition || adjacentCreationPosition(anchor, cards), selection, generation: { mode: 'new' } })
       const baseKey = initial.key
@@ -1529,12 +1530,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           onEditEnd: () => setEditingNodeId(current => current === node.id ? null : current), autoEdit: node.id === autoEditId },
       }
       if (node.type !== 'content') return node
+      const measured = node.measured || flow.getInternalNode(node.id)?.measured
       const card = node.data.outputCard
       const head = card?.versions.find(version => version.id === card.latestVersionId)
       const task = taskById.get(head?.taskId)
       const publishedGeneration = (!node.data.pendingGeneration || node.data.pendingGeneration.published)
         ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : undefined
-      return { ...node, data: { ...node.data, onCreate: openNodeMenu,
+      // Preserve actual measurements on data refresh so React Flow keeps handle bounds.
+      return { ...node, ...(measured?.width > 0 && measured?.height > 0 ? { measured } : {}), data: { ...node.data, onCreate: openNodeMenu,
       publishedGeneration,
       onEditText: () => openTextEditor(node.data),
       onResizeStart: beginResize, onResizeEnd: finishCardResize,
@@ -2183,6 +2186,31 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     setEdgeSelection(selectedEdges.filter(edge => !edge.provenance).map(edge => edge.id))
   }, [])
 
+  useEffect(() => flowStore.subscribe((state, previous) => {
+    const rect = state.userSelectionRect
+    if (!state.userSelectionActive || !rect || rect === previous.userSelectionRect) return
+    // React Flow's visibility helper includes unmeasured nodes regardless of their
+    // position. Reconcile its completed rectangle, including virtualized cards.
+    const [tx, ty, zoom] = state.transform
+    const left = (rect.x - tx) / zoom, top = (rect.y - ty) / zoom
+    const right = left + rect.width / zoom, bottom = top + rect.height / zoom
+    const chosen = new Set()
+    const changes = []
+    for (const node of nodesRef.current) {
+      const bounds = flow.getNodesBounds([node.id])
+      const selected = node.selectable !== false && !node.hidden && bounds.width > 0 && bounds.height > 0
+        && bounds.x >= left && bounds.y >= top && bounds.x + bounds.width <= right && bounds.y + bounds.height <= bottom
+      if (selected) chosen.add(node.id)
+      if (!!node.selected !== selected) changes.push({ id: node.id, type: 'select', selected })
+    }
+    if (changes.length) replaceNodes(applyNodeChanges(changes, nodesRef.current))
+    const edgeChanges = edgesRef.current.filter(edge => edge.selectable !== false).flatMap(edge => {
+      const selected = chosen.has(edge.source) || chosen.has(edge.target)
+      return !!edge.selected === selected ? [] : [{ id: edge.id, type: 'select', selected }]
+    })
+    if (edgeChanges.length) replaceEdges(applyEdgeChanges(edgeChanges, edgesRef.current))
+  }), [flow, flowStore])
+
   function connect(connection) {
     if (!connection.source || !connection.target || connection.source === connection.target) return
     if (edgesRef.current.some(edge => edge.source === connection.source && edge.target === connection.target)) return
@@ -2339,7 +2367,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         if (mounted.current && epoch === epochRef.current) {
           attempt.current = null
           const anchor = nodesRef.current.find(node => node.id === (context.anchor.nodeId || context.anchor.id))
-          const occupied = [...nodesRef.current.filter(isObject).map(node => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize(node) })), ...[...cache.current.reservations.values()].map(position => ({ position }))]
+          const occupied = [...nodesRef.current.filter(isObject).map(node => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize(node) })), ...[...cache.current.reservations.values()].map(position => ({ position, ...OUTPUT_CARD_SIZE }))]
           const nextPosition = anchor ? adjacentCreationPosition({ position: absolutePosition(anchor, nodesRef.current), ...nodeSize(anchor) }, occupied) : context.outputPosition
           updateCreation(context.key, { error: '', taskId: created.task.id, sessionId: started?.sessionId || created.task.sessionId, outputPosition: context.intent === 'revise' || context.composerNodeId ? context.outputPosition : nextPosition })
           setNotice('任务已提交，卡片会显示生成进度。')
@@ -2355,7 +2383,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (context.intent === 'revise') return context.outputPosition
     const anchor = nodesRef.current.find(node => node.id === (context.anchor.nodeId || context.anchor.id))
     const occupied = [...nodesRef.current.filter(isObject).map(node => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize(node) })),
-      ...[...cache.current.reservations.values()].map(position => ({ position }))]
+      ...[...cache.current.reservations.values()].map(position => ({ position, ...OUTPUT_CARD_SIZE }))]
     const origin = anchor ? { position: absolutePosition(anchor, nodesRef.current), ...nodeSize(anchor) }
       : { position: { x: context.outputPosition.x - CARD_WIDTH - 80, y: context.outputPosition.y } }
     return adjacentCreationPosition(origin, occupied)
@@ -2448,7 +2476,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       }))
       const anchor = occupied.find(node => node.id === (context.composerNodeId || context.anchor.nodeId || context.anchor.id))
         || { position: context.outputPosition }
-      const position = adjacentCreationPosition(anchor, occupied)
+      const position = adjacentCreationPosition(anchor, occupied, CARD_WIDTH, CARD_HEIGHT)
       const result = await request('project-file-reference', { requirementId: context.requirementId, path,
         useCurrentFile: true, position, operationId: crypto.randomUUID() })
       const card = referenceResultCard(result)
@@ -2784,7 +2812,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     {recycleOpen&&<ProjectRecycleDialog request={request} endpoint={endpoint} onClose={()=>{setRecycleOpen(false);onCloseRecycle?.()}} onChanged={recycledChanged}/>}
     {(error || notice) && <div className={`wcc-message${error ? ' is-error' : ''}`} role={error ? 'alert' : 'status'}>{error ? <UserError error={error} announce={false} /> : <span>{notice}</span>}<UiButton variant="ghost" size="compact" onClick={() => { setError(''); setNotice('') }} aria-label="关闭提示">×</UiButton></div>}
     <div className="wcc-workspace">
-      <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} inert={(dock.mobile||editorFullscreen)&&dockOpen} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy} onDragOver={event => {
+    <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} inert={(dock.mobile||editorFullscreen)&&dockOpen} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy} onDragOver={event => {
         if ([...event.dataTransfer.types].some(type=>type==='Files'||type===PROJECT_FILE_DRAG)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDraggingFile(true) }
       }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDraggingFile(false) }} onDrop={dropFiles} onDoubleClick={blankMenu}>
         {loading && <div className="wcc-loading" role="status">正在读取画布…</div>}
@@ -2802,9 +2830,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           onMove={(_, viewport) => { if (active) { cancelPaneInsert(); viewportRef.current = viewport; if (creationMenu) setCreationMenu(null) } }}
           onMoveEnd={(_, viewport) => { if (active) { viewportRef.current = viewport; if (!restoringViewport.current && !gestureViewportActive.current) void saveLayout(false, false, true) } }}
           defaultViewport={board.viewport || { x: 0, y: 0, zoom: 1 }}
-          minZoom={0.1} maxZoom={3} selectionMode={SelectionMode.Partial} nodeDragThreshold={5} nodeClickDistance={5}
+          minZoom={0.1} maxZoom={3} selectionMode={SelectionMode.Full} nodeDragThreshold={5} nodeClickDistance={5}
           multiSelectionKeyCode={['Meta', 'Control', 'Shift']} selectionKeyCode="Shift"
           selectionOnDrag={tool === 'select' && !busy}
+          autoPanOnSelection={false}
           // The gesture adapter owns wheel/pinch over both the pane and nodes.
           panActivationKeyCode="Space" panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomActivationKeyCode={null}
           panOnDrag={tool === 'hand' ? true : [1]} zoomOnDoubleClick={false}
@@ -3002,7 +3031,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         x: Math.max(12, Math.min(skillReview.position.x, canvasSize.width - Math.min(500, canvasSize.width - 24) - 12)),
         y: 76, maxHeight: Math.max(160, canvasSize.height - 88),
       }}
-      loadOutputs={loadSkillReviewOutputs} verifyOutputs={verifySkillReviewOutputs} onClose={() => setSkillReview(null)}
+      loadOutputs={loadSkillReviewOutputs} verifyOutputs={verifySkillReviewOutputs} onClose={() => setSkillReview(null)} hidden={Boolean(projectFileSelection?.fromConversation)}
       projectRoot={project?.path} getReviewImageHref={(image, preview) => endpoint({ reviewImage: image.path, hash: image.hash, ...(preview ? { preview: '1' } : {}) }).href}
       renderConversation={renderEditorConversation ? task => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: '任务' }) : undefined}
       onOpenNative={() => { const sessionId = skillReview.entry.task.sessionId; setSkillReview(null); void openTaskSession(sessionId).then(() => { if (creationRef.current?.sessionId === sessionId) updateCreation(creationRef.current.key, { openExecutionRequest: crypto.randomUUID() }) }) }}

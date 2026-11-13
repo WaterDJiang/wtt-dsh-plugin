@@ -13,7 +13,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -35,6 +35,119 @@ async function seed(workspace) {
       positions: { [nodeId]: { x: 80, y: 150 } }, viewport: { x: 0, y: 0, zoom: 0.8 } });
     return { id, nodeId };
   } finally { service.close(); }
+}
+
+async function seedSelection(workspace) {
+  const service = new WorkbenchService({ workspaceRoot: workspace });
+  try {
+    const cases = [];
+    for (const [title, viewport] of [['平移缩放', { x: 55, y: -60, zoom: 0.7 }], ['缩小', { x: 110, y: 40, zoom: 0.5 }],
+      ['放大', { x: 20, y: -160, zoom: 1.2 }], ['分组', { x: 70, y: -40, zoom: 0.65 }]]) {
+      const { id } = service.store.createCanvas({ title, operationId: randomUUID() });
+      const ids = {};
+      for (const label of ['A', 'C', 'D']) {
+        const { material } = service.canvas.addMaterial({ requirementId: id, title: `${label} 卡片`, content: '合成框选正文', operationId: randomUUID() });
+        ids[label] = `material:${material.id}`;
+      }
+      ids.B = service.createOutputDraft({ requirementId: id, outputType: 'text', selectedCardIds: [], sourceRefs: [],
+        position: { x: 470, y: 250 }, operationId: randomUUID() }).node.id;
+      const group = title === '分组' ? `group:${randomUUID()}` : null;
+      const linked = `edge:${randomUUID()}`, outside = `edge:${randomUUID()}`;
+      service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision,
+        positions: { [ids.A]: { x: 100, y: 250 }, [ids.B]: { x: 470, y: 250 }, [ids.C]: { x: 1250, y: 850 }, [ids.D]: { x: 1900, y: 1400 } },
+        edges: [{ id: linked, source: ids.A, target: ids.B }, { id: outside, source: ids.C, target: ids.D }],
+        groups: group ? [{ id: group, title: '关联分组', nodeIds: [ids.A, ids.B] }] : [], viewport });
+      cases.push({ id, ids, group, viewport, linked });
+    }
+    const { id } = service.store.createCanvas({ title: '300卡屏外框选', operationId: randomUUID() });
+    const all = [];
+    for (let i = 0; i < 300; i++) {
+      const { material } = service.canvas.addMaterial({ requirementId: id, title: `性能 ${i}`, content: '合成正文。'.repeat(100), operationId: randomUUID() });
+      all.push(`material:${material.id}`);
+    }
+    service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision,
+      positions: Object.fromEntries(all.map((node, i) => [node, { x: 100 + i % 15 * 350, y: 600 + Math.floor(i / 15) * 300 }])),
+      viewport: { x: 40, y: -220, zoom: 0.5 } });
+    cases.push({ id, ids: { A: all[0], B: all[1], C: all[2], D: all[3] }, group: null, linked: null });
+    return cases;
+  } finally { service.close(); }
+}
+
+async function checkSelection(page, canvas, cases, api) {
+  const choose = page.getByRole('combobox', { name: '当前画布', exact: true });
+  const card = id => canvas.locator(`article[data-card-id="${id}"]`);
+  const selected = () => canvas.locator('.react-flow__node.selected').evaluateAll(nodes => nodes.map(node => node.dataset.id).sort());
+  const frame = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const view = () => canvas.locator('.react-flow__viewport').getAttribute('style');
+  const board = async id => {
+    const url = new URL(api); url.searchParams.set('canvas', id);
+    const reply = await page.request.get(url.href); assert(reply.ok()); return reply.json();
+  };
+  async function open(entry) {
+    await choose.selectOption(entry.id);
+    await card(entry.ids.A).waitFor();
+    await frame();
+    if (entry.linked) await canvas.locator(`.react-flow__edge[data-id="${entry.linked}"]`).waitFor({ state: 'attached' });
+  }
+  async function box(start, end, { shift = false, reverse = false, hold = 0 } = {}) {
+    if (reverse) [start, end] = [end, start];
+    await canvas.focus();
+    if (shift) { await page.keyboard.down('Shift'); await frame(); }
+    try {
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(end.x, end.y, { steps: 8 });
+      if (hold) await page.waitForTimeout(hold);
+      await frame();
+    } finally {
+      await page.mouse.up();
+      if (shift) await page.keyboard.up('Shift');
+    }
+    await frame();
+  }
+  for (const entry of cases) {
+    await open(entry);
+    const before = await board(entry.id), viewport = await view();
+    const a = await card(entry.ids.A).boundingBox(), b = await card(entry.ids.B).boundingBox();
+    await box({ x: a.x - 14, y: a.y - 14 }, { x: b.x + 12, y: a.y + a.height + 14 }, { shift: !!entry.group });
+    assert.deepEqual(await selected(), [entry.ids.A], '只擦到大卡边缘不能选中，框外未测量节点不能入选');
+    if (entry.linked) await canvas.locator(`.react-flow__edge.selected[data-id="${entry.linked}"]`).waitFor({ state: 'attached' });
+    assert.deepEqual(await canvas.locator('.react-flow__edge.selected').evaluateAll(edges => edges.map(edge => edge.dataset.id)), entry.linked ? [entry.linked] : [], '只选择实际框中卡片关联的连线');
+    await box({ x: a.x - 10, y: a.y - 10 }, { x: a.x + a.width + 10, y: a.y + a.height + 10 }, { shift: !!entry.group, reverse: true });
+    assert.deepEqual(await selected(), [entry.ids.A], '反向框选也必须完整包含');
+    assert.equal(await view(), viewport, '框选不能移动视口');
+    assert.deepEqual((await board(entry.id)).nodes.map(node => [node.id, node.position]), before.nodes.map(node => [node.id, node.position]), '框选不能改变卡片位置');
+  }
+  await open(cases[0]);
+  const area = await canvas.locator('.react-flow').boundingBox(), viewport = await view();
+  await box({ x: area.x + 45, y: area.y + 180 }, { x: area.x + area.width - 2, y: area.y + area.height - 3 }, { hold: 650 });
+  assert.equal(await view(), viewport, '边缘停留不能让框选范围漂移');
+  await open(cases[1]);
+  const large = await card(cases[1].ids.B).boundingBox();
+  await box({ x: large.x - 8, y: large.y - 8 }, { x: large.x + large.width + 8, y: large.y + large.height + 8 });
+  assert.deepEqual(await selected(), [cases[1].ids.B], '完整框住640×512卡且清除旧选择');
+  await open(cases[2]);
+  await card(cases[2].ids.A).getByRole('heading').click();
+  await page.keyboard.down('Meta');
+  await card(cases[2].ids.B).getByRole('heading').click();
+  await page.keyboard.up('Meta');
+  assert.deepEqual(await selected(), [cases[2].ids.A, cases[2].ids.B].sort(), '原修饰键多选继续可用');
+  const group = cases[3];
+  await open(group);
+  const p = await card(group.ids.A).boundingBox();
+  await box({ x: p.x - 8, y: p.y - 8 }, { x: p.x + p.width + 8, y: p.y + p.height + 8 }, { shift: true });
+  assert.deepEqual(await selected(), [group.ids.A]);
+  const before = await board(group.id), heading = await card(group.ids.A).getByRole('heading').boundingBox();
+  const saved = page.waitForResponse(reply => new URL(reply.url()).pathname === api.pathname
+    && reply.request().method() === 'POST' && reply.request().postDataJSON()?.action === 'save-canvas');
+  await page.mouse.move(heading.x + 20, heading.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(heading.x + 70, heading.y + 38, { steps: 10 });
+  await page.mouse.up();
+  assert((await saved).ok());
+  const after = await board(group.id);
+  assert.notDeepEqual(after.nodes.find(node => node.id === group.ids.A).position, before.nodes.find(node => node.id === group.ids.A).position);
+  assert.deepEqual(after.nodes.find(node => node.id === group.ids.B).position, before.nodes.find(node => node.id === group.ids.B).position, '拖动框中子卡不移动框外兄弟卡');
 }
 
 async function loginUrl(host) {
@@ -205,6 +318,7 @@ try {
   const workspace = path.join(temporary, 'workspace');
   await mkdir(workspace);
   const fixture = await seed(workspace);
+  const selectionCases = ['all', 'selection'].includes(scenario) ? await seedSelection(workspace) : null;
   const env = { ...process.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
     PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`, npm_config_offline: 'true',
     npm_config_store_dir: path.join(repo, '.runtime/pnpm-store') };
@@ -222,19 +336,24 @@ try {
   const account = page.getByRole('dialog').filter({ hasText: '开始使用' }).getByRole('button', { name: '关闭', exact: true });
   if (await account.waitFor({ timeout: 1800 }).then(() => true, () => false)) await account.click();
   await page.getByRole('button', { name: 'WTT 创作工作台', exact: true }).click();
+  await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(fixture.id);
   const canvas = page.locator('.wtt-course-canvas:visible');
   const card = canvas.locator(`article[data-card-id="${fixture.nodeId}"]`);
   await card.waitFor();
   const api = new URL('/api/wtt-creation-workbench', login);
   api.searchParams.set('projectId', createHash('sha256').update(await realpath(workspace)).digest('hex'));
   try {
-    if (scenario !== 'refresh') {
+    if (['all', 'delete'].includes(scenario)) {
       await checkDelete(page, canvas, card, api.pathname);
       console.log('PASS 删除核对、取消、移除后视口复用和回收站恢复');
     }
-    if (scenario !== 'delete') {
+    if (['all', 'refresh'].includes(scenario)) {
       await checkRefresh(page, canvas, card, api, fixture);
       console.log('PASS 后台刷新期间拖动与保存');
+    }
+    if (selectionCases) {
+      await checkSelection(page, canvas, selectionCases, api);
+      console.log('PASS 完整框选、反向、分组、缩放、大卡及边缘停留');
     }
     assert.deepEqual(errors, [], '页面不应抛出运行错误');
     console.log(`画布冒烟通过，用时 ${((performance.now() - start) / 1000).toFixed(1)} 秒`);

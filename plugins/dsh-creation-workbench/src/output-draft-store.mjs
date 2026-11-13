@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { adjacentCreationPosition, creationPositionFree, creationSourceAnchor, CARD_WIDTH } from './creation-context.mjs';
+import { adjacentCreationPosition, creationPositionFree, creationSourceAnchor, CARD_WIDTH, OUTPUT_CARD_SIZE } from './creation-context.mjs';
 
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const labels = { text: '新文本', pptx: '新 PPT', image: '新图片', video: '新视频' };
@@ -36,8 +36,8 @@ export class OutputDraftStore {
         const occupied = this.store.cards.canvas.getBoard(requirementId).nodes;
         const placed = creationPositionFree(position, occupied) ? position : adjacentCreationPosition(
           creationSourceAnchor(references, occupied) || { position: { x: position.x - CARD_WIDTH - 80, y: position.y } }, occupied);
-        this.db.prepare('INSERT INTO output_cards (id,requirement_id,type,title,node_id,created_at) VALUES (?,?,?,?,?,?)')
-          .run(id,requirementId,outputType,labels[outputType],`output:${id}`,new Date().toISOString());
+        this.db.prepare('INSERT INTO output_cards (id,requirement_id,type,title,node_id,created_at,initial_size_json) VALUES (?,?,?,?,?,?,?)')
+          .run(id,requirementId,outputType,labels[outputType],`output:${id}`,new Date().toISOString(),JSON.stringify(OUTPUT_CARD_SIZE));
         this.db.prepare('INSERT INTO output_card_drafts VALUES (?,?,?,?,?,0)').run(id,outputType,JSON.stringify(references),'',JSON.stringify(placed));
         this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(operationId,'create-output-draft',inputHash,id);
       }

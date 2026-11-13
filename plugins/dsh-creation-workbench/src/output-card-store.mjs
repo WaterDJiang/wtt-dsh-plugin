@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { OutputDraftStore } from './output-draft-store.mjs';
 import { isActiveTaskPhase } from './pending-card-state.mjs';
-import { CARD_WIDTH, adjacentCreationPosition, creationPositionFree, creationSourceAnchor } from './creation-context.mjs';
+import { CARD_WIDTH, OUTPUT_CARD_SIZE, adjacentCreationPosition, creationPositionFree, creationSourceAnchor } from './creation-context.mjs';
 
 const REF = /^(artifact|outline|word|material):[0-9a-f-]{36}$/;
 const typeOf = type => type === 'pptx' ? 'pptx' : ['image', 'video'].includes(type) ? type : 'text';
@@ -26,7 +26,7 @@ export class OutputCardStore {
     this.db.exec(`CREATE TABLE IF NOT EXISTS output_cards (
       id TEXT PRIMARY KEY, requirement_id TEXT NOT NULL REFERENCES canvas_spaces(id), type TEXT NOT NULL,
       title TEXT NOT NULL, node_id TEXT, head_version_id TEXT, head_sequence INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL, initial_position_json TEXT
+      created_at TEXT NOT NULL, initial_position_json TEXT, initial_size_json TEXT
     );
     CREATE TABLE IF NOT EXISTS output_card_versions (
       id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES output_cards(id), number INTEGER NOT NULL,
@@ -44,6 +44,9 @@ export class OutputCardStore {
     )`);
     if (!this.db.prepare('PRAGMA table_info(output_cards)').all().some(column => column.name === 'initial_position_json')) {
       this.db.exec('ALTER TABLE output_cards ADD COLUMN initial_position_json TEXT');
+    }
+    if (!this.db.prepare('PRAGMA table_info(output_cards)').all().some(column => column.name === 'initial_size_json')) {
+      this.db.exec('ALTER TABLE output_cards ADD COLUMN initial_size_json TEXT');
     }
     this.drafts = new OutputDraftStore(store);
   }
@@ -81,7 +84,8 @@ export class OutputCardStore {
   #card(row) {
     return { id: row.id, requirementId: row.requirement_id, type: row.type, title: row.title, nodeId: row.node_id || `output:${row.id}`,
       latestVersionId: row.head_version_id, versions: this.db.prepare('SELECT * FROM output_card_versions WHERE card_id=? ORDER BY number').all(row.id).map(value => this.#version(value)), legacy: false,
-      ...(row.initial_position_json ? { initialPosition: JSON.parse(row.initial_position_json) } : {}) };
+      ...(row.initial_position_json ? { initialPosition: JSON.parse(row.initial_position_json) } : {}),
+      ...(row.initial_size_json ? { initialSize: JSON.parse(row.initial_size_json) } : {}) };
   }
 
   binding(taskId) {
@@ -127,8 +131,8 @@ export class OutputCardStore {
         position = creationPositionFree(input.outputPosition, occupied) ? input.outputPosition : adjacentCreationPosition(
           creationSourceAnchor(input.sources, occupied) || { position: { x: (input.outputPosition?.x ?? 410) - CARD_WIDTH - 80, y: input.outputPosition?.y ?? 60 } }, occupied);
       }
-      this.db.prepare('INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at) VALUES (?,?,?,?,?,NULL,0,?)')
-        .run(plan.id, plan.requirementId, plan.type, plan.title, plan.adoption?.card.nodeId || `output:${plan.id}`, now);
+      this.db.prepare('INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at,initial_size_json) VALUES (?,?,?,?,?,NULL,0,?,?)')
+        .run(plan.id, plan.requirementId, plan.type, plan.title, plan.adoption?.card.nodeId || `output:${plan.id}`, now, plan.adoption ? null : JSON.stringify(OUTPUT_CARD_SIZE));
       if (position) this.db.prepare('UPDATE output_cards SET initial_position_json=? WHERE id=?').run(JSON.stringify(position), plan.id);
       if (plan.adoption) {
         const base = plan.adoption.version;
@@ -191,8 +195,8 @@ export class OutputCardStore {
     const position = adjacentCreationPosition(anchor, occupied);
     const cardId = randomUUID(), versionId = randomUUID(), now = new Date().toISOString();
     const type = /\.pptx$/i.test(artifact.path) ? 'pptx' : typeOf(artifact.kind);
-    this.db.prepare(`INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at,initial_position_json)
-      VALUES (?,?,?,?,?,?,0,?,?)`).run(cardId, parent.requirement_id, type, artifact.title, `output:${cardId}`, versionId, now, JSON.stringify(position));
+    this.db.prepare(`INSERT INTO output_cards (id,requirement_id,type,title,node_id,head_version_id,head_sequence,created_at,initial_position_json,initial_size_json)
+      VALUES (?,?,?,?,?,?,0,?,?,?)`).run(cardId, parent.requirement_id, type, artifact.title, `output:${cardId}`, versionId, now, JSON.stringify(position), JSON.stringify(OUTPUT_CARD_SIZE));
     this.db.prepare('INSERT INTO output_card_versions VALUES (?,?,1,?,NULL,?,0,0,?)')
       .run(versionId, cardId, artifact.task_id, sourceRef, now);
     this.db.prepare("INSERT INTO output_card_outputs VALUES (?,?,?,?,'primary')")
@@ -232,7 +236,7 @@ export class OutputCardStore {
     const firstTask = this.db.prepare(`SELECT t.input_json FROM output_card_tasks b
       JOIN course_tasks t ON t.id=b.task_id WHERE b.card_id=? ORDER BY b.request_sequence LIMIT 1`).get(card.id);
     const initialPosition = card.initialPosition || (firstTask && JSON.parse(firstTask.input_json).outputPosition);
-    const node = { ...actual, id: card.nodeId, sourceId: version.primaryRef,
+    const node = { ...actual, ...card.initialSize, id: card.nodeId, sourceId: version.primaryRef,
       position: raw.layoutPositions?.[card.nodeId] || original?.position || initialPosition || actual.position, ...(raw.sizes?.[card.nodeId] || {}), outputCard: { ...card, versionId: version.id, number: version.number } };
     if (pending) node.pendingGeneration = this.#pendingGeneration(pending);
     if (version.primaryRef.startsWith('outline:')) node.wordPath = this.store.getVersion(actual.refId)?.wordPath || null;
@@ -279,7 +283,7 @@ export class OutputCardStore {
 
   #pendingNode(card, task, raw) {
     const position = raw.layoutPositions?.[card.nodeId] || card.initialPosition || task.input.outputPosition || { x: 410, y: 60 };
-    const node = { id: card.nodeId, kind: 'generation', title: card.title, position, ...(raw.sizes?.[card.nodeId] || {}),
+    const node = { id: card.nodeId, kind: 'generation', title: card.title, position, ...card.initialSize, ...(raw.sizes?.[card.nodeId] || {}),
       outputCard: { ...card, versionId: null }, pendingGeneration: this.#pendingGeneration(task) };
     const annotated = this.store.slides?.annotate(node) || node;
     return this.store.outcomes?.annotate(annotated, null, task) || annotated;
@@ -294,6 +298,7 @@ export class OutputCardStore {
 
   #draftNode(card,composition,raw){
     return {id:card.nodeId,kind:'generation',title:card.title,position:raw.layoutPositions?.[card.nodeId]||composition.position,
+      ...card.initialSize,
       ...(raw.sizes?.[card.nodeId]||{}),outputCard:{...card,versionId:null},composition,
       pendingGeneration:{phase:'composing',message:'填写创作要求后开始生成',outputType:card.type}};
   }

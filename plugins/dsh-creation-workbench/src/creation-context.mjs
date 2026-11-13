@@ -1,6 +1,7 @@
 import { extractSkillNames } from './skill-commands.mjs';
 export const CARD_WIDTH = 320;
 export const CARD_HEIGHT = 256;
+export const OUTPUT_CARD_SIZE = Object.freeze({ width: CARD_WIDTH * 2, height: CARD_HEIGHT * 2 });
 const BLOCKED = /^(missing|modified|changed|unavailable)$/;
 const FIELDS = ['id', 'nodeId', 'kind', 'artifactKind', 'title', 'number', 'refId', 'content', 'excerpt', 'path', 'sourcePath', 'sourceHash', 'status', 'sourceStatus', 'extracted', 'excerptInfo', 'importedFile', 'generatedFile', 'whiteboardSource', 'referenceNote', 'unavailable'];
 
@@ -113,14 +114,14 @@ export function creationSourceAnchor(sources, cards) {
   }
 }
 
-export function creationPositionFree(position, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+export function creationPositionFree(position, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
   return Number.isFinite(position?.x) && Number.isFinite(position?.y) && Math.abs(position.x) <= 999_000 && Math.abs(position.y) <= 999_000
     && !cards.some(card => position.x < card.position.x + (card.width || CARD_WIDTH) + 24
       && position.x + width + 24 > card.position.x && position.y < card.position.y + (card.height || CARD_HEIGHT) + 24
       && position.y + height + 24 > card.position.y);
 }
 
-export function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+export function adjacentCreationPosition(anchor, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
   const min = -999_000, maxX = 999_000 - width, maxY = 999_000 - height;
   const clamp = (value, max) => Math.max(min, Math.min(max, value));
   const origin = { x: clamp(anchor.position.x + (anchor.width || CARD_WIDTH) + 80, maxX), y: clamp(anchor.position.y, maxY) };
@@ -154,6 +155,6 @@ export function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, heig
 }
 
 // Keep the existing caller contract; source proximity now takes precedence over the viewport.
-export function visibleCreationPosition(anchor, cards, viewport, size, width = CARD_WIDTH, height = CARD_HEIGHT) {
+export function visibleCreationPosition(anchor, cards, viewport, size, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
   return adjacentCreationPosition(anchor, cards, width, height);
 }

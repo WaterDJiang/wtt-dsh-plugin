@@ -8,7 +8,7 @@ import { ReviewImageGallery } from './review-image-gallery.jsx'
 import './skill-confirmation.css'
 
 export function SkillConfirmation({ entry, currentEntry, position, draftCache, loadOutputs, verifyOutputs, onClose, onOpenNative, onOpenOutput,
-  loadDeckPreview, getDeckPageHref, projectRoot, getReviewImageHref, renderConversation }) {
+  loadDeckPreview, getDeckPageHref, projectRoot, getReviewImageHref, renderConversation, hidden = false }) {
   const [drafts, setDrafts] = useState(() => draftCache.get(entry.key) || {})
   const [outputs, setOutputs] = useState(null)
   const [previewError, setPreviewError] = useState('')
@@ -48,7 +48,7 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
   const plan = pending.questions?.length === 1 && pending.questions[0].intent?.kind === 'plan-review'
   const disabled = sending || sent || stale || !permission && (outputs === null || Boolean(previewError)) || Boolean(pending.getSnapshot?.().closed)
   return <section className="wcc-skill-confirmation nodrag nopan nowheel" role="dialog" aria-label="任务待确认"
-    style={{ left: position.x, top: position.y, maxHeight: position.maxHeight }}
+    hidden={hidden} style={{ left: position.x, top: position.y, maxHeight: position.maxHeight, display: hidden ? 'none' : undefined }}
     onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') onClose() }}>
     <PanelHeader title={entry.task.title} subtitle={`任务待确认 · ${interactionLabel(pending)}`} onClose={onClose} closeLabel="稍后处理 任务待确认"/>
     <div className="wcc-skill-confirmation-body">

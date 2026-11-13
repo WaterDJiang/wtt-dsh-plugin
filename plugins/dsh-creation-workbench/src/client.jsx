@@ -208,7 +208,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   const request = useCallback((action, data) => apiRequest(action, data, project.id), [project.id])
   const renderNativePreview = source => <HostFilePreview key={`${source.path}:${source.hash}`} source={source} project={project} active={active}
     acquire={acquirePreviewSession} SessionProvider={SessionProvider} renderSlot={renderSlot} />
-  const renderEditorConversation=props=><NativeEditorConversation {...props} project={project} acquire={acquireEditingSession} bridge={nativeEditorBridge} SessionProvider={SessionProvider} renderSlot={renderSlot}/>
+  const renderEditorConversation=props=><NativeEditorConversation {...props} project={project} acquire={acquireEditingSession} bridge={nativeEditorBridge} SessionProvider={SessionProvider} renderSlot={renderSlot} onFileClick={openConversationFile} fileError={conversationFileError}/>
   const [deliverableFeedback, setDeliverableFeedback] = useState(null)
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -237,7 +237,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   const [backgroundError,setBackgroundError]=useState('')
   const backgroundAttempt=useRef(null)
   const previewProjectFile=entry=>{setProjectFileSelection({...entry,token:crypto.randomUUID()});if(window.innerWidth<=700)setFilesOpen(false)}
-  function openConversationFile(event) {
+  function openConversationFile(event, sessionId = reference?.sessionId) {
     const file = nativeConversationFilePath(event.target.closest?.('button'))
     if (!file) return
     event.preventDefault()
@@ -246,7 +246,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
       previewProjectFile(conversationFileSelection(project.path, file))
       setConversationFileError(null)
     } catch (cause) {
-      setConversationFileError({ sessionId: reference.sessionId, message: messageOf(cause) })
+      setConversationFileError({ sessionId, message: messageOf(cause) })
     }
   }
   const addProjectFile=entry=>{setFileAddRequest({...entry,projectId:project.id,requirementId:selectedId,token:crypto.randomUUID()});setProjectFileSelection(null);if(window.innerWidth<=700)setFilesOpen(false)}

@@ -21,6 +21,8 @@ test('choosing any type creates a persistent B with an A to B curve and no task,
  const f=fixture(t),bytes=readFileSync(path.join(f.root,f.source.path));
  for(const type of ['text','pptx','image','video']){
   const input=f.input(type),d=f.service.createOutputDraft(input),again=f.service.createOutputDraft(input);
+  assert.deepEqual({width:d.node.width,height:d.node.height},{width:640,height:512});
+  assert.deepEqual({width:again.node.width,height:again.node.height},{width:640,height:512});
   assert.equal(d.card.id,again.card.id);assert.deepEqual(d.card.versions,[]);assert.equal(d.node.pendingGeneration.phase,'composing');
   const board=f.service.canvas.getBoard(f.canvas.id);
   assert.ok(board.nodes.some(n=>n.id===d.node.id));assert.ok(board.edges.some(e=>e.source===f.source.id&&e.target===d.node.id&&e.provenance));
@@ -58,6 +60,7 @@ test('manual text draft saves a real Markdown V1 in place and remains available 
  assert.equal(saved.nodeId,draft.node.id);
  assert.equal(initial.node.title,'自写讲稿');
  assert.deepEqual(initial.node.position,draft.node.position);
+ assert.deepEqual({width:initial.node.width,height:initial.node.height},{width:640,height:512});
  assert.equal(initial.version.number,1);
  assert.equal(path.basename(initial.node.path),'自写讲稿.md');
  assert.equal(readFileSync(path.join(f.root,initial.node.path),'utf8'),content);
@@ -130,9 +133,33 @@ test('new B stays beside its source even outside a narrow viewport without chang
 test('colliding draft requests are placed near the live source once, and replay keeps the stored position',t=>{
  const f=fixture(t),input=f.input();
  const first=f.service.createOutputDraft(input),secondInput={...input,operationId:randomUUID()},second=f.service.createOutputDraft(secondInput);
- const overlap=(a,b)=>a.position.x<b.position.x+320&&a.position.x+320>b.position.x&&a.position.y<b.position.y+256&&a.position.y+256>b.position.y;
+ const overlap=(a,b)=>a.position.x<b.position.x+(b.width||320)&&a.position.x+(a.width||320)>b.position.x&&a.position.y<b.position.y+(b.height||256)&&a.position.y+(a.height||256)>b.position.y;
  assert.equal(overlap(first.node,second.node),false);
  assert.equal(overlap(second.node,f.source),false);
  assert.deepEqual(f.service.createOutputDraft(secondInput).node.position,second.node.position);
  assert.deepEqual(f.service.cards.describeDraft({requirementId:f.canvas.id,cardId:first.card.id}).node.position,first.node.position);
+});
+
+
+test('new output dimensions survive restart while old databases and saved custom sizes keep their geometry',t=>{
+ const f=fixture(t),legacy=f.service.createOutputDraft(f.input()),custom=f.service.createOutputDraft(f.input());
+ const board=f.service.canvas.getBoard(f.canvas.id);
+ f.service.canvas.saveBoard({requirementId:f.canvas.id,expectedRevision:board.revision,sizes:{[custom.node.id]:{width:470,height:350}}});
+ // Recreate the previous schema before opening the updated service.
+ f.service.store.db.exec('ALTER TABLE output_cards DROP COLUMN initial_size_json');f.service.close();
+ const reopened=new WorkbenchService({workspaceRoot:f.root});t.after(()=>reopened.close());
+ const prior=reopened.canvas.getBoard(f.canvas.id),old=prior.nodes.find(n=>n.id===legacy.node.id),sized=prior.nodes.find(n=>n.id===custom.node.id);
+ assert.deepEqual({width:old.width||320,height:old.height||256},{width:320,height:256});
+ assert.deepEqual({width:sized.width,height:sized.height},{width:470,height:350});
+ assert.deepEqual(old.position,legacy.node.position);assert.deepEqual(sized.position,custom.node.position);
+ const input=f.input('image'),created=reopened.createOutputDraft(input),node=created.node;
+ assert.deepEqual({width:node.width,height:node.height},{width:640,height:512});
+ const updated=reopened.canvas.getBoard(f.canvas.id);
+ reopened.canvas.saveBoard({requirementId:f.canvas.id,expectedRevision:updated.revision,sizes:{[node.id]:{width:720,height:600}}});
+ assert.deepEqual({width:reopened.createOutputDraft(input).node.width,height:reopened.createOutputDraft(input).node.height},{width:720,height:600});
+ reopened.close();
+ const again=new WorkbenchService({workspaceRoot:f.root});t.after(()=>again.close());
+ const persisted=again.canvas.getBoard(f.canvas.id).nodes.find(n=>n.id===node.id);
+ assert.deepEqual({width:persisted.width,height:persisted.height},{width:720,height:600});
+ assert.deepEqual(persisted.outputCard.initialSize,{width:640,height:512});
 });

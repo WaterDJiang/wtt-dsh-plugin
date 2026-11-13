@@ -1346,7 +1346,7 @@ function NativeEditorInputDock({ sessionId, useInput, inputActions, bridge }) {
   };
   return /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-native-edit-reference", "aria-label": "\u8BFE\u4EF6\u4FEE\u6539\u5F15\u7528" }, /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("span", { title: owner.label }, entry.mode ? owner.label : "\u666E\u901A\u5BF9\u8BDD"), /* @__PURE__ */ import_react6.default.createElement(UiButton, { size: "compact", disabled: ["adjudicating", "submitting"].includes(input.phase) || !owner.ready, onClick: switchMode }, entry.mode ? "\u666E\u901A\u5BF9\u8BDD" : "\u5F15\u7528\u5F53\u524D\u5185\u5BB9")), owner.controls);
 }
-function NativeEditorConversation({ identity: identity4, project, sessionId, acquire, onSession, owner, bridge, SessionProvider, renderSlot, onSettled, label: label2 = "\u8BFE\u4EF6" }) {
+function NativeEditorConversation({ identity: identity4, project, sessionId, acquire, onSession, owner, bridge, SessionProvider, renderSlot, onSettled, label: label2 = "\u8BFE\u4EF6", onFileClick, fileError }) {
   const [binding, setBinding] = (0, import_react6.useState)(null), [error, setError] = (0, import_react6.useState)(""), ownerRef = (0, import_react6.useRef)(owner), sessionCallback = (0, import_react6.useRef)(onSession);
   ownerRef.current = owner;
   sessionCallback.current = onSession;
@@ -1384,7 +1384,7 @@ function NativeEditorConversation({ identity: identity4, project, sessionId, acq
   }, [binding, identity4, owner?.ready, owner?.label, owner?.autoCommand, owner?.uiKey]);
   if (error) return /* @__PURE__ */ import_react6.default.createElement(UserError, { error: `${label2}\u5BF9\u8BDD\u672A\u80FD\u6253\u5F00\uFF1A${error}` });
   if (binding?.identity !== identity4) return /* @__PURE__ */ import_react6.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6253\u5F00", label2, "\u5BF9\u8BDD\u2026");
-  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-native-editor-conversation" }, /* @__PURE__ */ import_react6.default.createElement(SessionProvider, { session: binding.reference }, renderSlot(CANVAS_CONVERSATION_SLOT, { onSettled, editing: true })));
+  return /* @__PURE__ */ import_react6.default.createElement("div", { className: "wtt-native-editor-conversation", onClickCapture: (event) => onFileClick?.(event, binding.reference.sessionId) }, fileError?.sessionId === binding.reference.sessionId && /* @__PURE__ */ import_react6.default.createElement(UserError, { error: fileError.message }), /* @__PURE__ */ import_react6.default.createElement(SessionProvider, { session: binding.reference }, renderSlot(CANVAS_CONVERSATION_SLOT, { onSettled, editing: true })));
 }
 
 // src/native-preview.jsx
@@ -44292,6 +44292,7 @@ function CardComposer({
 // src/creation-context.mjs
 var CARD_WIDTH = 320;
 var CARD_HEIGHT = 256;
+var OUTPUT_CARD_SIZE = Object.freeze({ width: CARD_WIDTH * 2, height: CARD_HEIGHT * 2 });
 var BLOCKED = /^(missing|modified|changed|unavailable)$/;
 var FIELDS2 = ["id", "nodeId", "kind", "artifactKind", "title", "number", "refId", "content", "excerpt", "path", "sourcePath", "sourceHash", "status", "sourceStatus", "extracted", "excerptInfo", "importedFile", "generatedFile", "whiteboardSource", "referenceNote", "unavailable"];
 function creationSource(card) {
@@ -44431,10 +44432,10 @@ function creationTaskInput(context) {
     ...context.generation ? { generation: { ...context.generation } } : {}
   };
 }
-function creationPositionFree(position, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+function creationPositionFree(position, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
   return Number.isFinite(position?.x) && Number.isFinite(position?.y) && Math.abs(position.x) <= 999e3 && Math.abs(position.y) <= 999e3 && !cards.some((card) => position.x < card.position.x + (card.width || CARD_WIDTH) + 24 && position.x + width + 24 > card.position.x && position.y < card.position.y + (card.height || CARD_HEIGHT) + 24 && position.y + height + 24 > card.position.y);
 }
-function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CARD_HEIGHT) {
+function adjacentCreationPosition(anchor, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
   const min = -999e3, maxX = 999e3 - width, maxY = 999e3 - height;
   const clamp2 = (value, max) => Math.max(min, Math.min(max, value));
   const origin = { x: clamp2(anchor.position.x + (anchor.width || CARD_WIDTH) + 80, maxX), y: clamp2(anchor.position.y, maxY) };
@@ -44468,7 +44469,7 @@ function adjacentCreationPosition(anchor, cards, width = CARD_WIDTH, height = CA
   if (!best) throw new Error("\u6765\u6E90\u9644\u8FD1\u6CA1\u6709\u53EF\u7528\u7684\u5361\u7247\u4F4D\u7F6E\uFF0C\u8BF7\u6574\u7406\u753B\u5E03\u540E\u91CD\u8BD5\u3002");
   return best;
 }
-function visibleCreationPosition(anchor, cards, viewport, size, width = CARD_WIDTH, height = CARD_HEIGHT) {
+function visibleCreationPosition(anchor, cards, viewport, size, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
   return adjacentCreationPosition(anchor, cards, width, height);
 }
 
@@ -46039,7 +46040,8 @@ function SkillConfirmation({
   getDeckPageHref,
   projectRoot,
   getReviewImageHref,
-  renderConversation
+  renderConversation,
+  hidden = false
 }) {
   const [drafts, setDrafts] = (0, import_react49.useState)(() => draftCache.get(entry.key) || {});
   const [outputs, setOutputs] = (0, import_react49.useState)(null);
@@ -46098,7 +46100,8 @@ function SkillConfirmation({
       className: "wcc-skill-confirmation nodrag nopan nowheel",
       role: "dialog",
       "aria-label": "\u4EFB\u52A1\u5F85\u786E\u8BA4",
-      style: { left: position.x, top: position.y, maxHeight: position.maxHeight },
+      hidden,
+      style: { left: position.x, top: position.y, maxHeight: position.maxHeight, display: hidden ? "none" : void 0 },
       onPointerDown: (event) => event.stopPropagation(),
       onClick: (event) => event.stopPropagation(),
       onDoubleClick: (event) => event.stopPropagation(),
@@ -46783,6 +46786,7 @@ function CanvasContent({
   const panelId = (0, import_react50.useId)();
   const endpoint2 = (query) => apiEndpoint(query, projectId);
   const flow = useReactFlow();
+  const flowStore = useStoreApi();
   const modelSelectionRef = (0, import_react50.useRef)(modelSelection);
   modelSelectionRef.current = modelSelection;
   const [watchedStatuses, setWatchedStatuses] = (0, import_react50.useState)(/* @__PURE__ */ new Map());
@@ -47641,7 +47645,7 @@ function CanvasContent({
     try {
       const node = nodesRef.current.find((item) => item.id === card.id);
       const anchor = { ...card, position: node ? absolutePosition(node, nodesRef.current) : card.position || { x: 80, y: 80 }, ...node ? nodeSize2(node) : {} };
-      const cards = [...nodesRef.current.filter(isObject).map((item) => ({ ...item.data, position: absolutePosition(item, nodesRef.current), ...nodeSize2(item) })), ...[...cache.current.reservations.values()].map((position) => ({ position }))];
+      const cards = [...nodesRef.current.filter(isObject).map((item) => ({ ...item.data, position: absolutePosition(item, nodesRef.current), ...nodeSize2(item) })), ...[...cache.current.reservations.values()].map((position) => ({ position, ...OUTPUT_CARD_SIZE }))];
       const initial = createCardContext({
         projectId,
         projectName: project?.name || "\u5F53\u524D\u9879\u76EE",
@@ -48200,11 +48204,12 @@ function CanvasContent({
         }
       };
       if (node.type !== "content") return node;
+      const measured = node.measured || flow.getInternalNode(node.id)?.measured;
       const card = node.data.outputCard;
       const head = card?.versions.find((version2) => version2.id === card.latestVersionId);
       const task = taskById.get(head?.taskId);
       const publishedGeneration = !node.data.pendingGeneration || node.data.pendingGeneration.published ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : void 0;
-      return { ...node, data: {
+      return { ...node, ...measured?.width > 0 && measured?.height > 0 ? { measured } : {}, data: {
         ...node.data,
         onCreate: openNodeMenu,
         publishedGeneration,
@@ -48931,6 +48936,27 @@ function CanvasContent({
     setSelectionKey(selected2.filter(isObject).map((node) => node.id).sort().join("|"));
     setEdgeSelection(selectedEdges.filter((edge) => !edge.provenance).map((edge) => edge.id));
   }, []);
+  (0, import_react50.useEffect)(() => flowStore.subscribe((state, previous) => {
+    const rect = state.userSelectionRect;
+    if (!state.userSelectionActive || !rect || rect === previous.userSelectionRect) return;
+    const [tx, ty, zoom] = state.transform;
+    const left = (rect.x - tx) / zoom, top = (rect.y - ty) / zoom;
+    const right = left + rect.width / zoom, bottom = top + rect.height / zoom;
+    const chosen = /* @__PURE__ */ new Set();
+    const changes = [];
+    for (const node of nodesRef.current) {
+      const bounds2 = flow.getNodesBounds([node.id]);
+      const selected2 = node.selectable !== false && !node.hidden && bounds2.width > 0 && bounds2.height > 0 && bounds2.x >= left && bounds2.y >= top && bounds2.x + bounds2.width <= right && bounds2.y + bounds2.height <= bottom;
+      if (selected2) chosen.add(node.id);
+      if (!!node.selected !== selected2) changes.push({ id: node.id, type: "select", selected: selected2 });
+    }
+    if (changes.length) replaceNodes2(applyNodeChanges(changes, nodesRef.current));
+    const edgeChanges = edgesRef.current.filter((edge) => edge.selectable !== false).flatMap((edge) => {
+      const selected2 = chosen.has(edge.source) || chosen.has(edge.target);
+      return !!edge.selected === selected2 ? [] : [{ id: edge.id, type: "select", selected: selected2 }];
+    });
+    if (edgeChanges.length) replaceEdges(applyEdgeChanges(edgeChanges, edgesRef.current));
+  }), [flow, flowStore]);
   function connect(connection) {
     if (!connection.source || !connection.target || connection.source === connection.target) return;
     if (edgesRef.current.some((edge) => edge.source === connection.source && edge.target === connection.target)) return;
@@ -49094,7 +49120,7 @@ function CanvasContent({
         if (mounted.current && epoch === epochRef.current) {
           attempt.current = null;
           const anchor = nodesRef.current.find((node) => node.id === (context.anchor.nodeId || context.anchor.id));
-          const occupied = [...nodesRef.current.filter(isObject).map((node) => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize2(node) })), ...[...cache.current.reservations.values()].map((position) => ({ position }))];
+          const occupied = [...nodesRef.current.filter(isObject).map((node) => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize2(node) })), ...[...cache.current.reservations.values()].map((position) => ({ position, ...OUTPUT_CARD_SIZE }))];
           const nextPosition = anchor ? adjacentCreationPosition({ position: absolutePosition(anchor, nodesRef.current), ...nodeSize2(anchor) }, occupied) : context.outputPosition;
           updateCreation(context.key, { error: "", taskId: created.task.id, sessionId: started?.sessionId || created.task.sessionId, outputPosition: context.intent === "revise" || context.composerNodeId ? context.outputPosition : nextPosition });
           setNotice("\u4EFB\u52A1\u5DF2\u63D0\u4EA4\uFF0C\u5361\u7247\u4F1A\u663E\u793A\u751F\u6210\u8FDB\u5EA6\u3002");
@@ -49114,7 +49140,7 @@ function CanvasContent({
     const anchor = nodesRef.current.find((node) => node.id === (context.anchor.nodeId || context.anchor.id));
     const occupied = [
       ...nodesRef.current.filter(isObject).map((node) => ({ position: absolutePosition(node, nodesRef.current), ...nodeSize2(node) })),
-      ...[...cache.current.reservations.values()].map((position) => ({ position }))
+      ...[...cache.current.reservations.values()].map((position) => ({ position, ...OUTPUT_CARD_SIZE }))
     ];
     const origin = anchor ? { position: absolutePosition(anchor, nodesRef.current), ...nodeSize2(anchor) } : { position: { x: context.outputPosition.x - CARD_WIDTH - 80, y: context.outputPosition.y } };
     return adjacentCreationPosition(origin, occupied);
@@ -49232,7 +49258,7 @@ function CanvasContent({
         ...nodeSize2(node)
       }));
       const anchor = occupied.find((node) => node.id === (context.composerNodeId || context.anchor.nodeId || context.anchor.id)) || { position: context.outputPosition };
-      const position = adjacentCreationPosition(anchor, occupied);
+      const position = adjacentCreationPosition(anchor, occupied, CARD_WIDTH, CARD_HEIGHT);
       const result = await request("project-file-reference", {
         requirementId: context.requirementId,
         path,
@@ -49768,12 +49794,13 @@ function CanvasContent({
       defaultViewport: board.viewport || { x: 0, y: 0, zoom: 1 },
       minZoom: 0.1,
       maxZoom: 3,
-      selectionMode: SelectionMode.Partial,
+      selectionMode: SelectionMode.Full,
       nodeDragThreshold: 5,
       nodeClickDistance: 5,
       multiSelectionKeyCode: ["Meta", "Control", "Shift"],
       selectionKeyCode: "Shift",
       selectionOnDrag: tool === "select" && !busy,
+      autoPanOnSelection: false,
       panActivationKeyCode: "Space",
       panOnScroll: false,
       zoomOnScroll: false,
@@ -50174,6 +50201,7 @@ function CanvasContent({
       loadOutputs: loadSkillReviewOutputs,
       verifyOutputs: verifySkillReviewOutputs,
       onClose: () => setSkillReview(null),
+      hidden: Boolean(projectFileSelection?.fromConversation),
       projectRoot: project?.path,
       getReviewImageHref: (image, preview) => endpoint2({ reviewImage: image.path, hash: image.hash, ...preview ? { preview: "1" } : {} }).href,
       renderConversation: renderEditorConversation ? (task) => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: "\u4EFB\u52A1" }) : void 0,
@@ -50415,7 +50443,7 @@ function WorkbenchPage({
       renderSlot
     }
   );
-  const renderEditorConversation = (props) => /* @__PURE__ */ import_react52.default.createElement(NativeEditorConversation, { ...props, project, acquire: acquireEditingSession, bridge: nativeEditorBridge, SessionProvider, renderSlot });
+  const renderEditorConversation = (props) => /* @__PURE__ */ import_react52.default.createElement(NativeEditorConversation, { ...props, project, acquire: acquireEditingSession, bridge: nativeEditorBridge, SessionProvider, renderSlot, onFileClick: openConversationFile, fileError: conversationFileError });
   const [deliverableFeedback, setDeliverableFeedback] = (0, import_react52.useState)(null);
   const [workspace, setWorkspace] = (0, import_react52.useState)(null);
   const [loading, setLoading] = (0, import_react52.useState)(true);
@@ -50447,7 +50475,7 @@ function WorkbenchPage({
     setProjectFileSelection({ ...entry, token: crypto.randomUUID() });
     if (window.innerWidth <= 700) setFilesOpen(false);
   };
-  function openConversationFile(event) {
+  function openConversationFile(event, sessionId = reference?.sessionId) {
     const file = nativeConversationFilePath(event.target.closest?.("button"));
     if (!file) return;
     event.preventDefault();
@@ -50456,7 +50484,7 @@ function WorkbenchPage({
       previewProjectFile(conversationFileSelection(project.path, file));
       setConversationFileError(null);
     } catch (cause) {
-      setConversationFileError({ sessionId: reference.sessionId, message: messageOf8(cause) });
+      setConversationFileError({ sessionId, message: messageOf8(cause) });
     }
   }
   const addProjectFile = (entry) => {

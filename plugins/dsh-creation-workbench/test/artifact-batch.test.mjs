@@ -54,6 +54,7 @@ test('one image container expands to seven real image cards, retaining successes
   writeFileSync(path.join(root, files[3].path), png.stdout);
   assert.equal((await batch([files[3]])).succeeded, 1);
   const seven = cards(); assert.equal(seven.length, 7);
+  assert(seven.every(node=>node.width===640&&node.height===512));
   assert(seven.every(node => node.artifactKind === 'image' && node.generatedFile.media.validated && node.outputCard.versions.length === 1));
   assert.equal(new Set(seven.map(node => node.outputCard.id)).size, 7);
   assert.equal(new Set(seven.map(node => JSON.stringify(node.position))).size, 7);

@@ -314,11 +314,14 @@ test('new task reservations avoid collisions once without rewriting the frozen r
   const first=service.createTask(input()),args=input(),second=service.createTask(args);
   const before=outputNodes(service,requirement.id),a=before.find(n=>n.outputCard.id===first.task.outputCardId),b=before.find(n=>n.outputCard.id===second.task.outputCardId);
   assert.notDeepEqual(a.position,b.position);
-  assert(!(a.position.x<b.position.x+320&&a.position.x+320>b.position.x&&a.position.y<b.position.y+256&&a.position.y+256>b.position.y));
+  assert.deepEqual({width:a.width,height:a.height},{width:640,height:512});
+  assert.deepEqual({width:b.width,height:b.height},{width:640,height:512});
+  assert(!(a.position.x<b.position.x+b.width&&a.position.x+a.width>b.position.x&&a.position.y<b.position.y+b.height&&a.position.y+a.height>b.position.y));
   assert.deepEqual(second.task.input.outputPosition,args.outputPosition,'request snapshot remains unchanged');
   assert.equal(service.createTask(args).task.id,second.task.id);
   await file(first,'first.md','# 第一张');await file(second,'second.md','# 第二张');
   const after=outputNodes(service,requirement.id);
+  assert(after.every(n=>n.width===640&&n.height===512));
   assert.deepEqual(after.find(n=>n.outputCard.id===first.task.outputCardId).position,a.position);
   assert.deepEqual(after.find(n=>n.outputCard.id===second.task.outputCardId).position,b.position);
 });

@@ -1463,6 +1463,9 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   flex: 1 0 auto;
   min-height: 0;
 }
+.wtt-native-editor-conversation > .wtt-user-error {
+  flex: 0 0 auto;
+}
 
 /* src/native-preview.css */
 .wtt-native-preview {

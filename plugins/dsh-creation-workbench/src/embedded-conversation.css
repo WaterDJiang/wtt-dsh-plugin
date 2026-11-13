@@ -1,1 +1,3 @@
 .wtt-embedded-chat-view{display:flex;flex-direction:column;flex:1 0 auto;min-height:0}
+
+.wtt-native-editor-conversation>.wtt-user-error{flex:0 0 auto}

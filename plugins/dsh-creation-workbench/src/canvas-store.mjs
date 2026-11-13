@@ -571,7 +571,7 @@ export class CanvasStore {
         if (!materialInput.position) {
           const cards = this.getRawBoard(requirement.id).nodes;
           const anchor = cards.find(card => card.id === association.cardId);
-          materialInput.position = adjacentCreationPosition(anchor, cards);
+          materialInput.position = adjacentCreationPosition(anchor, cards, CARD_WIDTH, CARD_HEIGHT);
         }
       } } : {}),
     });
