@@ -1,6 +1,7 @@
 import { PanelHeader, PanelToolbar, UiButton } from './ui/controls.jsx'
 import { VersionSelect } from './version-select.jsx'
 import { UserError } from './user-feedback.jsx'
+import { CardNameDialog } from './card-name-dialog.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import './asset-board.css'
 
@@ -14,7 +15,7 @@ const titleOf = task => {
   return names || task.instruction?.replace(/(^|\s)\/[a-z0-9-]+(?=\s|$)/g, ' ').replace(/CW[- ]?\d+\s*[A-Z0-9]*[：:]?/g, '').trim().slice(0, 60) || task.title
 }
 
-export function AssetBoard({ projectId, requirementId, endpoint, request, onClose, onOpenCard, onOpenTask, draftCache }) {
+export function AssetBoard({ projectId, requirementId, endpoint, request, onClose, onOpenCard, onOpenTask, onChanged, draftCache }) {
   const saved = draftCache?.assetBoard || {}
   const [tab, setTab] = useState(saved.tab || 'deliveries'), [selected, setSelected] = useState(saved.selected || requirementId)
   const [overview, setOverview] = useState(null), [course, setCourse] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('')
@@ -22,6 +23,7 @@ export function AssetBoard({ projectId, requirementId, endpoint, request, onClos
   const [policy, setPolicy] = useState(null), [taskId, setTaskId] = useState(''), [production, setProduction] = useState(null)
   const [reviewNotes, setReviewNotes] = useState(saved.reviewNotes || {}), [versions, setVersions] = useState(saved.versions || {}), [checkpoint, setCheckpoint] = useState(saved.checkpoint || { title: '', decisions: '', pending: '' })
   const [diagnostics, setDiagnostics] = useState(null), [businessFilter, setBusinessFilter] = useState('all')
+  const [renaming, setRenaming] = useState(null)
   const panelRef = useRef(null)
   useEffect(() => { const previous = document.activeElement; panelRef.current?.focus(); return () => { if (previous?.isConnected) previous.focus() } }, [])
   const operationStorageKey = `wtt-assets-operations:${projectId}`
@@ -84,7 +86,7 @@ export function AssetBoard({ projectId, requirementId, endpoint, request, onClos
           const version = card.versions.find(item => item.id === versionId), state = version?.review?.state || 'pending'
           const warnings = card.dependencyWarnings.filter(item => item.taskId === version?.taskId)
           return <article key={card.id} className="wtt-asset-item">
-            <div className="wtt-asset-heading"><strong title={card.title}>{card.title}</strong><VersionSelect ariaLabel={`审阅 ${card.title} 的版本`} versions={card.versions} value={versionId} onChange={value => setVersions({ ...versions, [card.id]: value })} /></div>
+            <div className="wtt-asset-heading"><strong title={card.title}>{card.title}</strong><UiButton variant="quiet" size="compact" onClick={() => { setError(''); setRenaming(card) }}>重命名</UiButton><VersionSelect ariaLabel={`审阅 ${card.title} 的版本`} versions={card.versions} value={versionId} onChange={value => setVersions({ ...versions, [card.id]: value })} /></div>
             <div className="wtt-asset-tags"><span>{version?.format || card.type.toUpperCase()}</span><span>{state === 'approved' ? '审阅通过' : state === 'changes' ? '需修改' : '待审阅'}</span>{card.selectedVersionId === versionId && <span className="is-selected">交付版</span>}</div>
             {!!warnings.length && <details className="wtt-asset-warning"><summary>引用的部分来源已有新版</summary>{warnings.map((item, index) => <p key={index}>{item.title}：这份内容仍使用旧资料；如需更新，请重新发起创作。</p>)}</details>}
             <input aria-label={`审阅意见 ${card.title}`} placeholder="审阅意见（可选）" value={reviewNotes[versionId] ?? version?.review?.note ?? ''} onChange={event => setReviewNotes({ ...reviewNotes, [versionId]: event.target.value })} />
@@ -121,5 +123,9 @@ export function AssetBoard({ projectId, requirementId, endpoint, request, onClos
         {diagnostics && <><ul>{diagnostics.checks?.map(item => <li key={item.name}><strong>{item.name}</strong> · {item.available ? '可用' : '待配置'}<details><summary>查看配置详情</summary><p>{item.message || item.path}</p></details></li>)}</ul><details><summary>诊断信息</summary><code>{diagnostics.fingerprint}</code></details><h3>本机技能</h3><p>技能从本机读取。点击卡旁输入框的“／技能 → 设置常用”，搜索后点星标即可；所有项目共用。</p></>}
       </>}
     </div>
+    {renaming && <CardNameDialog title={renaming.title} busy={busy} error={error} onClose={() => { if (!busy) setRenaming(null) }} onSave={async title => {
+      const result = await act('rename-card', { requirementId: selected, nodeId: renaming.node.id, expectedTitle: renaming.cardTitle || renaming.title, title }, '名称已更新')
+      if (result) { const cardId = renaming.id; setRenaming(null); await onChanged?.({ ...result, cardId }) }
+    }}/>}
   </section>
 }

@@ -1,6 +1,7 @@
 import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton, UiIcon } from './ui/controls.jsx'
 import {DeleteNodesDialog,ProjectRecycleDialog} from './canvas-recycle.jsx'
 import { TaskControlDialog } from './task-control.jsx'
+import { CardNameDialog } from './card-name-dialog.jsx'
 import {PROJECT_FILE_DRAG, ProjectFilePreview} from './project-explorer.jsx'
 import { SvgSourceView } from './svg-source-view.jsx'
 import {SavedPptPreview} from './saved-ppt-preview.jsx'
@@ -38,7 +39,7 @@ import { createPendingContext, generationStateSignature, isActiveTaskPhase, unco
 import { taskInteractions, interactionLabel } from './skill-interactions.mjs'
 import { SkillConfirmation } from './skill-confirmation.jsx'
 import { attachCanvasGestures } from './canvas-gestures.mjs'
-import { cardCapabilities, cardTextDraftKey, cardDisplayTitle } from './card-capabilities.mjs'
+import { cardCapabilities, cardTextDraftKey, cardDisplayTitle, cardContentAccept } from './card-capabilities.mjs'
 import { VersionSelect } from './version-select.jsx'
 
 const LARGE_CANVAS_THRESHOLD = 80
@@ -149,7 +150,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         value={data.outputCard?.versionId || data.currentMaterialVersionId}
         onChange={value => data.outputCard ? data.onVersionChange?.(value) : data.onMaterialVersionView?.(value)} />}
         {!caps.versioned && data.number != null && <span className="wcc-version">v{String(data.number).padStart(3, '0')}</span>}
-      {openTarget && <div className="wcc-card-open-wrap" ref={openMenuRef} onKeyDown={event => {
+      {(openTarget || data.onUploadContent || data.onRename) && <div className="wcc-card-open-wrap" ref={openMenuRef} onKeyDown={event => {
         if (!openMenu) return
         event.stopPropagation()
         if (event.key !== 'Escape') return
@@ -159,6 +160,9 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         <UiButton variant="ghost" size="compact" iconOnly className="nodrag nopan" aria-label={`卡片操作：${title}`} title="卡片操作" aria-expanded={openMenu} aria-controls={openMenu ? openMenuId : undefined}
           onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setOpenMenu(value => !value) }}><UiIcon name="more" /></UiButton>
         {openMenu && <div id={openMenuId} className="wcc-card-open-menu nodrag nopan nowheel" role="group" aria-label="卡片操作" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+          {data.onUploadContent && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onUploadContent() }}>上传文件</UiButton>}
+          {data.onRename && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRename() }}>重命名</UiButton>}
+          {openTarget && <>
           <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onOpenInspect?.() }}><UiIcon name="file" size={14} />在侧栏查看</UiButton>
           {data.projectFile?.status === 'missing' && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRestoreFile?.() }}><UiIcon name="refresh" size={14} />恢复源文件</UiButton>}
           <details className="wcc-card-apps" onToggle={event => { if (event.currentTarget.open) void loadOpenApps() }}>
@@ -171,11 +175,15 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
             </div>
           </details>
           <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRevealFile?.(openTarget) }}><UiIcon name="folder" size={14} />显示所在文件夹</UiButton>
+          </>}
         </div>}
       </div>}
       <span className="wcc-grip" aria-hidden="true">⠿</span></div>
     </header>
     <div className="wcc-card-body">
+      {data.composition && data.onUploadContent && <div className="wcc-text-draft-actions nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
+        <UiButton variant="quiet" size="compact" onClick={event => { event.stopPropagation(); data.onUploadContent() }}>上传文件</UiButton>
+      </div>}
       {data.projectFile?.status === 'missing' && <p className="wcc-card-missing" role="status">源文件已被删除，可从卡片菜单恢复。</p>}
       {data.skillTodo && <UiButton variant="custom" type="button" className="wcc-skill-todo nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenSkillTodo?.() }}><strong>待办 · {interactionLabel(data.skillTodo.interaction)}</strong><span>{data.skillTodo.interaction.questions?.[0]?.question || '核对执行权限'} →</span></UiButton>}
       {textDraft && <div className="wcc-text-draft-actions nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
@@ -378,6 +386,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   creationRef.current = creation
   const [creationVisible, setCreationVisible] = useState(() => cache.current.visible)
   const [creationMenu, setCreationMenu] = useState(null)
+  const contentPicker = useRef(null), contentTarget = useRef(null), uploadAttempt = useRef(null)
+  const [renameCard, setRenameCard] = useState(null), [renameError, setRenameError] = useState('')
   const [taskControl, setTaskControl] = useState(null)
   const [deletePlan,setDeletePlan]=useState(null)
   const deleteRequest = useRef(null)
@@ -444,6 +454,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const interactions = taskInteractions(tasks, effectiveStatuses, requirement.id)
   const interactionsRef = useRef(interactions)
   interactionsRef.current = interactions
+
+  useEffect(() => {
+    if (!creationVisible || !['image', 'video'].includes(creation?.outputType)) return
+    setSkillReview(null)
+    setSkillDeckPreview(null)
+  }, [creationVisible, creation?.key, creation?.outputType])
   const taskSessionIds = JSON.stringify([...new Set(tasks.filter(task => task.kind === 'ai').map(task => task.sessionId).filter(Boolean))].sort())
   useEffect(() => {
     setWatchedStatuses(new Map())
@@ -1521,6 +1537,77 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (before && historyRef.current.record(before, layoutSnapshot())) setHistoryGeneration(value => value + 1)
   }
 
+  function chooseCardFile(card) {
+    if (operationLock.current || !cardContentAccept(card)) return
+    cancelCardOpen()
+    contentTarget.current = { nodeId: card.id, versionId: card.outputCard?.versionId || null,
+      headVersionId: card.outputCard?.latestVersionId || null, sourceHash: card.sourceHash || null }
+    contentPicker.current.accept = cardContentAccept(card)
+    contentPicker.current.value = ''
+    contentPicker.current.click()
+  }
+
+  function uploadCardFile(event) {
+    const file = event.target.files?.[0], target = contentTarget.current
+    event.target.value = ''; contentTarget.current = null
+    if (!file || !target) return
+    if (file.size > 20 * 1024 * 1024) { setError('单个上传文件不能超过20MB'); return }
+    closeCreation()
+    const intent = creationIntent.current
+    void perform('upload-card', async epoch => {
+      const bytes = await file.arrayBuffer()
+      const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('')
+      const operationId = stableOperation(uploadAttempt, { target, filename: file.name, hash })
+      const url = endpoint({ uploadCardContent: requirement.id, target: JSON.stringify(target), filename: file.name, operationId })
+      const response = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || '上传文件失败')
+      uploadAttempt.current = null
+      if (!mounted.current || epoch !== epochRef.current) return
+      cache.current.versionViews.delete(result.cardId)
+      await onChanged?.()
+      await loadBoard({ preserveViewport: true, selectIds: [result.nodeId], selectionIntent: intent })
+      if (!mounted.current || epoch !== epochRef.current) return
+      onFilesChanged?.()
+      return { ...result, epoch }
+    }).then(async outcome => {
+      if (!outcome.ok || !outcome.value || !mounted.current || !activeRef.current || outcome.value.epoch !== epochRef.current || intent !== creationIntent.current) return
+      const card = nodesRef.current.find(node => node.id === outcome.value.nodeId)?.data
+      if (!card) { setError('文件已保存，请刷新后打开卡片'); return }
+      if (cardCapabilities(card).editableText.editable) openTextEditor(card)
+      else await openOutputCard(card, outcome.value.versionId)
+    }).catch(cause => { if (mounted.current) setError(messageOf(cause)) })
+  }
+
+  function updateCardNameViews({ nodeId, cardId, title }) {
+    const named = card => card && (card.id === nodeId || cardId && card.outputCard?.id === cardId) ? { ...card, title, displayTitle: title,
+      ...(card.outputCard ? { outputCard: { ...card.outputCard, title } } : {}) } : card
+    const view = cardId && cache.current.versionViews.get(cardId)
+    if (view) cache.current.versionViews.set(cardId, { ...view, node: named(view.node) })
+    replaceNodes(decorate(nodesRef.current.map(node => ({ ...node, data: named(node.data) }))))
+    if (boardRef.current) boardRef.current = { ...boardRef.current, nodes: boardRef.current.nodes.map(named) }
+    setBoard(current => current && ({ ...current, nodes: current.nodes.map(named) }))
+    setTextEditCard(named)
+    const update = value => value && cardId && value.cardId === cardId ? { ...value, title, displayTitle: title } : value
+    setOutcomeView(update)
+    setDocumentViewState(current => { const next = update(current); documentViewRef.current = next; return next })
+    setDeckPreviewState(current => { const next = update(current); deckPreviewRef.current = next; return next })
+  }
+
+  async function saveCardName(title) {
+    const scope = renameCard
+    setRenameError('')
+    const result = await perform('rename-card', async epoch => {
+      const renamed = await request('rename-card', { requirementId: requirement.id, nodeId: scope.id,
+        expectedTitle: scope.outputCard?.title || cardDisplayTitle(scope), title, operationId: crypto.randomUUID() })
+      if (!mounted.current || epoch !== epochRef.current) return
+      updateCardNameViews({ ...renamed, cardId: scope.outputCard?.id })
+      await onChanged?.()
+      setRenameCard(null)
+    })
+    if (!result.ok) setRenameError(messageOf(result.error))
+  }
+
   function decorate(flowNodes, autoEditId) {
     const taskById = new Map(tasksRef.current.map(task => [task.id, task]))
     return flowNodes.map(node => {
@@ -1538,6 +1625,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : undefined
       // Preserve actual measurements on data refresh so React Flow keeps handle bounds.
       return { ...node, ...(measured?.width > 0 && measured?.height > 0 ? { measured } : {}), data: { ...node.data, onCreate: openNodeMenu,
+      onUploadContent: cardContentAccept(node.data) ? () => chooseCardFile(node.data) : undefined,
+      onRename: () => { closeCreation(); setRenameError(''); setRenameCard(node.data) },
       publishedGeneration,
       onEditText: () => openTextEditor(node.data),
       onResizeStart: beginResize, onResizeEnd: finishCardResize,
@@ -2353,7 +2442,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         modelSelection: created.task.input?.modelSelection || null, sessionId: created.task.sessionId || null, error: '' })
       cache.current.reservations.set(created.task.id, context.outputPosition)
       try {
-        if (!await loadBoard({ preserveViewport: true })) throw new Error('任务已保存，画布暂未加载；请重新加载后打开任务。')
+        if (!await loadBoard({ preserveViewport: true, keepVisible: true })) throw new Error('任务已保存，画布暂未加载；请重新加载后打开任务。')
         if (!mounted.current || epoch !== epochRef.current) return
         if (!pendingRetryAllowed(created.task)) {
           openPanel('tasks')
@@ -2426,7 +2515,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       updateCreation(context.key, current => ({ ...current, taskId: result.task.id, pendingTaskId: result.task.id, mediaJob: result.job, mediaOptions: options,
         outputPosition: nextMediaPosition(current), error: '', mediaPollError: '' }))
       attempt.current = null
-      if (mounted.current) { await loadBoard({ preserveViewport: true }); setNotice('生成任务已保存，画布卡片将持续显示生成状态。'); await refreshTasks() }
+      if (mounted.current) { await loadBoard({ preserveViewport: true, keepVisible: true }); setNotice('生成任务已保存，画布卡片将持续显示生成状态。'); await refreshTasks() }
     }).then(outcome => { if (!outcome.ok) updateCreation(context.key, { error: messageOf(outcome.error) }) })
   }
 
@@ -2797,6 +2886,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     { label: '适应全部', onClick: fitAllCards },
   ]
 
+  const feedbackError = board && loadError ? `${error ? error + ' ' : ''}画布刷新失败：${loadError}` : error
   return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}`}>
@@ -2810,14 +2900,18 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       <DialogFooter><span className="wcc-version-view-meta">{materialVersionView.origin === 'card-edit' ? '卡内编辑版本' : '导入基线'} · {new Date(materialVersionView.createdAt).toLocaleString()}</span><UiButton variant="quiet" type="button" onClick={() => setMaterialVersionView(null)}>关闭</UiButton></DialogFooter>
     </dialog>}
     {recycleOpen&&<ProjectRecycleDialog request={request} endpoint={endpoint} onClose={()=>{setRecycleOpen(false);onCloseRecycle?.()}} onChanged={recycledChanged}/>}
-    {(error || notice) && <div className={`wcc-message${error ? ' is-error' : ''}`} role={error ? 'alert' : 'status'}>{error ? <UserError error={error} announce={false} /> : <span>{notice}</span>}<UiButton variant="ghost" size="compact" onClick={() => { setError(''); setNotice('') }} aria-label="关闭提示">×</UiButton></div>}
+    {(feedbackError || notice || busy === 'upload-card') && <div className={`wcc-message${feedbackError ? ' is-error' : ''}${board && loadError ? ' has-retry' : ''}`} role={feedbackError ? 'alert' : 'status'}>{feedbackError ? <UserError error={feedbackError} announce={false} /> : <span>{busy === 'upload-card' ? '正在上传文件…' : notice}</span>}
+      {board && loadError && <UiButton variant="quiet" size="compact" disabled={!!busy} onClick={() => void perform('refresh', async () => { await saveLayout(); await loadBoard({ preserveViewport: true, keepVisible: true }) })}>重试刷新</UiButton>}
+      {busy !== 'upload-card' && <UiButton variant="ghost" size="compact" onClick={() => { setError(''); setNotice(''); setLoadError('') }} aria-label="关闭提示">×</UiButton>}</div>}
+    <input ref={contentPicker} type="file" hidden aria-label="上传卡片内容" onChange={uploadCardFile}/>
+    {renameCard && <CardNameDialog title={cardDisplayTitle(renameCard)} busy={!!busy} error={renameError} onSave={saveCardName} onClose={() => { if (!busy) setRenameCard(null) }}/>}
     <div className="wcc-workspace">
     <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} inert={(dock.mobile||editorFullscreen)&&dockOpen} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy} onDragOver={event => {
         if ([...event.dataTransfer.types].some(type=>type==='Files'||type===PROJECT_FILE_DRAG)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDraggingFile(true) }
       }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDraggingFile(false) }} onDrop={dropFiles} onDoubleClick={blankMenu}>
         {loading && <div className="wcc-loading" role="status">正在读取画布…</div>}
-        {loadError && <div className="wcc-load-error" role="alert"><strong>画布未能加载</strong><UserError error={loadError} announce={false} /><UiButton variant="quiet" onClick={() => void loadBoard({ initial: !board })}>重新加载</UiButton></div>}
-        {board && !loading && !loadError && <ReactFlow id={`wtt-flow-${panelId.replace(/:/g, '')}`}
+        {loadError && !board && <div className="wcc-load-error" role="alert"><strong>画布未能加载</strong><UserError error={loadError} announce={false} /><UiButton variant="quiet" onClick={() => void loadBoard({ initial: true })}>重新加载</UiButton></div>}
+        {board && !loading && <ReactFlow id={`wtt-flow-${panelId.replace(/:/g, '')}`}
           key={requirement.id}
           nodes={nodes} edges={visibleEdges} nodeTypes={NODE_TYPES}
           onlyRenderVisibleElements={nodes.length >= LARGE_CANVAS_THRESHOLD && !editingNodeId}
@@ -3039,7 +3133,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     {skillDeckPreview && active && <DeckPreview artifactId={skillDeckPreview.output.node.refId} hash={skillDeckPreview.output.node.sourceHash}
       title={skillDeckPreview.output.node.title} downloadHref={skillDeckPreview.output.downloadHref} loadPreview={loadDeckPreview} getPageHref={getDeckPageHref}
       onClose={() => { setSkillReview(skillDeckPreview.review); setSkillDeckPreview(null) }} />}
-    {assetsOpen && <AssetBoard key={`${projectId}:${requirement.id}`} projectId={projectId} requirementId={requirement.id} endpoint={endpoint} request={request} draftCache={cache.current} onClose={() => { setAssetsOpen(false); void refreshSkillCatalog() }}
+    {assetsOpen && <AssetBoard key={`${projectId}:${requirement.id}`} projectId={projectId} requirementId={requirement.id} endpoint={endpoint} request={request} draftCache={cache.current} onChanged={async change => { updateCardNameViews(change); await onChanged?.(); await loadBoard({ preserveViewport: true, requireStableLayout: true }) }} onClose={() => { setAssetsOpen(false); void refreshSkillCatalog() }}
       onOpenCard={(card, versionId, targetRequirement) => { if (targetRequirement !== requirement.id) { onAssetNavigate?.(targetRequirement, card.id, versionId); return } const node = boardRef.current?.nodes.find(item => item.outputCard?.id === card.id); if (node) { setAssetsOpen(false); void openOutputCard(node, versionId) } }}
       onOpenTask={task => { if (task?.sessionId) { setAssetsOpen(false); void openTaskSession(task.sessionId) } }} />}
 

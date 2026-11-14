@@ -10,7 +10,7 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
   const [manifest, setManifest] = useState(null), [selected, setSelected] = useState(''), [sourceBinding, setSource] = useState(null)
   const [error, setError] = useState('')
   const [svgBinding,setSvgBinding]=useState(null),[svgChoice,setSvgChoice]=useState('')
-  const identity = JSON.stringify(target)
+  const identity = JSON.stringify({ ...target, title: undefined, displayTitle: undefined })
   const read = async query => {
     const response = await fetch(endpoint(query), { credentials: 'same-origin' })
     const result = await response.json(); if (!response.ok) throw new Error(result.error || '文件读取失败。'); return result
@@ -80,12 +80,12 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
 
 
   </>
-  if (canModify) return <DocumentViewer key={selectionKey} sourceRef={selected} hash={source.hash} title={source.name} endpoint={endpoint}
+  if (canModify) return <DocumentViewer key={selectionKey} sourceRef={selected} hash={source.hash} title={target.displayTitle || manifest?.displayTitle || source.name} endpoint={endpoint}
     requirementId={target.requirementId} cardId={manifest.cardId} versionId={manifest.versionId} outcome active={active}
     fileActions={choices} outcomeRole={file.role} renderNativePreview={renderNativePreview} downloadHref={downloadHref} onClose={onClose} onSaved={onSaved}
     onToggleWidth={onToggleWidth} widthExpanded={widthExpanded} />
   return <aside className="wtt-outcome-viewer nodrag nopan nowheel" aria-label={target.reviewDraft ? '待审稿预览' : '成果文件预览'} onPointerDown={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-    <PanelHeader title={file?.name || target.title || '成果文件'} format={source?.format?.toUpperCase()} downloadHref={downloadHref}
+    <PanelHeader title={target.displayTitle || manifest?.displayTitle || file?.name || target.title || '成果文件'} format={source?.format?.toUpperCase()} downloadHref={downloadHref}
       expanded={widthExpanded} onToggleWidth={onToggleWidth} onClose={onClose} closeLabel="关闭成果预览" />
     <PanelToolbar>{choices(false)}
       {onAdd && source && <UiButton variant="quiet" onClick={() => onAdd({ path: target.projectPath, name: source.name, hash: source.hash, directory: false })}>添加到画布</UiButton>}

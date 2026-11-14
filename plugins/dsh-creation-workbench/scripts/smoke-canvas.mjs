@@ -3,7 +3,7 @@ import { execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +13,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -71,6 +71,88 @@ async function seedSelection(workspace) {
     cases.push({ id, ids: { A: all[0], B: all[1], C: all[2], D: all[3] }, group: null, linked: null });
     return cases;
   } finally { service.close(); }
+}
+
+async function seedSend(workspace) {
+  const service = new WorkbenchService({ workspaceRoot: workspace });
+  try {
+    return ['text', 'image', 'video'].map(type => {
+      const { id } = service.store.createCanvas({ title: `发送刷新 ${type}`, operationId: randomUUID() });
+      const { node } = service.createOutputDraft({ requirementId: id, outputType: type, selectedCardIds: [], sourceRefs: [],
+        position: { x: 100, y: 160 }, operationId: randomUUID() });
+      service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision, viewport: { x: 20, y: 35, zoom: .7 } });
+      return { id, nodeId: node.id, type };
+    });
+  } finally { service.close(); }
+}
+
+async function checkSend(page, canvas, cases, api) {
+  const send = async (action, data) => {
+    const reply = await page.request.post(api.href, { data: { action, data } }); assert(reply.ok(), `${action} HTTP ${reply.status()}: ${await reply.text()}`); return reply.json();
+  };
+  for (const entry of cases) {
+    const closeSidebar = canvas.getByRole('button', { name: '关闭画布侧栏', exact: true });
+    if (await closeSidebar.isVisible()) await closeSidebar.click();
+    await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(entry.id);
+    const card = canvas.locator(`article[data-card-id="${entry.nodeId}"]`);
+    await card.waitFor(); await card.locator('.wcc-card-body').click({ position: { x: 30, y: 160 } });
+    const composer = canvas.locator('.wcc-card-composer:visible');
+    await composer.locator('textarea').first().fill('合成发送刷新，不调用模型');
+    const viewport = canvas.locator('.react-flow__viewport');
+    await viewport.evaluate(node => { node.dataset.sendMarker = 'mounted'; });
+    const transform = await viewport.getAttribute('style');
+    const { promise: captured, resolve: capture, reject } = Promise.withResolvers();
+    void captured.catch(() => {});
+    const { promise: paused, resolve: resume } = Promise.withResolvers();
+    const isBoard = url => url.pathname === api.pathname && url.searchParams.get('canvas') === entry.id;
+    let submitted = false, blocked = false, created;
+    const taskRoute = async route => {
+      if (route.request().method() !== 'POST' || route.request().postDataJSON()?.action !== 'create-task') return route.continue();
+      try {
+      const response = await route.fetch(); assert(response.ok()); created = await response.json();
+      // Mark the real synthetic task unknown before returning it. sendToAI must
+      // stop before onStart, so no model or remote prompt can run in this test.
+      await send('set-task-dispatch', { taskId: created.task.id, status: 'unknown' });
+      created.task.dispatchStatus = 'unknown'; submitted = true;
+      await route.fulfill({ response, json: created });
+      } catch (error) { reject(error); await route.abort().catch(() => {}); }
+    };
+    const boardRoute = async route => {
+      if (!submitted || blocked) return route.continue();
+      blocked = true;
+      try { const response = await route.fetch(); assert(response.ok()); capture(); await paused;
+        if (entry.type === 'image') await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: '合成发送后刷新失败' }) });
+        else await route.fulfill({ response });
+      } catch (error) { reject(error); await route.abort().catch(() => {}); }
+    };
+    await page.route(url => url.pathname === api.pathname, taskRoute);
+    await page.route(isBoard, boardRoute);
+    const timer = setTimeout(() => reject(new Error('发送后没有读取画布')), 10000);
+    try {
+      await composer.getByRole('button', { name: `生成${{ text: '文本', image: '图片', video: '视频' }[entry.type]}`, exact: true }).click();
+      await captured;
+      if (process.env.WTT_SMOKE_ARTIFACTS) { await mkdir(process.env.WTT_SMOKE_ARTIFACTS, { recursive: true }); await page.screenshot({ path: path.join(process.env.WTT_SMOKE_ARTIFACTS, `send-${entry.type}.png`) }); }
+      assert(await card.isVisible(), '发送后读取期间必须保留卡片');
+      assert.equal(await canvas.locator('.wcc-loading').count(), 0, '发送不能显示首次加载遮罩');
+      assert.equal(await viewport.getAttribute('data-send-marker'), 'mounted', '发送不能卸载视口');
+      assert.equal(await viewport.getAttribute('style'), transform, '发送不能移动视口');
+      const reply = page.waitForResponse(response => isBoard(new URL(response.url())));
+      resume(); await reply;
+      if (entry.type === 'image') {
+        await canvas.getByRole('alert').filter({ hasText: '合成发送后刷新失败' }).waitFor();
+        assert.equal(await canvas.locator('.wcc-load-error').count(), 0, '已有画布失败不能覆盖卡片');
+        assert(await card.isVisible());
+        if (process.env.WTT_SMOKE_ARTIFACTS) await page.screenshot({ path: path.join(process.env.WTT_SMOKE_ARTIFACTS, 'send-error.png') });
+        await canvas.getByRole('button', { name: '重试刷新', exact: true }).click();
+        await canvas.getByRole('alert').filter({ hasText: '合成发送后刷新失败' }).waitFor({ state: 'hidden' });
+      } else await card.locator('.wcc-card-generation-status').filter({ hasText: '待核对' }).waitFor();
+      assert.equal(await viewport.getAttribute('data-send-marker'), 'mounted');
+      console.log('PASS 发送保留画布', entry.type, entry.type === 'image' ? '失败提示及重试' : '任务更新');
+    } finally {
+      clearTimeout(timer); resume();
+      await page.unrouteAll({ behavior: 'wait' });
+    }
+  }
 }
 
 async function checkSelection(page, canvas, cases, api) {
@@ -319,17 +401,22 @@ try {
   await mkdir(workspace);
   const fixture = await seed(workspace);
   const selectionCases = ['all', 'selection'].includes(scenario) ? await seedSelection(workspace) : null;
+  const sendCases = ['all', 'send'].includes(scenario) ? await seedSend(workspace) : null;
   const env = { ...process.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
     PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`, npm_config_offline: 'true',
     npm_config_store_dir: path.join(repo, '.runtime/pnpm-store') };
-  await run(process.execPath, [cli, 'plugin', '--profile', 'web', 'add', repo], { cwd: workspace, env, timeout: 30_000 });
+  const candidate = process.env.WTT_SMOKE_PACKAGE || repo;
+  await run(process.execPath, [cli, 'plugin', '--profile', 'web', 'add', candidate], { cwd: workspace, env, timeout: 30_000 });
+  for (const file of ['src/canvas.jsx', 'src/canvas.css', 'dist/client.js']) assert.deepEqual(
+    await readFile(path.join(candidate, file)), await readFile(path.join(env.DSH_HOME, 'profiles/web/node_modules/@wtt/dsh-creation-workbench', file)), `安装文件不一致：${file}`);
   host = spawn(process.execPath, [cli, 'web', '--port', '0', '--no-open'], { cwd: workspace, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const login = await loginUrl(host);
   browser = await chromium.launch({ executablePath, headless: true });
   const page = await browser.newPage({ viewport: { width: 1320, height: 940 } });
   page.setDefaultTimeout(7000);
-  const errors = [];
+  const errors = [], consoleMessages = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (['error', 'warning'].includes(message.type())) consoleMessages.push(message.text()); });
   await page.goto(login);
   const intro = page.getByRole('button', { name: '继续', exact: true });
   if (await intro.waitFor({ timeout: 1800 }).then(() => true, () => false)) await intro.click();
@@ -355,10 +442,21 @@ try {
       await checkSelection(page, canvas, selectionCases, api);
       console.log('PASS 完整框选、反向、分组、缩放、大卡及边缘停留');
     }
+    if (sendCases) await checkSend(page, canvas, sendCases, api);
     assert.deepEqual(errors, [], '页面不应抛出运行错误');
+    assert.equal(consoleMessages.filter(message => message.includes('500')).length, sendCases ? 1 : 0, '仅允许合成刷新故障的一条500资源日志');
+    assert.deepEqual(consoleMessages.filter(message => !message.includes('500')), [], '不应出现其他控制台错误或警告');
+    console.log('PAGE', new URL(page.url()).origin, await page.title());
     console.log(`画布冒烟通过，用时 ${((performance.now() - start) / 1000).toFixed(1)} 秒`);
   } catch (error) {
     if (errors.length) console.error(errors.join('\n'));
+    const screenshot = path.join(tmpdir(), `wtt-canvas-smoke-${process.pid}-failure.png`);
+    await page.screenshot({ path: screenshot }).catch(() => {});
+    try { console.error('冒烟失败现场', JSON.stringify({ screenshot, canvas: await page.getByRole('combobox', { name: '当前画布', exact: true }).inputValue(),
+      viewport: await canvas.locator('.react-flow__viewport').getAttribute('style'),
+      nodes: await canvas.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => ({ id: node.dataset.id, style: node.getAttribute('style'),
+        box: node.getBoundingClientRect().toJSON(), handles: [...node.querySelectorAll('.react-flow__handle')].map(handle => handle.className) }))),
+      edges: await canvas.locator('.react-flow__edge').evaluateAll(edges => edges.map(edge => edge.dataset.id)) })); } catch {}
     throw error;
   }
 } finally {

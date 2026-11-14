@@ -282,6 +282,19 @@ export function apply(ctx, config = {}) {
           const bytes=new Uint8Array(await request.arrayBuffer());if(bytes.length>IMPORT_MAX_BYTES)throw Object.assign(new Error('引用图片不能超过20MiB'),{status:413});
           return Response.json(await projects.get(projectId).svgEditor.addImage({draftId:url.searchParams.get('svgEditorImage'),operationId:url.searchParams.get('operationId'),filename:url.searchParams.get('filename'),bytes}),{headers});
         }
+        if (url.searchParams.has('uploadCardContent')) {
+          if (!projectId) throw new Error('卡片上传必须指定当前项目');
+          for (const key of ['uploadCardContent', 'target', 'filename', 'operationId']) {
+            if (url.searchParams.getAll(key).length !== 1) throw new Error(`上传参数 ${key} 必须指定一次`);
+          }
+          if (Number(request.headers.get('content-length')) > IMPORT_MAX_BYTES) throw Object.assign(new Error('单文件不能超过20MB'), { status: 413 });
+          const bytes = new Uint8Array(await request.arrayBuffer());
+          if (bytes.length > IMPORT_MAX_BYTES) throw Object.assign(new Error('单文件不能超过20MB'), { status: 413 });
+          const target = JSON.parse(url.searchParams.get('target'));
+          const result = await projects.get(projectId).cardFiles.upload({ ...target, requirementId: url.searchParams.get('uploadCardContent'),
+            filename: url.searchParams.get('filename'), operationId: url.searchParams.get('operationId'), bytes }, { signal: request.signal });
+          return Response.json(result, { headers });
+        }
         if (url.searchParams.has('importMaterial')) {
           for (const key of ['importMaterial', 'operationId', 'filename', 'x', 'y', 'associate']) {
             if (url.searchParams.getAll(key).length > 1) throw new Error(`导入参数 ${key} 只能指定一次`);
@@ -384,6 +397,10 @@ export function apply(ctx, config = {}) {
           result = { ...created, prepared: projects.prepared(service, created.prepared) };
         }
         else if (action === 'save-card-text') result = service.canvas.saveCardText(data);
+        else if (action === 'rename-card') {
+          if (!projectId) throw new Error('卡片改名必须指定当前项目');
+          result = service.cardFiles.rename(data);
+        }
         else if (action === 'save-canvas') result = service.canvas.saveBoard(data);
         else if (action === 'save-canvas-viewport') result = service.canvas.saveViewport(data);
         else if (action === 'add-material') result = service.canvas.addMaterial(data);

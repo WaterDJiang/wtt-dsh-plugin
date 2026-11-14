@@ -50,7 +50,8 @@ export class Outcomes {
     if (sourceRef && !files.some(file => file.sourceRef === sourceRef)) throw new Error('所选文件不属于当前卡片版本或任务。');
     return { cardId: card.id, requirementId, versionId: version?.id || null, number: version?.number || null,
       files, selectedRef: sourceRef || defaultOutcome(files, version?.primaryRef)?.sourceRef,
-      ...(node.slideProject ? { slideProject: node.slideProject } : {}), title: card.title };
+      ...(node.slideProject ? { slideProject: node.slideProject } : {}), title: card.title,
+      ...(node.displayTitle ? { displayTitle: node.displayTitle } : {}) };
   }
   read({ requirementId, sourceRef, hash, projectPath }) {
     let bytes, relative, title, mime, sessionId, cardId, versionId;

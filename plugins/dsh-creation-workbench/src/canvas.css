@@ -62,7 +62,12 @@
 .wtt-course-canvas .wcc-save-state.is-draft { color: var(--wtt-ui-warning, #a26e3b); }
 .wtt-course-canvas .wcc-message { flex-shrink: 0; display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 8px 13px; border-bottom: 1px solid var(--wtt-ui-line, #dae4f6); background: var(--wtt-ui-accent-paper, #f0f5ff); color: var(--wtt-ui-text, #3c578d); font-size:var(--wtt-text-sm); }
 .wtt-course-canvas .wcc-message.is-error { background: var(--wtt-ui-danger-paper, #fff3f0); border-color: var(--wtt-ui-danger-line, #f0d1c8); color: var(--wtt-ui-danger, #ac402c); }
-.wtt-course-canvas .wcc-message button { min-height: 22px; width: 22px; padding: 0; border: 0; background: transparent; color: inherit; font-size:var(--wtt-text-xl); }
+.wtt-course-canvas .wcc-message button[aria-label="关闭提示"] { min-height: 22px; width: 22px; padding: 0; border: 0; background: transparent; color: inherit; font-size:var(--wtt-text-xl); }
+.wtt-course-canvas .wcc-message.has-retry { flex-wrap: wrap; justify-content: flex-end; }
+.wtt-course-canvas .wcc-message.has-retry > .wtt-user-error { flex-basis: 100%; }
+@media (max-width: 600px) {
+  .wtt-course-canvas.wcc-studio .wcc-message.has-retry { left: var(--wtt-space-3); right: var(--wtt-space-3); max-width: none; }
+}
 .wtt-course-canvas .wcc-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .wtt-course-canvas.is-focus-open .wcc-studio-chrome,
 .wtt-course-canvas.is-focus-open .wcc-studio-selection { display: none; }

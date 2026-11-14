@@ -425,7 +425,7 @@ export class CanvasStore {
       }
     }
     this.store.tasks.files.list(requirement.id).forEach((file, index) => {
-      const isText = ['.md', '.txt', '.json', '.jsonl', '.csv'].includes(path.extname(file.path).toLowerCase()) && file.byteSize <= MAX_BYTES;
+      const isText = ['.md', '.markdown', '.txt', '.json', '.jsonl', '.csv'].includes(path.extname(file.path).toLowerCase()) && file.byteSize <= MAX_BYTES;
       let content = `已登记 ${file.kind} 文件：${file.path}\n\n二进制或超出预览范围的文件未提取正文，请下载原文件阅读。`;
       let extracted = false;
       let status = file.status;

@@ -146,7 +146,7 @@ export class AssetLedger {
           if (producer && producer.sourceId !== source.cardId) dependencyWarnings.push({ taskId: task.id, title: source.title, source: source.cardId, latest: producer.sourceId });
         }
       }
-      return { id: card.id, title: node.title, type: card.type, fileKind: node.artifactKind,
+      return { id: card.id, title: node.title, cardTitle: card.title, type: card.type, fileKind: node.artifactKind,
         versions, latestVersionId: card.latestVersionId, selectedVersionId: selected?.version_id || null,
         node: { id: node.id, refId: node.refId, sourceId: node.sourceId, sourceHash: node.sourceHash, path: node.path, status: node.status }, dependencyWarnings };
     });

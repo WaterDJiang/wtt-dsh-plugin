@@ -6,7 +6,13 @@ const TEXT_FILE = /\.(md|markdown|txt)$/i;
 const OFFICE_FILE = /\.(docx|pptx|csv|pdf)$/i;
 
 export function cardDisplayTitle(card) {
-  return card?.defaultOutcome?.title || card?.title || card?.defaultOutcome?.name || '';
+  return card?.displayTitle || card?.defaultOutcome?.title || card?.title || card?.defaultOutcome?.name || '';
+}
+
+export function cardContentAccept(card) {
+  if (!['generation', 'artifact', 'outline', 'word', 'material', 'excerpt'].includes(card?.kind)) return null;
+  return { text: '.txt,.md,.markdown,.json,.jsonl', pptx: '.pptx', image: '.png,.jpg,.jpeg,.webp,.gif',
+    video: '.mp4,.webm', document: '.pdf,.docx,.csv' }[cardFormat(card)] || null;
 }
 
 export function editableCardText(card) {
@@ -21,7 +27,7 @@ export function editableCardText(card) {
     // 提取失败的纯文本文件（如文件树新建的空 md 拖入后的引用卡）从空正文起编；卡片上的状态提示文案不是正文
     return card.importedFile?.mime?.startsWith('text/') ? '' : null;
   }
-  if (card.kind === 'artifact' && /\.(md|txt)$/i.test(card.path || '') && card.extracted !== false) return card.content ?? '';
+  if (card.kind === 'artifact' && /\.(md|markdown|txt)$/i.test(card.path || '') && card.extracted !== false) return card.content ?? '';
   return null;
 }
 

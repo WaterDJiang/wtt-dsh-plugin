@@ -16,7 +16,7 @@ import { ProjectRecycleDialog } from './canvas-recycle.jsx'
 import { ProjectExplorer, ProjectFilePreview } from './project-explorer.jsx'
 import { ProjectPicker } from './project-picker.jsx'
 import { normalizeModelCatalog, openNativeModelSettings } from './model-selection.mjs'
-import { CANVAS_CONVERSATION_SLOT, CANVAS_CONVERSATION_CHILDREN, registerCanvasConversation } from './embedded-conversation.jsx'
+import { CANVAS_CONVERSATION_SLOT, CANVAS_CONVERSATION_CHILDREN, registerCanvasConversation, registerConversationFilePreview } from './embedded-conversation.jsx'
 import { conversationFileSelection, nativeConversationFilePath } from './conversation-file.mjs'
 import './ui/controls.css'
 import './card-reference-ui.css'
@@ -208,7 +208,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   const request = useCallback((action, data) => apiRequest(action, data, project.id), [project.id])
   const renderNativePreview = source => <HostFilePreview key={`${source.path}:${source.hash}`} source={source} project={project} active={active}
     acquire={acquirePreviewSession} SessionProvider={SessionProvider} renderSlot={renderSlot} />
-  const renderEditorConversation=props=><NativeEditorConversation {...props} project={project} acquire={acquireEditingSession} bridge={nativeEditorBridge} SessionProvider={SessionProvider} renderSlot={renderSlot} onFileClick={openConversationFile} fileError={conversationFileError}/>
+  const renderEditorConversation=props=><NativeEditorConversation {...props} project={project} acquire={acquireEditingSession} bridge={nativeEditorBridge} SessionProvider={SessionProvider} renderSlot={renderSlot} onFileClick={openConversationFile} onOpenFile={previewConversationFile} fileError={conversationFileError}/>
   const [deliverableFeedback, setDeliverableFeedback] = useState(null)
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -242,6 +242,9 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     if (!file) return
     event.preventDefault()
     event.stopPropagation()
+    void previewConversationFile(file, sessionId)
+  }
+  async function previewConversationFile(file, sessionId = reference?.sessionId) {
     try {
       previewProjectFile(conversationFileSelection(project.path, file))
       setConversationFileError(null)
@@ -577,6 +580,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {reference && <div className="wtt-native-conversation" data-generation={sessionGeneration} onClickCapture={openConversationFile}>
       {conversationFileError?.sessionId === reference.sessionId && <UserError className="wtt-inline-error" error={conversationFileError.message} />}
       <SessionProvider key={reference.sessionId} session={reference}>{renderSlot(CANVAS_CONVERSATION_SLOT, {
+        onOpenFile: file => previewConversationFile(file, reference.sessionId),
         onSettled: () => setCanvasSignals(signals => ({ ...signals, [selectedId]: (signals[selectedId] || 0) + 1 })),
       })}</SessionProvider>
     </div>}
@@ -785,6 +789,7 @@ export function apply(ctx) {
   ctx.effect(()=>ctx.inputTriggers.registerSource(nativeEditorBridge.source))
   ctx.effect(()=>ctx.slots.inject('conversation.input.dock',()=>ctx.slots.register({name:'conversation.input.dock',id:'wtt-course-edit-reference',order:5},props=><NativeEditorInputDock {...props} bridge={nativeEditorBridge}/>)))
   registerCanvasConversation(ctx)
+  registerConversationFilePreview(ctx)
   const acquirePreviewSession = createPreviewSessionAcquirer(ctx)
   const acquireEditingSession=createEditorSessionAcquirer(ctx)
   registerNativePreview(ctx)

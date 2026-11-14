@@ -24,7 +24,8 @@ test('distributed DSH factory activates and disposes its styles with the plugin'
     configForms: { get: () => ({}), describe: () => ({}) },
     effect: (apply) => { disposers.push(apply()); },
     inputTriggers: { registerSource: source => { sources.add(source); return () => sources.delete(source); } },
-    slots: { inject: (_key, apply) => apply(), register: (options, component) => { registrations.push({ options, component }); return () => {}; } },
+    slots: { inject: (_key, apply) => apply(), entriesOfSlot: () => [], subscribe: () => () => {},
+      register: (options, component) => { registrations.push({ options, component }); return () => {}; } },
   };
   plugin.apply(ctx);
   assert.equal(styles.size, 1);

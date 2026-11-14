@@ -26,6 +26,7 @@ import { CanvasRecycle } from './canvas-recycle.mjs';
 import { ProjectFiles } from './project-files.mjs';
 import { ExternalDocuments, openWithApplications } from './external-documents.mjs';
 import { Outcomes } from './outcomes.mjs';
+import { CardFileContent } from './card-file-content.mjs';
 
 const localSkillDirectory = name => ['.codex', '.agents', '.claude'].map(parent => path.join(os.homedir(), parent, 'skills', name)).find(directory => existsSync(path.join(directory, 'SKILL.md'))) || path.join(os.homedir(), '.codex', 'skills', name);
 
@@ -96,6 +97,7 @@ export class WorkbenchService {
       catch (error) { this.deliverables.lastError = error.message || String(error); }
     };
     this.assets = new AssetLedger(this);
+    this.cardFiles = new CardFileContent(this);
     config.attachProduction?.(this);
   }
 

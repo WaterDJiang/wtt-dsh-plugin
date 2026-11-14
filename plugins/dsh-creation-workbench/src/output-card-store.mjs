@@ -2,11 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { OutputDraftStore } from './output-draft-store.mjs';
 import { isActiveTaskPhase } from './pending-card-state.mjs';
 import { CARD_WIDTH, OUTPUT_CARD_SIZE, adjacentCreationPosition, creationPositionFree, creationSourceAnchor } from './creation-context.mjs';
+import { cardFormat } from './card-capabilities.mjs';
 
 const REF = /^(artifact|outline|word|material):[0-9a-f-]{36}$/;
 const typeOf = type => type === 'pptx' ? 'pptx' : ['image', 'video'].includes(type) ? type : 'text';
 const legacyId = ref => `legacy:${ref}`;
 const legacyVersion = ref => `legacy-v1:${ref}`;
+const namedNode = (node, title) => title ? { ...node, title, displayTitle: title,
+  ...(node.outputCard ? { outputCard: { ...node.outputCard, title } } : {}) } : node;
 
 export function normalizeGeneration(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('产物卡生成目标无效');
@@ -49,9 +52,17 @@ export class OutputCardStore {
       this.db.exec('ALTER TABLE output_cards ADD COLUMN initial_size_json TEXT');
     }
     this.drafts = new OutputDraftStore(store);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS card_display_names (
+      requirement_id TEXT NOT NULL REFERENCES canvas_spaces(id), node_id TEXT NOT NULL, title TEXT NOT NULL,
+      PRIMARY KEY(requirement_id,node_id))`);
   }
 
   #check() { if (this.store.closed) throw new Error('工作台已关闭'); }
+  #named(descriptor) {
+    const title = this.db.prepare('SELECT title FROM card_display_names WHERE requirement_id=? AND node_id=?')
+      .get(descriptor.card.requirementId, descriptor.node.id)?.title;
+    return title ? { ...descriptor, card: { ...descriptor.card, title }, node: namedNode(descriptor.node, title) } : descriptor;
+  }
   #raw(requirementId) {
     this.#check();
     if (!this.canvas) throw new Error('产物卡来源尚未就绪');
@@ -73,7 +84,7 @@ export class OutputCardStore {
     const node = this.#source(requirementId, ref, raw);
     const version = { id: legacyVersion(ref), cardId: legacyId(ref), number: 1, taskId: this.#originalTask(ref) || null,
       baseVersionId: null, primaryRef: ref, requestSequence: 0, legacy: true, createdAt: node.createdAt || null };
-    return { card: { id: legacyId(ref), requirementId, type: typeOf(node.artifactKind), title: node.title, nodeId: ref,
+    return { card: { id: legacyId(ref), requirementId, type: typeOf(node.artifactKind || cardFormat(node)), title: node.title, nodeId: ref,
       latestVersionId: version.id, versions: [version], legacy: true }, version, node };
   }
   #version(row) {
@@ -293,7 +304,7 @@ export class OutputCardStore {
     const raw=this.#raw(requirementId), composition=this.drafts.get(requirementId,cardId);
     if(!composition.editable)throw new Error('此草稿已提交，请打开原任务');
     const card=this.#card(this.db.prepare('SELECT * FROM output_cards WHERE id=?').get(cardId));
-    return {card,composition,node:this.#draftNode(card,composition,raw)};
+    return this.#named({card,composition,node:this.#draftNode(card,composition,raw)});
   }
 
   #draftNode(card,composition,raw){
@@ -312,7 +323,7 @@ export class OutputCardStore {
     if (!task) throw new Error('此卡没有未完成的生成任务，请刷新画布');
     const version = card.versions.find(value => value.id === card.latestVersionId);
     const node = version ? this.#node(card, version, raw, task) : this.#pendingNode(card, task, raw);
-    return { card, node, task, pendingGeneration: node.pendingGeneration };
+    return this.#named({ card, node, task, pendingGeneration: node.pendingGeneration });
   }
 
   describe({ requirementId, cardId, versionId } = {}, raw = this.#raw(requirementId)) {
@@ -328,8 +339,8 @@ export class OutputCardStore {
       version = card.versions.find(value => value.id === (versionId || card.latestVersionId));
       if (!version) throw new Error('此卡尚无成功产物或所选历史版本不存在');
     }
-    return { card, version, node: this.#node(card, version, raw), editor: this.#editor(version, raw),
-      provenanceEdges: raw.edges.filter(edge => edge.provenance && edge.target === version.primaryRef) };
+    return this.#named({ card, version, node: this.#node(card, version, raw), editor: this.#editor(version, raw),
+      provenanceEdges: raw.edges.filter(edge => edge.provenance && edge.target === version.primaryRef) });
   }
 
   project(raw) {
@@ -380,6 +391,7 @@ export class OutputCardStore {
       }
     }
     const { layoutPositions: _positions, ...board } = raw;
-    return { ...board, nodes, edges };
+    const names = new Map(this.db.prepare('SELECT node_id,title FROM card_display_names WHERE requirement_id=?').all(raw.requirementId).map(row => [row.node_id, row.title]));
+    return { ...board, nodes: nodes.map(node => namedNode(node, names.get(node.id))), edges };
   }
 }
