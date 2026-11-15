@@ -1,3 +1,5 @@
+import { CanvasReferencePickerContext, ReferencePickOverlay } from './canvas-reference-picker.jsx'
+import { sameReference, pinnedReference, referencePickReason, addPickedReferences, togglePickedReference } from './canvas-reference-picker.mjs'
 import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton, UiIcon } from './ui/controls.jsx'
 import {DeleteNodesDialog,ProjectRecycleDialog} from './canvas-recycle.jsx'
 import { TaskControlDialog } from './task-control.jsx'
@@ -10,7 +12,7 @@ import { UserError } from './user-feedback.jsx'
 import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Background, ConnectionLineType, Handle, MiniMap, NodeResizer, NodeToolbar, Position, ReactFlow, ReactFlowProvider,
-  SelectionMode, applyEdgeChanges, applyNodeChanges, getViewportForBounds, useReactFlow, useStore, useStoreApi,
+  SelectionMode, applyEdgeChanges, applyNodeChanges, getViewportForBounds, useReactFlow, useStore, useStoreApi, useUpdateNodeInternals,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './canvas.css'
@@ -138,6 +140,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   useEffect(() => { setVideoError(false) }, [data.videoPreview])
   const warning = data.delivery?.status === 'failed' || /missing|modified|changed|unavailable|缺失|变化|外改/.test(`${data.status || ''} ${data.sourceStatus || ''} ${data.projectFile?.status || ''}`)
   return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined}>
+    <ReferencePickOverlay nodeId={id} />
     <NodeResizer nodeId={id} isVisible={selected} minWidth={200} minHeight={160} maxWidth={1200} maxHeight={1200}
       color="var(--wtt-ui-accent)" handleClassName="wcc-content-resize-handle" lineClassName="wcc-content-resize-line"
       onResizeStart={() => data.onResizeStart?.()} onResizeEnd={(_event, size) => data.onResizeEnd?.(id, size)} />
@@ -360,6 +363,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
   const flowStore = useStoreApi()
+  const updateNodeInternals = useUpdateNodeInternals()
   const modelSelectionRef = useRef(modelSelection)
   modelSelectionRef.current = modelSelection
   const [watchedStatuses, setWatchedStatuses] = useState(new Map())
@@ -378,6 +382,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   if (!cache.current.compositionSaving) cache.current.compositionSaving = new Set()
   if (!cache.current.outputTracking) cache.current.outputTracking = new Map()
   const [creation, setCreation] = useState(() => cache.current.drafts.get(cache.current.activeKey) || null)
+  const [referencePick, setReferencePick] = useState(null)
+  const referencePickRef = useRef(null)
+  const referenceBoxBase = useRef(null)
+  const referenceOptionsRef = useRef(new Map())
+  const referenceDoneButton = useRef(null)
   const creationRef = useRef(creation)
   const creationIntent = useRef(0)
   const cardOpenTimer = useRef(null)
@@ -581,7 +590,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const deskVersion = selectedCard?.kind === 'outline' ? outlineVersions.find(version => version.id === selectedCard.refId) : null
   const productionTypes = dependencies?.creationTypes || ['outline', 'pptx', 'exercise', 'script'].map(id => ({ id, label: OUTPUT_LABELS[id], available: false, message: '正在检查创作能力…' }))
   const availableReferences = [
-    ...(board?.nodes || []).filter(usableCreationSource).map(creationSource).map(card => ({ ...card,
+    ...nodes.filter(node => node.type === 'content').map(node => node.data).filter(usableCreationSource).map(creationSource).map(card => ({ ...card,
       displayTitle: contentCardTitle(card),
       ...(card.importedFile ? { referenceNote: card.importedFile.extractionStatus === 'extracted'
         ? (card.importedFile.truncated ? '已提取正文节选' : '已提取正文')
@@ -673,7 +682,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const draftChanged = (key, next) => {
       if (mounted.current && creationRef.current?.key === key) { creationRef.current = next; setCreation(next) }
     }
-    const materialsChanged = () => mounted.current ? loadBoard({ preserveViewport: true }) : Promise.resolve()
+    const materialsChanged = () => mounted.current ? loadBoard({ preserveViewport: true, keepVisible: true }) : Promise.resolve()
     cache.current.onDraftChanged = draftChanged
     cache.current.onMaterialsChanged = materialsChanged
     return () => {
@@ -980,6 +989,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function openClickedCard(event, node) {
+    if (referencePickRef.current) return
     cancelCardOpen()
     if (nodeDragging.current) return
     if (!isObject(node) || event.shiftKey || event.metaKey || event.ctrlKey || event.detail > 1) return
@@ -1017,6 +1027,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function dismissOtherCardCreation(event) {
+    if (referencePickRef.current) return
     const node = event.target.closest?.('.react-flow__node')
     if (!node) return
     const context = creationRef.current
@@ -2253,6 +2264,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   const onNodesChange = useCallback(changes => {
+    if (referencePickRef.current) changes = changes.filter(change => change.type === 'dimensions')
     if (changes.some(change => change.type === 'position') && !gestureBefore.current) gestureBefore.current = layoutSnapshot()
     const next = applyNodeChanges(changes.filter(change => change.type !== 'remove'), nodesRef.current)
     nodesRef.current = next
@@ -2263,6 +2275,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }, [])
 
   function onEdgesChange(changes) {
+    if (referencePickRef.current) return
     const before = layoutSnapshot()
     const allowed = changes.filter(change => change.type !== 'remove' || !edgesRef.current.find(edge => edge.id === change.id)?.provenance)
     const next = applyEdgeChanges(allowed, edgesRef.current)
@@ -2271,9 +2284,21 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   const selectionChanged = useCallback(({ nodes: selected, edges: selectedEdges }) => {
+    if (referencePickRef.current) return
     setSelectionKey(selected.filter(isObject).map(node => node.id).sort().join('|'))
     setEdgeSelection(selectedEdges.filter(edge => !edge.provenance).map(edge => edge.id))
   }, [])
+
+  useEffect(() => {
+    if (loading || !board) return
+    // A remounted flow may retain controlled dimensions while its handle bounds
+    // were reset. Measure mounted nodes after the new canvas has committed.
+    const frame = requestAnimationFrame(() => {
+      const ids = [...(graphRef.current?.querySelectorAll('.react-flow__node') || [])].map(node => node.dataset.id)
+      if (ids.length) updateNodeInternals(ids)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [requirement.id, loading, Boolean(board), updateNodeInternals])
 
   useEffect(() => flowStore.subscribe((state, previous) => {
     const rect = state.userSelectionRect
@@ -2291,6 +2316,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         && bounds.x >= left && bounds.y >= top && bounds.x + bounds.width <= right && bounds.y + bounds.height <= bottom
       if (selected) chosen.add(node.id)
       if (!!node.selected !== selected) changes.push({ id: node.id, type: 'select', selected })
+    }
+    if (referencePickRef.current) {
+      const pick = referencePickRef.current
+      if (pick.busy || !referencePickCurrent(pick)) return
+      const candidates = [...chosen].map(id => referenceOptionsRef.current.get(id)).filter(option => option && !option.reason).map(option => option.card)
+      const result = addPickedReferences(referenceBoxBase.current || pick.references, candidates, creationRef.current)
+      updateReferencePick({ ...pick, ...result })
+      return
     }
     if (changes.length) replaceNodes(applyNodeChanges(changes, nodesRef.current))
     const edgeChanges = edgesRef.current.filter(edge => edge.selectable !== false).flatMap(edge => {
@@ -2577,8 +2610,77 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (!outcome.ok) throw outcome.error
   }
 
-  async function changeCreationReferences(cards) {
+  function updateReferencePick(value) {
+    referencePickRef.current = value
+    setReferencePick(value)
+  }
+  function referencePickCurrent(pick = referencePickRef.current) {
+    return Boolean(pick && mounted.current && activeRef.current && pick.key === creationRef.current?.key
+      && pick.scope === `${projectId}:${requirement.id}` && pick.epoch === epochRef.current && !creationRef.current.pendingTaskId)
+  }
+  function startReferencePick(restoreFocus) {
     const context = creationRef.current
+    if (!context || context.pendingTaskId || busy) return
+    cancelCardOpen(); cancelPaneInsert(); setContextMenu(null); setCreationMenu(null)
+    updateReferencePick({ key: context.key, scope: `${projectId}:${requirement.id}`, epoch: epochRef.current,
+      references: [...context.references], restoreFocus, previousTool: tool, busy: false, error: '' })
+    referenceBoxBase.current = null
+    setTool('select')
+  }
+  function finishReferencePick(pick = referencePickRef.current) {
+    if (!pick || referencePickRef.current !== pick) return
+    const current = referencePickCurrent(pick)
+    updateReferencePick(null)
+    referenceBoxBase.current = null
+    // Restore controlled selection after React Flow's temporary rectangle gesture.
+    replaceNodes(nodesRef.current.map(node => ({ ...node })))
+    replaceEdges(edgesRef.current.map(edge => ({ ...edge })))
+    if (current) {
+      setTool(pick.previousTool)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (mounted.current && creationRef.current?.key === pick.key && !referencePickRef.current) pick.restoreFocus?.()
+      }))
+    }
+  }
+  function toggleReferencePick(nodeId) {
+    const pick = referencePickRef.current, option = referenceOptionsRef.current.get(nodeId)
+    if (!referencePickCurrent(pick) || pick.busy || !option) return
+    updateReferencePick({ ...pick, ...togglePickedReference(pick.references, option.card, creationRef.current) })
+  }
+  async function confirmReferencePick() {
+    const pick = referencePickRef.current
+    if (!referencePickCurrent(pick) || pick.busy) return
+    const submitting = { ...pick, busy: true, error: '' }
+    updateReferencePick(submitting)
+    try {
+      const invalid = pick.references.find(card => referencePickReason(card, creationRef.current) && !creationRef.current.references.some(old => sameReference(old, card)))
+      if (invalid) throw new Error(referencePickReason(invalid, creationRef.current))
+      await changeCreationReferences(pick.references, { contextKey: pick.key })
+      if (referencePickRef.current === submitting) finishReferencePick(submitting)
+    } catch (cause) {
+      if (referencePickRef.current === submitting && referencePickCurrent(submitting)) updateReferencePick({ ...submitting, busy: false, error: messageOf(cause) })
+    }
+  }
+  useEffect(() => {
+    if (referencePick && (!referencePickCurrent(referencePick) || !creationVisible)) finishReferencePick(referencePick)
+  }, [referencePick, creation?.key, creation?.pendingTaskId, creationVisible, projectId, requirement.id, active])
+  useEffect(() => {
+    if (referencePick) referenceDoneButton.current?.focus({ preventScroll: true })
+  }, [Boolean(referencePick)])
+  useEffect(() => {
+    if (!referencePick) return
+    const escape = event => {
+      if (event.key !== 'Escape' || !referencePickRef.current) return
+      event.preventDefault(); event.stopPropagation()
+      if (!referencePickRef.current.busy) finishReferencePick()
+    }
+    document.addEventListener('keydown', escape, true)
+    return () => document.removeEventListener('keydown', escape, true)
+  }, [Boolean(referencePick)])
+
+  async function changeCreationReferences(cards, { contextKey } = {}) {
+    const context = creationRef.current
+    if (contextKey && context?.key !== contextKey) throw new Error('创作上下文已切换，请重新选择引用。')
     if (!context) return
     if (context.pendingTaskId) throw new Error('任务已提交，本次引用不能更换。请打开任务对话补充要求。')
     const unique = [...new Map(cards.map(card => [card.id, card])).values()]
@@ -2749,6 +2851,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}finally{if(mounted.current&&epoch===epochRef.current)setBusy('')}
   }
   function clickPane(event) {
+    if (referencePickRef.current) return
     closeCreation()
     setContextMenu(null)
     setCreationMenu(null)
@@ -2764,6 +2867,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function blankMenu(event){
+    if (referencePickRef.current) return
     if(!event.target.matches?.('.react-flow__pane')||busy||loading||operationLock.current)return
     cancelPaneInsert()
     if (tool !== 'select' && tool !== 'hand') setTool('select')
@@ -2779,6 +2883,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     openCreation(anchor,type,undefined,{explicitNew:true,blank:true,outputPosition:menu.point})
   }
   async function dropFiles(event) {
+    if (referencePickRef.current) { event.preventDefault(); setDraggingFile(false); return }
     const projectPayload=event.dataTransfer.getData(PROJECT_FILE_DRAG)
     if(projectPayload){event.preventDefault();setDraggingFile(false);try{const entry=JSON.parse(projectPayload);await addProjectReference(entry,flow.screenToFlowPosition({x:event.clientX,y:event.clientY}))}catch(cause){setError(messageOf(cause))}return}
 
@@ -2826,6 +2931,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function showContext(event, node) {
+    if (referencePickRef.current) { event.preventDefault(); return }
     cancelCardOpen()
     event.preventDefault()
     if (node && !node.selected) selectCard(node.id)
@@ -2836,6 +2942,18 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   function keyboard(event) {
+    if (referencePickRef.current) {
+      const key = event.key.toLowerCase()
+      if (key === 'escape') { event.preventDefault(); event.stopPropagation(); if (!referencePickRef.current.busy) finishReferencePick(); return }
+      if (key === 'tab') {
+        const controls = [...rootRef.current.querySelectorAll('.wcc-reference-pick-bar button,.wcc-reference-pick-card,.wcc-studio-zoom-dock button')].filter(element => !element.disabled && element.getClientRects().length)
+        const index = controls.indexOf(document.activeElement)
+        event.preventDefault(); controls[(index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus({ preventScroll: true }); return
+      }
+      if (['+', '=', '-'].includes(key)) { event.preventDefault(); if (key === '-') void flow.zoomOut(); else void flow.zoomIn(); return }
+      if (![' ', 'enter'].includes(key)) { event.preventDefault(); event.stopPropagation() }
+      return
+    }
     if (deskVisible) return
     if (event.target.closest('dialog,input,textarea,select,[contenteditable="true"],[role="textbox"],[role="separator"]') || event.nativeEvent?.isComposing) return
     cancelPaneInsert()
@@ -2858,8 +2976,18 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (key === '2') { event.preventDefault(); fitSelection() }
   }
 
+  const pickingReferences = Boolean(referencePick && referencePickCurrent(referencePick))
+  const referenceOptions = new Map()
+  if (pickingReferences) for (const node of nodes) {
+    if (node.type !== 'content' && node.type !== 'whiteboard') continue
+    const card = node.type === 'whiteboard' ? { ...node.data, id: node.id, kind: 'whiteboard', title: String(node.data.text || '').trim().slice(0, 36) || '空白图形', content: String(node.data.text || '') } : creationSource(node.data)
+    const reason = referencePickReason(card, creation) || (node.type === 'whiteboard' ? !card.content.trim() ? '此白板元素没有文字内容' : '' : !usableCreationSource(card) ? '此卡片尚无可用的已保存来源' : '')
+    referenceOptions.set(node.id, { card, reason, checked: referencePick.references.some(reference => sameReference(reference, card)), pinned: pinnedReference(card, creation) })
+  }
+  referenceOptionsRef.current = referenceOptions
+  const referencePicker = pickingReferences ? { options: referenceOptions, onToggle: toggleReferencePick, busy: referencePick.busy } : null
   const composerVisible = creationVisible && !editingNodeId && !deskVisible && !deckPreview && !assetsOpen && !documentView
-  const showSelectionActions = selectedNodes.length > 0 && !(creationVisible && selectedNodes.length === 1)
+  const showSelectionActions = !pickingReferences && selectedNodes.length > 0 && !(creationVisible && selectedNodes.length === 1)
     && !deckPreview && !assetsOpen && !deskVisible && tool === 'select' && !busy && !contextMenu
   const bounds = showSelectionActions ? selectedNodes.map(node => ({ ...absolutePosition(node, nodes), ...nodeSize(node) })) : []
   const selectionTop = Math.min(...bounds.map(node => node.y))
@@ -2889,7 +3017,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const feedbackError = board && loadError ? `${error ? error + ' ' : ''}画布刷新失败：${loadError}` : error
   return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
-  }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}`}>
+  }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
       onRemove={() => void removeElements()} />}
@@ -2911,12 +3039,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDraggingFile(false) }} onDrop={dropFiles} onDoubleClick={blankMenu}>
         {loading && <div className="wcc-loading" role="status">正在读取画布…</div>}
         {loadError && !board && <div className="wcc-load-error" role="alert"><strong>画布未能加载</strong><UserError error={loadError} announce={false} /><UiButton variant="quiet" onClick={() => void loadBoard({ initial: true })}>重新加载</UiButton></div>}
-        {board && !loading && <ReactFlow id={`wtt-flow-${panelId.replace(/:/g, '')}`}
+        {board && !loading && <CanvasReferencePickerContext.Provider key={requirement.id} value={referencePicker}><ReactFlow id={`wtt-flow-${panelId.replace(/:/g, '')}`}
           key={requirement.id}
           nodes={nodes} edges={visibleEdges} nodeTypes={NODE_TYPES}
           onlyRenderVisibleElements={nodes.length >= LARGE_CANVAS_THRESHOLD && !editingNodeId}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
           onSelectionChange={selectionChanged} onConnect={connect}
+          onSelectionStart={() => { if (referencePickRef.current) referenceBoxBase.current = [...referencePickRef.current.references] }}
+          onSelectionEnd={() => { if (referencePickRef.current) { referenceBoxBase.current = null; replaceNodes(nodesRef.current.map(node => ({ ...node }))) } }}
           connectionLineType={ConnectionLineType.Bezier}
           onNodeDragStart={beginNodeDrag} onSelectionDragStart={beginNodeDrag}
           onNodeDragStop={finishNodeDrag}
@@ -2931,11 +3061,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           // The gesture adapter owns wheel/pinch over both the pane and nodes.
           panActivationKeyCode="Space" panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomActivationKeyCode={null}
           panOnDrag={tool === 'hand' ? true : [1]} zoomOnDoubleClick={false}
-          nodesDraggable={!busy && tool === 'select'} nodesConnectable={!busy && tool === 'select'} elementsSelectable={!busy && tool === 'select'} disableKeyboardA11y={!!busy}
+          nodesDraggable={!pickingReferences && !busy && tool === 'select'} nodesConnectable={!pickingReferences && !busy && tool === 'select'} elementsSelectable={!busy && tool === 'select'} disableKeyboardA11y={!!busy || pickingReferences}
           deleteKeyCode={null}
           onPaneClick={clickPane}
           onNodeClick={openClickedCard}
-          onNodeDoubleClick={(_event, node) => { if (node.type === 'content') openCardDetails(node.data) }}
+          onNodeDoubleClick={(_event, node) => { if (!referencePickRef.current && node.type === 'content') openCardDetails(node.data) }}
           onPaneContextMenu={event => showContext(event)} onNodeContextMenu={showContext}
           onSelectionContextMenu={(event, selection) => showContext(event, selection[0])}
           ariaLabelConfig={{
@@ -2946,8 +3076,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         >
           <Background gap={24} size={1} color="var(--wtt-ui-grid, #d4d9e3)" />
           {showMap && <MiniMap pannable zoomable position="bottom-right" nodeColor={node => node.type === 'whiteboard' ? 'var(--wtt-ui-warning, #e6ce8d)' : 'var(--wtt-ui-edge, #a6b6d5)'} />}
-        </ReactFlow>}
-        <CanvasChrome tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
+        </ReactFlow></CanvasReferencePickerContext.Provider>}
+        {pickingReferences && <div className="wcc-reference-pick-bar" role="region" aria-label="选择画布引用">
+          <strong aria-live="polite">选择引用 · {referencePick.references.length}/24</strong>
+          <UiButton variant="quiet" disabled={referencePick.busy} onClick={() => finishReferencePick()}>取消</UiButton>
+          <UiButton ref={referenceDoneButton} variant="primary" disabled={referencePick.busy} onClick={() => void confirmReferencePick()}>{referencePick.busy ? '正在添加…' : '完成'}</UiButton>
+          {referencePick.error && <UserError error={referencePick.error} />}
+        </div>}
+        <CanvasChrome pickingReferences={pickingReferences} tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
           onZoom100={zoom100} onFitAll={fitAllCards} onFitSelected={fitSelection}
           showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => { setMaterialError(''); setMaterialDialog(EMPTY_MATERIAL) }}
           onUndo={() => undo()} onRedo={() => undo(true)} canUndo={historyRef.current.canUndo} canRedo={historyRef.current.canRedo}
@@ -2967,11 +3103,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         {board && !loading && !loadError && <div className="wcc-canvas-hint">V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 空白双击新建 · 卡片双击编辑</div>}
         {draggingFile && <div className="wcc-drop-overlay">松开以添加到画布</div>}
         {projectBar}
-    <CanvasSearch width={canvasSize.width} panelOpen={false} hidden={deskVisible || Boolean(deckPreview) || assetsOpen || Boolean(documentView)}
+    <CanvasSearch width={canvasSize.width} panelOpen={false} hidden={pickingReferences || deskVisible || Boolean(deckPreview) || assetsOpen || Boolean(documentView)}
       query={searchQuery} onQuery={setSearchQuery} nodes={nodes} allRelations={allRelations} onRelations={() => setAllRelations(value => !value)}
       onOpen={() => setSidebar(false)} onSelect={node => { selectCard(node.id); void flow.fitView({ nodes: [node], padding: .4, maxZoom: 1, duration: 160 }) }} />
     <CanvasViewportLayer follow={Boolean(active && composerVisible && creation && !draggingCard)}>{view =>
-    <CardComposer suspended={draggingCard} visible={composerVisible} position={composerPosition(view)} context={creation ? { ...creation,
+    <CardComposer onPickCanvasReferences={startReferencePick} suspended={draggingCard} visible={composerVisible && !pickingReferences} position={composerPosition(view)} context={creation ? { ...creation,
       pendingGeneration: publishedExecution || nativePendingState(creation.pendingGeneration, effectiveStatuses.get(creation.pendingGeneration?.sessionId || creation.sessionId)) } : creation}
       references={creationReferences} availableReferences={availableReferences}
       creationTypes={creation ? [...creationMenuItems(creation.anchor).map(item => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...['outline', 'exercise', 'script'].map(id => ({ id, label: '文本', available: true })), ...['word', 'excerpt', 'material'].map(id => ({ id, label: OUTPUT_LABELS[id], available: true }))] : productionTypes}

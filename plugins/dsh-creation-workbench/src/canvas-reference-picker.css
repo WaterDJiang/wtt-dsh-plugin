@@ -1,0 +1,17 @@
+.wtt-course-canvas .wcc-reference-pick-bar{position:absolute;z-index:35;top:var(--wtt-space-3);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:var(--wtt-space-2);max-width:calc(100% - var(--wtt-space-4));box-sizing:border-box;padding:var(--wtt-space-2) var(--wtt-space-3);border-radius:var(--wtt-radius-panel);background:var(--wtt-ui-surface);box-shadow:0 4px 24px color-mix(in srgb,var(--wtt-ui-ink) 18%,transparent);color:var(--wtt-ui-ink);flex-wrap:wrap}
+.wcc-reference-pick-bar strong{margin-right:auto;white-space:nowrap;font-size:var(--wtt-text-sm)}
+.wcc-reference-pick-bar [role=alert]{flex-basis:100%;min-width:0;overflow-wrap:anywhere}
+.wtt-course-canvas .wcc-reference-pick-card{position:absolute;inset:0;z-index:20;display:block;width:100%;height:100%;padding:0;border:2px solid transparent;border-radius:inherit;background:transparent;cursor:pointer;color:var(--wtt-ui-accent);box-sizing:border-box;text-align:left}
+.wtt-course-canvas .wcc-reference-pick-card.is-checked{border-color:var(--wtt-ui-accent);box-shadow:inset 0 0 0 2px var(--wtt-ui-surface)}
+.wtt-course-canvas .wcc-reference-pick-card:focus-visible{outline:3px solid var(--wtt-ui-accent);outline-offset:4px}
+.wcc-reference-pick-check{position:absolute;right:var(--wtt-space-2);top:var(--wtt-space-2);display:grid;place-items:center;width:var(--wtt-control-compact-h);height:var(--wtt-control-compact-h);border:2px solid var(--wtt-ui-accent);border-radius:var(--wtt-radius-control);background:var(--wtt-ui-surface);font-weight:700;font-size:var(--wtt-text-sm)}
+.is-checked>.wcc-reference-pick-check{background:var(--wtt-ui-accent-fill);color:var(--wtt-ui-on-accent)}
+.wcc-reference-pick-reason{position:absolute;left:var(--wtt-space-2);bottom:var(--wtt-space-2);max-width:calc(100% - var(--wtt-space-4));padding:var(--wtt-space-1) var(--wtt-space-2);background:var(--wtt-ui-surface);border-radius:var(--wtt-radius-control);color:var(--wtt-ui-muted);font-size:var(--wtt-text-sm);overflow-wrap:anywhere}
+.wtt-course-canvas.is-picking-references .wcc-studio-tools,.wtt-course-canvas.is-picking-references .wcc-studio-status-dock,.wtt-course-canvas.is-picking-references .wcc-skill-inbox{display:none}
+.wtt-course-canvas.is-picking-references .react-flow__nodesselection{display:none}
+@media(max-width:600px){.wtt-course-canvas .wcc-reference-pick-bar{left:var(--wtt-space-2);right:var(--wtt-space-2);transform:none;max-width:none}.wtt-course-canvas .wcc-reference-pick-bar strong{white-space:normal}.wtt-course-canvas.is-picking-references .wcc-studio-navigation-hint{display:none}}
+
+.wtt-course-canvas.is-picking-references :is(.react-flow__resize-control,.react-flow__handle,.react-flow__node-toolbar){visibility:hidden;pointer-events:none}
+
+.wtt-course-canvas.is-picking-references :is(.wcc-card.is-selected,.wcc-element.is-selected){box-shadow:none}
+.wtt-course-canvas :is(.wcc-card,.wcc-element) button.wcc-reference-pick-card:is(:hover,:focus,:active){background:transparent}

@@ -1,3 +1,4 @@
+import { uniqueCards, sameReference, unavailableReason, pinnedReference } from './canvas-reference-picker.mjs'
 import { UiButton } from './ui/controls.jsx'
 import { skillLabel, skillSearchText } from './skill-presentation.mjs'
 import { UserError } from './user-feedback.jsx'
@@ -22,25 +23,6 @@ const DEFAULT_ACCEPTED_FILES = '.txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png
 
 
 
-
-function uniqueCards(cards) {
-  const result = new Map()
-  for (const card of cards) if (card?.id && !result.has(card.id)) result.set(card.id, card)
-  return [...result.values()]
-}
-
-function sameReference(reference, candidate) {
-  if (!reference?.id || !candidate?.id) return false
-  if (reference.id === candidate.id) return true
-  const referenceElement = reference.whiteboardSource?.elementId || (reference.kind === 'whiteboard' ? reference.id : undefined)
-  const candidateElement = candidate.whiteboardSource?.elementId || (candidate.kind === 'whiteboard' ? candidate.id : undefined)
-  if (!referenceElement || referenceElement !== candidateElement) return false
-  const referenceHash = reference.whiteboardSource?.contentHash
-  const candidateHash = candidate.whiteboardSource?.contentHash
-  if (referenceHash && candidateHash) return referenceHash === candidateHash
-  const normalize = card => String(card.content ?? card.text ?? '').replace(/\r\n?/g, '\n')
-  return normalize(reference) === normalize(candidate)
-}
 
 function referenceErrorMessage(error) { return error?.rpcError?.message || error?.message || String(error) }
 
@@ -75,11 +57,6 @@ function referenceFormat(card) {
   const ext=name.match(/\.([a-z0-9]{1,8})(?:[?#].*)?$/i)?.[1]?.toLowerCase();
   if(ext&&/^(txt|md|markdown|pdf|docx?|pptx?|csv|xlsx?|jsonl?|png|jpe?g|webp|gif|svg|mp4|webm|mov)$/.test(ext))return ext.toUpperCase();
   return {requirement:'文本',whiteboard:'文本',material:'文本',excerpt:'摘录',outline:'MD',word:'DOCX',image:'图片',video:'视频'}[card.kind]||'文件';
-}
-
-function unavailableReason(card) {
-  if (card?.disabled) return card.reason || '该资料暂不可引用'
-  return { missing: '文件已缺失', changed: '文件已在外部修改', modified: '文件已在外部修改', unavailable: '文件暂不可用' }[card?.status] || (card?.unavailable ? '原引用当前不可用' : '')
 }
 
 function selectionLabel(context) {
@@ -279,7 +256,7 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [],
 
 export function CardComposer({
   visible = true, suspended = false, position = { x: 0, y: 0 }, context, references: referenceItems = [], availableReferences = [], creationTypes = [],
-  instruction = '', onInstructionChange, onReferencesChange, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onClose, onSend, onAction,
+  instruction = '', onInstructionChange, onReferencesChange, onPickCanvasReferences, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onClose, onSend, onAction,
   searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewImageHref,
   busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onTaskControl, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
@@ -297,16 +274,13 @@ export function CardComposer({
   const [previewOpen,setPreviewOpen] = useState(false)
   const fileInput = useRef(null)
   const boardSourceButton = useRef(null)
-  const boardSearch = useRef(null)
   const mounted = useRef(true)
   const referenceOperations = useRef(new Map())
   const currentContextKey = useRef(context?.key)
   currentContextKey.current = context?.key
   const [referencesOpen, setReferencesOpen] = useState(false)
-  const [referenceSource, setReferenceSource] = useState(null)
   const [referenceWork, setReferenceWork] = useState(() => new Map())
   const [referenceErrors, setReferenceErrors] = useState(() => new Map())
-  const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState(false)
   const [skillSettingsOpen, setSkillSettingsOpen] = useState(false)
   const [conversationOpen, setConversationOpen] = useState(false)
@@ -374,7 +348,6 @@ export function CardComposer({
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || (!mediaReason && !mediaPending && !mediaLoading))
   const reason = recoveringMedia ? '' : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || '该创作能力暂不可用。' : ''))
   const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
-  const candidates = uniqueCards(availableReferences).filter(card => [cardTitle(card), card.title, card.defaultOutcome?.name, KIND_LABELS[card.kind]].join(' ').toLowerCase().includes(search.toLowerCase()))
   const projectReferences = new Map(availableReferences.filter(card => card.projectFile).map(card => [card.id, card.projectFile]))
   const referenceOptions = uniqueCards([...references, ...availableReferences])
     .filter(card => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith('video/')))
@@ -424,7 +397,7 @@ export function CardComposer({
     return () => cancelAnimationFrame(frame)
   }, [visible, context?.key, context?.focusRequest])
 
-  useEffect(() => { setPreviewOpen(false); setReferencesOpen(false); setReferenceSource(null); setSearch(''); setCollapsed(false); setSkillSettingsOpen(false) }, [context?.key])
+  useEffect(() => { setPreviewOpen(false); setReferencesOpen(false); setCollapsed(false); setSkillSettingsOpen(false) }, [context?.key])
   useEffect(() => { setConversationOpen(false); setRevisionEditing(false) }, [context?.key, context?.sessionId])
   useEffect(() => {
     if (scrollBody.current) scrollBody.current.scrollTop = 0
@@ -502,9 +475,9 @@ export function CardComposer({
 
   useEffect(() => {
     if (!referencesOpen) return
-    const frame = requestAnimationFrame(() => (referenceSource === 'board' ? boardSearch : boardSourceButton).current?.focus({ preventScroll: true }))
+    const frame = requestAnimationFrame(() => boardSourceButton.current?.focus({ preventScroll: true }))
     return () => cancelAnimationFrame(frame)
-  }, [referencesOpen, referenceSource])
+  }, [referencesOpen])
 
   useEffect(() => {
     if (!referencesOpen) return
@@ -515,7 +488,7 @@ export function CardComposer({
     return () => document.removeEventListener('pointerdown', dismiss, true)
   }, [referencesOpen])
 
-  function isPinned(card) { return inputLocked || !revising && !context?.blank && Boolean(card?.pinned || sameReference(card, context?.anchor)) }
+  function isPinned(card) { return pinnedReference(card, context) }
   async function runReferenceOperation(operation, kind = 'selection', count = 0) {
     const key = context?.key
     if (busy || referenceOperations.current.has(key)) return false
@@ -565,10 +538,6 @@ export function CardComposer({
     if (isPinned(card)) return
     changeReferences(references.filter(reference => !sameReference(reference, card)))
   }
-  function toggleReference(card) {
-    if (referencesBusy || isPinned(card)) return
-    changeReferences(isChosen(card) ? references.filter(reference => !sameReference(reference, card)) : [...references, card])
-  }
   async function importFiles(event) {
     const files = [...new Set(Array.from(event.currentTarget.files || []))]
     event.currentTarget.value = ''
@@ -580,7 +549,6 @@ export function CardComposer({
     }, 'import', files.length)
     if (succeeded && mounted.current && currentContextKey.current === key) {
       setReferencesOpen(false)
-      setReferenceSource(null)
       requestAnimationFrame(() => addButton.current?.focus({ preventScroll: true }))
     }
   }
@@ -665,22 +633,14 @@ export function CardComposer({
           <span className="wcc-reference-format">{referenceFormat(card)}</span><UiButton variant="custom" className="wcc-reference-name" type="button" aria-label={`查看引用 ${cardTitle(card)}`} aria-expanded={previewOpen} aria-controls={`${id}-reference-preview`} onClick={event=>{previewTrigger.current=event.currentTarget;setPreviewOpen(true);setReferencesOpen(false);const detail=referenceDetails.current.get(card.id);if(detail)detail.open=true}}>{cardTitle(card)}</UiButton>
           {isPinned(card) ? <span className="wcc-creation-reference-lock" title="已关联到来源卡片" role="img" aria-label="已关联到来源卡片"><CreationIcon type="lock" size={11} /></span> : <UiButton variant="custom" type="button" className="wcc-reference-remove" disabled={referencesBusy} aria-label={`移除引用 ${cardTitle(card)}`} onClick={() => removeReference(card)}><CreationIcon type="close" size={12} /></UiButton>}
         </span>)}</div>
-        <UiButton variant="ghost" size="compact" ref={addButton} className="wcc-creation-add-reference" aria-label="添加引用资料" aria-expanded={referencesOpen} aria-controls={`${id}-references`} disabled={referencesBusy} onClick={() => { setReferencesOpen(value => !value); setReferenceSource(null);setPreviewOpen(false) }}><CreationIcon type="plus" size={14} />加引用</UiButton>
+        <UiButton variant="ghost" size="compact" ref={addButton} className="wcc-creation-add-reference" aria-label="添加引用资料" aria-expanded={referencesOpen} aria-controls={`${id}-references`} disabled={referencesBusy} onClick={() => { setReferencesOpen(value => !value); setPreviewOpen(false) }}><CreationIcon type="plus" size={14} />加引用</UiButton>
         <input ref={fileInput} type="file" hidden multiple accept={acceptedFiles || undefined} aria-label="选择电脑素材文件" onChange={event => void importFiles(event)} />
         <div ref={picker} id={`${id}-references`} hidden={!referencesOpen} className="wcc-creation-reference-picker" aria-label="选择引用资料">
-          <div className="wcc-creation-reference-sources" hidden={referenceSource === 'board'}>
-            <UiButton variant="custom" ref={boardSourceButton} type="button" disabled={referencesBusy} onClick={() => { setReferenceSource('board'); setSearch('') }}><CreationIcon type="whiteboard" size={16} /><span>从画布选择</span><span aria-hidden="true">›</span></UiButton>
+          <div className="wcc-creation-reference-sources">
+            <UiButton variant="custom" ref={boardSourceButton} type="button" disabled={referencesBusy || !onPickCanvasReferences} onClick={() => { setReferencesOpen(false); onPickCanvasReferences?.(() => addButton.current?.focus({ preventScroll: true })) }}><CreationIcon type="whiteboard" size={16} /><span>从画布选择</span><span aria-hidden="true">›</span></UiButton>
             <UiButton variant="custom" type="button" disabled={referencesBusy || !onImportFiles} title={!onImportFiles ? '电脑素材导入尚未就绪' : '添加本机资料'} onClick={() => fileInput.current?.click()}><CreationIcon type="computer" size={16} /><span>从电脑添加</span><span aria-hidden="true">›</span></UiButton>
           </div>
-          <div className="wcc-creation-board-picker" hidden={referenceSource !== 'board'}>
-          <div className="wcc-creation-reference-picker-heading"><UiButton variant="custom" type="button" aria-label="返回引用来源" disabled={referencesBusy} onClick={() => setReferenceSource(null)}>‹</UiButton><span>从画布选择</span></div>
-          <input ref={boardSearch} aria-label="搜索引用资料" value={search} disabled={referencesBusy} onChange={event => setSearch(event.target.value)} placeholder="搜索当前画布内的资料" spellCheck={false} />
-          <div className="wcc-creation-reference-options">{candidates.map(card => {
-            const unavailable = unavailableReason(card)
-            return <label key={card.id} title={cardTitle(card)}><input type="checkbox" checked={isChosen(card)} disabled={referencesBusy || isPinned(card) || Boolean(unavailable && !isChosen(card))} onChange={() => toggleReference(card)} /><CreationIcon type={card.kind} size={14} /><span><strong>{cardTitle(card)}</strong><small>{unavailable || card.referenceNote || (isPinned(card) ? '来源卡片 · 保留引用' : KIND_LABELS[card.kind] || '资料')}</small></span></label>
-          })}{!candidates.length && <p>{search ? '没有匹配的引用资料。' : '当前画布没有可添加的资料。'}</p>}</div>
-          <UiButton variant="custom" type="button" className="wcc-creation-reference-done" onClick={() => { setReferencesOpen(false); addButton.current?.focus() }}>完成选择</UiButton>
-          </div>
+
         </div>
         {referencePending && <p className="wcc-creation-reference-pending" role="status">{activeReferenceWork.kind === 'import' ? `正在添加 ${activeReferenceWork.count} 份电脑资料…` : activeReferenceWork.kind === 'media' ? `正在导入 ${activeReferenceWork.count} 份${KIND_LABELS[outputType]}文件…` : '正在更新引用…'}</p>}
         {!!references.length && <div className="wcc-creation-reference-preview" id={`${id}-reference-preview`} hidden={!previewOpen}><div>{references.map(card => <details key={card.id} ref={element=>element?referenceDetails.current.set(card.id,element):referenceDetails.current.delete(card.id)}>

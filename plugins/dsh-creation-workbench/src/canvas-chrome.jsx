@@ -93,7 +93,7 @@ export function CanvasChrome({
   tool = 'select', onTool, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected, onArrange, canArrange,
   onToggleMap, showMap = false, onAddMaterial, onAddElement, onUndo, onRedo, canUndo, canRedo,
   onInspect, onAI, onTasks, onAssets, taskCount = 0, runningCount = 0, pendingCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
-  hasSelection = selectedCount > 0, busy = false,
+  hasSelection = selectedCount > 0, busy = false, pickingReferences = false,
 }) {
   const status = {
     saved: ['已保存', 'check'], saving: ['保存中', 'loading'],
@@ -138,7 +138,7 @@ export function CanvasChrome({
       <ToolButton icon="fit" label="查看全部卡片" onClick={onFitAll} />
       <ToolButton icon="focus" label="定位所选卡片" onClick={onFitSelected} disabled={!hasSelection} />
       <ToolButton icon="map" label="显示小地图" active={showMap} onClick={onToggleMap} />
-      <ToolButton icon="arrange" label="快速排版" onClick={onArrange} disabled={!canArrange || controlsDisabled}><span>排版</span></ToolButton>
+      <ToolButton icon="arrange" label="快速排版" onClick={onArrange} disabled={pickingReferences || !canArrange || controlsDisabled}><span>排版</span></ToolButton>
     </div>
 
     <div className="wcc-studio-navigation-hint" aria-hidden="true">双指滑动／滚轮平移<span>·</span>捏合／＋－缩放</div>

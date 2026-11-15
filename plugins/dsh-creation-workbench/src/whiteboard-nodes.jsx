@@ -1,3 +1,4 @@
+import { ReferencePickOverlay } from './canvas-reference-picker.jsx'
 import { UiButton } from './ui/controls.jsx'
 import React, { memo, useEffect, useRef, useState } from 'react'
 import { Handle, NodeResizer, Position } from '@xyflow/react'
@@ -83,6 +84,7 @@ export const WhiteboardNode = memo(function WhiteboardNode({ id, data, selected,
     style={{ '--wcc-element-paper': colour.paper, '--wcc-element-line': colour.line }}
     onDoubleClick={beginEdit}
   >
+    <ReferencePickOverlay nodeId={id} />
     <NodeResizer nodeId={id} isVisible={selected && !editing} minWidth={100} minHeight={60} maxWidth={1200} maxHeight={1200}
       color="var(--wtt-ui-accent, #3559c7)" handleClassName="wcc-element-resize-handle" lineClassName="wcc-element-resize-line"
       onResizeStart={() => data.onResizeStart?.(id)}

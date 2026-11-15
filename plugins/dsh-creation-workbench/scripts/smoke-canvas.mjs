@@ -1,3 +1,4 @@
+import { seedReferenceSelection, checkReferenceSelection } from './canvas-reference-smoke.mjs';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -13,7 +14,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -402,6 +403,7 @@ try {
   const fixture = await seed(workspace);
   const selectionCases = ['all', 'selection'].includes(scenario) ? await seedSelection(workspace) : null;
   const sendCases = ['all', 'send'].includes(scenario) ? await seedSend(workspace) : null;
+  const referenceCase = ['all', 'references'].includes(scenario) ? await seedReferenceSelection(workspace, run) : null;
   const env = { ...process.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
     PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`, npm_config_offline: 'true',
     npm_config_store_dir: path.join(repo, '.runtime/pnpm-store') };
@@ -413,7 +415,7 @@ try {
   const login = await loginUrl(host);
   browser = await chromium.launch({ executablePath, headless: true });
   const page = await browser.newPage({ viewport: { width: 1320, height: 940 } });
-  page.setDefaultTimeout(7000);
+  page.setDefaultTimeout(12000);
   const errors = [], consoleMessages = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (['error', 'warning'].includes(message.type())) consoleMessages.push(message.text()); });
@@ -443,6 +445,7 @@ try {
       console.log('PASS 完整框选、反向、分组、缩放、大卡及边缘停留');
     }
     if (sendCases) await checkSend(page, canvas, sendCases, api);
+    if (referenceCase) await checkReferenceSelection(page, canvas, referenceCase, api);
     assert.deepEqual(errors, [], '页面不应抛出运行错误');
     assert.equal(consoleMessages.filter(message => message.includes('500')).length, sendCases ? 1 : 0, '仅允许合成刷新故障的一条500资源日志');
     assert.deepEqual(consoleMessages.filter(message => !message.includes('500')), [], '不应出现其他控制台错误或警告');
