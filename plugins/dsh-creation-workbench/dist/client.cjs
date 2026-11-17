@@ -46579,7 +46579,6 @@ function attachCanvasGestures(root2, options) {
 
 // src/canvas.jsx
 var LARGE_CANVAS_THRESHOLD = 80;
-var isCanvasOverview = (state) => state.nodes.length >= LARGE_CANVAS_THRESHOLD && state.transform[2] < 0.4;
 var LABELS2 = { requirement: "\u80CC\u666F", material: "\u7D20\u6750", excerpt: "\u6458\u5F55", outline: "\u8BFE\u7A0B\u5927\u7EB2", word: "Word \u6587\u6863", whiteboard: "\u767D\u677F", artifact: "\u6210\u679C\u6587\u4EF6", generation: "\u521B\u4F5C\u4EFB\u52A1" };
 var OUTPUT_LABELS = { text: "\u6587\u672C", image: "\u56FE\u7247", video: "\u89C6\u9891", outline: "\u8BFE\u7A0B\u5927\u7EB2", pptx: "PPT", exercise: "\u8BFE\u5802\u7EC3\u4E60", script: "\u8BB2\u5E08\u9010\u5B57\u7A3F", storyboard: "PPT \u5206\u955C", support: "\u5236\u4F5C\u8D44\u6599", material: "\u7D20\u6750\u5361", excerpt: "\u6458\u5F55\u5361", word: "Word \u6587\u6863" };
 var EMPTY_MATERIAL = { title: "", content: "", sourcePath: "" };
@@ -46629,7 +46628,6 @@ function stateLabel(card) {
   return "\u80CC\u666F\u8D44\u6599";
 }
 var ContentCard = (0, import_react52.memo)(function ContentCard2({ id: id2, data, selected: selected2, isConnectable }) {
-  const overview = useStore(isCanvasOverview);
   const [videoError, setVideoError] = (0, import_react52.useState)(false);
   const [openMenu, setOpenMenu] = (0, import_react52.useState)(false);
   const [openApps, setOpenApps] = (0, import_react52.useState)(null);
@@ -46784,7 +46782,7 @@ var ContentCard = (0, import_react52.memo)(function ContentCard2({ id: id2, data
     /* @__PURE__ */ import_react52.default.createElement("span", { className: "wcc-generation-indicator", "aria-hidden": "true" }),
     /* @__PURE__ */ import_react52.default.createElement("strong", null, pending.phase === "idle" && data.slideProject && !fileDeck ? "\u5DE5\u7A0B\u8349\u7A3F\u5F85\u4FDD\u5B58" : pending.phase === "generating" && data.kind !== "generation" && !pending.published ? "\u65B0\u7248\u751F\u6210\u4E2D" : pendingLabel(pending)),
     /* @__PURE__ */ import_react52.default.createElement("span", null, data.composition ? "\u586B\u5199\u8981\u6C42 \u2192" : pendingContinueAllowed(pending) ? "\u7EE7\u7EED\u4EFB\u52A1 \u2192" : "\u67E5\u770B\u4EFB\u52A1 \u2192")
-  ), textDraft || overview && !selected2 ? null : fileDeck ? /* @__PURE__ */ import_react52.default.createElement(OutputPreview, { compact: true, type: "pptx", title: fileDeck.name, status: fileDeck.status, artifactId: fileDeck.artifactId, hash: fileDeck.hash, loadPreview: data.loadDeckPreview, getPageHref: data.getDeckPageHref, onOpenDeck: () => data.onOpenOutcome?.(fileDeck.sourceRef) }) : data.kind === "generation" && data.slideProject ? /* @__PURE__ */ import_react52.default.createElement(SlideDraftCover, { project: data.slideProject, title: data.title, loadCover: data.loadSlideCover, onOpen: data.onOpenDeck, running: pending?.phase === "generating" }) : data.kind === "generation" ? /* @__PURE__ */ import_react52.default.createElement("p", { className: "wcc-card-generation-message" }, pending?.error || (pending?.nativeLabel ? "\u5728\u539F\u4EFB\u52A1\u7684\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u4E2D\u7EE7\u7EED\u3002" : pending?.message) || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u5C06\u5728\u8FD9\u91CC\u663E\u793A\u3002") : data.outputCard ? /* @__PURE__ */ import_react52.default.createElement(
+  ), textDraft ? null : fileDeck ? /* @__PURE__ */ import_react52.default.createElement(OutputPreview, { compact: true, type: "pptx", title: fileDeck.name, status: fileDeck.status, artifactId: fileDeck.artifactId, hash: fileDeck.hash, loadPreview: data.loadDeckPreview, getPageHref: data.getDeckPageHref, onOpenDeck: () => data.onOpenOutcome?.(fileDeck.sourceRef) }) : data.kind === "generation" && data.slideProject ? /* @__PURE__ */ import_react52.default.createElement(SlideDraftCover, { project: data.slideProject, title: data.title, loadCover: data.loadSlideCover, onOpen: data.onOpenDeck, running: pending?.phase === "generating" }) : data.kind === "generation" ? /* @__PURE__ */ import_react52.default.createElement("p", { className: "wcc-card-generation-message" }, pending?.error || (pending?.nativeLabel ? "\u5728\u539F\u4EFB\u52A1\u7684\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u4E2D\u7EE7\u7EED\u3002" : pending?.message) || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u5C06\u5728\u8FD9\u91CC\u663E\u793A\u3002") : data.outputCard ? /* @__PURE__ */ import_react52.default.createElement(
     OutputPreview,
     {
       compact: true,

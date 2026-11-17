@@ -45,7 +45,6 @@ import { cardCapabilities, cardTextDraftKey, cardDisplayTitle, cardContentAccept
 import { VersionSelect } from './version-select.jsx'
 
 const LARGE_CANVAS_THRESHOLD = 80
-const isCanvasOverview = state => state.nodes.length >= LARGE_CANVAS_THRESHOLD && state.transform[2] < 0.4
 const LABELS = { requirement: '背景', material: '素材', excerpt: '摘录', outline: '课程大纲', word: 'Word 文档', whiteboard: '白板', artifact: '成果文件', generation: '创作任务' }
 const OUTPUT_LABELS = { text: '文本', image: '图片', video: '视频', outline: '课程大纲', pptx: 'PPT', exercise: '课堂练习', script: '讲师逐字稿', storyboard: 'PPT 分镜', support: '制作资料', material: '素材卡', excerpt: '摘录卡', word: 'Word 文档' }
 const EMPTY_MATERIAL = { title: '', content: '', sourcePath: '' }
@@ -97,7 +96,6 @@ function stateLabel(card) {
 
 
 export const ContentCard = memo(function ContentCard({ id, data, selected, isConnectable }) {
-  const overview = useStore(isCanvasOverview)
   const [videoError, setVideoError] = useState(false)
   const [openMenu, setOpenMenu] = useState(false)
   const [openApps, setOpenApps] = useState(null)
@@ -198,7 +196,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenPending?.() }} title={pending.error || pending.message}>
         <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' && !pending.published ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : pendingContinueAllowed(pending) ? '继续任务 →' : '查看任务 →'}</span>
       </UiButton>}
-      {textDraft || overview && !selected ? null : fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
+      {textDraft ? null : fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
         extracted={data.extracted !== false} mime={data.generatedFile?.mime || data.importedFile?.mime} src={data.videoPreview || data.imagePreview}
         status={data.status || 'ready'} downloadHref={data.downloadHref} artifactId={data.artifactKind === 'pptx' ? data.refId : undefined}
         hash={data.sourceHash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={data.onOpenDeck} onOpenMedia={data.onOpenDetails} />

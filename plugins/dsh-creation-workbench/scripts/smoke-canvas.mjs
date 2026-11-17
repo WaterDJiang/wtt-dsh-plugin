@@ -1,3 +1,4 @@
+import { seedCanvasOverview, checkCanvasOverview } from './canvas-overview-smoke.mjs';
 import { seedReadPerformance, checkReadPerformance } from './canvas-read-perf.mjs';
 import { seedCanvasReads, checkCanvasReads } from './canvas-read-smoke.mjs';
 import { seedReferenceSelection, checkReferenceSelection } from './canvas-reference-smoke.mjs';
@@ -16,7 +17,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -405,6 +406,7 @@ try {
   const fixture = await seed(workspace);
   const selectionCases = ['all', 'selection'].includes(scenario) ? await seedSelection(workspace) : null;
   const sendCases = ['all', 'send'].includes(scenario) ? await seedSend(workspace) : null;
+  const overviewCases = (scenario === 'overview' || scenario === 'all' && process.env.WTT_OVERVIEW_ALL === '1') ? await seedCanvasOverview(workspace, run) : null;
   const referenceCase = ['all', 'references'].includes(scenario) ? await seedReferenceSelection(workspace, run) : null;
   const readCases = ['all', 'reads'].includes(scenario) ? await seedCanvasReads(workspace) : null;
   const readPerfCases = (scenario === 'readperf' || scenario === 'all' && process.env.WTT_READ_PERF === '1') ? seedReadPerformance(workspace) : null;
@@ -449,6 +451,7 @@ try {
       console.log('PASS 完整框选、反向、分组、缩放、大卡及边缘停留');
     }
     if (sendCases) await checkSend(page, canvas, sendCases, api);
+    if (overviewCases) await checkCanvasOverview(page, canvas, overviewCases);
     if (referenceCase) await checkReferenceSelection(page, canvas, referenceCase, api);
     if (readCases) await checkCanvasReads(page, canvas, readCases, api);
     if (readPerfCases) await checkReadPerformance(page, canvas, readPerfCases, api);
