@@ -9,7 +9,7 @@ import { SvgSourceView } from './svg-source-view.jsx'
 import {SavedPptPreview} from './saved-ppt-preview.jsx'
 import { OutcomeViewer } from './outcome-viewer.jsx'
 import { UserError } from './user-feedback.jsx'
-import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Background, ConnectionLineType, Handle, MiniMap, NodeResizer, NodeToolbar, Position, ReactFlow, ReactFlowProvider,
   SelectionMode, applyEdgeChanges, applyNodeChanges, getViewportForBounds, useReactFlow, useStore, useStoreApi, useUpdateNodeInternals,
@@ -419,6 +419,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const canvasSizeRef = useRef(canvasSize)
   canvasSizeRef.current = canvasSize
   const [board, setBoard] = useState(null)
+  const hasLoadedBoard = Boolean(board && board.requirementId === requirement.id)
   const [nodes, setNodes] = useState([])
   const [edges, setEdges] = useState([])
   const [loading, setLoading] = useState(true)
@@ -3015,6 +3016,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   ]
 
   const feedbackError = board && loadError ? `${error ? error + ' ' : ''}画布刷新失败：${loadError}` : error
+  const graphInputBlocked = Boolean(((dock.mobile || editorFullscreen) && dockOpen) || (loading && hasLoadedBoard))
+  useLayoutEffect(() => {
+    // Set the DOM property directly: supported DSH renderers may omit JSX inert.
+    if (graphRef.current) graphRef.current.inert = graphInputBlocked
+  }, [graphInputBlocked])
+
   return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
@@ -3034,12 +3041,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     <input ref={contentPicker} type="file" hidden aria-label="上传卡片内容" onChange={uploadCardFile}/>
     {renameCard && <CardNameDialog title={cardDisplayTitle(renameCard)} busy={!!busy} error={renameError} onSave={saveCardName} onClose={() => { if (!busy) setRenameCard(null) }}/>}
     <div className="wcc-workspace">
-    <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} inert={(dock.mobile||editorFullscreen)&&dockOpen} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy} onDragOver={event => {
+    <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy || loading} onDragOver={event => {
         if ([...event.dataTransfer.types].some(type=>type==='Files'||type===PROJECT_FILE_DRAG)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDraggingFile(true) }
       }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDraggingFile(false) }} onDrop={dropFiles} onDoubleClick={blankMenu}>
-        {loading && <div className="wcc-loading" role="status">正在读取画布…</div>}
+        {loading && !hasLoadedBoard && <div className="wcc-loading" role="status">正在读取画布…</div>}
         {loadError && !board && <div className="wcc-load-error" role="alert"><strong>画布未能加载</strong><UserError error={loadError} announce={false} /><UiButton variant="quiet" onClick={() => void loadBoard({ initial: true })}>重新加载</UiButton></div>}
-        {board && !loading && <CanvasReferencePickerContext.Provider key={requirement.id} value={referencePicker}><ReactFlow id={`wtt-flow-${panelId.replace(/:/g, '')}`}
+        {hasLoadedBoard && <CanvasReferencePickerContext.Provider key={requirement.id} value={referencePicker}><ReactFlow id={`wtt-flow-${panelId.replace(/:/g, '')}`}
           key={requirement.id}
           nodes={nodes} edges={visibleEdges} nodeTypes={NODE_TYPES}
           onlyRenderVisibleElements={nodes.length >= LARGE_CANVAS_THRESHOLD && !editingNodeId}

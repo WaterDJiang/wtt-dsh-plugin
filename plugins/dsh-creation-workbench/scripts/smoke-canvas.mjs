@@ -1,3 +1,5 @@
+import { seedReadPerformance, checkReadPerformance } from './canvas-read-perf.mjs';
+import { seedCanvasReads, checkCanvasReads } from './canvas-read-smoke.mjs';
 import { seedReferenceSelection, checkReferenceSelection } from './canvas-reference-smoke.mjs';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
@@ -14,7 +16,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -404,6 +406,8 @@ try {
   const selectionCases = ['all', 'selection'].includes(scenario) ? await seedSelection(workspace) : null;
   const sendCases = ['all', 'send'].includes(scenario) ? await seedSend(workspace) : null;
   const referenceCase = ['all', 'references'].includes(scenario) ? await seedReferenceSelection(workspace, run) : null;
+  const readCases = ['all', 'reads'].includes(scenario) ? await seedCanvasReads(workspace) : null;
+  const readPerfCases = (scenario === 'readperf' || scenario === 'all' && process.env.WTT_READ_PERF === '1') ? seedReadPerformance(workspace) : null;
   const env = { ...process.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
     PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`, npm_config_offline: 'true',
     npm_config_store_dir: path.join(repo, '.runtime/pnpm-store') };
@@ -446,6 +450,8 @@ try {
     }
     if (sendCases) await checkSend(page, canvas, sendCases, api);
     if (referenceCase) await checkReferenceSelection(page, canvas, referenceCase, api);
+    if (readCases) await checkCanvasReads(page, canvas, readCases, api);
+    if (readPerfCases) await checkReadPerformance(page, canvas, readPerfCases, api);
     assert.deepEqual(errors, [], '页面不应抛出运行错误');
     assert.equal(consoleMessages.filter(message => message.includes('500')).length, sendCases ? 1 : 0, '仅允许合成刷新故障的一条500资源日志');
     assert.deepEqual(consoleMessages.filter(message => !message.includes('500')), [], '不应出现其他控制台错误或警告');

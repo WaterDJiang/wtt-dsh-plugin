@@ -62,7 +62,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
           inst: { value, getSnapshot }
         });
         var inst = cachedValue[0].inst, forceUpdate = cachedValue[1];
-        useLayoutEffect5(
+        useLayoutEffect6(
           function() {
             inst.value = value;
             inst.getSnapshot = getSnapshot;
@@ -96,7 +96,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
         return getSnapshot();
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React47 = require("react"), objectIs = "function" === typeof Object.is ? Object.is : is, useState40 = React47.useState, useEffect43 = React47.useEffect, useLayoutEffect5 = React47.useLayoutEffect, useDebugValue3 = React47.useDebugValue, didWarnOld18Alpha = false, didWarnUncachedGetSnapshot = false, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
+      var React47 = require("react"), objectIs = "function" === typeof Object.is ? Object.is : is, useState40 = React47.useState, useEffect43 = React47.useEffect, useLayoutEffect6 = React47.useLayoutEffect, useDebugValue3 = React47.useDebugValue, didWarnOld18Alpha = false, didWarnUncachedGetSnapshot = false, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
       exports.useSyncExternalStore = void 0 !== React47.useSyncExternalStore ? React47.useSyncExternalStore : shim;
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
     })();
@@ -47059,6 +47059,7 @@ function CanvasContent({
   const canvasSizeRef = (0, import_react52.useRef)(canvasSize);
   canvasSizeRef.current = canvasSize;
   const [board, setBoard] = (0, import_react52.useState)(null);
+  const hasLoadedBoard = Boolean(board && board.requirementId === requirement.id);
   const [nodes, setNodes] = (0, import_react52.useState)([]);
   const [edges, setEdges] = (0, import_react52.useState)([]);
   const [loading, setLoading] = (0, import_react52.useState)(true);
@@ -50205,6 +50206,10 @@ function CanvasContent({
     { label: "\u9002\u5E94\u5168\u90E8", onClick: fitAllCards }
   ];
   const feedbackError = board && loadError ? `${error ? error + " " : ""}\u753B\u5E03\u5237\u65B0\u5931\u8D25\uFF1A${loadError}` : error;
+  const graphInputBlocked = Boolean((dock.mobile || editorFullscreen) && dockOpen || loading && hasLoadedBoard);
+  (0, import_react52.useLayoutEffect)(() => {
+    if (graphRef.current) graphRef.current.inert = graphInputBlocked;
+  }, [graphInputBlocked]);
   return /* @__PURE__ */ import_react52.default.createElement("div", { ref: rootRef, tabIndex: -1, onKeyDown: keyboard, onClickCapture: dismissOtherCardCreation, onPointerDownCapture: cancelPaneInsert, onMouseDownCapture: (event) => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true });
   }, "data-editor-fullscreen": dockOpen && editorFullscreen || void 0, "data-dock-open": dockOpen || void 0, "data-dock-mobile": dock.mobile || void 0, "data-dock-resizing": dock.dragging || void 0, style: { "--wtt-dock-width": `${dock.width}px` }, className: `wtt-course-canvas wcc-studio${sidebar ? "" : " is-sidebar-collapsed"}${deskVisible ? " is-focus-open" : ""} is-tool-${tool}${pickingReferences ? " is-picking-references" : ""}` }, taskControl && /* @__PURE__ */ import_react52.default.createElement(
@@ -50236,7 +50241,7 @@ function CanvasContent({
     setLoadError("");
   }, "aria-label": "\u5173\u95ED\u63D0\u793A" }, "\xD7")), /* @__PURE__ */ import_react52.default.createElement("input", { ref: contentPicker, type: "file", hidden: true, "aria-label": "\u4E0A\u4F20\u5361\u7247\u5185\u5BB9", onChange: uploadCardFile }), renameCard && /* @__PURE__ */ import_react52.default.createElement(CardNameDialog, { title: cardDisplayTitle(renameCard), busy: !!busy, error: renameError, onSave: saveCardName, onClose: () => {
     if (!busy) setRenameCard(null);
-  } }), /* @__PURE__ */ import_react52.default.createElement("div", { className: "wcc-workspace" }, /* @__PURE__ */ import_react52.default.createElement("div", { ref: graphRef, className: `wcc-graph${draggingFile ? " is-file-dragging" : ""}`, inert: (dock.mobile || editorFullscreen) && dockOpen, "aria-hidden": (dock.mobile || editorFullscreen) && dockOpen || void 0, "aria-busy": !!busy, onDragOver: (event) => {
+  } }), /* @__PURE__ */ import_react52.default.createElement("div", { className: "wcc-workspace" }, /* @__PURE__ */ import_react52.default.createElement("div", { ref: graphRef, className: `wcc-graph${draggingFile ? " is-file-dragging" : ""}`, "aria-hidden": (dock.mobile || editorFullscreen) && dockOpen || void 0, "aria-busy": !!busy || loading, onDragOver: (event) => {
     if ([...event.dataTransfer.types].some((type) => type === "Files" || type === PROJECT_FILE_DRAG)) {
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
@@ -50244,7 +50249,7 @@ function CanvasContent({
     }
   }, onDragLeave: (event) => {
     if (!event.currentTarget.contains(event.relatedTarget)) setDraggingFile(false);
-  }, onDrop: dropFiles, onDoubleClick: blankMenu }, loading && /* @__PURE__ */ import_react52.default.createElement("div", { className: "wcc-loading", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u2026"), loadError && !board && /* @__PURE__ */ import_react52.default.createElement("div", { className: "wcc-load-error", role: "alert" }, /* @__PURE__ */ import_react52.default.createElement("strong", null, "\u753B\u5E03\u672A\u80FD\u52A0\u8F7D"), /* @__PURE__ */ import_react52.default.createElement(UserError, { error: loadError, announce: false }), /* @__PURE__ */ import_react52.default.createElement(UiButton, { variant: "quiet", onClick: () => void loadBoard({ initial: true }) }, "\u91CD\u65B0\u52A0\u8F7D")), board && !loading && /* @__PURE__ */ import_react52.default.createElement(CanvasReferencePickerContext.Provider, { key: requirement.id, value: referencePicker }, /* @__PURE__ */ import_react52.default.createElement(
+  }, onDrop: dropFiles, onDoubleClick: blankMenu }, loading && !hasLoadedBoard && /* @__PURE__ */ import_react52.default.createElement("div", { className: "wcc-loading", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u2026"), loadError && !board && /* @__PURE__ */ import_react52.default.createElement("div", { className: "wcc-load-error", role: "alert" }, /* @__PURE__ */ import_react52.default.createElement("strong", null, "\u753B\u5E03\u672A\u80FD\u52A0\u8F7D"), /* @__PURE__ */ import_react52.default.createElement(UserError, { error: loadError, announce: false }), /* @__PURE__ */ import_react52.default.createElement(UiButton, { variant: "quiet", onClick: () => void loadBoard({ initial: true }) }, "\u91CD\u65B0\u52A0\u8F7D")), hasLoadedBoard && /* @__PURE__ */ import_react52.default.createElement(CanvasReferencePickerContext.Provider, { key: requirement.id, value: referencePicker }, /* @__PURE__ */ import_react52.default.createElement(
     index,
     {
       id: `wtt-flow-${panelId.replace(/:/g, "")}`,
