@@ -50,7 +50,7 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
   return <section className="wcc-skill-confirmation nodrag nopan nowheel" role="dialog" aria-label="任务待确认"
     hidden={hidden} style={{ left: position.x, top: position.y, maxHeight: position.maxHeight, display: hidden ? 'none' : undefined }}
     onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') onClose() }}>
-    <PanelHeader title={entry.task.title} subtitle={`任务待确认 · ${interactionLabel(pending)}`} onClose={onClose} closeLabel="稍后处理 任务待确认"/>
+    <PanelHeader title={entry.task.title} subtitle={`任务待确认 · ${interactionLabel(pending)}`} onClose={onClose} closeLabel="隐藏任务对话"/>
     <div className="wcc-skill-confirmation-body">
       <p className="wcc-skill-scope">回答后继续这次任务。本次确认不会发送文件给客户。</p>
       {sent ? <p role="status">回答已提交。请关闭浮窗查看原任务进展；达到预算时需调整后继续。</p> : stale ? <p role="status">此问题已结束或已更新。请关闭后打开当前待办。</p> : <>
@@ -85,7 +85,7 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
       </details>}
       {error && <UserError className="wcc-skill-error" error={error} />}
     </div>
-    <footer><UiButton variant="quiet" type="button" onClick={onClose}>稍后处理</UiButton><UiButton variant="quiet" type="button" onClick={onOpenNative}>回到卡片对话</UiButton>
+    <footer><UiButton variant="quiet" type="button" onClick={onClose}>隐藏对话</UiButton><UiButton variant="quiet" type="button" onClick={onOpenNative}>回到卡片对话</UiButton>
       {!nativeChat && !permission && !sent && (plan ? <><UiButton variant="quiet" type="button" disabled={disabled || !drafts[pending.questions[0].id]?.custom?.trim()} onClick={() => void submit('modify')}>提交修改意见</UiButton><UiButton variant="primary" className="is-primary" type="button" disabled={disabled || Boolean(drafts[pending.questions[0].id]?.custom?.trim())} onClick={() => void submit('approve')}>{sending ? '提交中…' : pending.questions[0].intent.approve}</UiButton></> : <UiButton variant="primary" className="is-primary" type="button" disabled={disabled} onClick={() => void submit('answer')}>{sending ? '提交中…' : '提交回答'}</UiButton>)}
     </footer>
   </section>

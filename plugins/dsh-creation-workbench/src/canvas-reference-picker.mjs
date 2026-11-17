@@ -30,6 +30,7 @@ export function pinnedReference(card, context) {
 export function referencePickReason(card, context) {
   const reason = unavailableReason(card)
   if (reason) return reason
+  if (context?.conversation && ['missing', 'changed', 'modified', 'unavailable'].includes(card?.sourceStatus)) return '原文件已缺失或变化'
   if (!card?.id) return '此卡片没有可引用内容'
   const media = ['image', 'video'].includes(context?.outputType) && context?.generationMethod === 'api'
   if (media && (card.generatedFile?.mime || card.importedFile?.mime || '').startsWith('video/')) return '当前媒体 API 不支持视频引用'
@@ -41,7 +42,7 @@ export function addPickedReferences(references, candidates, context) {
   let error = ''
   for (const card of candidates) {
     if (!card || next.some(reference => sameReference(reference, card)) || referencePickReason(card, context)) continue
-    if (next.length >= 24) { error = '一次创作最多引用 24 份资料，请先取消部分选择。'; break }
+    if (next.length >= (context?.maxReferences ?? 24)) { error = context?.maxReferences !== undefined ? `本次最多可再添加 ${context.maxReferences} 份附件，请先移除部分选择。` : '一次创作最多引用 24 份资料，请先取消部分选择。'; break }
     next.push(card)
   }
   return { references: next, error }

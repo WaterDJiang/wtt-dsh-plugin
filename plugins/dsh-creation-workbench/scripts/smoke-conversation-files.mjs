@@ -1,3 +1,4 @@
+import { seedConversationReferences, checkConversationReferences } from './conversation-reference-smoke.mjs';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -10,6 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { WorkbenchService } from '../src/service.mjs';
 
+const referenceMode = process.argv[2] === 'references';
+assert(!process.argv[2] || referenceMode, '用法：node scripts/smoke-conversation-files.mjs [references]');
 const run = promisify(execFile), repo = fileURLToPath(new URL('../', import.meta.url));
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir => path.join(repo, dir, 'node_modules/playwright-core/index.mjs')).find(existsSync);
@@ -23,8 +26,18 @@ async function fixture(ctx) {
   const { readFileSync } = await import('node:fs');
   const { createAssistantMessage, createUserMessage, createToolResultMessage } = await import(process.env.WTT_SMOKE_LLM_URL);
   const root = process.env.WTT_COURSE_WORKSPACE, f = JSON.parse(readFileSync(root + '/fixture.json', 'utf8'));
-  const s = ctx.sessions.create(f.sessionId, { meta: { cwd: root } }), turn = 1, step = 0;
+  const handle = f.conversationReferences ? await ctx.agents.create({ sessionId: f.sessionId, meta: { cwd: root } }) : null;
+  if (handle) ctx.effect(() => () => handle.dispose());
+  const s = handle?.agent.session || ctx.sessions.create(f.sessionId, { meta: { cwd: root } }), turn = 1, step = 0;
   const text = '仅合成验收，无模型调用。\n\n| 文件 | 审核 |\n| --- | --- |\n| [V2 双人中全景](working/image.png) | 合成图片 |\n| [视频片段](working/video.mp4) | 合成视频 |\n| [导演文档](working/document.md) | 合成文档 |';
+  if (f.conversationReferences) {
+    s.append('turn/start', {turn});s.append('step/start',{turn,step});
+    s.append('request/header',{reason:'initial',header:{config:{provider:'manual-fixture',model:'none'}}});
+    s.append('user/message',createUserMessage({content:[{type:'text',text:'合成任务，没有初始引用。'}],source:{kind:'user'}}),{surfaceOp:'append'});
+    s.append('assistant/message',{turn,step,message:createAssistantMessage({content:[{type:'text',text}],source:{provider:'manual-fixture',model:'none'}}),stream:[{type:'text-chunks',time0:Date.now(),index:0,dt:[],texts:[text]}]},{surfaceOp:'append'});
+    s.append('step/end',{turn,step});s.append('turn/end',{turn,reason:{kind:'completed'}});await ctx.sessions.flush(s);
+    ctx.effect(()=>ctx.connection.fetch.register({path:'/api/wtt-chat-file-fixture',methods:['GET'],requestBody:'buffered',fetch:async()=>Response.json({sessionId:s.id,seq:s.seq,callId:f.callId})}));return;
+  }
   const args = JSON.stringify({ questions: [{ id: 'review', header: '合成审核', question: '是否采用这份合成内容？',
     options: [{ label: '采用', description: '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
   s.append('turn/start', { turn }); s.append('step/start', { turn, step });
@@ -64,11 +77,12 @@ try {
     const task = service.createTask({ requirementId: canvas.id, outputType: 'text', selectedCardIds: [], selectedSkills: [], sourceRefs: [], generation: { mode: 'new' }, instruction: '合成媒体审核任务', operationId: randomUUID() }).task;
     f = { requirementId: canvas.id, sessionId: 'file-smoke-' + randomUUID(), callId: randomUUID() };
     service.tasks.bindSession({ taskId: task.id, sessionId: f.sessionId });
+    if (referenceMode) { f.conversationReferences = await seedConversationReferences(service, canvas.id, workspace, run); f.taskId = task.id; f.taskInput = service.tasks.get(task.id).input; assert(f.taskInput); }
     await writeFile(path.join(workspace, 'fixture.json'), JSON.stringify(f));
   } finally { service.close(); }
   const plugin = path.join(temporary, 'fixture'); await mkdir(plugin);
   await writeFile(path.join(plugin, 'package.json'), JSON.stringify({ name: 'wtt-chat-file-fixture', version: '1.0.0', type: 'module', exports: { '.': './index.mjs' }, dsh: { bundle: { patch: './cordis.patch.yml' } } }));
-  await writeFile(path.join(plugin, 'index.mjs'), `export const name='wtt-chat-file-fixture';export const inject=['connection','sessions'];export const apply=${fixture.toString()};`);
+  await writeFile(path.join(plugin, 'index.mjs'), `export const name='wtt-chat-file-fixture';export const inject=['connection','sessions','agents'];export const apply=${fixture.toString()};`);
   await writeFile(path.join(plugin, 'cordis.patch.yml'), '- insert:\n    - id: wtt-chat-file-fixture\n      name: wtt-chat-file-fixture\n');
   const env = { ...process.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
     WTT_SMOKE_LLM_URL: pathToFileURL(path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh-llm/lib/index.js')).href,
@@ -82,18 +96,39 @@ try {
   const login = await loginUrl(host);
   browser = await chromium.launch({ executablePath: process.env.WTT_SMOKE_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }); page.setDefaultTimeout(10000);
-  const errors = [], logs = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (['error', 'warning'].includes(message.type())) logs.push(message.text()); });
+  const errors = [], logs = [];
+  page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (['error', 'warning'].includes(message.type())) logs.push(message.text()); });
   try {
     await page.goto(login);
     const intro = page.getByRole('button', { name: '继续', exact: true }); if (await intro.waitFor({ timeout: 1800 }).then(() => true, () => false)) await intro.click();
     const account = page.getByRole('dialog').filter({ hasText: '开始使用' }).getByRole('button', { name: '关闭', exact: true }); if (await account.waitFor({ timeout: 1800 }).then(() => true, () => false)) await account.click();
     await page.getByRole('button', { name: 'WTT 创作工作台', exact: true }).click(); await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(f.requirementId);
-    const canvas = page.locator('.wtt-course-canvas:visible'); await canvas.locator('.wcc-skill-todo').first().click();
+    const canvas = page.locator('.wtt-course-canvas:visible');
+    if (referenceMode) {
+      await checkConversationReferences(page, canvas, f.conversationReferences, artifacts);
+      const verify = new WorkbenchService({ workspaceRoot: workspace });
+      try { assert.deepEqual(verify.tasks.get(f.taskId).input, f.taskInput, '后续附件不能改写原任务输入'); } finally { verify.close(); }
+      assert.deepEqual(errors, []);
+      assert.equal(logs.filter(message => message.includes('409')).length, 1);
+      assert.deepEqual(logs.filter(message => !message.includes('409')), []);
+    } else {
+      await canvas.locator('.wcc-skill-todo').first().click();
     const review = page.getByRole('dialog', { name: '任务待确认', exact: true }), chat = review.locator('.wtt-native-editor-conversation');
     await chat.getByRole('button', { name: 'V2 双人中全景', exact: true }).waitFor();
     await review.getByText('保留候选', { exact: true }).click(); assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled());
     const readState = () => page.request.get(new URL('/api/wtt-chat-file-fixture', login).href).then(reply => reply.json());
     const before = await readState();
+    const addCanvasAsset = chat.getByRole('button', { name: '从画布添加资产', exact: true });
+    // A native question takeover can replace the entire message input and its dock.
+    if (await chat.locator('[contenteditable="true"]:visible').count()) {
+      await addCanvasAsset.waitFor();
+      assert(await addCanvasAsset.isEnabled());
+      await addCanvasAsset.click();
+      const picker = canvas.getByRole('region', { name: '选择画布引用', exact: true });
+      await picker.waitFor(); assert.equal(await review.isVisible(), false);
+      await picker.getByRole('button', { name: '取消', exact: true }).click();
+      await review.waitFor({ state: 'visible' }); assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled());
+    } else assert.equal(await addCanvasAsset.count(), 0, '原生问答接管时不伪装成可追加附件的输入框');
     const close = async () => { await canvas.getByRole('button', { name: '关闭成果预览', exact: true }).click(); await review.waitFor({ state: 'visible' }); assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled()); };
     await chat.getByRole('button', { name: 'V2 双人中全景', exact: true }).click();
     const image = canvas.locator('.wtt-outcome-viewer img'); await image.waitFor(); await image.evaluate(async img => { await img.decode(); if (img.naturalWidth !== 41 || img.naturalHeight !== 27) throw new Error('图片内容不匹配'); });
@@ -108,9 +143,10 @@ try {
     await canvas.getByRole('button', { name: '关闭成果预览', exact: true }).click();
     assert.equal(await page.getByRole('dialog', { name: '无法打开文件' }).count(), 0); assert.deepEqual(errors, []); assert.deepEqual(logs, []);
     console.log('PASS 表格图片／视频／文档、真实解码播放、审核返回与未提交选择、原卡片chat');
+    }
     console.log('PAGE', new URL(page.url()).origin, await page.title());
   } catch (error) {
-    await page.screenshot({ path: path.join(artifacts, 'failure.png') }); console.error('BODY', (await page.locator('body').innerText()).slice(-3500)); console.error('ERRORS', errors, 'CONSOLE', logs); throw error;
+    await page.locator('details').evaluateAll(items => items.forEach(item => { item.open = true; }));await page.screenshot({ path: path.join(artifacts, 'failure.png') }); console.error('BODY', (await page.locator('body').innerText()).slice(-3500)); console.error('ERRORS', errors, 'CONSOLE', logs); throw error;
   }
 } finally {
   await browser?.close();

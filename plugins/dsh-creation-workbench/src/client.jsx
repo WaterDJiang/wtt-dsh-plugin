@@ -1,3 +1,4 @@
+import { CanvasConversationReferenceButton } from './conversation-references.jsx'
 import { MediaServiceSettings } from './media-service-settings.jsx';
 import { createMediaSettingsOperations } from './media-service-operations.mjs';
 import { DialogBody, DialogFooter, DialogHeader, UiButton } from './ui/controls.jsx'
@@ -25,7 +26,7 @@ const PANEL_ID = 'wtt-creation-workbench'
 const EMPTY_SESSION_STATUSES = new Map()
 
 export const name = 'wtt-creation-workbench-client'
-export const inject = ['slots', 'layout', 'remote', 'remote.session', 'remote.workspace', 'remote.skills', 'uiWorkspace', 'sessions', 'uiSession', 'uiConversation', 'inputTriggers', 'remote.userQuestions','locale','sidebarRightTabs','remote.workspaceFiles','configForms','resources','remote.settings','remote.credentials','settingsSchema']
+export const inject = ['conversation', 'slots', 'layout', 'remote', 'remote.session', 'remote.workspace', 'remote.skills', 'uiWorkspace', 'sessions', 'uiSession', 'uiConversation', 'inputTriggers', 'remote.userQuestions','locale','sidebarRightTabs','remote.workspaceFiles','configForms','resources','remote.settings','remote.credentials','settingsSchema']
 
 function endpoint(query = {}, projectId) {
   const url = new URL('api/wtt-creation-workbench', document.baseURI)
@@ -785,6 +786,7 @@ export function apply(ctx) {
     }
     return apiRequest(undefined, undefined, undefined, { directory: path || '' }, signal)
   }
+  ctx.effect(()=>ctx.slots.inject('conversation.input.dock',()=>ctx.slots.register({name:'conversation.input.dock',id:'wtt-canvas-assets',order:5},props=><CanvasConversationReferenceButton {...props} getAttachmentService={()=>ctx.conversation}/>)))
   const nativeEditorBridge=createNativeEditorBridge()
   ctx.effect(()=>ctx.inputTriggers.registerSource(nativeEditorBridge.source))
   ctx.effect(()=>ctx.slots.inject('conversation.input.dock',()=>ctx.slots.register({name:'conversation.input.dock',id:'wtt-course-edit-reference',order:5},props=><NativeEditorInputDock {...props} bridge={nativeEditorBridge}/>)))

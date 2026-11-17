@@ -34,8 +34,9 @@ test('distributed DSH factory activates and disposes its styles with the plugin'
   assert.equal(sources.size, 1);
   assert.equal([...sources][0].name, 'wtt-course-native-editor');
   assert.equal(plugin.inject.includes('inputTriggers'), true);
-  assert.equal(plugin.inject.includes('conversation'), false);
-  assert.equal(registrations.find(r => r.options.name === 'conversation.input.dock').options.id, 'wtt-course-edit-reference');
+  assert.equal(plugin.inject.includes('conversation'), true);
+  assert.deepEqual(registrations.filter(r => r.options.name === 'conversation.input.dock').map(r => r.options.id).sort(),
+    ['wtt-canvas-assets', 'wtt-course-edit-reference']);
   assert.match([...styles][0].textContent, /\.wtt-course-workbench/);
   assert.equal(registrations.find((r) => r.options.name === 'main').options.key, 'wtt-creation-workbench');
   assert.equal(registrations.find((r) => r.options.name === 'sidebar.panellist').options.id, 'wtt-creation-workbench');

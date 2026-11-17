@@ -15,3 +15,7 @@
 
 .wtt-course-canvas.is-picking-references :is(.wcc-card.is-selected,.wcc-element.is-selected){box-shadow:none}
 .wtt-course-canvas :is(.wcc-card,.wcc-element) button.wcc-reference-pick-card:is(:hover,:focus,:active){background:transparent}
+
+.wtt-course-canvas.is-picking-references .wcc-dock{display:none}
+.wtt-conversation-canvas-reference{display:inline-flex;align-items:center;min-width:0}
+.wtt-conversation-canvas-reference [role=alert]{font-size:var(--wtt-text-sm);color:var(--wtt-ui-danger);overflow-wrap:anywhere}

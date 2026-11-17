@@ -1,3 +1,5 @@
+import { CanvasConversationReferenceContext } from './conversation-references.jsx'
+import { loadConversationReferenceFiles } from './conversation-references.mjs'
 import { CanvasReferencePickerContext, ReferencePickOverlay } from './canvas-reference-picker.jsx'
 import { sameReference, pinnedReference, referencePickReason, addPickedReferences, togglePickedReference } from './canvas-reference-picker.mjs'
 import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton, UiIcon } from './ui/controls.jsx'
@@ -2320,7 +2322,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const pick = referencePickRef.current
       if (pick.busy || !referencePickCurrent(pick)) return
       const candidates = [...chosen].map(id => referenceOptionsRef.current.get(id)).filter(option => option && !option.reason).map(option => option.card)
-      const result = addPickedReferences(referenceBoxBase.current || pick.references, candidates, creationRef.current)
+      const result = addPickedReferences(referenceBoxBase.current || pick.references, candidates, referencePickContext(pick))
       updateReferencePick({ ...pick, ...result })
       return
     }
@@ -2614,8 +2616,23 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     setReferencePick(value)
   }
   function referencePickCurrent(pick = referencePickRef.current) {
-    return Boolean(pick && mounted.current && activeRef.current && pick.key === creationRef.current?.key
-      && pick.scope === `${projectId}:${requirement.id}` && pick.epoch === epochRef.current && !creationRef.current.pendingTaskId)
+    return Boolean(pick && mounted.current && activeRef.current && pick.scope === `${projectId}:${requirement.id}` && pick.epoch === epochRef.current
+      && (pick.mode === 'conversation' ? pick.isCurrent() : pick.key === creationRef.current?.key && !creationRef.current.pendingTaskId))
+  }
+  function referencePickContext(pick = referencePickRef.current) {
+    return pick?.mode === 'conversation' ? pick.context : creationRef.current
+  }
+  function startConversationReferencePick(owner) {
+    if (busy || loading || referencePickRef.current) throw new Error('请先完成当前操作，再添加画布资产。')
+    if (!owner.maxReferences) throw new Error('一条消息最多添加24份附件，请先移除部分附件。')
+    cancelCardOpen(); cancelPaneInsert(); setContextMenu(null); setCreationMenu(null)
+    const key = `conversation:${owner.sessionId}:${crypto.randomUUID()}`
+    updateReferencePick({ ...owner, key, mode: 'conversation', scope: `${projectId}:${requirement.id}`, epoch: epochRef.current,
+      references: [], context: { intent: 'revise', blank: true, outputType: 'text', conversation: true, maxReferences: owner.maxReferences },
+      controller: new AbortController(), previousTool: tool, busy: false, error: '' })
+    referenceBoxBase.current = null
+    setTool('select')
+    return () => { if (referencePickRef.current?.key === key) finishReferencePick() }
   }
   function startReferencePick(restoreFocus) {
     const context = creationRef.current
@@ -2629,6 +2646,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   function finishReferencePick(pick = referencePickRef.current) {
     if (!pick || referencePickRef.current !== pick) return
     const current = referencePickCurrent(pick)
+    pick.controller?.abort()
+    if (!mounted.current) { referencePickRef.current = null; return }
     updateReferencePick(null)
     referenceBoxBase.current = null
     // Restore controlled selection after React Flow's temporary rectangle gesture.
@@ -2637,14 +2656,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (current) {
       setTool(pick.previousTool)
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (mounted.current && creationRef.current?.key === pick.key && !referencePickRef.current) pick.restoreFocus?.()
+        if (mounted.current && !referencePickRef.current && (pick.mode === 'conversation' ? pick.isCurrent() : creationRef.current?.key === pick.key)) pick.restoreFocus?.()
       }))
     }
   }
   function toggleReferencePick(nodeId) {
     const pick = referencePickRef.current, option = referenceOptionsRef.current.get(nodeId)
     if (!referencePickCurrent(pick) || pick.busy || !option) return
-    updateReferencePick({ ...pick, ...togglePickedReference(pick.references, option.card, creationRef.current) })
+    updateReferencePick({ ...pick, ...togglePickedReference(pick.references, option.card, referencePickContext(pick)) })
   }
   async function confirmReferencePick() {
     const pick = referencePickRef.current
@@ -2652,16 +2671,24 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const submitting = { ...pick, busy: true, error: '' }
     updateReferencePick(submitting)
     try {
-      const invalid = pick.references.find(card => referencePickReason(card, creationRef.current) && !creationRef.current.references.some(old => sameReference(old, card)))
-      if (invalid) throw new Error(referencePickReason(invalid, creationRef.current))
-      await changeCreationReferences(pick.references, { contextKey: pick.key })
+      if (pick.mode === 'conversation') {
+        const files = await loadConversationReferenceFiles(pick.references, { endpoint, signal: pick.controller.signal,
+          isCurrent: () => referencePickRef.current === submitting && referencePickCurrent(submitting),
+          currentCard: card => referenceOptionsRef.current.get(card.nodeId || card.id)?.card })
+        if (!referencePickCurrent(submitting)) throw new Error('对话已切换，请重新添加资产。')
+        pick.stage(files)
+      } else {
+        const invalid = pick.references.find(card => referencePickReason(card, creationRef.current) && !creationRef.current.references.some(old => sameReference(old, card)))
+        if (invalid) throw new Error(referencePickReason(invalid, creationRef.current))
+        await changeCreationReferences(pick.references, { contextKey: pick.key })
+      }
       if (referencePickRef.current === submitting) finishReferencePick(submitting)
     } catch (cause) {
       if (referencePickRef.current === submitting && referencePickCurrent(submitting)) updateReferencePick({ ...submitting, busy: false, error: messageOf(cause) })
     }
   }
   useEffect(() => {
-    if (referencePick && (!referencePickCurrent(referencePick) || !creationVisible)) finishReferencePick(referencePick)
+    if (referencePick && (!referencePickCurrent(referencePick) || referencePick.mode !== 'conversation' && !creationVisible)) finishReferencePick(referencePick)
   }, [referencePick, creation?.key, creation?.pendingTaskId, creationVisible, projectId, requirement.id, active])
   useEffect(() => {
     if (referencePick) referenceDoneButton.current?.focus({ preventScroll: true })
@@ -2976,12 +3003,13 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
 
   const pickingReferences = Boolean(referencePick && referencePickCurrent(referencePick))
+  const referenceContext = referencePickContext(referencePick)
   const referenceOptions = new Map()
   if (pickingReferences) for (const node of nodes) {
     if (node.type !== 'content' && node.type !== 'whiteboard') continue
     const card = node.type === 'whiteboard' ? { ...node.data, id: node.id, kind: 'whiteboard', title: String(node.data.text || '').trim().slice(0, 36) || '空白图形', content: String(node.data.text || '') } : creationSource(node.data)
-    const reason = referencePickReason(card, creation) || (node.type === 'whiteboard' ? !card.content.trim() ? '此白板元素没有文字内容' : '' : !usableCreationSource(card) ? '此卡片尚无可用的已保存来源' : '')
-    referenceOptions.set(node.id, { card, reason, checked: referencePick.references.some(reference => sameReference(reference, card)), pinned: pinnedReference(card, creation) })
+    const reason = referencePickReason(card, referenceContext) || (node.type === 'whiteboard' ? !card.content.trim() ? '此白板元素没有文字内容' : '' : !usableCreationSource(card) ? '此卡片尚无可用的已保存来源' : '')
+    referenceOptions.set(node.id, { card, reason, checked: referencePick.references.some(reference => sameReference(reference, card)), pinned: pinnedReference(card, referenceContext) })
   }
   referenceOptionsRef.current = referenceOptions
   const referencePicker = pickingReferences ? { options: referenceOptions, onToggle: toggleReferencePick, busy: referencePick.busy } : null
@@ -3014,15 +3042,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   ]
 
   const feedbackError = board && loadError ? `${error ? error + ' ' : ''}画布刷新失败：${loadError}` : error
-  const graphInputBlocked = Boolean(((dock.mobile || editorFullscreen) && dockOpen) || (loading && hasLoadedBoard))
+  const graphInputBlocked = Boolean((!pickingReferences && (dock.mobile || editorFullscreen) && dockOpen) || (loading && hasLoadedBoard))
   useLayoutEffect(() => {
     // Set the DOM property directly: supported DSH renderers may omit JSX inert.
     if (graphRef.current) graphRef.current.inert = graphInputBlocked
   }, [graphInputBlocked])
 
-  return <div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
+  return <CanvasConversationReferenceContext.Provider value={{ start: startConversationReferencePick, busy: Boolean(busy) || loading || pickingReferences }}><div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
-  }} data-editor-fullscreen={dockOpen&&editorFullscreen||undefined} data-dock-open={dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
+  }} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
       onRemove={() => void removeElements()} />}
@@ -3083,7 +3111,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           {showMap && <MiniMap pannable zoomable position="bottom-right" nodeColor={node => node.type === 'whiteboard' ? 'var(--wtt-ui-warning, #e6ce8d)' : 'var(--wtt-ui-edge, #a6b6d5)'} />}
         </ReactFlow></CanvasReferencePickerContext.Provider>}
         {pickingReferences && <div className="wcc-reference-pick-bar" role="region" aria-label="选择画布引用">
-          <strong aria-live="polite">选择引用 · {referencePick.references.length}/24</strong>
+          <strong aria-live="polite">{referencePick.mode === 'conversation' ? '添加对话附件' : '选择引用'} · {referencePick.references.length}/{referencePick.mode === 'conversation' ? referencePick.context.maxReferences : 24}</strong>
           <UiButton variant="quiet" disabled={referencePick.busy} onClick={() => finishReferencePick()}>取消</UiButton>
           <UiButton ref={referenceDoneButton} variant="primary" disabled={referencePick.busy} onClick={() => void confirmReferencePick()}>{referencePick.busy ? '正在添加…' : '完成'}</UiButton>
           {referencePick.error && <UserError error={referencePick.error} />}
@@ -3151,7 +3179,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         onChange={editOutline} onClose={() => setFocusOpen(false)} onSave={saveOutline} onExport={exportWord}
         onPassage={selectPassage} busy={!!busy} error={error}
         downloadHref={deskVersion.wordPath ? endpoint({ download: deskVersion.id }).href : undefined} />}
-      <div hidden={!dockOpen} className="wcc-dock" aria-label="右侧工作栏">
+      <div hidden={!dockOpen || pickingReferences} className="wcc-dock" aria-label="右侧工作栏">
         {!dock.mobile && !editorFullscreen && <div className="wcc-dock-separator" {...dock.separator} />}
         <div className="wcc-dock-mobile-header"><UiButton variant="quiet" type="button" onClick={closeDock} disabled={textEditorOpen && busy === 'text-edit'}>← 返回画布</UiButton></div>
       {textEditorOpen && <CardTextEditor key={textEditorKey} card={textEditCard} title={contentCardTitle(textEditCard)}
@@ -3266,7 +3294,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         x: Math.max(12, Math.min(skillReview.position.x, canvasSize.width - Math.min(500, canvasSize.width - 24) - 12)),
         y: 76, maxHeight: Math.max(160, canvasSize.height - 88),
       }}
-      loadOutputs={loadSkillReviewOutputs} verifyOutputs={verifySkillReviewOutputs} onClose={() => setSkillReview(null)} hidden={Boolean(projectFileSelection?.fromConversation)}
+      loadOutputs={loadSkillReviewOutputs} verifyOutputs={verifySkillReviewOutputs} onClose={() => setSkillReview(null)} hidden={pickingReferences || Boolean(projectFileSelection?.fromConversation)}
       projectRoot={project?.path} getReviewImageHref={(image, preview) => endpoint({ reviewImage: image.path, hash: image.hash, ...(preview ? { preview: '1' } : {}) }).href}
       renderConversation={renderEditorConversation ? task => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: '任务' }) : undefined}
       onOpenNative={() => { const sessionId = skillReview.entry.task.sessionId; setSkillReview(null); void openTaskSession(sessionId).then(() => { if (creationRef.current?.sessionId === sessionId) updateCreation(creationRef.current.key, { openExecutionRequest: crypto.randomUUID() }) }) }}
@@ -3280,7 +3308,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
     {materialDialog && <MaterialDialog initial={materialDialog} busy={busy === 'material'} error={materialError} onClose={() => setMaterialDialog(null)} onSubmit={values => void addMaterial(values)} />}
     {groupDialog && <GroupDialog busy={!!busy} onClose={() => setGroupDialog(false)} onSubmit={regroup} />}
-  </div>
+  </div></CanvasConversationReferenceContext.Provider>
 }
 
 export function CourseCanvas(props) {
