@@ -142,7 +142,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined}>
     <ReferencePickOverlay nodeId={id} />
     <NodeResizer nodeId={id} isVisible={selected} minWidth={200} minHeight={160} maxWidth={1200} maxHeight={1200}
-      color="var(--wtt-ui-accent)" handleClassName="wcc-content-resize-handle" lineClassName="wcc-content-resize-line"
+      handleStyle={{ backgroundColor: 'var(--wtt-ui-card-selection)', borderColor: 'var(--wtt-ui-card-selection)' }} lineStyle={{ borderColor: 'transparent' }} handleClassName="wcc-content-resize-handle" lineClassName="wcc-content-resize-line"
       onResizeStart={() => data.onResizeStart?.()} onResizeEnd={(_event, size) => data.onResizeEnd?.(id, size)} />
     <Handle type="target" position={Position.Left} isConnectable={isConnectable} aria-label={`连接到 ${data.title}`} />
     <header className="wcc-card-grip">

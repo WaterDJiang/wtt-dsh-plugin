@@ -1299,6 +1299,12 @@
 /* src/theme.css */
 .wtt-project-workbench {
   color-scheme: light;
+  --wtt-ui-card-text: light-dark(#376bc6, #78a9ff);
+  --wtt-ui-card-pptx: light-dark(#b5681f, #ffb56b);
+  --wtt-ui-card-image: light-dark(#4b832b, #8cd47a);
+  --wtt-ui-card-video: light-dark(#8f51b3, #c29aff);
+  --wtt-ui-card-document: light-dark(#18847d, #62cfc8);
+  --wtt-ui-card-selection: light-dark(#445069, #f4f6f9);
   --wtt-ui-canvas: var(--dsw-alias-bg-base, #f7f9fc);
   --wtt-ui-surface: var(--dsw-alias-bg-layer-1, #fff);
   --wtt-ui-subtle: var(--dsw-alias-bg-layer-2, #f1f4f8);
@@ -4567,26 +4573,29 @@ svg.react-flow__connectionline {
 }
 .wtt-course-canvas .wcc-card[data-card-format],
 .wtt-course-canvas .wcc-card.has-skill-todo[data-card-format] {
-  border-color: color-mix(in srgb, var(--wcc-type-color) 85%, light-dark(#dde1e7, #44474e));
+  border: 2px solid var(--wcc-type-color);
 }
 .wtt-course-canvas .wcc-card[data-card-format=text] {
-  --wcc-type-color: light-dark(#5487cf, #78a5e8);
+  --wcc-type-color: var(--wtt-ui-card-text);
 }
 .wtt-course-canvas .wcc-card[data-card-format=pptx] {
-  --wcc-type-color: light-dark(#cc873f, #e3a568);
+  --wcc-type-color: var(--wtt-ui-card-pptx);
 }
 .wtt-course-canvas .wcc-card[data-card-format=image] {
-  --wcc-type-color: light-dark(#72994a, #99bb70);
+  --wcc-type-color: var(--wtt-ui-card-image);
 }
 .wtt-course-canvas .wcc-card[data-card-format=video] {
-  --wcc-type-color: light-dark(#a875c3, #c394dd);
+  --wcc-type-color: var(--wtt-ui-card-video);
 }
 .wtt-course-canvas .wcc-card[data-card-format=document] {
-  --wcc-type-color: light-dark(#3e9b96, #6bb9b1);
+  --wcc-type-color: var(--wtt-ui-card-document);
+}
+.wtt-course-canvas .wcc-card[data-card-format] .wcc-card-kind {
+  color: var(--wcc-type-color);
 }
 .wtt-course-canvas .wcc-card.is-selected,
 .wtt-course-canvas .wcc-card.is-selected[data-card-format] {
-  box-shadow: 0 0 0 2px light-dark(#5879b4, #8aa5dc), 0 3px 12px var(--wtt-ui-shadow, #25344b0d);
+  box-shadow: 0 3px 12px var(--wtt-ui-shadow, #25344b0d);
 }
 .wtt-course-canvas .wcc-card-grip {
   display: flex;
@@ -11605,6 +11614,7 @@ dialog.wtt-project-picker[open] {
   flex-direction: column;
   width: min(500px, calc(100% - 24px));
   min-height: 180px;
+  overflow: hidden;
   border: 1px solid var(--wtt-ui-warning-line, #dcc59f);
   border-radius: 13px;
   background: var(--wtt-ui-surface, #fff);

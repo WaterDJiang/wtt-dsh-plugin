@@ -22,7 +22,7 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本为 **0.57.1**。修复新建、导入、保存与刷新时整页读取画布的问题，保留原卡片和视口。[查看更新内容](plugins/dsh-creation-workbench/README.md#0571-的主要改进)
+当前版本为 **0.57.2**。增强五类卡片的类型彩框，选中时保留类型色；修复任务待确认浮窗的圆角底色溢出。[查看更新内容](plugins/dsh-creation-workbench/README.md#0572-的主要改进)
 
 使用社区市场 `dshmarket` 时，打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」就点 **立即更新**。如果旧版的「代码来源」写的是 `path:plugins/...`，在原 DSH 配置用上面的安装串覆盖安装一次，以后可以直接从市场更新。
 

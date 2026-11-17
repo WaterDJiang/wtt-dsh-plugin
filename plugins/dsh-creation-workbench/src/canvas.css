@@ -94,13 +94,14 @@
 .wtt-course-canvas .react-flow__node-courseGroup { border: 0; border-radius: 10px; }
 .wtt-course-canvas .react-flow__node:focus-visible { outline: 2px solid var(--wtt-ui-accent, #627fda); outline-offset: 4px; border-radius: 8px; }
 .wtt-course-canvas .wcc-card { position: relative; display: flex; flex-direction: column; width: 320px; height: 256px; border: 1px solid var(--wtt-ui-line, #dce2eb); border-radius: 8px; background: var(--wtt-ui-surface, #fff); box-shadow: 0 2px 6px var(--wtt-ui-shadow, #25344b06); overflow: visible; }
-.wtt-course-canvas .wcc-card[data-card-format], .wtt-course-canvas .wcc-card.has-skill-todo[data-card-format] { border-color: color-mix(in srgb, var(--wcc-type-color) 85%, light-dark(#dde1e7, #44474e)); }
-.wtt-course-canvas .wcc-card[data-card-format="text"] { --wcc-type-color: light-dark(#5487cf, #78a5e8); }
-.wtt-course-canvas .wcc-card[data-card-format="pptx"] { --wcc-type-color: light-dark(#cc873f, #e3a568); }
-.wtt-course-canvas .wcc-card[data-card-format="image"] { --wcc-type-color: light-dark(#72994a, #99bb70); }
-.wtt-course-canvas .wcc-card[data-card-format="video"] { --wcc-type-color: light-dark(#a875c3, #c394dd); }
-.wtt-course-canvas .wcc-card[data-card-format="document"] { --wcc-type-color: light-dark(#3e9b96, #6bb9b1); }
-.wtt-course-canvas .wcc-card.is-selected, .wtt-course-canvas .wcc-card.is-selected[data-card-format] { box-shadow: 0 0 0 2px light-dark(#5879b4, #8aa5dc), 0 3px 12px var(--wtt-ui-shadow, #25344b0d); }
+.wtt-course-canvas .wcc-card[data-card-format], .wtt-course-canvas .wcc-card.has-skill-todo[data-card-format] { border: 2px solid var(--wcc-type-color); }
+.wtt-course-canvas .wcc-card[data-card-format="text"] { --wcc-type-color: var(--wtt-ui-card-text); }
+.wtt-course-canvas .wcc-card[data-card-format="pptx"] { --wcc-type-color: var(--wtt-ui-card-pptx); }
+.wtt-course-canvas .wcc-card[data-card-format="image"] { --wcc-type-color: var(--wtt-ui-card-image); }
+.wtt-course-canvas .wcc-card[data-card-format="video"] { --wcc-type-color: var(--wtt-ui-card-video); }
+.wtt-course-canvas .wcc-card[data-card-format="document"] { --wcc-type-color: var(--wtt-ui-card-document); }
+.wtt-course-canvas .wcc-card[data-card-format] .wcc-card-kind { color: var(--wcc-type-color); }
+.wtt-course-canvas .wcc-card.is-selected, .wtt-course-canvas .wcc-card.is-selected[data-card-format] { box-shadow: 0 3px 12px var(--wtt-ui-shadow, #25344b0d); }
 .wtt-course-canvas .wcc-card-grip { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 35px; padding: 7px 13px; border-bottom: 1px solid var(--wtt-ui-line, #eef1f5); border-radius: 7px 7px 0 0; background: var(--wtt-ui-surface, #fbfcfe); cursor: grab; user-select: none; }
 .wtt-course-canvas .wcc-card-grip:active { cursor: grabbing; }
 .wtt-course-canvas .wcc-card-kind { font-size:var(--wtt-text-xs); font-weight: 600; letter-spacing: .06em; color: var(--wtt-ui-text, #61718d); }

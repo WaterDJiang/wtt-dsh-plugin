@@ -1,6 +1,12 @@
 /* CW-18：只消费宿主主题，变量仅作用于工作台；不改宿主或媒体像素。 */
 .wtt-project-workbench {
   color-scheme: light;
+  --wtt-ui-card-text: light-dark(#376bc6, #78a9ff);
+  --wtt-ui-card-pptx: light-dark(#b5681f, #ffb56b);
+  --wtt-ui-card-image: light-dark(#4b832b, #8cd47a);
+  --wtt-ui-card-video: light-dark(#8f51b3, #c29aff);
+  --wtt-ui-card-document: light-dark(#18847d, #62cfc8);
+  --wtt-ui-card-selection: light-dark(#445069, #f4f6f9);
   --wtt-ui-canvas: var(--dsw-alias-bg-base, #f7f9fc);
   --wtt-ui-surface: var(--dsw-alias-bg-layer-1, #fff);
   --wtt-ui-subtle: var(--dsw-alias-bg-layer-2, #f1f4f8);
