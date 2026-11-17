@@ -19,6 +19,8 @@
 .wtt-course-canvas.wcc-studio { height: 100%; min-height: 0; border: 0; border-radius: 0; }
 .wtt-course-canvas.wcc-studio .wcc-workspace { position: relative; display: block; height: 100%; flex: 1; }
 .wtt-course-canvas.wcc-studio .wcc-graph { width: 100%; height: 100%; }
+/* Three shared layers, rather than promoting every card or dropping previews. */
+.wtt-course-canvas[data-large-canvas] :is(.react-flow__viewport,.react-flow__nodes,.react-flow__edges) { will-change: transform; }
 .wtt-course-canvas.wcc-studio .wcc-sidebar { position: absolute; z-index: 24; top: 76px; right: 18px; bottom: 18px; height: auto; width: 360px; max-width: calc(100% - 82px); min-width: 240px; border: 1px solid var(--wtt-ui-line, #e0e4e9); border-radius: 12px; box-shadow: 0 10px 40px var(--wtt-ui-shadow, #25344b12); }
 .wtt-course-canvas.wcc-studio .wcc-tabs { padding-right: 48px; }
 .wtt-course-canvas.wcc-studio .wcc-close-panel { position: absolute; top: 7px; right: 8px; z-index: 2; width: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 7px; font-size: 20px; background: transparent; color: var(--wtt-ui-text, #7c8492); }
@@ -131,6 +133,13 @@
 .wtt-course-canvas .wcc-imported-preview { display: block; max-width: 100%; max-height: 280px; margin: 12px auto; object-fit: contain; border-radius: 7px; }
 .wtt-course-canvas .wcc-card-footer { display: flex; flex-shrink: 0; align-items: center; gap: 5px; height: 29px; margin: 0 13px; border-top: 1px solid var(--wtt-ui-line, #f0f2f6); color: var(--wtt-ui-muted, #8b93a2); font-size:var(--wtt-text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wtt-course-canvas .wcc-state-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--wtt-ui-hover, #94a3b6); }
+.wtt-course-canvas .wcc-card-media-actions { display: flex; flex-shrink: 0; margin: 0 13px var(--wtt-space-1); }
+.wtt-course-canvas .wcc-card-media-actions button.wtt-ui-button {
+  width: 100%;
+  min-height: var(--wtt-control-touch-h);
+  color: var(--wtt-ui-accent);
+  background: var(--wtt-ui-accent-paper);
+}
 .wtt-course-canvas .wcc-card-footer.is-warning { color: var(--wtt-ui-warning, #b97832); }
 .wtt-course-canvas button.wcc-card-file { display: flex; flex: 1; min-width: 0; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .wtt-course-canvas .wcc-card-file > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

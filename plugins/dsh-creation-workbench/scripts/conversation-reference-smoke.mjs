@@ -82,14 +82,86 @@ export async function checkConversationReferences(page, canvas, fixture, artifac
   await picker.getByRole('button', { name: '取消', exact: true }).click(); await native.waitFor(); assert.equal(await remove.count(), 6);
   await page.screenshot({ path: path.join(artifacts, 'native-mobile.png') });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await enter(); await choose('text');
+  await enter(); for (const type of ['text', 'video', 'document']) await choose(type);
   const captured = Promise.withResolvers(), release = Promise.withResolvers();
-  let intercepted = false;
+  let intercepted = 0;
   const late = url => url.pathname === '/api/wtt-creation-workbench' && url.searchParams.has('projectFileDownload');
-  await page.route(late, async route => { intercepted = true; captured.resolve(); await release.promise; await route.abort().catch(() => {}); });
+  await page.route(late, async route => { if (++intercepted === 3) captured.resolve(); await release.promise; await route.abort().catch(() => {}); });
   await picker.getByRole('button', { name: '完成', exact: true }).click(); await captured.promise;
   await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(fixture.otherId);
-  release.resolve(); await page.unroute(late); assert(intercepted);
+  release.resolve(); await page.unroute(late); assert.equal(intercepted, 3, '三个并行下载在切换时一同取消');
   await picker.waitFor({ state: 'hidden' }); assert.equal(await canvas.getByRole('button', { name: '从画布添加资产', exact: true }).count(), 0);
   console.log('PASS 无初始引用的任务对话、原生图片／文件附件、历史hash、原草稿／附件、取消、读取失败重试、深色／390px和切换隔离');
+}
+
+export async function seedConversationReferenceStress(service, requirementId, workspace, run) {
+  await run('python3', ['-c', 'from PIL import Image;import sys;Image.effect_noise((1600,900),65).convert("RGB").save(sys.argv[1])', path.join(workspace, 'working/stress.png')]);
+  const bytes = await readFile(path.join(workspace, 'working/stress.png')), ids = [];
+  for (let i = 0; i < 24; i++) {
+    const { material } = await service.importMaterial({ requirementId, filename: `追加压力${i}.png`, bytes, operationId: randomUUID() });
+    ids.push(`material:${material.id}`);
+  }
+  const board = service.canvas.getBoard(requirementId), taskNode = board.nodes.find(node => node.pendingGeneration)?.id;
+  service.canvas.saveBoard({ requirementId, expectedRevision: board.revision,
+    positions: { [taskNode]: { x: 80, y: 250 }, ...Object.fromEntries(ids.map((id, i) => [id, { x: 80 + i % 6 * 360, y: 650 + Math.floor(i / 6) * 280 }])) },
+    sizes: Object.fromEntries([taskNode, ...ids].map(id => [id, { width: 320, height: 256 }])), viewport: { x: 20, y: 10, zoom: .4 } });
+  return { ids, taskNode, bytes: bytes.length };
+}
+
+export async function checkConversationReferenceStress(page, canvas, fixture, artifacts) {
+  await canvas.locator(`article[data-card-id="${fixture.taskNode}"] .wcc-card-body`).click();
+  const composer = canvas.locator('.wcc-card-composer:visible'), native = canvas.locator('.wtt-native-conversation:visible');
+  if (!await native.waitFor({ timeout: 2500 }).then(() => true, () => false)) {
+    const toggle = composer.getByRole('button', { name: '任务对话', exact: false });
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  }
+  await native.waitFor();
+  const input = native.locator('[contenteditable="true"]'), add = native.getByRole('button', { name: '从画布添加资产', exact: true });
+  const picker = canvas.getByRole('region', { name: '选择画布引用', exact: true });
+  await input.fill('原生输入保留，不发送');
+  const cdp = await page.context().newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.start');
+  let active = 0, peak = 0, total = 0;
+  const pending = new Set();
+  const started = request => { if (new URL(request.url()).searchParams.has('projectFileDownload')) { pending.add(request); active++; total++; peak = Math.max(peak, active); } };
+  const finished = request => { if (pending.delete(request)) active--; };
+  page.on('request', started); page.on('requestfinished', finished); page.on('requestfailed', finished);
+  const reports = [];
+  for (const count of [1, 20, 24]) {
+    const addSamples = [], typing = [], feedback = [];
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const remove = native.getByRole('button', { name: /^移除图片/ });
+      while (await remove.count()) await remove.first().click();
+      await add.click(); await picker.waitFor();
+      for (const id of fixture.ids.slice(0, count)) await canvas.locator(`[data-id="${id}"] .wcc-reference-pick-card`).click();
+      const start = performance.now();
+      await picker.getByRole('button', { name: '完成', exact: true }).evaluate(button => {
+        button.addEventListener('click', () => {
+          performance.mark('wtt-attachment-click');
+          requestAnimationFrame(() => { performance.mark('wtt-attachment-feedback', { detail: { responded: button.disabled || !button.isConnected } }); performance.measure('wtt-attachment-feedback-delay', 'wtt-attachment-click', 'wtt-attachment-feedback'); });
+        }, { once: true });
+      });
+      await picker.getByRole('button', { name: '完成', exact: true }).click(); await picker.waitFor({ state: 'hidden' });
+      await native.locator('img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+      assert.equal(await native.getByRole('button', { name: /^移除图片/ }).count(), count);
+      if (attempt) addSamples.push(performance.now() - start);
+      if (attempt) feedback.push(await page.evaluate(() => performance.getEntriesByName('wtt-attachment-feedback-delay').at(-1).duration));
+      assert(await page.evaluate(() => performance.getEntriesByName('wtt-attachment-feedback').at(-1).detail.responded), '完成按钮应立即进入添加状态或完成返回');
+      const typeStart = performance.now(); await input.fill(`原生输入保留，不发送 ${attempt}`);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      if (attempt) typing.push(performance.now() - typeStart);
+    }
+    const stats = values => { const sorted = [...values].sort((a, b) => a - b); return { median: sorted[3], p95: sorted.at(-1), samples: values }; };
+    reports.push({ count, imageBytes: fixture.bytes, add: stats(addSamples), feedback: stats(feedback), typing: stats(typing) });
+    console.log('ATTACHMENTS', JSON.stringify(reports.at(-1), (key, value) => key === 'samples' ? undefined : value));
+    if (process.env.WTT_CONVERSATION_PERF_CHECK === '1') {
+      assert(reports.at(-1).feedback.p95 <= 100, `${count}附件点击反馈p95超过100ms`);
+      assert(reports.at(-1).typing.p95 <= 100, `${count}附件原生输入p95超过100ms`);
+    }
+  }
+  page.off('request', started); page.off('requestfinished', finished); page.off('requestfailed', finished);
+  const { profile } = await cdp.send('Profiler.stop'); await cdp.detach();
+  await writeFile(path.join(artifacts, 'attachments.cpuprofile'), JSON.stringify(profile));
+  await writeFile(path.join(artifacts, 'attachments.json'), JSON.stringify({ reports, requests: { peak, total } }, null, 2));
+  await page.screenshot({ path: path.join(artifacts, 'attachments-24.png') });
+  console.log('PASS 原生1／20／24图片附件、各7次暖态添加／输入、不发送、原草稿和任务冻结输入保留');
 }

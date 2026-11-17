@@ -4245,6 +4245,9 @@ svg.react-flow__connectionline {
   width: 100%;
   height: 100%;
 }
+.wtt-course-canvas[data-large-canvas] :is(.react-flow__viewport, .react-flow__nodes, .react-flow__edges) {
+  will-change: transform;
+}
 .wtt-course-canvas.wcc-studio .wcc-sidebar {
   position: absolute;
   z-index: 24;
@@ -4796,6 +4799,17 @@ svg.react-flow__connectionline {
   height: 4px;
   border-radius: 50%;
   background: var(--wtt-ui-hover, #94a3b6);
+}
+.wtt-course-canvas .wcc-card-media-actions {
+  display: flex;
+  flex-shrink: 0;
+  margin: 0 13px var(--wtt-space-1);
+}
+.wtt-course-canvas .wcc-card-media-actions button.wtt-ui-button {
+  width: 100%;
+  min-height: var(--wtt-control-touch-h);
+  color: var(--wtt-ui-accent);
+  background: var(--wtt-ui-accent-paper);
 }
 .wtt-course-canvas .wcc-card-footer.is-warning {
   color: var(--wtt-ui-warning, #b97832);
@@ -8305,6 +8319,10 @@ dialog.wtt-project-picker[open] {
   .wcc-task-input-summary > summary {
     min-height: var(--wtt-control-touch-h);
   }
+}
+.wcc-task-input-summary > summary .wcc-task-input-warning {
+  color: var(--wtt-ui-warning);
+  white-space: normal;
 }
 
 /* src/review-image-gallery.css */

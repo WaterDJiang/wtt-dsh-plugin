@@ -64,6 +64,9 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
   const canModify = source && manifest?.cardId && externalFormats.includes(source.format)
   const downloadHref = file?.artifactId ? endpoint({ downloadArtifact: file.artifactId }).href
     : source ? endpoint({ projectFileDownload: source.originalPath, hash: source.hash }).href : undefined
+  const isImage = source && (source.mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(source.format?.toLowerCase()))
+  const imageHref = isImage && target.projectPath
+    ? endpoint({ reviewImage: source.originalPath, hash: source.hash }).href : downloadHref
   const otherWebProject = source?.format === 'pptx' && manifest?.slideProject?.artifactId !== file?.artifactId
   const choices = disabled => <>
     {manifest?.files.length > 1 && <div className="wtt-outcome-picker"><select aria-label="选择成果文件" value={selected} disabled={disabled} onChange={e=>setSelected(e.target.value)}>
@@ -92,7 +95,7 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     </PanelToolbar>
     {file?.role === 'attachment' && <div className="wtt-outcome-status" role="status">附件 · 未作为正式版本归档</div>}
     <div className="wtt-outcome-viewer-body">{error ? <UserError error={error} /> : source
-      ? source.mime?.startsWith('image/') ? <OutputPreview type="image" title={source.name} src={downloadHref} status={source.status} />
+      ? isImage ? <OutputPreview type="image" title={source.name} src={imageHref} status={source.status} />
         : source.format === 'mp4' || source.format === 'webm' || source.format === 'mov' ? <video key={selectionKey} src={downloadHref} controls preload="metadata" playsInline aria-label={source.name} />
         : renderNativePreview?.(source) || <UserError error="DSH 原生文件预览尚未连接。" />
       : <p role="status">正在读取成果文件…</p>}</div>

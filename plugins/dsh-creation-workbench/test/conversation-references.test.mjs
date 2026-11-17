@@ -68,3 +68,27 @@ test('conversation selection preserves original creation rules and respects rema
   const result = addPickedReferences([], [{ id: 'a' }, { id: 'b' }], { intent: 'revise', maxReferences: 1 });
   assert.deepEqual(result.references, [{ id: 'a' }]); assert.match(result.error, /1 份附件/);
 });
+
+test('bulk references read at most three files concurrently and retain selection order', async () => {
+  const cards = Array.from({ length: 8 }, (_, i) => ({ ...source(`body-${i}`), id: `material:${i}`, title: `资料${i}`, importedFile: { path: `file-${i}.md`, hash: hash(`body-${i}`) } }));
+  const byId = new Map(cards.map(card => [card.id, card]));
+  let active = 0, peak = 0;
+  const files = await loadConversationReferenceFiles(cards, { ...env(null), currentCard: card => byId.get(card.id), fetchFile: async query => {
+    active++; peak = Math.max(peak, active);
+    const i = Number(/file-(\d+)/.exec(query.projectFileDownload)[1]);
+    await new Promise(resolve => setTimeout(resolve, (8 - i) * 2));
+    active--; return new Response(`body-${i}`);
+  } });
+  assert.equal(peak, 3);
+  assert.deepEqual(await Promise.all(files.map(file => file.text())), cards.map((_, i) => `body-${i}`));
+});
+
+test('one bulk read failure aborts peers and does not start the remaining batch', async () => {
+  const cards = Array.from({ length: 8 }, (_, i) => ({ ...source('body'), id: `material:${i}` }));
+  let started = 0, aborted = 0;
+  await assert.rejects(loadConversationReferenceFiles(cards, { ...env(null), currentCard: card => card, fetchFile: async (_query, { signal }) => {
+    if (++started === 1) return Response.json({ error: '第一份已被外改' }, { status: 409 });
+    return new Promise((resolve, reject) => signal.addEventListener('abort', () => { aborted++; reject(signal.reason); }, { once: true }));
+  } }), /第一份已被外改/);
+  assert.equal(started, 3); assert.equal(aborted, 2);
+});

@@ -1,8 +1,8 @@
 import { uniqueCards, sameReference, unavailableReason, pinnedReference } from './canvas-reference-picker.mjs'
-import { UiButton } from './ui/controls.jsx'
+import { LazyDetails, UiButton } from './ui/controls.jsx'
 import { skillLabel, skillSearchText } from './skill-presentation.mjs'
 import { UserError } from './user-feedback.jsx'
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { extractSkillNames, skillQueryAtCursor, pptEngineForSelection } from './skill-commands.mjs'
 import { SkillSettings } from './skill-settings.jsx'
 import { ApiMediaPrompt, mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
@@ -318,7 +318,7 @@ export function CardComposer({
   const reviewImages = reviewQuestion?.scope === conversationScope ? reviewImagesFromQuestion(projectRoot, reviewQuestion.text) : []
   const frameTop = executionExpanded && Number.isFinite(position.canvasHeight)
     ? Math.max(12, Math.min(position.y, position.canvasHeight - Math.min(560, position.canvasHeight - 24))) : position.y
-  const references = uniqueCards(referenceItems)
+  const references = useMemo(() => uniqueCards(referenceItems), [referenceItems])
   const activeReferenceWork = referenceWork.get(context?.key)
   const referencePending = Boolean(activeReferenceWork)
   const referencesBusy = busy || referencePending || inputLocked
@@ -347,19 +347,21 @@ export function CardComposer({
   const mediaReason = chosenSkills.length && !legacyMedia ? 'API 生成不执行 Skill，请移除技能指令或切换 Skill 生成' : !legacyMedia && !mediaCapabilities?.providers?.length ? '尚未接入 API 服务' : !activeMediaCapabilities ? '请选择 API 服务' : !activeMediaCapabilities.healthy ? activeMediaCapabilities.error || 'API 服务未连接，请核对提供商配置' : !activeMediaCapabilities.credentialConfigured ? '尚未配置服务认证' : !mediaModel ? '请选择可用模型' : hasVideoReference ? '此 API 接口暂不支持视频参考，请切换 Skill 生成或移除视频引用' : mediaModel.requiresReference && !imageReferences.length ? '此模型需要参考图片' : imageReferences.length > (mediaModel.maxReferences || 0) ? `此模型最多支持 ${mediaModel.maxReferences || 0} 张参考图片` : mediaModel.sizes?.length && !mediaModel.sizes.includes(mediaOptions.size) ? '请选择图片或视频尺寸' : mediaModel.qualities?.length && !mediaModel.qualities.includes(mediaOptions.quality) ? '请选择生成质量' : mediaModel.ratios?.length && !mediaModel.ratios.includes(mediaOptions.ratio) ? '请选择画面比例' : mediaModel.resolutions?.length && !mediaModel.resolutions.includes(mediaOptions.resolution) ? '请选择分辨率' : outputType === 'video' && mediaModel.durations?.length && !mediaModel.durations.includes(Number(mediaOptions.duration)) ? '请选择视频时长' : context?.mediaJob?.status === 'unknown' ? '提交结果未知，请先核对原任务' : ''
   const ready = recoveringMedia ? !busy && !referencePending && Boolean(onResumeMedia) : !engineError && !busy && !referencePending && (!inputLocked || !isMedia && pendingRetryAllowed(context?.pendingGeneration)) && sourcesAvailable && canSend !== false && selectedType?.available !== false && (isAction || Boolean(instruction.trim())) && (!isMedia || (!mediaReason && !mediaPending && !mediaLoading))
   const reason = recoveringMedia ? '' : engineError || sourceReason || (isMedia ? mediaReason : sendDisabledReason || (selectedType?.available === false ? selectedType.message || '该创作能力暂不可用。' : ''))
-  const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
-  const projectReferences = new Map(availableReferences.filter(card => card.projectFile).map(card => [card.id, card.projectFile]))
-  const referenceOptions = uniqueCards([...references, ...availableReferences])
-    .filter(card => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith('video/')))
-    .map(card => {
-      const projectFile = projectReferences.get(card.id)
-      const projectPath = projectFile?.path
-      const label = cardTitle(card)
-      const detail = [isChosen(card) ? '已引用' : '画布', referenceFormat(card), projectPath].filter(Boolean).join(' · ')
-      const readyProjectPath = projectFile?.status === 'ready' ? projectPath : undefined
-      return { key: card.id, card, label, detail, mentionLabel: projectPath, path: readyProjectPath,
-        searchText: [label, card.title, card.defaultOutcome?.name, card.path, detail].join(' ').normalize('NFC').toLowerCase() }
-    })
+  const referenceOptions = useMemo(() => {
+    const isChosen = candidate => references.some(reference => sameReference(reference, candidate))
+    const projectReferences = new Map(availableReferences.filter(card => card.projectFile).map(card => [card.id, card.projectFile]))
+    return uniqueCards([...references, ...availableReferences])
+      .filter(card => !unavailableReason(card) && !(isMedia && (card.importedFile || card.generatedFile)?.mime?.startsWith('video/')))
+      .map(card => {
+        const projectFile = projectReferences.get(card.id)
+        const projectPath = projectFile?.path
+        const label = cardTitle(card)
+        const detail = [isChosen(card) ? '已引用' : '画布', referenceFormat(card), projectPath].filter(Boolean).join(' · ')
+        const readyProjectPath = projectFile?.status === 'ready' ? projectPath : undefined
+        return { key: card.id, card, label, detail, mentionLabel: projectPath, path: readyProjectPath,
+          searchText: [label, card.title, card.defaultOutcome?.name, card.path, detail].join(' ').normalize('NFC').toLowerCase() }
+      })
+  }, [references, availableReferences, isMedia])
   const mentionProps = {
     referenceOptions, searchReferences: searchProjectReferences,
     acceptProjectFile: entry => !isMedia || !/\.(mp4|webm)$/i.test(entry.name),
@@ -583,7 +585,10 @@ export function CardComposer({
   }
 
   useEffect(() => {
-    if (visible && context?.openExecutionRequest) void toggleConversation(true)
+    if (visible && context?.openExecutionRequest) {
+      setRevisionEditing(false)
+      void toggleConversation(true)
+    }
   }, [context?.openExecutionRequest])
 
   useEffect(() => {
@@ -643,15 +648,15 @@ export function CardComposer({
 
         </div>
         {referencePending && <p className="wcc-creation-reference-pending" role="status">{activeReferenceWork.kind === 'import' ? `正在添加 ${activeReferenceWork.count} 份电脑资料…` : activeReferenceWork.kind === 'media' ? `正在导入 ${activeReferenceWork.count} 份${KIND_LABELS[outputType]}文件…` : '正在更新引用…'}</p>}
-        {!!references.length && <div className="wcc-creation-reference-preview" id={`${id}-reference-preview`} hidden={!previewOpen}><div>{references.map(card => <details key={card.id} ref={element=>element?referenceDetails.current.set(card.id,element):referenceDetails.current.delete(card.id)}>
-          <summary><span>{referenceFormat(card)}</span>{cardTitle(card)}</summary>
+        {!!references.length && <div className="wcc-creation-reference-preview" id={`${id}-reference-preview`} hidden={!previewOpen}><div>{references.map(card => <LazyDetails key={card.id} active={previewOpen} ref={element=>element?referenceDetails.current.set(card.id,element):referenceDetails.current.delete(card.id)}
+          summary={<summary><span>{referenceFormat(card)}</span>{cardTitle(card)}</summary>}>
           {card.truncated && <p className="wcc-creation-preview-note">本次引用为节选{Number.isFinite(card.fullLength) ? `，原文共 ${card.fullLength} 字符` : ''}。</p>}
           {card.kind === 'word' && <p className="wcc-creation-preview-note">正文来自此 Word 绑定的大纲版本。</p>}
           {card.referenceNote && <p className="wcc-creation-preview-note">{card.referenceNote}</p>}
           {(card.importedFile || card.generatedFile) && getReferenceFileHref && <ImportedReferenceFile card={card} getHref={getReferenceFileHref} />}
           <pre>{card.previewText ?? card.content ?? '本次未提供正文预览。'}</pre>
           {(card.excerptInfo?.annotation || card.annotation) && <div className="wcc-creation-preview-annotation"><span>注释</span><pre>{card.excerptInfo?.annotation || card.annotation}</pre></div>}
-        </details>)}</div></div>}
+        </LazyDetails>)}</div></div>}
       </section>
       {inputLocked && <div className={`wcc-creation-pending-state is-${context?.pendingGeneration?.phase || 'unknown'}`} role="status"><strong>{pendingLabel(context?.pendingGeneration)}</strong><p>{context?.pendingGeneration?.error || context?.pendingGeneration?.message || '成果文件保存后会原位更新卡片。'}</p><small>任务已提交。需要补充要求或确认时，请打开「任务对话」。</small></div>}
       {mediaCard && !inputLocked && !reviewingResult && <div className="wcc-media-method" role="group" aria-label="生成方式">

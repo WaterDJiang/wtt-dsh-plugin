@@ -10,9 +10,13 @@ function attachmentName(card, sourcePath) {
 }
 
 export async function loadConversationReferenceFiles(cards, { endpoint, isCurrent, currentCard, signal, fetchFile = fetch, FileType = File }) {
-  const files = [];
-  for (const card of cards) {
-    signal?.throwIfAborted();
+  const files = new Array(cards.length), controller = new AbortController();
+  const cancelled = () => controller.abort(signal.reason);
+  if (signal?.aborted) cancelled();
+  signal?.addEventListener('abort', cancelled, { once: true });
+  const readSignal = controller.signal;
+  async function read(card) {
+    readSignal.throwIfAborted();
     if (!isCurrent()) throw new Error('对话或画布已切换，请重新选择资产。');
     const current = currentCard(card);
     if (['missing', 'changed', 'modified', 'unavailable'].includes(current?.status) || ['missing', 'changed', 'modified', 'unavailable'].includes(current?.sourceStatus)) throw new Error('原文件已缺失或变化，请重新选择资产。');
@@ -23,20 +27,19 @@ export async function loadConversationReferenceFiles(cards, { endpoint, isCurren
       if (!text.trim()) throw new Error('此卡片没有可添加的内容。');
       const file = new FileType([text], attachmentName(card, '.md'), { type: 'text/markdown' });
       if (file.size > MAX_CONVERSATION_FILE_BYTES) throw new Error('单个附件不能超过20MiB。');
-      files.push(file);
-      continue;
+      return file;
     }
     const source = card.importedFile || card.generatedFile || card.defaultOutcome;
     const sourcePath = source?.path || card.path;
     if (!sourcePath) throw new Error('此卡片尚无可添加的已保存文件。');
     let hash = source?.hash || source?.sha256 || (card.kind === 'word' ? undefined : card.sourceHash);
     if (!hash) {
-      const result = await fetchFile(endpoint({ projectFilePreview: sourcePath }), { signal });
+      const result = await fetchFile(endpoint({ projectFilePreview: sourcePath }), { signal: readSignal });
       if (!result.ok) throw new Error('文件信息暂不可用，请重试。');
       hash = (await result.json()).hash;
     }
     if (!/^[a-f0-9]{64}$/i.test(hash || '')) throw new Error('文件缺少准确版本信息，请刷新后重试。');
-    const response = await fetchFile(endpoint({ projectFileDownload: sourcePath, hash }), { signal });
+    const response = await fetchFile(endpoint({ projectFileDownload: sourcePath, hash }), { signal: readSignal });
     if (!response.ok) {
       const detail = await response.json().catch(() => null);
       throw new Error(detail?.error?.message || detail?.error || '文件已缺失或变化，请刷新后重新选择。');
@@ -46,10 +49,25 @@ export async function loadConversationReferenceFiles(cards, { endpoint, isCurren
     if (blob.size > MAX_CONVERSATION_FILE_BYTES) throw new Error('单个附件不能超过20MiB。');
     const actual = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))].map(byte => byte.toString(16).padStart(2, '0')).join('');
     if (actual !== hash) throw new Error('文件内容与所选版本不一致，请重新选择。');
-    files.push(new FileType([blob], attachmentName(card, sourcePath), { type: source?.mime || blob.type || 'application/octet-stream' }));
+    return new FileType([blob], attachmentName(card, sourcePath), { type: source?.mime || blob.type || 'application/octet-stream' });
   }
-  if (!isCurrent()) throw new Error('对话或画布已切换，请重新选择资产。');
-  return files;
+  let next = 0, failure;
+  async function worker() {
+    while (next < cards.length && !readSignal.aborted) {
+      const index = next++;
+      try { files[index] = await read(cards[index]); }
+      catch (error) { if (!failure) { failure = error; controller.abort(error); } throw error; }
+    }
+  }
+  try {
+    const results = await Promise.allSettled(Array.from({ length: Math.min(3, cards.length) }, worker));
+    if (failure) throw failure;
+    const rejected = results.find(result => result.status === 'rejected');
+    if (rejected) throw rejected.reason;
+    readSignal.throwIfAborted();
+    if (!isCurrent()) throw new Error('对话或画布已切换，请重新选择资产。');
+    return files;
+  } finally { signal?.removeEventListener('abort', cancelled); }
 }
 
 // Only stage drafts. The resident native composer still owns send, queue and upload errors.

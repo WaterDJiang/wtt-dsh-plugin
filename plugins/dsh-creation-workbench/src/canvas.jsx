@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './canvas.css'
-import { CanvasChrome, CanvasSearch, SelectionActions, CanvasContextMenu } from './canvas-chrome.jsx'
+import { CanvasChrome, CanvasIcon, CanvasSearch, SelectionActions, CanvasContextMenu } from './canvas-chrome.jsx'
 import { WhiteboardNode, WhiteboardStyleControls } from './whiteboard-nodes.jsx'
 import { createLayoutHistory } from './canvas-history.mjs'
 import { arrangeCardBlocks } from './canvas-arrangement.mjs'
@@ -141,9 +141,9 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const warning = data.delivery?.status === 'failed' || /missing|modified|changed|unavailable|缺失|变化|外改/.test(`${data.status || ''} ${data.sourceStatus || ''} ${data.projectFile?.status || ''}`)
   return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined}>
     <ReferencePickOverlay nodeId={id} />
-    <NodeResizer nodeId={id} isVisible={selected} minWidth={200} minHeight={160} maxWidth={1200} maxHeight={1200}
+    {selected && <NodeResizer nodeId={id} minWidth={200} minHeight={160} maxWidth={1200} maxHeight={1200}
       handleStyle={{ backgroundColor: 'var(--wtt-ui-card-selection)', borderColor: 'var(--wtt-ui-card-selection)' }} lineStyle={{ borderColor: 'transparent' }} handleClassName="wcc-content-resize-handle" lineClassName="wcc-content-resize-line"
-      onResizeStart={() => data.onResizeStart?.()} onResizeEnd={(_event, size) => data.onResizeEnd?.(id, size)} />
+      onResizeStart={() => data.onResizeStart?.()} onResizeEnd={(_event, size) => data.onResizeEnd?.(id, size)} />}
     <Handle type="target" position={Position.Left} isConnectable={isConnectable} aria-label={`连接到 ${data.title}`} />
     <header className="wcc-card-grip">
       <div className="wcc-card-heading"><h3 title={titleHint}>{title}</h3></div>
@@ -208,15 +208,24 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
       {fileDeck && <UiButton variant="quiet" size="compact" onClick={e=>{e.stopPropagation();data.onOpenOutcome?.(fileDeck.sourceRef)}}>查看 PPTX{fileDeck.role==='attachment'?' · 附件':''}</UiButton>}
       {data.slideProject && <UiButton variant="quiet" size="compact" onClick={e=>{e.stopPropagation();data.onOpenWeb?.()}} title={fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? '同任务的其他网页工程，未关联当前PPTX' : undefined}>{fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? '其他网页工程' : '编辑网页课件'}</UiButton>}
     </div>}
+    {data.mediaActionLabel && <div className="wcc-card-media-actions nodrag nopan" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
+      <UiButton variant="quiet" onClick={event => {
+        event.stopPropagation()
+        if (event.detail <= 1) data.onMediaAction?.()
+      }}>
+        <CanvasIcon name={data.mediaHasConversation ? 'chat' : 'ai'} size={16} />
+        {data.mediaActionLabel}
+      </UiButton>
+    </div>}
     <footer hidden={data.kind === 'generation' && Boolean(data.slideProject)} className={warning ? 'wcc-card-footer is-warning' : 'wcc-card-footer'} title={data.projectFile?.path || data.sourcePath || data.path || ''}>
       <span className="wcc-state-dot" />{['artifact', 'outline', 'word'].includes(data.kind) ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan" aria-label={`显示所在文件夹：${data.delivery?.fileName || data.title}`} title={data.delivery?.error || data.delivery?.path || '在文件夹中显示此版本'} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenFile?.() }}>
         <span>{data.delivery?.fileName || '整理并定位文件'}</span><small>{data.delivery?.version === 0 ? '制作资料' : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, '0')}`}</small><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z" /></svg>
       </UiButton> : data.projectFile ? <span>{data.projectFile.status==='ready'?'文件引用':'原文件已变化 · 引用保留'}</span> : stateLabel({ ...data, pendingGeneration: pending })}
     </footer>
     <Handle type="source" position={Position.Right} isConnectable={isConnectable} aria-label={`从 ${data.title} 连线`} />
-    <NodeToolbar isVisible={selected && data.kind !== 'generation'} position={Position.Right} offset={12}>
+    {selected && data.kind !== 'generation' && <NodeToolbar isVisible position={Position.Right} offset={12}>
       <UiButton variant="custom" className="wcc-card-create nodrag nopan" aria-label={`用 ${title} 继续创作`} title="用这张卡创作" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onCreate?.(id) }}>＋</UiButton>
-    </NodeToolbar>
+    </NodeToolbar>}
   </article>
 })
 
@@ -230,6 +239,13 @@ const NODE_TYPES = { content: ContentCard, courseGroup: CardGroup, whiteboard: W
 const isObject = node => node.type === 'content' || node.type === 'whiteboard'
 const nodeSize = node => ({ width: Number(node.width || node.style?.width || node.data?.width || CARD_WIDTH), height: Number(node.height || node.style?.height || node.data?.height || CARD_HEIGHT) })
 const STATIC_VIEW = [0, 0, 1]
+const MULTI_SELECTION_KEYS = ['Meta', 'Control', 'Shift']
+const PAN_MOUSE_BUTTONS = [1]
+const CANVAS_ARIA_LABELS = {
+  'controls.zoomIn.ariaLabel': '放大画布', 'controls.zoomOut.ariaLabel': '缩小画布',
+  'controls.fitView.ariaLabel': '适应全部卡片', 'controls.interactive.ariaLabel': '切换画布交互',
+  'node.a11yDescription.default': '单击内容区打开 AI，双击编辑或查看。可从标题或边框拖动，按 Shift 多选。',
+}
 
 function CanvasViewportLayer({ follow = true, children }) {
   const transform = useStore(state => follow ? state.transform : STATIC_VIEW)
@@ -590,7 +606,13 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }))
   const deskVersion = selectedCard?.kind === 'outline' ? outlineVersions.find(version => version.id === selectedCard.refId) : null
   const productionTypes = dependencies?.creationTypes || ['outline', 'pptx', 'exercise', 'script'].map(id => ({ id, label: OUTPUT_LABELS[id], available: false, message: '正在检查创作能力…' }))
-  const availableReferences = [
+  // Reuse only UI metadata when layout moves keep card data intact; file reads still verify their hash.
+  const referenceDataCache = useRef({ scope: '', nodes: [], cards: [] })
+  const referenceNodes = nodes.filter(node => node.type === 'content' || node.type === 'whiteboard')
+  const referenceScope = `${projectId}:${requirement.id}`
+  const sameReferenceData = referenceDataCache.current.scope === referenceScope && referenceNodes.length === referenceDataCache.current.nodes.length
+    && referenceNodes.every((node, index) => { const old = referenceDataCache.current.nodes[index]; return node.id === old.id && node.type === old.type && node.data === old.data })
+  const availableReferences = sameReferenceData ? referenceDataCache.current.cards : [
     ...nodes.filter(node => node.type === 'content').map(node => node.data).filter(usableCreationSource).map(creationSource).map(card => ({ ...card,
       displayTitle: contentCardTitle(card),
       ...(card.importedFile ? { referenceNote: card.importedFile.extractionStatus === 'extracted'
@@ -602,6 +624,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       referenceNote: '引用时自动保存素材快照',
       ...(!String(node.data.text ?? node.data.content ?? '').trim() ? { disabled: true, reason: '此白板元素没有文字内容' } : {}) })),
   ]
+  if (!sameReferenceData) referenceDataCache.current = { scope: referenceScope, nodes: referenceNodes, cards: availableReferences }
   const sourceNode = creation && nodes.find(node => node.id === (creation.composerNodeId || creation.anchor.nodeId || creation.anchor.id))
   const blankPoint = !creation?.composerNodeId && creation?.blankPosition
   const sourcePoint = blankPoint || (sourceNode ? absolutePosition(sourceNode, nodes) : null)
@@ -624,17 +647,19 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     position.x = Math.max(12, Math.min(availableWidth - width - 12, position.x))
     return position
   }
-  const availableReferencesById = new Map(availableReferences.map(card => [card.id, card]))
-  let creationBudget = 60_000 - (creation?.selection?.quote.length || 0)
-  const creationReferences = (creation?.references || []).map(card => {
-    const current = availableReferencesById.get(card.id)
-    const displayTitle = current?.sourceHash === card.sourceHash ? current?.displayTitle : undefined
-    const selectedPassage = creation?.selection?.sourceCardId === card.id
-    const content = selectedPassage ? creation.selection.quote : String(card.content || card.excerpt || '')
-    const allowed = selectedPassage ? content.length : Math.min(12_000, creationBudget)
-    if (!selectedPassage) creationBudget -= Math.min(content.length, allowed)
-    return { ...card, displayTitle, previewText: content.slice(0, allowed), truncated: content.length > allowed, fullLength: content.length }
-  })
+  const availableReferencesById = useMemo(() => new Map(availableReferences.map(card => [card.id, card])), [availableReferences])
+  const creationReferences = useMemo(() => {
+    let creationBudget = 60_000 - (creation?.selection?.quote.length || 0)
+    return (creation?.references || []).map(card => {
+      const current = availableReferencesById.get(card.id)
+      const displayTitle = current?.sourceHash === card.sourceHash ? current?.displayTitle : undefined
+      const selectedPassage = creation?.selection?.sourceCardId === card.id
+      const content = selectedPassage ? creation.selection.quote : String(card.content || card.excerpt || '')
+      const allowed = selectedPassage ? content.length : Math.min(12_000, creationBudget)
+      if (!selectedPassage) creationBudget -= Math.min(content.length, allowed)
+      return { ...card, displayTitle, previewText: content.slice(0, allowed), truncated: content.length > allowed, fullLength: content.length }
+    })
+  }, [creation?.references, creation?.selection, availableReferencesById])
 
   function setDeckPreview(value) {
     if (value) setOutcomeView(null)
@@ -899,7 +924,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }
   }
 
-  async function openOutputCard(card, versionId, { showDeck = true, expectedFrame } = {}) {
+  async function openOutputCard(card, versionId, { showDeck = true, expectedFrame, openConversation = false } = {}) {
     if (card.composition) return openComposition({card:card.outputCard,node:card,composition:card.composition})
     if (card.kind === 'generation') return openPendingCard(card, { showDeck })
     cancelCardOpen()
@@ -928,10 +953,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       replaceNodes(decorate(nodesRef.current.map(item => item.id === node.id ? { ...item, selected: true, data: descriptor.node } : { ...item, selected: false })))
       setSelectionKey(node.id)
       const initial = createRevisionContext({ projectId, projectName: project?.name || '当前项目', projectPath: project?.path || '', requirement, descriptor })
+      // Keep an unfinished revision draft attached to its own task.
+      const cachedRevision = cache.current.drafts.get(initial.key)
+      if (openConversation && cachedRevision && cachedRevision.sessionId !== initial.sessionId) initial.key += `:original-conversation:${crypto.randomUUID()}`
       const previous = cache.current.drafts.get(initial.key)
       const next = previous ? { ...initial, ...previous, anchor: initial.anchor, targetCard: initial.targetCard, baseVersion: initial.baseVersion,
         recorded: initial.recorded, referenceNotes: initial.referenceNotes } : initial
       next.focusRequest = (previous?.focusRequest || 0) + 1
+      if (openConversation && initial.sessionId) next.openExecutionRequest = crypto.randomUUID()
       cache.current.drafts.set(next.key, next)
       cache.current.cardKeys.set(node.id, next.key)
       cache.current.activeKey = next.key
@@ -943,6 +972,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       setContextMenu(null)
       setSidebar(false)
       setFocusOpen(false)
+      if (openConversation) setOutcomeView(null)
       const mediaFile = ['image', 'video'].includes(cardCapabilities(descriptor.node).format)
       const nativeFile = showDeck && (mediaFile || descriptor.node.path && !/\.(md|txt)$/i.test(descriptor.node.path))
       if (showDeck && (descriptor.card.type === 'pptx' || nativeFile)) {
@@ -989,11 +1019,25 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     else openPanel('inspect')
   }
 
+  function openMediaAction(id) {
+    if (referencePickRef.current || operationLock.current || nodeDragging.current || !activeRef.current) return
+    const card = nodesRef.current.find(node => node.id === id)?.data
+    if (!card?.mediaActionLabel) return
+    selectCard(id)
+    onCloseProjectFile?.()
+    if (card.outputCard && card.mediaHasConversation) {
+      void openOutputCard(card, card.outputCard.versionId, { showDeck: false, openConversation: true })
+      return
+    }
+    openCreation(card, cardCapabilities(card).format)
+  }
+
   function openClickedCard(event, node) {
     if (referencePickRef.current) return
     cancelCardOpen()
     if (nodeDragging.current) return
     if (!isObject(node) || event.shiftKey || event.metaKey || event.ctrlKey || event.detail > 1) return
+    if (node.data.mediaActionLabel) return
     const content = node.type === 'whiteboard' ? '.wcc-element-content' : '.wcc-card-body'
     if (!event.target.closest?.(content)) return
     onCloseProjectFile?.()
@@ -1635,11 +1679,17 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const task = taskById.get(head?.taskId)
       const publishedGeneration = (!node.data.pendingGeneration || node.data.pendingGeneration.published)
         ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : undefined
+      const shownVersion = card?.versions.find(version => version.id === card.versionId)
+      const mediaFormat = ['image', 'video'].includes(cardCapabilities(node.data).format)
+      const mediaHasConversation = mediaFormat && Boolean(taskById.get(shownVersion?.taskId)?.sessionId)
+      const mediaActionLabel = mediaHasConversation ? '打开对话'
+        : mediaFormat && node.data.kind !== 'generation' && usableCreationSource(node.data) ? '用 AI 创作' : undefined
       // Preserve actual measurements on data refresh so React Flow keeps handle bounds.
       return { ...node, ...(measured?.width > 0 && measured?.height > 0 ? { measured } : {}), data: { ...node.data, onCreate: openNodeMenu,
       onUploadContent: cardContentAccept(node.data) ? () => chooseCardFile(node.data) : undefined,
       onRename: () => { closeCreation(); setRenameError(''); setRenameCard(node.data) },
       publishedGeneration,
+      mediaHasConversation, mediaActionLabel, onMediaAction: mediaActionLabel ? () => openMediaAction(node.id) : undefined,
       onEditText: () => openTextEditor(node.data),
       onResizeStart: beginResize, onResizeEnd: finishCardResize,
       nativeSessionStatus: nativeStatusesRef.current?.get(node.data.pendingGeneration?.sessionId),
@@ -2277,11 +2327,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   function onEdgesChange(changes) {
     if (referencePickRef.current) return
-    const before = layoutSnapshot()
     const allowed = changes.filter(change => change.type !== 'remove' || !edgesRef.current.find(edge => edge.id === change.id)?.provenance)
+    const removing = allowed.some(change => change.type === 'remove')
+    const before = removing ? layoutSnapshot() : null
     const next = applyEdgeChanges(allowed, edgesRef.current)
     replaceEdges(next)
-    if (allowed.some(change => change.type === 'remove')) { remember(before); void saveLayout() }
+    if (removing) { remember(before); void saveLayout() }
   }
 
   const selectionChanged = useCallback(({ nodes: selected, edges: selectedEdges }) => {
@@ -3042,6 +3093,22 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   ]
 
   const feedbackError = board && loadError ? `${error ? error + ' ' : ''}画布刷新失败：${loadError}` : error
+  // React Flow stores event props individually. Draft typing must not fan out to every edge subscription.
+  const graphCallbacksRef = useRef(null)
+  graphCallbacksRef.current = {
+    onEdgesChange, onConnect: connect, onNodeDragStart: beginNodeDrag, onSelectionDragStart: beginNodeDrag,
+    onNodeDragStop: finishNodeDrag, onSelectionDragStop: finishNodeDrag,
+    onSelectionStart: () => { if (referencePickRef.current) referenceBoxBase.current = [...referencePickRef.current.references] },
+    onSelectionEnd: () => { if (referencePickRef.current) { referenceBoxBase.current = null; replaceNodes(nodesRef.current.map(node => ({ ...node }))) } },
+    onMove: (_, viewport) => { if (active) { cancelPaneInsert(); viewportRef.current = viewport; if (creationMenu) setCreationMenu(null) } },
+    onMoveEnd: (_, viewport) => { if (active) { viewportRef.current = viewport; if (!restoringViewport.current && !gestureViewportActive.current) void saveLayout(false, false, true) } },
+    onPaneClick: clickPane, onNodeClick: openClickedCard,
+    onNodeDoubleClick: (_event, node) => { if (!referencePickRef.current && node.type === 'content') openCardDetails(node.data) },
+    onPaneContextMenu: event => showContext(event), onNodeContextMenu: showContext,
+    onSelectionContextMenu: (event, selection) => showContext(event, selection[0]),
+  }
+  const graphCallbacks = useMemo(() => Object.fromEntries(Object.keys(graphCallbacksRef.current)
+    .map(name => [name, (...args) => graphCallbacksRef.current[name](...args)])), [])
   const graphInputBlocked = Boolean((!pickingReferences && (dock.mobile || editorFullscreen) && dockOpen) || (loading && hasLoadedBoard))
   useLayoutEffect(() => {
     // Set the DOM property directly: supported DSH renderers may omit JSX inert.
@@ -3050,7 +3117,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   return <CanvasConversationReferenceContext.Provider value={{ start: startConversationReferencePick, busy: Boolean(busy) || loading || pickingReferences }}><div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
-  }} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
+  }} data-large-canvas={nodes.length >= LARGE_CANVAS_THRESHOLD || undefined} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
       onRemove={() => void removeElements()} />}
@@ -3076,36 +3143,19 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           key={requirement.id}
           nodes={nodes} edges={visibleEdges} nodeTypes={NODE_TYPES}
           onlyRenderVisibleElements={nodes.length >= LARGE_CANVAS_THRESHOLD && !editingNodeId}
-          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-          onSelectionChange={selectionChanged} onConnect={connect}
-          onSelectionStart={() => { if (referencePickRef.current) referenceBoxBase.current = [...referencePickRef.current.references] }}
-          onSelectionEnd={() => { if (referencePickRef.current) { referenceBoxBase.current = null; replaceNodes(nodesRef.current.map(node => ({ ...node }))) } }}
+          onNodesChange={onNodesChange} onSelectionChange={selectionChanged} {...graphCallbacks}
           connectionLineType={ConnectionLineType.Bezier}
-          onNodeDragStart={beginNodeDrag} onSelectionDragStart={beginNodeDrag}
-          onNodeDragStop={finishNodeDrag}
-          onSelectionDragStop={finishNodeDrag}
-          onMove={(_, viewport) => { if (active) { cancelPaneInsert(); viewportRef.current = viewport; if (creationMenu) setCreationMenu(null) } }}
-          onMoveEnd={(_, viewport) => { if (active) { viewportRef.current = viewport; if (!restoringViewport.current && !gestureViewportActive.current) void saveLayout(false, false, true) } }}
           defaultViewport={board.viewport || { x: 0, y: 0, zoom: 1 }}
           minZoom={0.1} maxZoom={3} selectionMode={SelectionMode.Full} nodeDragThreshold={5} nodeClickDistance={5}
-          multiSelectionKeyCode={['Meta', 'Control', 'Shift']} selectionKeyCode="Shift"
+          multiSelectionKeyCode={MULTI_SELECTION_KEYS} selectionKeyCode="Shift"
           selectionOnDrag={tool === 'select' && !busy}
           autoPanOnSelection={false}
           // The gesture adapter owns wheel/pinch over both the pane and nodes.
           panActivationKeyCode="Space" panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomActivationKeyCode={null}
-          panOnDrag={tool === 'hand' ? true : [1]} zoomOnDoubleClick={false}
+          panOnDrag={tool === 'hand' ? true : PAN_MOUSE_BUTTONS} zoomOnDoubleClick={false}
           nodesDraggable={!pickingReferences && !busy && tool === 'select'} nodesConnectable={!pickingReferences && !busy && tool === 'select'} elementsSelectable={!busy && tool === 'select'} disableKeyboardA11y={!!busy || pickingReferences}
           deleteKeyCode={null}
-          onPaneClick={clickPane}
-          onNodeClick={openClickedCard}
-          onNodeDoubleClick={(_event, node) => { if (!referencePickRef.current && node.type === 'content') openCardDetails(node.data) }}
-          onPaneContextMenu={event => showContext(event)} onNodeContextMenu={showContext}
-          onSelectionContextMenu={(event, selection) => showContext(event, selection[0])}
-          ariaLabelConfig={{
-            'controls.zoomIn.ariaLabel': '放大画布', 'controls.zoomOut.ariaLabel': '缩小画布',
-            'controls.fitView.ariaLabel': '适应全部卡片', 'controls.interactive.ariaLabel': '切换画布交互',
-            'node.a11yDescription.default': '单击内容区打开 AI，双击编辑或查看。可从标题或边框拖动，按 Shift 多选。',
-          }}
+          ariaLabelConfig={CANVAS_ARIA_LABELS}
         >
           <Background gap={24} size={1} color="var(--wtt-ui-grid, #d4d9e3)" />
           {showMap && <MiniMap pannable zoomable position="bottom-right" nodeColor={node => node.type === 'whiteboard' ? 'var(--wtt-ui-warning, #e6ce8d)' : 'var(--wtt-ui-edge, #a6b6d5)'} />}
@@ -3128,6 +3178,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         {interactions.length > 0 && <details className="wcc-skill-inbox"><summary>待你处理 · {interactions.length}</summary><div>{interactions.map(entry => <UiButton variant="custom" type="button" key={entry.key} onClick={() => openSkillReview(entry)}>{entry.interaction.questions?.[0]?.header || entry.interaction.questions?.[0]?.question?.slice(0, 120) || '执行权限待确认'}<small>{entry.task.title}</small></UiButton>)}</div></details>}
         {showSelectionActions && <CanvasViewportLayer follow={active}>{view => <SelectionActions {...selectionPosition(view)} selectedCount={selectedNodes.length}
           onInspect={() => openPanel('inspect')} onAI={() => openPanel('ai')} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
+          mediaActionLabel={selectedCard?.mediaActionLabel} onMediaAction={selectedCard?.onMediaAction}
           canUngroup={hasSelectedGroup} onUngroup={ungroup} onAlign={alignSelection}
           canPromote={onlyWhiteboard && selectedNodes.length === 1 && !!selectedCard?.text?.trim()} onPromote={promoteWhiteboard}
           canDuplicate={onlyWhiteboard} onDuplicate={duplicateElements} canDelete={selectedNodes.length>0} onDelete={removeElements} />}</CanvasViewportLayer>}

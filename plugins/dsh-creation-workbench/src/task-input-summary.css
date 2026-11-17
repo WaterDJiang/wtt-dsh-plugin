@@ -13,3 +13,5 @@
 .wcc-task-input-meta{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:0 var(--wtt-space-2);margin:var(--wtt-space-2) 0;color:var(--wtt-ui-muted);font-size:var(--wtt-text-xs)}
 .wcc-task-input-meta dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:600px){.wcc-task-input-summary>summary{min-height:var(--wtt-control-touch-h)}}
+
+.wcc-task-input-summary > summary .wcc-task-input-warning{color:var(--wtt-ui-warning);white-space:normal}

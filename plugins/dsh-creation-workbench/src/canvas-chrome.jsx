@@ -21,6 +21,7 @@ const ICONS = {
   redo: <><path d="m16 5 5 5-5 5M21 10H10a6 6 0 0 0 0 12" /></>,
   refresh: <><path d="M20 11a8 8 0 0 0-14-5L3 9M3 3v6h6M4 13a8 8 0 0 0 14 5l3-3M15 15h6v6" /></>,
   inspect: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M14 4v16M6 8h5M6 12h5M6 16h3" /></>,
+  chat: <path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />,
   ai: <><path d="m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2Z" /><path d="m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7L19 2Z" /></>,
   group: <><path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5" /><rect x="7" y="7" width="10" height="10" rx="1" /></>,
   ungroup: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><path d="M14 3h7v7M3 14v7h7" /></>,
@@ -150,13 +151,15 @@ export function SelectionActions({
   canGroup = selectedCount > 1, canUngroup = false, onAlign, busy = false,
   onPromote, canPromote = false, onDuplicate, canDuplicate = false,
   onDelete, canDelete = false,
+  mediaActionLabel, onMediaAction,
 }) {
   const [alignOpen, setAlignOpen] = useState(false)
   const style = x === undefined ? undefined : { left: x, top: y ?? 86 }
   return <div className={`wcc-studio-selection wcc-studio-surface${x === undefined ? '' : ' is-positioned'}`} style={style} role="toolbar" aria-label={`已选 ${selectedCount} 个对象的操作`} onPointerDown={event => event.stopPropagation()}>
     <span className="wcc-studio-selection-count">{selectedCount} 项</span>
     <ToolButton icon="inspect" label="查看内容" onClick={onInspect} />
-    <ToolButton icon="ai" label="交给 AI" onClick={onAI} className="is-ai"><span>交给 AI</span></ToolButton>
+    {onMediaAction ? <ToolButton icon={mediaActionLabel === '打开对话' ? 'chat' : 'ai'} label={mediaActionLabel} onClick={onMediaAction} className="is-ai"><span>{mediaActionLabel === '打开对话' ? '对话' : mediaActionLabel}</span></ToolButton>
+      : <ToolButton icon="ai" label="交给 AI" onClick={onAI} className="is-ai"><span>交给 AI</span></ToolButton>}
     {canPromote && <ToolButton icon="material" label="保存为素材" onClick={onPromote} disabled={busy} />}
     <span className="wcc-studio-divider" aria-hidden="true" />
     {canGroup && <ToolButton icon="group" label="编组" shortcut="⌘/Ctrl G" onClick={onGroup} disabled={busy} />}

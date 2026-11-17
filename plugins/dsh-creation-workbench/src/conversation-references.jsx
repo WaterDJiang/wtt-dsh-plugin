@@ -6,7 +6,10 @@ export const CanvasConversationReferenceContext = createContext(null)
 
 export function CanvasConversationReferenceButton({ sessionId, useInput, inputActions, getAttachmentService }) {
   const picker = useContext(CanvasConversationReferenceContext)
-  const input = useInput(value => value)
+  const phase = useInput(value => value.phase)
+  const claim = useInput(value => value.claim)
+  const attachmentIds = useInput(value => value.attachmentIds)
+  const input = { phase, claim, attachmentIds }
   const current = useRef({ sessionId, input })
   const live = useRef(false), cancel = useRef(null), button = useRef(null)
   const [error, setError] = useState('')

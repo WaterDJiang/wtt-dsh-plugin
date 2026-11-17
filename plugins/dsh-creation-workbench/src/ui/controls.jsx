@@ -1,4 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
+
+// Closed reference sections keep their summaries, without mounting media or full bodies.
+export function LazyDetails({ summary, children, active = true, onToggle, ...props }) {
+ const [expanded,setExpanded]=useState(Boolean(props.open))
+ return <details {...props} onToggle={event=>{if(event.target!==event.currentTarget)return;setExpanded(event.currentTarget.open);onToggle?.(event)}}>
+  {summary}{active&&expanded?children:null}
+ </details>
+}
 
 export function UiIcon({name,size=16,...props}) {
  const paths={file:<><path d="M13 3H5v18h14V9l-6-6Z"/><path d="M13 3v6h6M8 15h8M12 11v8"/></>,folder:<><path d="M3 7V4h6l2 3h10v13H3V7Z"/><path d="M8 13h8M12 9v8"/></>,check:<path d="m4 12 5 5L20 6"/>,close:<path d="m6 6 12 12M18 6 6 18"/>,download:<><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></>,expand:<><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></>,restore:<><path d="M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6"/></>,back:<path d="m14 5-7 7 7 7"/>,refresh:<path d="M20 10a8 8 0 1 0-2 8M20 4v6h-6"/>,more:<><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>}
