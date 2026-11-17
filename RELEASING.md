@@ -11,6 +11,7 @@
 - [ ] 检查 WTT 自定义市场的中英文标题、描述、分类与关键词。有新版本时，核对市场条目、安装包和固定提交一致。
 - [ ] 检查 DSH 社区市场的中英文描述、分类和安装来源。需要修改时，通过社区目录提交独立条目 PR。 [社区目录条目](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/data/plugins/WaterDJiang__wtt-dsh-plugin--plugins-dsh-creation-workbench.yml)
 - [ ] 检查随本次发布更新的版本说明、公告、示例及截图，逐个打开更新过的链接。
+- [ ] 新增或改名的入口同步到README日常使用指南，写清位置、操作、限制和返回方式；不能只写在版本记录。首次引用与后续对话附件、隐藏与取消任务分别说明。
 - [ ] 审查公开提交和安装包的文件范围，检查凭据、个人信息、私有资料及本机数据是否混入。
 
 ## 发布后
