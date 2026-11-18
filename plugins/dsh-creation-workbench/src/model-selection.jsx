@@ -1,11 +1,63 @@
 import { UiButton } from './ui/controls.jsx'
 import { UserError } from './user-feedback.jsx'
-import React, { useId } from 'react'
+import React, { useId, useMemo, useSyncExternalStore } from 'react'
 import { EFFORT_LABELS, normalizeModelCatalog } from './model-selection.mjs'
 import './model-selection.css'
 
-export function ModelSelection({ catalog, selection, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false }) {
+const MODEL_SLOT = 'conversation.input.model'
+const noSubscription = () => () => {}
+const noSnapshot = () => null
+const renderDraftModelLabel = (_slot, _props, options) => options?.fallback ?? null
+
+export function createNativeModelSeat(slots, locale) {
+  if (!locale) return undefined
+  return {
+    subscribe: listener => slots.subscribe(MODEL_SLOT, listener),
+    getSnapshot: () => slots.entriesOfSlot(MODEL_SLOT)[0]?.component ?? null,
+    subscribeLocale: listener => locale.subscribe(listener),
+    getLocale: () => locale.getSnapshot(),
+    t: locale.bind('model'),
+    resolveText: value => locale.resolveText(value),
+  }
+}
+
+function NativeModelSelection({ Component, seat, catalog, current, model, loading, failure, onChange, onRefresh, onOpenSettings }) {
+  useSyncExternalStore(seat.subscribeLocale, seat.getLocale)
+  const snapshot = useMemo(() => ({
+    current: current ?? null,
+    routable: loading ? null : Boolean(model),
+    groups: catalog?.groups ?? [],
+    failures: catalog?.failures ?? [],
+    status: loading ? 'loading' : failure ? 'error' : 'ready',
+    pending: null,
+    error: failure || null,
+  }), [catalog, current, model, loading, failure])
+  // The draft hasn't created a DSH session yet. The host view reads the workbench's
+  // controlled selection here; the task/session boundary freezes it on submit.
+  const directory = useMemo(() => ({ subscribe: noSubscription, getSnapshot: () => snapshot }), [snapshot])
+  async function select(next) {
+    if (!onChange) return
+    if (next.provider !== current?.provider || next.model !== current?.model) {
+      const chosen = snapshot.groups.find(group => group.id === next.provider)?.models.find(item => item.id === next.model)
+      if (!chosen) return
+      const defaultEffort = chosen.reasoning?.defaultEffort
+      if (defaultEffort && next.reasoningEffort === undefined) next = { ...next, reasoningEffort: defaultEffort }
+    }
+    onChange(next)
+    return { ok: true }
+  }
+  return <div className="wcc-native-model-selection">
+    <Component locked={!onChange} available directory={directory}
+      load={() => { if (!loading) void onRefresh?.() }} select={select}
+      t={seat.t} resolveText={seat.resolveText} renderSlot={renderDraftModelLabel} />
+    {!loading && (failure || !snapshot.groups.length) && onOpenSettings &&
+      <UiButton variant="quiet" size="compact" type="button" onClick={onOpenSettings}>模型设置</UiButton>}
+  </div>
+}
+
+export function ModelSelection({ catalog, selection, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false, nativeSeat, frozen = false }) {
   const id = useId()
+  const NativeComponent = useSyncExternalStore(nativeSeat?.subscribe ?? noSubscription, nativeSeat?.getSnapshot ?? noSnapshot, noSnapshot)
   let normalized = null
   let catalogError = ''
   if (catalog) {
@@ -19,6 +71,14 @@ export function ModelSelection({ catalog, selection, onChange, onRefresh, onOpen
   const efforts = model?.reasoning?.efforts || []
   const unavailable = Boolean(current && !model)
   const failure = error?.message || (typeof error === 'string' ? error : '') || catalogError
+  const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : '默认'
+  if (NativeComponent && frozen) {
+    return <span className="wcc-model-selection-state" title="原任务模型已锁定">{model?.name || current?.model} · {effortLabel} · 已锁定</span>
+  }
+  if (NativeComponent) {
+    return <NativeModelSelection Component={NativeComponent} seat={nativeSeat} catalog={normalized} current={current} model={model}
+      loading={loading} failure={failure} onChange={onChange} onRefresh={onRefresh} onOpenSettings={onOpenSettings} />
+  }
   const disabled = loading || !groups.length || typeof onChange !== 'function'
   function chooseModel(group, nextModel) {
     if (!group || !nextModel) return
@@ -55,7 +115,6 @@ export function ModelSelection({ catalog, selection, onChange, onRefresh, onOpen
     <p className="wcc-model-selection-hint">用于之后发起的创作；已有任务继续使用创建时的模型。</p>
   </>
   const modelLabel = loading ? '读取模型…' : model?.name || current?.model || '选择模型'
-  const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : '默认'
   const modelState = failure ? '加载失败' : !loading && !groups.length ? '未配置' : unavailable ? '不可用' : normalized?.failures.length ? '部分不可用' : ''
   const diagnostics = <>
     {failure && <UserError className="wcc-model-selection-error" error={failure} />}

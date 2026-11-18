@@ -8093,6 +8093,16 @@ dialog.wtt-project-picker[open] {
 }
 
 /* src/model-selection.css */
+.wcc-native-model-selection {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--wtt-space-1);
+}
+.wcc-native-model-selection > :first-child {
+  min-width: 0;
+}
 .wcc-model-selection {
   display: grid;
   gap: 7px;

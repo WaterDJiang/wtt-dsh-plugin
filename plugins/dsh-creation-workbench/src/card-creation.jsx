@@ -261,7 +261,7 @@ export function CardComposer({
   busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onTaskControl, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
   mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onMediaOptionsChange, onGenerationMethodChange, onMediaProviderChange, onGenerateMedia, onResumeMedia, onNewMedia,
-  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, modelLoading, modelError,
+  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, modelLoading, modelError,
 }) {
   const id = useId()
   const composer = useRef(null)
@@ -370,7 +370,14 @@ export function CardComposer({
   const label = recoveringMedia ? '取回生成结果' : inputLocked ? pendingRetryAllowed(context?.pendingGeneration) && !isMedia ? '重试原任务' : pendingLabel(context?.pendingGeneration) : isAction ? sendLabel || { material: '添加素材', excerpt: '选择原文摘录', word: '导出 Word' }[outputType] : revising ? '生成新版本' : `生成${['outline', 'exercise', 'script'].includes(outputType) ? '文本' : KIND_LABELS[outputType] || '文本'}`
   const acceptedFiles = Array.isArray(acceptedFileTypes) ? acceptedFileTypes.join(',') : acceptedFileTypes
   const submitFooter = !hideSubmit && showInitialInput && <footer className={`wcc-creation-submit${isMedia ? ' is-media' : ''}`}>
-    {isMedia ? (recoveringMedia ? <p>取回原结果，不重复生成。</p> : <span />) : <div className="wcc-creation-footer-model">{!isAction && (inputLocked && !modelSelection ? <span title="继续沿用原任务会话">原任务模型</span> : <ModelSelection key={`model:${context?.key}`} compact catalog={modelCatalog} selection={modelSelection} onChange={busy || inputLocked ? undefined : onModelChange} onRefresh={onRefreshModels} onOpenSettings={onOpenModelSettings} loading={modelLoading} error={modelError} />)}{engineSummary && <span className="wcc-creation-engine-summary" aria-label={`PPT制作方式：${engineSummary}`} title={engineDetail}>{engineSummary}</span>}</div>}
+    {isMedia ? (recoveringMedia ? <p>取回原结果，不重复生成。</p> : <span />) : <div className="wcc-creation-footer-model">
+      {!isAction && visible && !suspended && !collapsed && (inputLocked && !modelSelection
+        ? <span title="继续沿用原任务会话">原任务模型</span>
+        : <ModelSelection key={`model:${context?.key}`} compact nativeSeat={nativeModelSeat} frozen={inputLocked}
+          catalog={modelCatalog} selection={modelSelection} onChange={busy || inputLocked ? undefined : onModelChange}
+          onRefresh={onRefreshModels} onOpenSettings={onOpenModelSettings} loading={modelLoading} error={modelError} />)}
+      {engineSummary && <span className="wcc-creation-engine-summary" aria-label={`PPT制作方式：${engineSummary}`} title={engineDetail}>{engineSummary}</span>}
+    </div>}
     <UiButton variant="custom" type="button" className="wcc-creation-send" disabled={!ready} aria-label={busy ? '提交中…' : mediaPending ? '生成中…' : label} aria-busy={busy} title={`${busy ? '提交中…' : mediaPending ? '生成中…' : label} · ⌘ / Ctrl + Enter`} onClick={submit}><CreationIcon type="send" size={18} /><span className="wcc-send-label">{busy ? '提交中…' : mediaPending ? '生成中…' : label}</span></UiButton>
   </footer>
 
@@ -608,6 +615,7 @@ export function CardComposer({
     onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
     onKeyDown={event => {
       event.stopPropagation()
+      if (event.defaultPrevented) return
       if (event.key === 'Escape' && referencesOpen) { event.preventDefault(); setReferencesOpen(false); addButton.current?.focus() }
       else if(event.key==='Escape'&&previewOpen){event.preventDefault();setPreviewOpen(false);previewTrigger.current?.focus()}
     }}>

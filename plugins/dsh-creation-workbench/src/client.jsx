@@ -17,6 +17,7 @@ import { ProjectRecycleDialog } from './canvas-recycle.jsx'
 import { ProjectExplorer, ProjectFilePreview } from './project-explorer.jsx'
 import { ProjectPicker } from './project-picker.jsx'
 import { normalizeModelCatalog, openNativeModelSettings } from './model-selection.mjs'
+import { createNativeModelSeat } from './model-selection.jsx'
 import { CANVAS_CONVERSATION_SLOT, CANVAS_CONVERSATION_CHILDREN, registerCanvasConversation, registerConversationFilePreview } from './embedded-conversation.jsx'
 import { conversationFileSelection, nativeConversationFilePath } from './conversation-file.mjs'
 import './ui/controls.css'
@@ -202,7 +203,7 @@ function RenameRequirementDialog({ value, onChange, busy, error, onClose, onSubm
 }
 
 function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStart, onStartCanvas, onRestoreCanvas, onPrepareContinuation, onWatchTaskSessions, acquirePreviewSession, acquireEditingSession,nativeEditorBridge,SessionProvider, renderSlot,
-  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses }) {
+  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses }) {
   const outlineTitleId = useId()
   const activeRef = useRef(active)
   activeRef.current = active
@@ -624,7 +625,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
       onPreviewProjectFile={previewProjectFile}
       onAssetNavigate={(requirementId, cardId, versionId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId }; selectRequirement(target) }}
-      onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
+      nativeModelSeat={nativeModelSeat} onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
     {!selected&&recycleRequest&&<ProjectRecycleDialog request={request} endpoint={q=>endpoint(q,project.id)} onClose={()=>setRecycleRequest(null)} onChanged={()=>setFileRefresh(v=>v+1)}/>}
     {view==='canvas'&&!selected&&projectFileSelection&&<div className="wtt-empty-file-preview"><ProjectFilePreview selection={projectFileSelection} endpoint={q=>endpoint(q,project.id)} onClose={()=>setProjectFileSelection(null)}/></div>}
     {view === 'canvas' && workspace && !selected && <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>拖入文件，继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div>}
@@ -794,6 +795,7 @@ export function apply(ctx) {
   registerConversationFilePreview(ctx)
   const acquirePreviewSession = createPreviewSessionAcquirer(ctx)
   const acquireEditingSession=createEditorSessionAcquirer(ctx)
+  const nativeModelSeat = createNativeModelSeat(ctx.slots, ctx.locale)
   registerNativePreview(ctx)
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
@@ -821,6 +823,7 @@ export function apply(ctx) {
       acquirePreviewSession,acquireEditingSession,nativeEditorBridge,
       onWatchTaskSessions: (scope, onChange, onError) => watchCourseTaskSessions(ctx, scope, onChange, onError),
       browseDirectory,
+      nativeModelSeat,
       onLoadModels: async () => {
         const result = await ctx.remote.session.modelCatalog()
         if (result?.ok !== true) throw new Error(result?.error?.message || 'DSH 模型目录读取失败，请检查连接后刷新。')

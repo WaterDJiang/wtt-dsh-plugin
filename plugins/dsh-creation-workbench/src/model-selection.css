@@ -1,3 +1,5 @@
+.wcc-native-model-selection { display: flex; align-items: center; min-width: 0; max-width: 100%; gap: var(--wtt-space-1); }
+.wcc-native-model-selection > :first-child { min-width: 0; }
 .wcc-model-selection { display: grid; gap: 7px; min-width: 0; color: var(--wtt-ui-text, #576783); font-size:var(--wtt-text-sm); }
 .wcc-model-selection-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .wcc-model-selection-heading > div { display: flex; align-items: center; gap: 8px; }

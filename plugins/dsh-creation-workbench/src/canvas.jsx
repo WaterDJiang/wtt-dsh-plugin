@@ -374,7 +374,7 @@ function GroupDialog({ busy, onClose, onSubmit }) {
 }
 
 function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
-  modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile }) {
+  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
@@ -3197,7 +3197,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       creationTypes={creation ? [...creationMenuItems(creation.anchor).map(item => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...['outline', 'exercise', 'script'].map(id => ({ id, label: '文本', available: true })), ...['word', 'excerpt', 'material'].map(id => ({ id, label: OUTPUT_LABELS[id], available: true }))] : productionTypes}
       skillCatalog={skillCatalog} skillCatalogLoading={skillCatalogLoading} skillCatalogError={skillCatalogError}
       onRefreshSkills={refreshSkillCatalog} onSaveSkillSettings={saveSkillSettings} onUpdateSkillPreference={updateSkillPreference}
-      onOpenMediaSettings={onOpenMediaSettings} modelCatalog={modelCatalog} modelSelection={creation?.pendingTaskId ? creation.modelSelection : modelSelection}
+      nativeModelSeat={nativeModelSeat} onOpenMediaSettings={onOpenMediaSettings} modelCatalog={modelCatalog} modelSelection={creation?.pendingTaskId ? creation.modelSelection : modelSelection}
       onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError}
       onGenerationMethodChange={method => { if (creation && !creation.pendingTaskId) updateCreation(creation.key, { generationMethod: method, mediaJob: null, error: '', mediaRecoveryError: false, mediaRestoring: false }) }}
       onMediaProviderChange={providerId => { if (creation && !creation.pendingTaskId) updateCreation(creation.key, { providerId, mediaOptions: {}, error: '' }) }}

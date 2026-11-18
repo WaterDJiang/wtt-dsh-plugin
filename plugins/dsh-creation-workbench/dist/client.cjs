@@ -132,14 +132,14 @@ var require_with_selector_development = __commonJS({
         return x2 === y2 && (0 !== x2 || 1 / x2 === 1 / y2) || x2 !== x2 && y2 !== y2;
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React48 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore5 = shim.useSyncExternalStore, useRef40 = React48.useRef, useEffect44 = React48.useEffect, useMemo10 = React48.useMemo, useDebugValue3 = React48.useDebugValue;
+      var React48 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore6 = shim.useSyncExternalStore, useRef40 = React48.useRef, useEffect44 = React48.useEffect, useMemo11 = React48.useMemo, useDebugValue3 = React48.useDebugValue;
       exports.useSyncExternalStoreWithSelector = function(subscribe, getSnapshot, getServerSnapshot, selector2, isEqual) {
         var instRef = useRef40(null);
         if (null === instRef.current) {
           var inst = { hasValue: false, value: null };
           instRef.current = inst;
         } else inst = instRef.current;
-        instRef = useMemo10(
+        instRef = useMemo11(
           function() {
             function memoizedSelector(nextSnapshot) {
               if (!hasMemo) {
@@ -174,7 +174,7 @@ var require_with_selector_development = __commonJS({
           },
           [getSnapshot, getServerSnapshot, selector2, isEqual]
         );
-        var value = useSyncExternalStore5(subscribe, instRef[0], instRef[1]);
+        var value = useSyncExternalStore6(subscribe, instRef[0], instRef[1]);
         useEffect44(
           function() {
             inst.hasValue = true;
@@ -43550,8 +43550,64 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
 
 // src/model-selection.jsx
 var import_react38 = __toESM(require("react"), 1);
-function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false }) {
+var MODEL_SLOT = "conversation.input.model";
+var noSubscription = () => () => {
+};
+var noSnapshot = () => null;
+var renderDraftModelLabel = (_slot, _props, options) => options?.fallback ?? null;
+function createNativeModelSeat(slots, locale) {
+  if (!locale) return void 0;
+  return {
+    subscribe: (listener) => slots.subscribe(MODEL_SLOT, listener),
+    getSnapshot: () => slots.entriesOfSlot(MODEL_SLOT)[0]?.component ?? null,
+    subscribeLocale: (listener) => locale.subscribe(listener),
+    getLocale: () => locale.getSnapshot(),
+    t: locale.bind("model"),
+    resolveText: (value) => locale.resolveText(value)
+  };
+}
+function NativeModelSelection({ Component, seat, catalog, current, model, loading, failure, onChange, onRefresh, onOpenSettings }) {
+  (0, import_react38.useSyncExternalStore)(seat.subscribeLocale, seat.getLocale);
+  const snapshot = (0, import_react38.useMemo)(() => ({
+    current: current ?? null,
+    routable: loading ? null : Boolean(model),
+    groups: catalog?.groups ?? [],
+    failures: catalog?.failures ?? [],
+    status: loading ? "loading" : failure ? "error" : "ready",
+    pending: null,
+    error: failure || null
+  }), [catalog, current, model, loading, failure]);
+  const directory = (0, import_react38.useMemo)(() => ({ subscribe: noSubscription, getSnapshot: () => snapshot }), [snapshot]);
+  async function select(next) {
+    if (!onChange) return;
+    if (next.provider !== current?.provider || next.model !== current?.model) {
+      const chosen = snapshot.groups.find((group) => group.id === next.provider)?.models.find((item) => item.id === next.model);
+      if (!chosen) return;
+      const defaultEffort = chosen.reasoning?.defaultEffort;
+      if (defaultEffort && next.reasoningEffort === void 0) next = { ...next, reasoningEffort: defaultEffort };
+    }
+    onChange(next);
+    return { ok: true };
+  }
+  return /* @__PURE__ */ import_react38.default.createElement("div", { className: "wcc-native-model-selection" }, /* @__PURE__ */ import_react38.default.createElement(
+    Component,
+    {
+      locked: !onChange,
+      available: true,
+      directory,
+      load: () => {
+        if (!loading) void onRefresh?.();
+      },
+      select,
+      t: seat.t,
+      resolveText: seat.resolveText,
+      renderSlot: renderDraftModelLabel
+    }
+  ), !loading && (failure || !snapshot.groups.length) && onOpenSettings && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", size: "compact", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"));
+}
+function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false, nativeSeat, frozen = false }) {
   const id2 = (0, import_react38.useId)();
+  const NativeComponent = (0, import_react38.useSyncExternalStore)(nativeSeat?.subscribe ?? noSubscription, nativeSeat?.getSnapshot ?? noSnapshot, noSnapshot);
   let normalized = null;
   let catalogError = "";
   if (catalog) {
@@ -43568,6 +43624,27 @@ function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, o
   const efforts = model?.reasoning?.efforts || [];
   const unavailable = Boolean(current && !model);
   const failure = error?.message || (typeof error === "string" ? error : "") || catalogError;
+  const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : "\u9ED8\u8BA4";
+  if (NativeComponent && frozen) {
+    return /* @__PURE__ */ import_react38.default.createElement("span", { className: "wcc-model-selection-state", title: "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A" }, model?.name || current?.model, " \xB7 ", effortLabel, " \xB7 \u5DF2\u9501\u5B9A");
+  }
+  if (NativeComponent) {
+    return /* @__PURE__ */ import_react38.default.createElement(
+      NativeModelSelection,
+      {
+        Component: NativeComponent,
+        seat: nativeSeat,
+        catalog: normalized,
+        current,
+        model,
+        loading,
+        failure,
+        onChange,
+        onRefresh,
+        onOpenSettings
+      }
+    );
+  }
   const disabled = loading || !groups.length || typeof onChange !== "function";
   function chooseModel(group, nextModel) {
     if (!group || !nextModel) return;
@@ -43584,7 +43661,6 @@ function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, o
     onChange?.(next);
   } }, /* @__PURE__ */ import_react38.default.createElement("option", { value: "" }, "\u6A21\u578B\u9ED8\u8BA4"), current?.reasoningEffort && !efforts.some((item) => item.id === current.reasoningEffort) && /* @__PURE__ */ import_react38.default.createElement("option", { value: current.reasoningEffort, disabled: true }, current.reasoningEffort, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), efforts.map((item) => /* @__PURE__ */ import_react38.default.createElement("option", { key: item.id, value: item.id }, EFFORT_LABELS[item.id] || item.name))))), /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-model-selection-hint" }, "\u7528\u4E8E\u4E4B\u540E\u53D1\u8D77\u7684\u521B\u4F5C\uFF1B\u5DF2\u6709\u4EFB\u52A1\u7EE7\u7EED\u4F7F\u7528\u521B\u5EFA\u65F6\u7684\u6A21\u578B\u3002"));
   const modelLabel = loading ? "\u8BFB\u53D6\u6A21\u578B\u2026" : model?.name || current?.model || "\u9009\u62E9\u6A21\u578B";
-  const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : "\u9ED8\u8BA4";
   const modelState = failure ? "\u52A0\u8F7D\u5931\u8D25" : !loading && !groups.length ? "\u672A\u914D\u7F6E" : unavailable ? "\u4E0D\u53EF\u7528" : normalized?.failures.length ? "\u90E8\u5206\u4E0D\u53EF\u7528" : "";
   const diagnostics = /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, failure && /* @__PURE__ */ import_react38.default.createElement(UserError, { className: "wcc-model-selection-error", error: failure }), !loading && !failure && !groups.length && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B\uFF0C\u8BF7\u6253\u5F00\u6A21\u578B\u8BBE\u7F6E\u6DFB\u52A0\u63D0\u4F9B\u5546\u3002"), unavailable && (groups.length > 0 || !compact) && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u8FD9\u4E2A\u6A21\u578B\u76EE\u524D\u4E0D\u53EF\u7528\u3002\u8BF7\u68C0\u67E5\u8FDE\u63A5\u8BBE\u7F6E\uFF0C\u6216\u4E3A\u65B0\u4EFB\u52A1\u9009\u62E9\u5176\u4ED6\u6A21\u578B\u3002"), normalized?.failures.map((item, index2) => /* @__PURE__ */ import_react38.default.createElement("p", { className: "wcc-model-selection-error", key: `${item.id}-${index2}`, role: "status" }, item.name, "\uFF1A", item.message)));
   return /* @__PURE__ */ import_react38.default.createElement("section", { className: `wcc-model-selection${compact ? " is-compact" : ""}`, "aria-label": "\u521B\u4F5C\u6A21\u578B", "aria-busy": loading }, compact ? /* @__PURE__ */ import_react38.default.createElement("details", { className: "wcc-model-selection-disclosure", onKeyDown: (event) => {
@@ -44230,6 +44306,7 @@ function CardComposer({
   onGenerateMedia,
   onResumeMedia,
   onNewMedia,
+  nativeModelSeat,
   modelCatalog,
   modelSelection,
   onModelChange,
@@ -44351,7 +44428,22 @@ function CardComposer({
   };
   const label2 = recoveringMedia ? "\u53D6\u56DE\u751F\u6210\u7ED3\u679C" : inputLocked ? pendingRetryAllowed(context?.pendingGeneration) && !isMedia ? "\u91CD\u8BD5\u539F\u4EFB\u52A1" : pendingLabel(context?.pendingGeneration) : isAction ? sendLabel || { material: "\u6DFB\u52A0\u7D20\u6750", excerpt: "\u9009\u62E9\u539F\u6587\u6458\u5F55", word: "\u5BFC\u51FA Word" }[outputType] : revising ? "\u751F\u6210\u65B0\u7248\u672C" : `\u751F\u6210${["outline", "exercise", "script"].includes(outputType) ? "\u6587\u672C" : KIND_LABELS[outputType] || "\u6587\u672C"}`;
   const acceptedFiles = Array.isArray(acceptedFileTypes) ? acceptedFileTypes.join(",") : acceptedFileTypes;
-  const submitFooter = !hideSubmit && showInitialInput && /* @__PURE__ */ import_react41.default.createElement("footer", { className: `wcc-creation-submit${isMedia ? " is-media" : ""}` }, isMedia ? recoveringMedia ? /* @__PURE__ */ import_react41.default.createElement("p", null, "\u53D6\u56DE\u539F\u7ED3\u679C\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3002") : /* @__PURE__ */ import_react41.default.createElement("span", null) : /* @__PURE__ */ import_react41.default.createElement("div", { className: "wcc-creation-footer-model" }, !isAction && (inputLocked && !modelSelection ? /* @__PURE__ */ import_react41.default.createElement("span", { title: "\u7EE7\u7EED\u6CBF\u7528\u539F\u4EFB\u52A1\u4F1A\u8BDD" }, "\u539F\u4EFB\u52A1\u6A21\u578B") : /* @__PURE__ */ import_react41.default.createElement(ModelSelection, { key: `model:${context?.key}`, compact: true, catalog: modelCatalog, selection: modelSelection, onChange: busy || inputLocked ? void 0 : onModelChange, onRefresh: onRefreshModels, onOpenSettings: onOpenModelSettings, loading: modelLoading, error: modelError })), engineSummary && /* @__PURE__ */ import_react41.default.createElement("span", { className: "wcc-creation-engine-summary", "aria-label": `PPT\u5236\u4F5C\u65B9\u5F0F\uFF1A${engineSummary}`, title: engineDetail }, engineSummary)), /* @__PURE__ */ import_react41.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-send", disabled: !ready, "aria-label": busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2, "aria-busy": busy, title: `${busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2} \xB7 \u2318 / Ctrl + Enter`, onClick: submit }, /* @__PURE__ */ import_react41.default.createElement(CreationIcon, { type: "send", size: 18 }), /* @__PURE__ */ import_react41.default.createElement("span", { className: "wcc-send-label" }, busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2)));
+  const submitFooter = !hideSubmit && showInitialInput && /* @__PURE__ */ import_react41.default.createElement("footer", { className: `wcc-creation-submit${isMedia ? " is-media" : ""}` }, isMedia ? recoveringMedia ? /* @__PURE__ */ import_react41.default.createElement("p", null, "\u53D6\u56DE\u539F\u7ED3\u679C\uFF0C\u4E0D\u91CD\u590D\u751F\u6210\u3002") : /* @__PURE__ */ import_react41.default.createElement("span", null) : /* @__PURE__ */ import_react41.default.createElement("div", { className: "wcc-creation-footer-model" }, !isAction && visible && !suspended && !collapsed && (inputLocked && !modelSelection ? /* @__PURE__ */ import_react41.default.createElement("span", { title: "\u7EE7\u7EED\u6CBF\u7528\u539F\u4EFB\u52A1\u4F1A\u8BDD" }, "\u539F\u4EFB\u52A1\u6A21\u578B") : /* @__PURE__ */ import_react41.default.createElement(
+    ModelSelection,
+    {
+      key: `model:${context?.key}`,
+      compact: true,
+      nativeSeat: nativeModelSeat,
+      frozen: inputLocked,
+      catalog: modelCatalog,
+      selection: modelSelection,
+      onChange: busy || inputLocked ? void 0 : onModelChange,
+      onRefresh: onRefreshModels,
+      onOpenSettings: onOpenModelSettings,
+      loading: modelLoading,
+      error: modelError
+    }
+  )), engineSummary && /* @__PURE__ */ import_react41.default.createElement("span", { className: "wcc-creation-engine-summary", "aria-label": `PPT\u5236\u4F5C\u65B9\u5F0F\uFF1A${engineSummary}`, title: engineDetail }, engineSummary)), /* @__PURE__ */ import_react41.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-creation-send", disabled: !ready, "aria-label": busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2, "aria-busy": busy, title: `${busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2} \xB7 \u2318 / Ctrl + Enter`, onClick: submit }, /* @__PURE__ */ import_react41.default.createElement(CreationIcon, { type: "send", size: 18 }), /* @__PURE__ */ import_react41.default.createElement("span", { className: "wcc-send-label" }, busy ? "\u63D0\u4EA4\u4E2D\u2026" : mediaPending ? "\u751F\u6210\u4E2D\u2026" : label2)));
   (0, import_react41.useEffect)(() => {
     mounted.current = true;
     return () => {
@@ -44591,6 +44683,7 @@ function CardComposer({
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => {
         event.stopPropagation();
+        if (event.defaultPrevented) return;
         if (event.key === "Escape" && referencesOpen) {
           event.preventDefault();
           setReferencesOpen(false);
@@ -47194,6 +47287,7 @@ function CanvasContent({
   onAssetNavigate,
   renderNativePreview,
   renderEditorConversation,
+  nativeModelSeat,
   modelCatalog,
   modelSelection,
   onModelChange,
@@ -50730,6 +50824,7 @@ function CanvasContent({
       onRefreshSkills: refreshSkillCatalog,
       onSaveSkillSettings: saveSkillSettings,
       onUpdateSkillPreference: updateSkillPreference,
+      nativeModelSeat,
       onOpenMediaSettings,
       modelCatalog,
       modelSelection: creation?.pendingTaskId ? creation.modelSelection : modelSelection,
@@ -51214,6 +51309,7 @@ function WorkbenchPage({
   nativeEditorBridge,
   SessionProvider,
   renderSlot,
+  nativeModelSeat,
   modelCatalog,
   modelSelection,
   onModelChange,
@@ -51693,6 +51789,7 @@ function WorkbenchPage({
         creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId: versionId2 };
         selectRequirement(target);
       },
+      nativeModelSeat,
       onOpenMediaSettings,
       onWatchMediaSettings,
       modelCatalog,
@@ -51847,6 +51944,7 @@ function apply2(ctx) {
   registerConversationFilePreview(ctx);
   const acquirePreviewSession = createPreviewSessionAcquirer(ctx);
   const acquireEditingSession = createEditorSessionAcquirer(ctx);
+  const nativeModelSeat = createNativeModelSeat(ctx.slots, ctx.locale);
   registerNativePreview(ctx);
   ctx.slots.inject("main", () => ctx.slots.register({
     name: "main",
@@ -51876,6 +51974,7 @@ function apply2(ctx) {
       nativeEditorBridge,
       onWatchTaskSessions: (scope, onChange, onError) => watchCourseTaskSessions(ctx, scope, onChange, onError),
       browseDirectory,
+      nativeModelSeat,
       onLoadModels: async () => {
         const result = await ctx.remote.session.modelCatalog();
         if (result?.ok !== true) throw new Error(result?.error?.message || "DSH \u6A21\u578B\u76EE\u5F55\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u8FDE\u63A5\u540E\u5237\u65B0\u3002");
