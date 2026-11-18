@@ -43,7 +43,9 @@ export async function seedCanvasStress(workspace, run) {
         positions: Object.fromEntries(ids.map((key, i) => [key, { x: 100 + i % columns * 360, y: 500 + Math.floor(i / columns) * 290 }])),
         sizes: Object.fromEntries(ids.map(key => [key, { width: 320, height: 256 }])), edges,
         viewport: { x: 20, y: 20, zoom: count === 300 ? .15 : .26 } });
-      cases.push({ id, count, drafts, sources, edges: service.canvas.getBoard(id).edges.length });
+      const saved = service.canvas.getBoard(id);
+      const dragStart = saved.nodes.find(node => node.id === drafts.at(-1).id).position;
+      cases.push({ id, count, drafts, sources, dragStart, edges: saved.edges.length });
     }
     return cases;
   } finally { service.close(); }
@@ -88,7 +90,7 @@ async function continuous(page, kind, steps = 72) {
   }, { kind, steps });
 }
 
-export async function checkCanvasStress(page, canvas, cases) {
+export async function checkCanvasStress(page, canvas, cases, api) {
   const artifacts = process.env.WTT_SMOKE_ARTIFACTS;
   assert(artifacts, 'stress requires WTT_SMOKE_ARTIFACTS to preserve before/after samples');
   await mkdir(artifacts, { recursive: true });
@@ -107,7 +109,29 @@ export async function checkCanvasStress(page, canvas, cases) {
     const report = { cards: entry.count, edges: entry.edges, mounted: await canvas.locator('article[data-card-id]').count(),
       dom: await canvas.locator('*').count(), pan: statistics(pan.samples), panFrames: statistics(pan.frames),
       zoom: statistics(zoom.samples), zoomFrames: statistics(zoom.frames), references: [] };
-    if (process.env.WTT_STRESS_DRAG === '1') report.drag = await dragCard(page, card(entry.drafts.at(-1).id).locator('.wcc-card-grip'));
+    if (process.env.WTT_STRESS_DRAG === '1') {
+      const key = entry.drafts.at(-1).id;
+      const waitForSave = () => page.waitForResponse(res => new URL(res.url()).pathname === api.pathname
+        && res.request().method() === 'POST' && res.request().postDataJSON()?.action === 'save-canvas');
+      const [reply, timing] = await Promise.all([
+        waitForSave(),
+        dragCard(page, card(key).locator('.wcc-card-grip')),
+      ]);
+      assert(reply.ok(), '密集画布拖动后须成功保存');
+      const saved = await reply.json();
+      const moved = saved.nodes.find(n => n.id === key).position;
+      assert.notDeepEqual(moved, entry.dragStart);
+      assert.equal(saved.edges.length, entry.edges, '拖动后须保留画布连线');
+      report.drag = timing;
+      await canvas.focus();
+      for (const [shortcut, position] of [['Control+z', entry.dragStart], ['Control+Shift+z', moved]]) {
+        const [response] = await Promise.all([waitForSave(), page.keyboard.press(shortcut)]);
+        assert(response.ok(), '撤销和重做均须成功保存');
+        const board = await response.json();
+        assert.deepEqual(board.nodes.find(n => n.id === key).position, position);
+        assert.equal(board.edges.length, entry.edges);
+      }
+    }
     for (const draft of diagnostic ? [] : entry.drafts) {
       const body = card(draft.id).locator('.wcc-card-body'), bounds = await body.boundingBox();
       await body.click({ position: { x: Math.max(2, bounds.width - 4), y: Math.max(2, bounds.height - 4) } });

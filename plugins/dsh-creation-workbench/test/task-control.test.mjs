@@ -103,3 +103,15 @@ test('unknown execution allows node-only removal without claiming a stopped task
   f.service.recycle.restore({ entryId: plan.id });
   assert(f.service.canvas.getBoard(f.id).nodes.some(value => value.id === node.id));
 });
+test('project stop may cancel only its exact bound, unsubmitted draft', t=>{
+  const f=fixture(t), task=f.create();
+  f.service.tasks.bindSession({taskId:task.id,sessionId:'bound-draft'});
+  assert.throws(()=>f.service.tasks.cancelDraft(task.id));
+  assert.throws(()=>f.service.tasks.cancelDraft(task.id,'another-session'));
+  assert.equal(f.service.tasks.cancelDraft(task.id,'bound-draft').dispatchStatus,'cancelled');
+  assert.equal(f.service.tasks.claimDraftDispatch(task.id,'bound-draft'),false);
+  const claimed=f.create();
+  f.service.tasks.bindSession({taskId:claimed.id,sessionId:'sent'});
+  assert.ok(f.service.tasks.claimDraftDispatch(claimed.id,'sent'));
+  assert.throws(()=>f.service.tasks.cancelDraft(claimed.id,'sent'));
+});

@@ -24,7 +24,7 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本为 **0.57.9**。DSH 桌面版的视频进度条支持前后拖动。框选多张卡片后，可选择生成文本、PPT、图片或视频，并自动带入引用。[使用说明](plugins/dsh-creation-workbench/README.md#0579-的主要改进) · [更新日志](CHANGELOG.md)
+当前版本为 **0.58.0**。打开画布上的「总 Agent」，可使用同一项目的长期对话，委托跨画布创作，并按需查回已保存的设定、日志和成果版本。[使用说明](plugins/dsh-creation-workbench/README.md#0580-的主要改进) · [更新日志](CHANGELOG.md)
 
 使用社区市场 `dshmarket` 时，打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」就点 **立即更新**。如果旧版的「代码来源」写的是 `path:plugins/...`，在原 DSH 配置用上面的安装串覆盖安装一次，以后可以直接从市场更新。
 

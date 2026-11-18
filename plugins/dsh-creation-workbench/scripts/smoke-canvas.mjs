@@ -18,7 +18,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -38,7 +38,18 @@ async function seed(workspace) {
     const nodeId = `material:${material.id}`;
     service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision,
       positions: { [nodeId]: { x: 80, y: 150 } }, viewport: { x: 0, y: 0, zoom: 0.8 } });
-    return { id, nodeId };
+    const other = scenario==='agent' ? service.store.createCanvas({title:'总 Agent 目标画布',operationId:randomUUID()}).id : null;
+    if(other)service.canvas.addMaterial({requirementId:id,title:'采访乙',content:'验收第二份来源',operationId:randomUUID()});
+    if(scenario==='agent'&&process.env.WTT_AGENT_AUDIT_PAGES==='1'){
+      const {ProjectAgent}=await import('../src/project-agent.mjs');
+      const agent=new ProjectAgent(service,{});
+      for(let i=1;i<=101;i++){
+        const turnId=randomUUID(),turn={mode:'plan',requirementId:id,sources:[],text:'审批样本'};
+        agent.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(turnId,'archived',JSON.stringify(turn));
+        agent.proposal(turnId,{title:'待办 '+i,steps:[{title:'脚本',instruction:'制作脚本',type:'text'}]},turn);
+      }
+    }
+    return { id, nodeId, other };
   } finally { service.close(); }
 }
 
@@ -399,7 +410,7 @@ async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
 
 const start = performance.now();
 const temporary = await mkdtemp(path.join(tmpdir(), 'wtt-canvas-smoke-'));
-let host, browser;
+let host, browser, agentModel;
 try {
   await run(process.execPath, ['scripts/build.mjs'], { cwd: repo, timeout: 30_000 });
   const workspace = path.join(temporary, 'workspace');
@@ -412,7 +423,8 @@ try {
   const readCases = ['all', 'reads'].includes(scenario) ? await seedCanvasReads(workspace) : null;
   const readPerfCases = (scenario === 'readperf' || scenario === 'all' && process.env.WTT_READ_PERF === '1') ? seedReadPerformance(workspace) : null;
   const stressCases = scenario === 'stress' ? await seedCanvasStress(workspace, run) : null;
-  const env = { ...process.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
+  if(scenario==='agent')agentModel=await (await import('./project-agent-smoke.mjs')).projectAgentModel(fixture);
+  const env = { ...process.env,...agentModel?.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
     PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`, npm_config_offline: 'true',
     npm_config_store_dir: path.join(repo, '.runtime/pnpm-store') };
   const candidate = process.env.WTT_SMOKE_PACKAGE || repo;
@@ -440,6 +452,81 @@ try {
   const api = new URL('/api/wtt-creation-workbench', login);
   api.searchParams.set('projectId', createHash('sha256').update(await realpath(workspace)).digest('hex'));
   try {
+    if(scenario==='agent' && process.env.WTT_AGENT_AUDIT_STOP==='1'){
+      const {checkProjectAgentStop}=await import('./project-agent-idle-audit.mjs');
+      await checkProjectAgentStop(page,canvas,api,agentModel);
+    } else if(scenario==='agent' && process.env.WTT_AGENT_AUDIT_PAGES==='1'){
+      const {checkProjectAgentPages}=await import('./project-agent-idle-audit.mjs');
+      await checkProjectAgentPages(canvas);
+    } else if(scenario==='agent' && process.env.WTT_AGENT_AUDIT_IDLE==='1'){
+      const { checkProjectAgentIdle }=await import('./project-agent-idle-audit.mjs');
+      await checkProjectAgentIdle(page,canvas,api,agentModel);
+    } else if(scenario==='agent'){
+      await canvas.focus();await page.keyboard.press('Meta+a');
+      const launcher=canvas.getByRole('button',{name:'打开项目总 Agent'}),before=await launcher.boundingBox();
+      await page.mouse.move(before.x+20,before.y+15);await page.mouse.down();await page.mouse.move(before.x-100,before.y-58,{steps:8});await page.mouse.up();
+      assert((await launcher.boundingBox()).x<before.x-50);await launcher.click();
+      const panel=canvas.locator('.wtt-agent-float.is-open');
+      const state=async()=>page.evaluate(async url=>{const r=await fetch(url,{method:'POST',body:JSON.stringify({action:'project-agent-state',data:{}})});return r.json()},api.href);
+      await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor({timeout:20000}).catch(async e=>{throw Error(e.message+' · '+await panel.innerText());});
+      await panel.getByText('已选 2 张').waitFor();
+      const bound=(await state()).sessionId;assert(bound);
+      const mode=process.env.WTT_AGENT_SMOKE_MODE||'plan';
+      const modeLabel={auto:'全自动',step:'逐项确认',plan:'按计划授权'}[mode];
+      if(mode!=='plan'){
+        await panel.getByRole('button',{name:'执行方式 · 按计划授权'}).click();await page.getByRole('menuitemradio',{name:modeLabel}).click();
+      }
+      const input=panel.locator('[contenteditable=true]').last();
+      await input.click();await input.press('End');await page.keyboard.insertText('从采访写脚本和分镜');await input.press('Enter');
+      if(mode==='auto')await panel.getByText('浏览器跨画布委托',{exact:false}).first().waitFor({timeout:26000});
+      else {
+        const approve=panel.getByRole('button',{name:mode==='plan'?'按计划执行':'执行此项',exact:true});
+        await approve.waitFor({timeout:26000}).catch(async e=>{throw Error(e.message+' · '+JSON.stringify(agentModel.calls)+' · '+await panel.innerText());});
+        await approve.click();
+      }
+      await panel.getByRole('button',{name:'收起项目总 Agent'}).click();
+      if(process.env.WTT_AGENT_SMOKE_QUESTION==='1'){
+        await launcher.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({calls:agentModel.calls,state:await state()}));});
+        assert.equal(agentModel.calls.filter(c=>c.name==='course_save_outline').length,0);
+        await panel.getByRole('button',{name:'查看原任务',exact:true}).first().click();
+        const answer=page.getByRole('radio',{name:'采用采访原文',exact:true}).last();
+        await answer.click({timeout:20000});await answer.press('Enter');
+      }
+      if(mode==='step'){
+        await launcher.click();
+        await panel.getByRole('button',{name:'执行此项',exact:true}).click({timeout:25000});
+        await panel.getByRole('button',{name:'收起项目总 Agent'}).click();
+      }
+      const deadline=Date.now()+40000;
+      let live=await state();
+      while(live.plans[0]?.state!=='done'&&Date.now()<deadline&&!live.plans[0]?.steps.some(s=>s.state==='blocked')){
+        await new Promise(resolve=>setTimeout(resolve,300));live=await state();
+      }
+      assert.equal(live.plans[0]?.state,'done',JSON.stringify({live,calls:agentModel.calls}));
+      assert.equal(agentModel.calls.filter(c=>c.name==='course_save_outline').length,2,JSON.stringify(agentModel.calls));
+      const sources=live.plans[0].steps[0].refs;assert.equal(sources.length,2);assert.ok(sources.every(s=>s.requirementId===fixture.id));
+      const receipts=(await state()).plans[0].steps.map(s=>s.receipt);assert(receipts.every(r=>r.requirementId===fixture.other&&r.versionId));
+      await launcher.click();
+      await panel.getByRole('button',{name:'项目记忆',exact:true}).click();
+      await panel.getByRole('button',{name:'新增设定'}).click();
+      await panel.getByLabel('设定名称').fill('画幅');await panel.getByLabel('设定原文').fill('横屏 16:9');
+      await panel.getByRole('button',{name:'保存设定'}).click();await panel.getByRole('button',{name:'画幅 · 项目'}).waitFor();
+      await panel.getByLabel('查项目日志').fill('横屏');await panel.getByText(/画幅/).first().waitFor();
+      const select=page.getByRole('combobox',{name:'当前画布',exact:true});
+      if(await select.inputValue()===fixture.other)await select.selectOption(fixture.id);else await select.selectOption(fixture.other);
+      await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor();assert.equal((await state()).sessionId,bound);
+      await panel.getByRole('button',{name:'执行方式 · '+modeLabel}).click();await page.getByRole('menuitemradio',{name:mode==='step'?'按计划授权':'逐项确认'}).click();
+      await panel.getByRole('button',{name:'项目记忆',exact:true}).click();
+      await panel.getByRole('button',{name:'用项目记忆开新对话'}).click();
+      await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor();
+      assert.notEqual((await state()).sessionId,bound);
+      const nextInput=panel.locator('[contenteditable=true]').last();await nextInput.click();await nextInput.press('End');await page.keyboard.insertText('回忆验收，查画幅和脚本');await nextInput.press('Enter');
+      const until=Date.now()+18000;while(!agentModel.evidence.length&&Date.now()<until)await new Promise(r=>setTimeout(r,250));
+      assert.ok(agentModel.evidence.some(r=>r.includes('横屏 16:9')&&r.includes(receipts[1].versionId)),'新会话应检索设定及上次委托的真实版本');
+      await page.setViewportSize({width:440,height:680});const box=await panel.boundingBox();assert(box.x>=0&&box.x+box.width<=441);
+      await panel.getByRole('button',{name:'收起项目总 Agent'}).click();await launcher.waitFor();
+      console.log('PASS 两份来源跨画布生成两项主成果、DSH 原生对话、后台派发、浮标拖动、原文记忆、新会话接续与窄屏收起');
+    }
     if (['all', 'delete'].includes(scenario)) {
       await checkDelete(page, canvas, card, api.pathname);
       console.log('PASS 删除核对、取消、移除后视口复用和回收站恢复');
@@ -457,7 +544,7 @@ try {
     if (referenceCase) await checkReferenceSelection(page, canvas, referenceCase, api);
     if (readCases) await checkCanvasReads(page, canvas, readCases, api);
     if (readPerfCases) await checkReadPerformance(page, canvas, readPerfCases, api);
-    if (stressCases) await checkCanvasStress(page, canvas, stressCases);
+    if (stressCases) await checkCanvasStress(page, canvas, stressCases, api);
     assert.deepEqual(errors, [], '页面不应抛出运行错误');
     assert.equal(consoleMessages.filter(message => message.includes('500')).length, sendCases ? 1 : 0, '仅允许合成刷新故障的一条500资源日志');
     assert.deepEqual(consoleMessages.filter(message => !message.includes('500')), [], '不应出现其他控制台错误或警告');
@@ -475,6 +562,7 @@ try {
     throw error;
   }
 } finally {
+  agentModel?.close();
   try { await browser?.close(); }
   finally {
     if (host?.pid && host.exitCode === null && host.signalCode === null) {

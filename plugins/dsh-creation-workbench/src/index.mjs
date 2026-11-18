@@ -1,5 +1,7 @@
 import { realpath } from 'node:fs/promises';
+import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { defineTool } from '@deepseek-ai/dsh-tools';
+import { projectAgents } from './project-agent-host.mjs';
 import { ProjectRegistry } from './project-registry.mjs';
 import { listProjectDirectory } from './project-directory.mjs';
 import { registerWorkbenchSkills } from './skills.mjs';
@@ -80,6 +82,22 @@ export function apply(ctx, config = {}) {
     const identity = async values => JSON.stringify(await Promise.all(values.map(async ref => [ref.name, ref.path ? await realpath(ref.path).catch(() => ref.path) : null, ref.hash])));
     if (await identity(current) !== await identity(refs)) throw new Error('Skill 已变化，旧任务输入已保留；请核对后新建任务。');
   }
+  const coordinators = projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskControl});
+  ctx.effect(() => () => coordinators.close());
+  ctx.on?.('agent/pre-step',async({agent,messages},next)=>{
+    const decision=await next(),runner=coordinators.bySession(agent);
+    if(!runner||runner.sessionId()!==agent.id||decision.kind!=='enter')return decision;
+    const incoming=messages.filter(m=>m.source?.kind==='user'&&m.source.rpcId);
+    if(incoming.length)runner.activeTurns.clear();
+    const contexts=incoming.map(m=>runner.promptContext(agent.id,m.source.rpcId)).filter(Boolean);
+    if(!contexts.length)return decision;
+    const text=contexts.join('\n');
+    return {...decision,messages:[...decision.messages,createUserMessage({content:[{type:'text',text}],source:{kind:'wtt-project-agent',form:'snapshot',sections:[{name:'画布与授权',text}]}})]};
+  });
+  ctx.on?.('tools/pre-execute',(exec,next)=>{
+    if (!coordinators.bySession(exec.agent) || ['workbench_project','ask_user_question','run_code','tool_search'].includes(exec.name)) return next();
+    return Promise.resolve({kind:'deny',reason:'请通过 workbench_project 提交项目计划，原任务会话在用户授权后执行创作。'});
+  });
   ctx.effect(() => ctx.connection.fetch.register({
     path: '/api/wtt-creation-workbench',
     methods: ['GET', 'HEAD', 'POST'],
@@ -320,6 +338,10 @@ export function apply(ctx, config = {}) {
         if(['document-external-open','document-external-status','document-open-application','document-reveal-file','document-external-save-version'].includes(action)&&!projectId)throw new Error('本机文档操作必须指定当前项目');
         if (action === 'open-project') return Response.json({ project: projects.open(data?.path) }, { headers });
         const service = projects.get(projectId);
+        if (typeof action==='string' && action.startsWith('project-agent-')) {
+          if (!projectId) throw Error('总 Agent 必须指定项目');
+          return Response.json(await coordinators.api(service,action.slice(14),data),{headers});
+        }
         if (['inspect-task-control', 'stop-task-control'].includes(action)) {
           if (!projectId) throw new Error('任务控制必须指定当前项目');
           return Response.json(await taskControl[action === 'inspect-task-control' ? 'inspect' : 'stop'](service, data || {}), { headers });
@@ -465,6 +487,18 @@ export function apply(ctx, config = {}) {
     render: (_args, value) => [{ type: 'text', text: value }],
   };
   const projectParameter = { type: 'string', description: '准备输入返回的 projectId；必须属于当前会话的原始项目目录' };
+  ctx.effect(() => ctx.tools.register(defineTool({
+    name:'workbench_project',
+    description:'项目总 Agent 专用。context 读取项目画布、计划、有效设定（可传 scope 查局部设定）。cards 按画布查询卡，search 查日志。plan 提交同一发送现场的一份计划，数据为 {title,steps:[{title,type:text|pptx|image|video,instruction,requirementId?,useSelection?,refs?:[{requirementId,cardId,versionId?}],dependsOn?:[前序步骤序号，从1开始],scope?,review?}]}。amend 使用 planId、steps 和可选 replaceFrom（从该序号起替换未派发部分，省略则追加）。suggest 提议长期设定 {name,scope,body}，log 保存事实 {title,body,taskId?,requirementId?,cardId?,versionId?}，details/pause/stop 传 {planId}。所有审批由用户在浮窗操作。',
+    parameters:{action:{type:'string',required:true,enum:['context','cards','read-card','search','evidence','plan','suggest','log','pause','stop','details','amend']},turnId:{type:'string',description:'当前用户消息的 turnId'},data:{type:'string',description:'JSON 对象字符串，cards 使用 requirementId 和可选 query，检索用 query，可带 requirementId、cardId 或 versionId。evidence 用 eventId；read-card 用 requirementId、cardId 和可选 versionId'}},
+    output:textOutput,execute:async(args,execution)=>{
+      execution.signal.throwIfAborted();
+      const service=projects.forExecution(undefined,execution);
+      const runner=coordinators.get(service);
+      if(!['search','cards','read-card','evidence'].includes(args.action)&&!runner.activeTurns.has(args.turnId))throw Error('请以本轮用户消息的发送现场执行');
+      return JSON.stringify(await runner.tool(execution.agent?.id,args.action,args.turnId,JSON.parse(args.data||'{}')));
+    },
+  })));
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'course_read_task_source',
     description: '按需读取当前任务已选中的冻结正文、注释或来源任务的配套文件路径与 hash。仅供该任务的主会话使用。',

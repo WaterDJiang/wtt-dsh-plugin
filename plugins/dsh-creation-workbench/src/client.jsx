@@ -1,3 +1,4 @@
+import {projectInputBridge, ProjectInputDock} from './project-agent-input.jsx'
 import { createDesktopTaskNotices, desktopTaskNotificationChannel } from './desktop-task-notices.mjs'
 import { CanvasConversationReferenceButton } from './conversation-references.jsx'
 import { MediaServiceSettings } from './media-service-settings.jsx';
@@ -626,7 +627,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
 
     {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
       onPreviewProjectFile={previewProjectFile}
-      onAssetNavigate={(requirementId, cardId, versionId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId }; selectRequirement(target) }}
+      onAssetNavigate={(requirementId, cardId, versionId,openConversation=false) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId,openConversation }; selectRequirement(target) }}
       nativeModelSeat={nativeModelSeat} desktopTaskNotices={desktopTaskNotices} onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation}
       onOpenNativeConversation={onOpenNativeConversation && (sessionId => {
         if (!active || canvasSessions.current.get(selectedId)?.sessionId !== sessionId) throw new Error('请重新打开此版本的原对话。')
@@ -794,6 +795,9 @@ export function apply(ctx) {
     return apiRequest(undefined, undefined, undefined, { directory: path || '' }, signal)
   }
   ctx.effect(()=>ctx.slots.inject('conversation.input.dock',()=>ctx.slots.register({name:'conversation.input.dock',id:'wtt-canvas-assets',order:5},props=><CanvasConversationReferenceButton {...props} getAttachmentService={()=>ctx.conversation}/>)))
+  const projectInput=projectInputBridge(ctx)
+  ctx.effect(()=>ctx.inputTriggers.registerSource(projectInput.source))
+  ctx.effect(()=>ctx.slots.inject('conversation.input.dock',()=>ctx.slots.register({name:'conversation.input.dock',id:'wtt-project-agent-input',order:4},props=><ProjectInputDock {...props} bridge={projectInput}/>)))
   const nativeEditorBridge=createNativeEditorBridge()
   ctx.effect(()=>ctx.inputTriggers.registerSource(nativeEditorBridge.source))
   ctx.effect(()=>ctx.slots.inject('conversation.input.dock',()=>ctx.slots.register({name:'conversation.input.dock',id:'wtt-course-edit-reference',order:5},props=><NativeEditorInputDock {...props} bridge={nativeEditorBridge}/>)))
@@ -805,6 +809,7 @@ export function apply(ctx) {
   const notificationChannel = desktopTaskNotificationChannel(globalThis.window, () => ctx.layout.selectPanel(PANEL_ID))
   const desktopTaskNotices = notificationChannel && createDesktopTaskNotices({
     channel: notificationChannel,
+    readAgentNotices:(projectId,signal)=>apiRequest('project-agent-attention',{},projectId,{},signal),
     readTasks: ({ projectId, canvasId }, signal) => apiRequest(undefined, undefined, projectId, { tasks: canvasId }, signal),
     readStatuses: () => ctx.uiSession.sessionStatus.getSnapshot(),
     watchSessions: (scope, onChange) => watchCourseTaskSessions(ctx, scope, onChange, error => console.warn(error)),

@@ -219,8 +219,14 @@ export class OutputCardStore {
     const input = task?.input;
     const recorded = (['ai', 'media'].includes(task?.kind) || ['slides-publish', 'text-edit', 'document-edit'].includes(input?.workflow)) && Boolean(input?.instruction);
     const nodes = new Map(raw.nodes.map(node => [node.id, node]));
+    const boards = new Map();
     const references = (input?.sources || []).map(source => {
-      const live = nodes.get(source.cardId);
+      let origin = nodes;
+      if (input.projectInputHash && source.requirementId && source.requirementId !== task.requirementId) {
+        if (!boards.has(source.requirementId)) boards.set(source.requirementId, new Map(this.#raw(source.requirementId).nodes.map(n=>[n.id,n])));
+        origin = boards.get(source.requirementId);
+      }
+      const live = origin.get(source.cardId);
       const ownerRef = source.cardId.startsWith('word:') ? source.cardId.replace('word:', 'outline:') : source.cardId;
       const owner = this.db.prepare('SELECT c.node_id FROM output_card_outputs o JOIN output_cards c ON c.id=o.card_id WHERE o.source_ref=?').get(ownerRef);
       const status = !live ? 'missing' : live.sourceHash !== source.hash ? 'changed'

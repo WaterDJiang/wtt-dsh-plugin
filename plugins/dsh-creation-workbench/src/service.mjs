@@ -1,3 +1,4 @@
+import { projectTaskFingerprint } from './task-store.mjs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, realpathSync, readFileSync } from 'node:fs';
@@ -311,7 +312,7 @@ export class WorkbenchService {
     return { cwd: this.workspaceRoot, prompt };
   }
 
-  prepareCanvas({ requirementId, selectedCardIds, instruction }, { allowEmpty = false } = {}) {
+  prepareCanvas({ requirementId, selectedCardIds, instruction }, { allowEmpty = false, deferCombinedBudget = false } = {}) {
     if (typeof instruction !== 'string' || !instruction.trim() || instruction.length > 8000)
       throw new Error('请填写创作要求（最多 8000 字）');
     if (!Array.isArray(selectedCardIds) || selectedCardIds.length < (allowEmpty ? 0 : 1) || selectedCardIds.length > 24)
@@ -323,7 +324,8 @@ export class WorkbenchService {
       || (node.extracted === false && node.sourceStatus && node.sourceStatus !== 'ready'));
     if (unavailable) throw new Error(`「${unavailable.title}」的文件不可用或已外改，请核对后再使用`);
     const requirement = this.store.getRequirement(requirementId);
-    let remaining = 60_000;
+    // A project plan combines multiple canvases in user order before applying its total.
+    let remaining = deferCombinedBudget ? Infinity : 60_000;
     const context = selected.map(node => {
       const content = String(node.content || node.excerpt || '');
       const allowed = Math.min(remaining, 12_000);
@@ -365,13 +367,28 @@ export class WorkbenchService {
       contextSummary: selected.map(({ id, title, kind }) => ({ id, title, kind })), prompt, context };
   }
 
-  createTask(input, { skillRefs = [] } = {}) {
+  createTask(input, { skillRefs = [], projectInputs } = {}) {
     if (typeof input?.selection?.quote === 'string' && input.selection.quote.length > 12_000) {
       throw new Error('选段不能超过 12000 字符，请缩小选择范围或改用整份已保存版本');
     }
     const outputType = input?.outputType === undefined ? 'outline' : input.outputType;
     if (['image', 'video'].includes(outputType) && (input.media || input.providerId || input.generationMethod && input.generationMethod !== 'skill')) throw new Error('媒体 API 参数请通过 API 生成入口提交；Skill 任务不接收媒体模型参数');
     if (!['outline', 'pptx', 'exercise', 'script', 'text', 'image', 'video'].includes(outputType)) throw new Error('不支持的创作类型');
+    // A manual revision may keep verified references from its exact base version.
+    // Only recover entries already frozen by this project, never client-supplied source bodies.
+    let inherited=[];
+    if (!projectInputs && input.generation?.mode==='revise' && input.sourceRefs?.length) {
+      const version=this.store.db.prepare('SELECT v.task_id FROM output_card_versions v JOIN output_cards c ON c.id=v.card_id WHERE v.id=? AND c.id=? AND c.requirement_id=?')
+        .get(input.generation.baseVersionId,input.generation.cardId,input.requirementId);
+      const original=version?.task_id && this.tasks.get(version.task_id).input;
+      if(original?.projectInputHash) {
+        inherited=original.sources.filter(s=>s.requirementId && s.requirementId!==input.requirementId && input.sourceRefs.some(r=>r.cardId===s.cardId&&r.hash===s.hash));
+        if(inherited.length)projectInputs={sources:inherited,settings:original.projectSettings||[]};
+      }
+    }
+    const foreign=new Set(inherited.map(s=>s.cardId));
+    const localInput=foreign.size ? {...input,selectedCardIds:input.selectedCardIds.filter(s=>!foreign.has(s))} : input;
+    if (projectInputs) input = { ...input, [projectTaskFingerprint]: digest(JSON.stringify(projectInputs)) };
     const replay = this.tasks.replay(input);
     const selectedSkills = input.selectedSkills || [];
     if (!Array.isArray(skillRefs) || skillRefs.length !== selectedSkills.length
@@ -388,7 +405,8 @@ export class WorkbenchService {
       throw new Error('指令中含未选择的技能。请回到画布选择该技能后再发送；局部文档编辑入口不会自动调用技能。');
     }
     const cardPlan = this.cards.prepare(input);
-    const prepared = this.prepareCanvas(input, { allowEmpty: Boolean(cardPlan) });
+    if (projectInputs?.title && cardPlan) cardPlan.title = projectInputs.title;
+    const prepared = this.prepareCanvas(localInput, { allowEmpty: Boolean(cardPlan) });
     const sourceNodes = this.canvas.getRawBoard(input.requirementId).nodes;
     const pptEngine = outputType === 'pptx' ? pptEngineForSelection(input) : undefined;
     if (pptEngine === 'baoyu' && input.pptStage !== undefined) throw new Error('宝玉制作不支持原生 PPT 阶段，请核对所选技能与制作方式。');
@@ -407,7 +425,7 @@ export class WorkbenchService {
         : this.creationTypes(outputType, { pptStage: route?.stage })[0];
     if (input.outputType !== undefined && !creation.available) throw new Error(`${creation.label}暂不可用：${creation.message}`);
     const sourceRefs = input.sourceRefs === undefined ? undefined
-      : this.canvas.validateSourceRefs(input.requirementId, input.sourceRefs, { selectedCardIds: prepared.selectedCardIds });
+      : [...this.canvas.validateSourceRefs(input.requirementId, input.sourceRefs.filter(ref=>!foreign.has(ref.cardId)), { selectedCardIds: prepared.selectedCardIds }),...inherited.map(({cardId,hash})=>({cardId,hash}))];
     const requirement = this.store.getRequirement(input.requirementId);
     let selection = null;
     if (input.selection !== undefined && input.selection !== null) {
@@ -436,11 +454,13 @@ export class WorkbenchService {
         ...(passage ? { rangeLabel: selection.rangeLabel } : {}),
         ...(content.length > allowed ? { noteTruncated: '正文超过本次上下文上限，以下仅为节选；未包含的内容需按路径进一步读取' } : {}) };
     });
+    if (projectInputs) sources.push(...projectInputs.sources);
     const modelSelection = normalizeModelSelection(input.modelSelection);
     const executionSkills = route ? route.skills : exactSkills && (selectedSkills.length || pptEngine !== 'baoyu')
       ? [...selectedSkills] : [...new Set([...creation.skills, ...selectedSkills])];
     const snapshot = { requirement: { id: requirement.id, title: requirement.title, customer: requirement.customer,
       audience: requirement.audience, background: requirement.background, objectives: requirement.objectives, origin: requirement.origin },
+    ...(projectInputs ? { projectSettings: projectInputs.settings } : {}),
     canvasId: requirement.id, sources, selection, instruction: input.instruction.trim(), outputType, productionPolicy: this.production.policy(),
     ...(['image', 'video'].includes(outputType) ? { generationMethod: 'skill' } : {}),
     ...(exactSkills ? { contextVersion: 1 } : {}),
@@ -496,6 +516,7 @@ export class WorkbenchService {
       ...(task.input.skillSelection ? ['只启动本任务列明的技能流程，不自行添加其他技能。若所选技能要求额外技能、补充素材、外部生成或扩大范围，先列出具体需求并按其确认门询问；不能将建议或依赖当作用户已授权。确定性的文件检查和格式转换工具仍可按任务范围使用。'] : []),
       ...(task.input.productionRoute ? [`冻结生产路由：${dataJson(task.input.productionRoute)}；仅执行本阶段。详细检查报告写入本任务目录，工具回执优先报告结论、错误定位与文件路径；需要时再读取详情。`] : []),
       `本次意图：${instruction}`,
+      ...(task.input.projectSettings?.length ? ['适用于本步骤的设定（用户已保存）：', dataJson(task.input.projectSettings.map(({name,scope,body})=>({name,scope,body})))] : []),
       `目标画布 canvasId（兼容工具参数 requirementId）：${requirement.id}`,
       `本次任务 taskId：${task.id}`,
       ...(outputType === 'outline' ? ['携带本 taskId 的 course_save_outline 必须由当前已绑定的主任务会话调用；子 Agent 只制作内容并回传路径和检查证据，由主会话复核后保存，不能用子 Agent 自己的会话标识登记。'] : []),
@@ -526,6 +547,7 @@ export class WorkbenchService {
     return [
       commands,
       `本次意图：${instruction}`,
+      ...(task.input.projectSettings?.length ? ['适用于本步骤的设定（用户已保存）：', dataJson(task.input.projectSettings.map(({name,scope,body})=>({name,scope,body})))] : []),
       `输出：${outputType}；requirementId=${task.requirementId}；taskId=${task.id}`,
       '只启动本任务列明的技能流程。保留其确认门；缺必要信息时用 ask_user_question 询问，不得编造。',
       ...(productionRoute ? [`仅执行冻结阶段：${productionRoute.stage}。`] : []),

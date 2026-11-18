@@ -1,3 +1,4 @@
+import {ProjectAgentFloat} from './project-agent.jsx'
 import { CanvasConversationReferenceContext } from './conversation-references.jsx'
 import { loadConversationReferenceFiles } from './conversation-references.mjs'
 import { CanvasReferencePickerContext, ReferencePickOverlay } from './canvas-reference-picker.jsx'
@@ -916,7 +917,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }
   }
 
-  async function openPendingCard(card, { showDeck = true } = {}) {
+  async function openPendingCard(card, { showDeck = true, openConversation = false } = {}) {
     cancelCardOpen()
     if (card.composition) return openComposition({card:card.outputCard,node:card,composition:card.composition})
     if (!card.outputCard?.id || !card.pendingGeneration) return
@@ -934,6 +935,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       descriptor.node.position = absolutePosition(node, nodesRef.current)
       const next = createPendingContext({ projectId, projectName: project?.name || '当前项目', projectPath: project?.path || '', requirement, descriptor })
       next.focusRequest = (cache.current.drafts.get(next.key)?.focusRequest || 0) + 1
+      if(openConversation && next.sessionId)next.openExecutionRequest=crypto.randomUUID()
       cache.current.drafts.set(next.key, next)
       cache.current.cardKeys.set(node.id, next.key)
       cache.current.activeKey = next.key
@@ -957,7 +959,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   async function openOutputCard(card, versionId, { showDeck = true, expectedFrame, openConversation = false } = {}) {
     if (card.composition) return openComposition({card:card.outputCard,node:card,composition:card.composition})
-    if (card.kind === 'generation') return openPendingCard(card, { showDeck })
+    if (card.kind === 'generation') return openPendingCard(card, { showDeck,openConversation })
     cancelCardOpen()
     const intent = ++creationIntent.current, epoch = epochRef.current
     const selectedAtOpen = nodesRef.current.filter(node => node.selected).map(node => node.id).sort().join('|')
@@ -1033,10 +1035,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   useEffect(() => {
     const target = cache.current.pendingAsset
     if (!target || loading || !board) return
-    const card = board.nodes.find(node => node.outputCard?.id === target.cardId)
+    const card = board.nodes.find(node => node.outputCard?.id === target.cardId || node.id === target.cardId)
     if (!card) return
     delete cache.current.pendingAsset
-    void openOutputCard(card, target.versionId)
+    if(card.outputCard)void openOutputCard(card, target.versionId,{openConversation:!!target.openConversation}); else openCardDetails(card)
   }, [loading, board?.nodes?.length])
 
   function openCardDetails(card) {
@@ -3192,9 +3194,26 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (graphRef.current) graphRef.current.inert = graphInputBlocked
   }, [graphInputBlocked])
 
+  // Moving nodes keep the same data. Keep the native conversation out of position-only renders.
+  const agentSelection=useRef([]);
+  if(selectedNodes.length!==agentSelection.current.length||selectedNodes.some((n,i)=>n.data!==agentSelection.current[i])){
+    agentSelection.current=selectedNodes.map(n=>n.data);
+  }
+  const agentActions=useRef(null);
+  agentActions.current={refresh:()=>{void refreshTasks();void loadBoard({preserveViewport:true,keepVisible:true});},
+    locate:async({requirementId,cardId,versionId,taskId})=>{
+        if(requirementId!==requirement.id){onAssetNavigate?.(requirementId,cardId,versionId,!!taskId);return}
+        try { const current=boardRef.current?.nodes.find(n=>n.outputCard?.id===cardId)
+          if(current){await openOutputCard(current,versionId,{openConversation:!!taskId});return}
+          cache.current.pendingAsset={cardId,versionId,openConversation:!!taskId};await loadBoard({preserveViewport:true,keepVisible:true})
+        } catch(e){setError(messageOf(e))}
+      }
+  };
   return <CanvasConversationReferenceContext.Provider value={{ start: startConversationReferencePick, busy: Boolean(busy) || loading || pickingReferences }}><div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[popover],[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-large-canvas={nodes.length >= LARGE_CANVAS_THRESHOLD || undefined} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
+    {active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current}
+      request={request} renderConversation={renderEditorConversation} canvasActions={agentActions}/>}
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
       onRemove={() => void removeElements()} />}
@@ -3211,7 +3230,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     <input ref={contentPicker} type="file" hidden aria-label="上传卡片内容" onChange={uploadCardFile}/>
     {renameCard && <CardNameDialog title={cardDisplayTitle(renameCard)} busy={!!busy} error={renameError} onSave={saveCardName} onClose={() => { if (!busy) setRenameCard(null) }}/>}
     <div className="wcc-workspace">
-    <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy || loading} onDragOver={event => {
+    <div ref={graphRef} className={`wcc-graph${draggingFile ? ' is-file-dragging' : ''}`} data-card-drag={draggingCard || undefined} aria-hidden={(dock.mobile||editorFullscreen)&&dockOpen||undefined} aria-busy={!!busy || loading} onDragOver={event => {
         if ([...event.dataTransfer.types].some(type=>type==='Files'||type===PROJECT_FILE_DRAG)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDraggingFile(true) }
       }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setDraggingFile(false) }} onDrop={dropFiles} onDoubleClick={blankMenu}>
         {loading && !hasLoadedBoard && <div className="wcc-loading" role="status">正在读取画布…</div>}
@@ -3290,6 +3309,11 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       projectRoot={project.path} onOpenReviewDraft={onPreviewProjectFile}
       getReviewImageHref={(image, preview) => endpoint({ [preview ? 'reviewImage' : 'projectFileDownload']: image.path, hash: image.hash }).href}
       acceptedFileTypes=".txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm"
+      onLocateReference={r=>{
+        if(r.requirementId!==requirement.id){onAssetNavigate?.(r.requirementId,r.outputCardId||r.cardId,r.versionId);return}
+        const node=boardRef.current?.nodes.find(n=>n.outputCard?.id===r.outputCardId&&r.outputCardId||n.id===r.cardId);
+        if(node?.outputCard)void openOutputCard(node,r.versionId);else if(node)openCardDetails(node);
+      }}
       getReferenceFileHref={(card, preview = false) => endpoint({ [card.generatedFile ? 'downloadArtifact' : 'materialFile']: card.refId, ...(preview ? { preview: '1' } : {}) }).href}
       onTaskControl={() => { const taskId = creation?.pendingGeneration?.taskId || creation?.pendingTaskId || creation?.mediaJob?.taskId || creation?.taskId; if (taskId) setTaskControl({taskId}) }}
       onClose={closeCreation} onSend={sendToAI} onAction={creationAction}

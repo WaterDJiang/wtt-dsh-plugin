@@ -267,20 +267,21 @@ export class WorkbenchStore {
         }
         const baseVersion = baseVersionId ? this.getVersion(baseVersionId) : null;
         if (baseVersionId && baseVersion?.requirementId !== requirementId) throw new Error('基准版本不存在或不属于当前需求');
-        if (taskId) this.tasks.validateOutline(taskId, requirementId, sourceCardIds, input.executionSessionId);
+        const boundTask = taskId && this.tasks.validateOutline(taskId, requirementId, sourceCardIds, input.executionSessionId);
         for (const source of sourceCardIds) {
           if (typeof source !== 'string' || !/^(requirement|material|outline|word|artifact):[0-9a-f-]+$/i.test(source)) throw new Error('来源卡片标识无效');
           const [kind, id] = source.split(':');
           entityId(id, '来源卡片标识');
-          let belongs = kind === 'requirement' && id === requirementId;
+          const owner = boundTask?.input?.projectInputHash && boundTask.input.sources.find(s => s.cardId === source)?.requirementId || requirementId;
+          let belongs = kind === 'requirement' && id === owner;
           if (kind === 'outline' || kind === 'word') {
             const row = this.db.prepare('SELECT requirement_id, word_path FROM outline_versions WHERE id = ?').get(id);
-            belongs = row?.requirement_id === requirementId && (kind !== 'word' || Boolean(row.word_path));
+            belongs = row?.requirement_id === owner && (kind !== 'word' || Boolean(row.word_path));
           }
           if (kind === 'material' && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='canvas_materials'").get()) {
-            belongs = this.db.prepare('SELECT requirement_id FROM canvas_materials WHERE id = ?').get(id)?.requirement_id === requirementId;
+            belongs = this.db.prepare('SELECT requirement_id FROM canvas_materials WHERE id = ?').get(id)?.requirement_id === owner;
           }
-          if (kind === 'artifact') belongs = this.db.prepare('SELECT requirement_id FROM task_files WHERE id=?').get(id)?.requirement_id === requirementId;
+          if (kind === 'artifact') belongs = this.db.prepare('SELECT requirement_id FROM task_files WHERE id=?').get(id)?.requirement_id === owner;
           if (!belongs) throw new Error('来源卡片不存在或不属于当前需求');
         }
         managedDirectory(path.join(this.workspaceRoot, 'courses'));

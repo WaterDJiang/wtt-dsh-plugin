@@ -270,7 +270,7 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, trigger, it
 
 export function CardComposer({
   visible = true, suspended = false, position = { x: 0, y: 0 }, context, references: referenceItems = [], availableReferences = [], creationTypes = [],
-  instruction = '', onInstructionChange, onReferencesChange, onPickCanvasReferences, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onClose, onSend, onAction,
+  instruction = '', onInstructionChange, onReferencesChange, onPickCanvasReferences, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onLocateReference, onClose, onSend, onAction,
   searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewImageHref,
   busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onOpenNativeConversation, onTaskControl, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
@@ -635,7 +635,7 @@ export function CardComposer({
     <div ref={scrollBody} id={`${id}-body`} className="wcc-creation-scroll-body" hidden={collapsed}>
     {(taskMode || reviewingResult) && <>
       <TaskInputSummary instruction={instruction} references={references} skills={(context?.selectedSkills || chosenSkills).map(name => skillLabel(skillCatalog?.skills?.find(skill => skill.name === name) || { name }))} model={context?.modelSelection || (taskMode ? modelSelection : undefined)} engine={engineSummary}
-        renderFile={getReferenceFileHref ? reference => (reference.importedFile || reference.generatedFile) && <ImportedReferenceFile card={reference} getHref={getReferenceFileHref} /> : undefined} />
+        renderFile={reference=><>{reference.requirementId&&onLocateReference&&<UiButton size="compact" onClick={()=>onLocateReference(reference)}>定位来源</UiButton>}{getReferenceFileHref&&(reference.importedFile||reference.generatedFile)&&<ImportedReferenceFile card={reference} getHref={getReferenceFileHref}/>}</>} />
       {context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={context.pendingGeneration.error} />}
       {displayError && displayError !== context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={displayError} />}
       {canContinue && <div className="wcc-task-stage-actions"><UiButton variant="primary" size="compact" disabled={busy || conversationOpening === conversationScope}

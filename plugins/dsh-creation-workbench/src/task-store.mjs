@@ -7,6 +7,8 @@ import { normalizeModelSelection } from './model-selection.mjs';
 const validId = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const id = (value, label) => { if (!validId(value)) throw new Error(`${label}无效`); return value.toLowerCase(); };
 
+export const projectTaskFingerprint = Symbol('project-task-input');
+
 export class TaskStore {
   constructor(store) {
     this.store = store;
@@ -86,7 +88,7 @@ export class TaskStore {
       sourceCardId: input.selection.sourceCardId, sourceHash: input.selection.sourceHash,
       start: input.selection.start, end: input.selection.end, quote: input.selection.quote,
     };
-    const additional = {};
+    const additional = input[projectTaskFingerprint] ? { projectInputHash:input[projectTaskFingerprint] } : {};
     const modelSelection = normalizeModelSelection(input.modelSelection);
     if (modelSelection) additional.modelSelection = modelSelection;
     if (generation) additional.generation = generation;
@@ -221,14 +223,19 @@ export class TaskStore {
     });
   }
 
-  cancelDraft(taskId) {
+  cancelDraft(taskId, expectedSessionId = null) {
     return this.#transaction(() => {
       const row = this.#row(taskId), task = this.get(row.id);
       if (row.status === 'cancelled') return task;
-      if (row.kind !== 'ai' || row.status !== 'draft' || row.session_id || task.files.length || task.artifacts.length) throw new Error('任务已开始提交，请重新核对后停止原会话');
+      if (row.kind !== 'ai' || row.status !== 'draft' || row.session_id !== expectedSessionId || task.files.length || task.artifacts.length) throw new Error('任务已开始提交，请重新核对后停止原会话');
       this.db.prepare("UPDATE course_tasks SET status='cancelled',error=?,updated_at=? WHERE id=?").run('已取消未发送任务', new Date().toISOString(), row.id);
       return this.get(row.id);
     });
+  }
+
+  claimDraftDispatch(taskId, sessionId) {
+    return this.db.prepare("UPDATE course_tasks SET status='submitting',updated_at=? WHERE id=? AND kind='ai' AND status='draft' AND session_id=?")
+      .run(new Date().toISOString(),taskId,sessionId).changes===1;
   }
 
   setDispatch({ taskId, status, error }) {

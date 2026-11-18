@@ -26,8 +26,33 @@ function isTracked(task, statuses, pendingIds) {
     || isActiveTaskPhase(task.runtimeState?.phase) || task.dispatchStatus === 'submitting')
 }
 
-export function createDesktopTaskNotices({ channel, readTasks, readStatuses, watchSessions, interval = 2500 }) {
+export function createDesktopTaskNotices({ channel, readTasks, readStatuses, watchSessions, readAgentNotices, interval = 2500 }) {
   const records = new Map()
+  const projectWatches=new Map(), delivered=new Set()
+  function notify(projectId,title,events){
+    if(channel.permission!=='granted')return
+    const fresh=events.filter(e=>!delivered.has(projectId+':'+e.key))
+    if(!fresh.length)return
+    try{
+      channel.send({title,pending:fresh.filter(e=>e.type==='pending').length,completed:fresh.filter(e=>e.type==='completed').length})
+      for(const e of fresh)delivered.add(projectId+':'+e.key)
+    }catch(e){console.warn('DSH 桌面任务通知发送失败',e)}
+  }
+  function watchProject(project){
+    if(!readAgentNotices||projectWatches.has(project.id))return
+    const record={timer:null,previous:null,fail:false}, abort=new AbortController()
+    projectWatches.set(project.id,()=>{abort.abort();clearTimeout(record.timer)})
+    async function poll(){
+      try{
+        const events=await readAgentNotices(project.id,abort.signal)
+        if(abort.signal.aborted)return
+        if(record.previous)notify(project.id,project.name,events.filter(e=>!record.previous.has(e.key)))
+        record.previous=new Set(events.map(e=>e.key));record.fail=false
+      }catch(e){if(abort.signal.aborted)return;if(!record.fail)console.warn('项目委托通知读取失败',e);record.fail=true}
+      if(!abort.signal.aborted)record.timer=setTimeout(poll,interval)
+    }
+    void poll()
+  }
   let disposed = false
   const scopeKey = scope => JSON.stringify([scope.projectId, scope.canvasId])
 
@@ -51,8 +76,8 @@ export function createDesktopTaskNotices({ channel, readTasks, readStatuses, wat
     for (const id of completed) record.completed.add(id)
     record.tracked = tasks.filter(task => isTracked(task, statuses, pendingIds))
     if (record.initialized && channel.permission === 'granted' && (pending.length || completed.length)) {
-      try { channel.send({ title: record.scope.title || 'WTT 创作工作台', pending: pending.length, completed: completed.length }) }
-      catch (error) { console.warn('DSH 桌面任务通知发送失败', error) }
+      notify(record.scope.projectId,record.scope.title||'WTT 创作工作台',[
+        ...pending.map(e=>({key:e.key,type:'pending'})),...completed.map(id=>({key:'task:'+id,type:'completed'}))])
     }
     record.initialized = true
   }
@@ -104,9 +129,11 @@ export function createDesktopTaskNotices({ channel, readTasks, readStatuses, wat
     timer = setTimeout(poll, interval)
   }
 
-  return { channel, observe, leave, dispose() {
+  return { channel, observe, leave, watchProject, dispose() {
     disposed = true
     for (const record of records.values()) record.stop?.()
     records.clear()
+    for(const stop of projectWatches.values())stop()
+    projectWatches.clear();delivered.clear()
   } }
 }
