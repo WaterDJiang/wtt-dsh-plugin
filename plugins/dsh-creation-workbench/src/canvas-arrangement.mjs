@@ -1,20 +1,61 @@
 const GAP = 48;
 const LIMIT = 1_000_000;
 
-function arrangeGrid(blocks, fixed) {
-  if (!blocks.length) return new Map();
-  const ordered = [...blocks].sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id));
-  const columns = Math.min(8, Math.ceil(Math.sqrt(ordered.length)));
+const readingOrder = (a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id);
+const natural = new Intl.Collator('zh-Hans', { numeric: true, sensitivity: 'base' });
+
+function semanticOrder(blocks) {
+  const keys = new Map(), taskTitles = new Map();
+  for (const block of blocks) {
+    const title = block.title?.normalize('NFKC').trim();
+    if (!title) continue;
+    const code = /^([A-Z]{1,8})[\s_-]*([0-9]+)(?![A-Z0-9])/i.exec(title);
+    const numbered = !code && /^(?:第\s*)?([0-9]+)(?=$|[\s._、:：-]|[章节集幕页])/.exec(title);
+    if (code || numbered) {
+      keys.set(block.id, { rank: 0, series: code?.[1] || '', number: code?.[2] || numbered[1], title });
+    } else if (block.outputType) {
+      keys.set(block.id, { rank: 1, taskId: block.taskId, type: block.outputType, title });
+      if (block.taskId && (!taskTitles.has(block.taskId) || natural.compare(title, taskTitles.get(block.taskId)) < 0)) {
+        taskTitles.set(block.taskId, title);
+      }
+    }
+  }
+  if (!keys.size) return null;
+  const unknown = { rank: 2 };
+  return (a, b) => {
+    const first = keys.get(a.id) || unknown, second = keys.get(b.id) || unknown;
+    if (first.rank !== second.rank) return first.rank - second.rank;
+    if (first.rank === 0) return natural.compare(first.series, second.series) || natural.compare(first.number, second.number)
+      || natural.compare(first.title, second.title);
+    if (first.rank === 1) return Number(!first.taskId) - Number(!second.taskId)
+      || natural.compare(taskTitles.get(first.taskId) || '', taskTitles.get(second.taskId) || '')
+      || (first.taskId || '').localeCompare(second.taskId || '') || natural.compare(first.type, second.type)
+      || natural.compare(first.title, second.title);
+    return 0;
+  };
+}
+
+function gridRows(ordered, columns) {
   const rows = [];
   for (let start = 0; start < ordered.length; start += columns) {
     const cards = ordered.slice(start, start + columns);
     rows.push({ cards, height: Math.max(...cards.map(card => card.height)),
       width: cards.reduce((width, card) => width + card.width + GAP, -GAP) });
   }
+  return rows;
+}
+
+function arrangeGrid(blocks, fixed, origin, rows) {
+  if (!blocks.length) return new Map();
+  if (!rows) {
+    const compare = semanticOrder(blocks);
+    const ordered = [...blocks].sort((a, b) => compare?.(a, b) || readingOrder(a, b));
+    rows = gridRows(ordered, Math.min(8, Math.ceil(Math.sqrt(ordered.length))));
+  }
   const width = Math.max(...rows.map(row => row.width));
   const height = rows.reduce((total, row) => total + row.height + GAP, -GAP);
-  const left = Math.max(-LIMIT, Math.min(...ordered.map(card => card.x), LIMIT - width));
-  let y = Math.max(-LIMIT, Math.min(ordered[0].y, LIMIT - height));
+  const left = origin?.x ?? Math.max(-LIMIT, Math.min(...blocks.map(card => card.x), LIMIT - width));
+  let y = origin?.y ?? Math.max(-LIMIT, Math.min(...blocks.map(card => card.y), LIMIT - height));
   const obstacles = [...fixed].sort((a, b) => a.x - b.x);
   const positions = new Map();
   for (const row of rows) {
@@ -35,8 +76,6 @@ function arrangeGrid(blocks, fixed) {
   return positions;
 }
 
-
-const readingOrder = (a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id);
 
 // Cyclic references stay together; the condensation graph still has a usable hierarchy.
 function sourceRanks(nodes, edges) {
@@ -103,7 +142,16 @@ export function arrangeCardBlocks(blocks, fixed, relations = []) {
   if (!edges.length) return arrangeGrid(blocks, fixed);
   const families = relatedFamilies(blocks, edges), connected = families.filter(family => family.relations.length);
   const isolated = families.filter(family => !family.relations.length).flatMap(family => family.nodes).sort(readingOrder);
-  const spans = connected.map(family => family.layers.reduce((width, layer) => width + Math.max(...layer.map(node => node.width)) + 80, -80));
+  for (const family of connected) {
+    const leafLayer = family.layers.at(-1);
+    const compare = leafLayer.length >= 8 && semanticOrder(leafLayer);
+    if (compare) family.leafRows = gridRows([...leafLayer].sort((a, b) => compare(a, b) || readingOrder(a, b)), 3);
+  }
+  const spans = connected.map(family => family.layers.reduce((width, layer) => {
+    const measured = family.leafRows && layer === family.layers.at(-1)
+      ? Math.max(...family.leafRows.map(row => row.width)) : Math.max(...layer.map(node => node.width));
+    return width + measured + 80;
+  }, -80));
   if (isolated.length) spans.push(Math.max(...isolated.map(node => node.width)) * Math.min(8, Math.ceil(Math.sqrt(isolated.length))) + GAP * 7);
   const span = Math.max(...spans);
   if (span > 2 * LIMIT || blocks.some(node => node.width > 2 * LIMIT || node.height > 2 * LIMIT)) throw new Error('排版超出画布坐标范围，请缩小分组跨度后重试。');
@@ -122,6 +170,11 @@ export function arrangeCardBlocks(blocks, fixed, relations = []) {
   for (const family of connected) {
     let x = left;
     for (const layer of family.layers) {
+      if (family.leafRows && layer === family.layers.at(-1)) {
+        for (const [id, position] of arrangeGrid(layer, obstacles, { x, y: top }, family.leafRows)) positions.set(id, position);
+        break;
+      }
+      const compare = semanticOrder(layer);
       const desired = node => {
         const parents = family.relations.filter(edge => edge.target === node.id).map(edge => edge.source);
         const placed = parents.map(id => {
@@ -130,7 +183,7 @@ export function arrangeCardBlocks(blocks, fixed, relations = []) {
         }).filter(value => value !== undefined);
         return placed.length ? placed.reduce((a, b) => a + b, 0) / placed.length : top + node.height / 2;
       };
-      layer.sort((a, b) => desired(a) - desired(b) || readingOrder(a, b));
+      layer.sort((a, b) => compare?.(a, b) || desired(a) - desired(b) || readingOrder(a, b));
       let y = top;
       for (const node of layer) {
         y = Math.max(y, desired(node) - node.height / 2);

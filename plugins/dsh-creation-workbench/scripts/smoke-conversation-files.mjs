@@ -247,7 +247,11 @@ try {
       assert.equal(logs.filter(message => message.includes('409')).length, stressMode ? 0 : 1);
       assert.deepEqual(logs.filter(message => !message.includes('409')), []);
     } else {
-      await canvas.locator('.wcc-skill-todo').first().click();
+      const taskButton = canvas.getByRole('button', { name: '创作任务', exact: true });
+      await taskButton.locator('.wcc-studio-task-badge').filter({ hasText: /^1$/ }).waitFor();
+      await taskButton.click();
+      await canvas.getByRole('button', { name: '处理待确认', exact: true }).click();
+      assert.equal(await taskButton.locator('.wcc-studio-task-badge').innerText(), '1', '查看不清除未处理的确认');
     const review = page.getByRole('dialog', { name: '任务待确认', exact: true }), chat = review.locator('.wtt-native-editor-conversation');
     await chat.getByRole('button', { name: 'V2 双人中全景', exact: true }).waitFor();
     await review.getByText('保留候选', { exact: true }).click(); assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled());

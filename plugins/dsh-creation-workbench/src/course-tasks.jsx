@@ -73,7 +73,10 @@ function TaskInput({ input }) {
   </div>
 }
 
-export function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenArtifact, onOpenSession, onResumeMediaTask, getDownloadHref, getFileDownloadHref, busy = false }) {
+const NO_TASK_IDS = new Set()
+
+export function CourseTasks({ tasks = [], pendingTaskIds = NO_TASK_IDS, newTaskIds = NO_TASK_IDS, onViewTask, onOpenPending,
+  loadTask, onOpenArtifact, onOpenSession, onResumeMediaTask, getDownloadHref, getFileDownloadHref, busy = false }) {
   const [selectedId, setSelectedId] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -81,8 +84,10 @@ export function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenA
   const [retry, setRetry] = useState(0)
   const [resumes, setResumes] = useState({})
   const [filter, setFilter] = useState('all')
+  const priority = id => pendingTaskIds.has(id) ? 2 : Number(newTaskIds.has(id))
   const visibleTasks = tasks.filter(task => filter === 'all' || filter === 'running' && task.runtimeState?.phase === 'generating'
-    || filter === 'pending' && pendingTaskIds.includes(task.id) || filter === 'review' && task.status === 'output' || filter === 'failed' && (task.runtimeState?.phase === 'failed' || ['failed', 'unknown'].includes(task.status)))
+    || filter === 'pending' && pendingTaskIds.has(task.id) || filter === 'review' && task.status === 'output' || filter === 'failed' && (task.runtimeState?.phase === 'failed' || ['failed', 'unknown'].includes(task.status)))
+    .sort((a, b) => priority(b.id) - priority(a.id))
   const requestRef = useRef(0)
   const loadRef = useRef(loadTask)
   loadRef.current = loadTask
@@ -136,15 +141,16 @@ export function CourseTasks({ tasks = [], pendingTaskIds = [], loadTask, onOpenA
     {!!tasks.length && !visibleTasks.length && <p role="status">此筛选下没有任务。</p>}
     {!tasks.length ? <div className="wcc-tasks-empty"><span aria-hidden="true">☷</span><p>还没有创作任务</p><small>点击卡片填写要求，即可开始创作；手动保存的新版本也会记录在这里。</small></div> : <>
       <div className="wcc-task-list" aria-label="选择任务">
-        {visibleTasks.map(item => <UiButton variant="custom" type="button" key={item.id} className={`wcc-task-list-item${item.id === activeId ? ' is-active' : ''}`} aria-pressed={item.id === activeId} onClick={() => setSelectedId(item.id)}>
+        {visibleTasks.map(item => <UiButton variant="custom" type="button" key={item.id} className={`wcc-task-list-item${item.id === activeId ? ' is-active' : ''}`} aria-pressed={item.id === activeId} onClick={() => { setSelectedId(item.id); onViewTask?.(item.id) }}>
           <span className="wcc-task-list-top"><span>{item.kind === 'manual' ? '人工修订' : item.kind === 'media' ? 'AI 媒体生成' : 'AI 创作'}</span><time dateTime={item.createdAt}>{timeLabel(item.createdAt)}</time></span>
           <strong>{taskName(item)}</strong>
-          <span className={`wcc-task-status is-${item.status}`}>{STATUS[item.status] || item.status || '状态未提供'}{item.artifacts?.length ? ` · ${item.artifacts.length} 个大纲版本` : ''}{item.files?.length ? ` · ${item.files.length} 个文件` : ''}</span>
+          <span className={`wcc-task-status is-${item.status}`}>{pendingTaskIds.has(item.id) ? '待确认' : newTaskIds.has(item.id) ? '新成果 · 待查看' : STATUS[item.status] || item.status || '状态未提供'}{item.artifacts?.length ? ` · ${item.artifacts.length} 个大纲版本` : ''}{item.files?.length ? ` · ${item.files.length} 个文件` : ''}</span>
         </UiButton>)}
       </div>
       {task && <article className="wcc-task-detail" aria-label="任务详情">
         <div className="wcc-task-detail-heading"><span className={`wcc-task-status is-${task.status}`}>{STATUS[task.status] || task.status || '状态未提供'}</span><UiButton variant="quiet" type="button" className="wcc-text-button" onClick={() => setRetry(value => value + 1)} disabled={loading || !canLoad}>刷新详情</UiButton></div>
         <h3>{taskName(task)}</h3>
+        {pendingTaskIds.has(task.id) && onOpenPending && <UiButton variant="primary" className="wcc-task-session" disabled={busy} onClick={() => onOpenPending(task.id)}>处理待确认</UiButton>}
         {task.status === 'accepted' && <p className="wcc-task-state-note">请求已提交，尚未登记可审阅的成果文件。</p>}
         {task.status === 'submitting' && <p className="wcc-task-state-note">正在确认是否提交成功。先等待结果，不要重复发送。</p>}
         {task.status === 'unknown' && <p className="wcc-inline-warning">{task.kind === 'media' ? '即梦提交结果未知。本任务不会自动重新生成，请先在即梦核对生成记录。' : '发送结果尚未核实。打开任务对话核对后再决定下一步。'}</p>}

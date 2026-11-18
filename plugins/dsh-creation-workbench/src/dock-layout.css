@@ -25,7 +25,7 @@
   .wtt-course-canvas .wcc-graph .wcc-studio-status-dock { top:76px;right:12px;left:auto;width:max-content;justify-content:flex-end; }
   .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-save-status,
   .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-divider,
-  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-panel-button span { display:none; }
+  .wtt-course-canvas .wcc-graph .wcc-studio-status-dock .wcc-studio-panel-button > span:not(.wcc-studio-task-badge) { display:none; }
   .wtt-course-canvas .wcc-graph .wcc-studio-status-dock { gap:1px;padding:3px; }
 }
 @container (max-width:460px) {

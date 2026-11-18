@@ -1,7 +1,9 @@
+import { createDesktopTaskNotices, desktopTaskNotificationChannel } from './desktop-task-notices.mjs'
 import { CanvasConversationReferenceButton } from './conversation-references.jsx'
 import { MediaServiceSettings } from './media-service-settings.jsx';
 import { createMediaSettingsOperations } from './media-service-operations.mjs';
 import { DialogBody, DialogFooter, DialogHeader, UiButton } from './ui/controls.jsx'
+import { CanvasPopover } from './ui/canvas-popover.jsx'
 import { UserError } from './user-feedback.jsx'
 import React, { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import './workbench.css'
@@ -81,21 +83,10 @@ function BookIcon() {
   </svg>
 }
 
-function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onList, onRefresh, onRename, onModelSettings, onSyncDeliverables, onBackground }) {
+function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onList, onRefresh, onRename, onModelSettings, onSyncDeliverables, onBackground, notificationChannel }) {
   const menuId = useId()
   const [menuOpen, setMenuOpen] = useState(false)
-  const menu = useRef(null)
-  useEffect(() => {
-    if (!menuOpen) return
-    const dismissOutside = event => { if (!menu.current?.contains(event.target)) setMenuOpen(false) }
-    const dismissOnEscape = event => { if (event.key === 'Escape') setMenuOpen(false) }
-    document.addEventListener('pointerdown', dismissOutside)
-    document.addEventListener('keydown', dismissOnEscape)
-    return () => {
-      document.removeEventListener('pointerdown', dismissOutside)
-      document.removeEventListener('keydown', dismissOnEscape)
-    }
-  }, [menuOpen])
+  const menuButton = useRef(null)
   return <header className="wtt-project-bar" aria-label="当前画布">
     <h1 className="wtt-visually-hidden">创作画布</h1>
     {!filesOpen&&<UiButton variant="ghost" type="button" className="wtt-open-files" aria-label={`打开文件栏 · ${project.name}`} title={`打开文件栏 · ${project.name}`} onClick={onToggleFiles} aria-expanded={false}>
@@ -110,18 +101,29 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
     <UiButton variant="quiet" type="button" className="wtt-project-button" aria-label="新建画布" title="新建画布" disabled={!workspace || Boolean(busy)} onClick={onNew}>
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </UiButton>
-    <div className="wtt-project-menu" ref={menu}>
-      <UiButton variant="quiet" type="button" className="wtt-project-button" aria-label="画布菜单" title="画布菜单" aria-expanded={menuOpen} aria-controls={menuId} aria-haspopup="menu" onClick={() => setMenuOpen(open => !open)}>
+    <div className="wtt-project-menu" onKeyDown={event => {
+      if (!menuOpen || event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      setMenuOpen(false)
+      menuButton.current?.focus({ preventScroll: true })
+    }}>
+      <UiButton ref={menuButton} variant="quiet" type="button" className="wtt-project-button" aria-label="画布菜单" title="画布菜单" aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined} aria-haspopup="menu" onClick={() => setMenuOpen(open => !open)}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
       </UiButton>
-      {menuOpen && <div className="wtt-project-options" id={menuId} role="menu" aria-label="画布菜单">
+      {menuOpen && <CanvasPopover anchorRef={menuButton} placement="bottom-end" onDismiss={() => setMenuOpen(false)}
+        className="wtt-project-options" id={menuId} role="menu" aria-label="画布菜单">
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onList() }}>列表编辑<span>查看大纲与版本</span></UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onRename() }}>重命名画布</UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onBackground() }}>背景资料</UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => { setMenuOpen(false); onSyncDeliverables() }}>整理成果文件夹<span>按白板名称整理全部已保存版本</span></UiButton>
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onModelSettings() }}>模型设置<span>连接第三方模型或自定义 API</span></UiButton>
+        {notificationChannel?.permission === 'default' && <UiButton variant="custom" type="button" role="menuitem" onClick={() => {
+          setMenuOpen(false)
+          void notificationChannel.requestPermission().catch(error => console.warn('DSH 桌面通知授权失败', error))
+        }}>启用桌面通知</UiButton>}
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onRefresh() }} disabled={loading || Boolean(busy)}>{loading ? '读取中…' : '刷新画布'}</UiButton>
-      </div>}
+      </CanvasPopover>}
     </div>
   </header>
 }
@@ -203,7 +205,7 @@ function RenameRequirementDialog({ value, onChange, busy, error, onClose, onSubm
 }
 
 function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStart, onStartCanvas, onRestoreCanvas, onPrepareContinuation, onWatchTaskSessions, acquirePreviewSession, acquireEditingSession,nativeEditorBridge,SessionProvider, renderSlot,
-  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses }) {
+  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, desktopTaskNotices }) {
   const outlineTitleId = useId()
   const activeRef = useRef(active)
   activeRef.current = active
@@ -594,7 +596,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     setFileRecycleSignal({token:crypto.randomUUID(),requirements:plan.courses.map(c=>c.requirementId)})
     await load()
   }
-  const projectBar = <CanvasProjectBar workspace={workspace} project={project} onToggleFiles={()=>setFilesOpen(true)} filesOpen={filesOpen} selectedId={selectedId} busy={busy} loading={loading} onSelect={selectRequirement} onNew={() => { setFormError(''); setShowNew(true) }} onList={showList} onRefresh={() => load()} onRename={showRename} onBackground={showBackground} onSyncDeliverables={syncDeliverables} onModelSettings={onOpenModelSettings} />
+  const projectBar = <CanvasProjectBar workspace={workspace} project={project} onToggleFiles={()=>setFilesOpen(true)} filesOpen={filesOpen} selectedId={selectedId} busy={busy} loading={loading} onSelect={selectRequirement} onNew={() => { setFormError(''); setShowNew(true) }} onList={showList} onRefresh={() => load()} onRename={showRename} onBackground={showBackground} onSyncDeliverables={syncDeliverables} onModelSettings={onOpenModelSettings} notificationChannel={desktopTaskNotices?.channel} />
 
   return <div className="wtt-project-layout">{filesOpen&&<ProjectExplorer onChanged={fileTreeChanged} refreshSignal={fileRefresh} onRecycle={()=>setRecycleRequest(crypto.randomUUID())} project={project} request={request} active={active} onClose={()=>setFilesOpen(false)} onChooseProject={onChooseProject} onOpenProject={onOpenProject} onPreview={previewProjectFile} onAdd={addProjectFile} canAdd={Boolean(selected)}/>}<div className="wtt-project-main"><div className={`wtt-course-workbench ${view === 'canvas' ? 'wtt-canvas-mode' : ''}`}>
     {view === 'canvas' && !selected && projectBar}
@@ -625,7 +627,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
       onPreviewProjectFile={previewProjectFile}
       onAssetNavigate={(requirementId, cardId, versionId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId }; selectRequirement(target) }}
-      nativeModelSeat={nativeModelSeat} onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
+      nativeModelSeat={nativeModelSeat} desktopTaskNotices={desktopTaskNotices} onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation} />}
     {!selected&&recycleRequest&&<ProjectRecycleDialog request={request} endpoint={q=>endpoint(q,project.id)} onClose={()=>setRecycleRequest(null)} onChanged={()=>setFileRefresh(v=>v+1)}/>}
     {view==='canvas'&&!selected&&projectFileSelection&&<div className="wtt-empty-file-preview"><ProjectFilePreview selection={projectFileSelection} endpoint={q=>endpoint(q,project.id)} onClose={()=>setProjectFileSelection(null)}/></div>}
     {view === 'canvas' && workspace && !selected && <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>拖入文件，继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div>}
@@ -796,6 +798,14 @@ export function apply(ctx) {
   const acquirePreviewSession = createPreviewSessionAcquirer(ctx)
   const acquireEditingSession=createEditorSessionAcquirer(ctx)
   const nativeModelSeat = createNativeModelSeat(ctx.slots, ctx.locale)
+  const notificationChannel = desktopTaskNotificationChannel(globalThis.window, () => ctx.layout.selectPanel(PANEL_ID))
+  const desktopTaskNotices = notificationChannel && createDesktopTaskNotices({
+    channel: notificationChannel,
+    readTasks: ({ projectId, canvasId }, signal) => apiRequest(undefined, undefined, projectId, { tasks: canvasId }, signal),
+    readStatuses: () => ctx.uiSession.sessionStatus.getSnapshot(),
+    watchSessions: (scope, onChange) => watchCourseTaskSessions(ctx, scope, onChange, error => console.warn(error)),
+  })
+  if (desktopTaskNotices) ctx.effect(() => desktopTaskNotices.dispose)
   registerNativePreview(ctx)
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
@@ -823,7 +833,7 @@ export function apply(ctx) {
       acquirePreviewSession,acquireEditingSession,nativeEditorBridge,
       onWatchTaskSessions: (scope, onChange, onError) => watchCourseTaskSessions(ctx, scope, onChange, onError),
       browseDirectory,
-      nativeModelSeat,
+      nativeModelSeat, desktopTaskNotices,
       onLoadModels: async () => {
         const result = await ctx.remote.session.modelCatalog()
         if (result?.ok !== true) throw new Error(result?.error?.message || 'DSH 模型目录读取失败，请检查连接后刷新。')

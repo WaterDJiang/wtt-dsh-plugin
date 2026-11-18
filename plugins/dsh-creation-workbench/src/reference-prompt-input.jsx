@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { UiButton } from './ui/controls.jsx'
+import { CanvasPopover } from './ui/canvas-popover.jsx'
 import { insertReferenceMention, referenceQueryAtCursor } from './reference-mention.mjs'
 
 export function ReferencePromptInput({ textareaRef, onValueChange, onCursor, onSelect, onKeyDown, onSubmit,
-  referenceOptions, searchReferences, acceptProjectFile, onMention, disabled, value, ...props }) {
+  referenceOptions, searchReferences, acceptProjectFile, onMention, disabled, value, popoverActive = true, ...props }) {
   const id = useId()
   const ownInput = useRef(null), list = useRef(null), choosing = useRef(false)
   const input = textareaRef || ownInput
@@ -20,10 +21,11 @@ export function ReferencePromptInput({ textareaRef, onValueChange, onCursor, onS
     .filter(entry => !paths.has(entry.path) && (!acceptProjectFile || acceptProjectFile(entry)))
     .map(entry => ({ key: entry.path, label: entry.name, detail: entry.path, mentionLabel: entry.path, projectFile: entry.path }))]
   const selected = Math.min(active, candidates.length - 1)
-  const open = Boolean(range && !disabled)
+  const open = Boolean(range && !disabled && popoverActive)
+  useEffect(() => { if (!popoverActive || disabled) setRange(null) }, [popoverActive, disabled])
 
   useEffect(() => {
-    if (query === undefined || !searchReferences || disabled) return
+    if (!open || !searchReferences) return
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       try {
@@ -34,7 +36,7 @@ export function ReferencePromptInput({ textareaRef, onValueChange, onCursor, onS
       }
     }, 160)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [query, searchReferences, disabled])
+  }, [query, searchReferences, open])
 
   useEffect(() => { setActive(0) }, [query])
   useEffect(() => {
@@ -47,8 +49,9 @@ export function ReferencePromptInput({ textareaRef, onValueChange, onCursor, onS
 
   function inspect(element) {
     onCursor?.(element)
-    if (!onMention || choosing.current) return
-    setRange(element.selectionStart === element.selectionEnd ? referenceQueryAtCursor(element.value, element.selectionStart) : null)
+    if (!popoverActive || !onMention || choosing.current) return
+    const next = element.selectionStart === element.selectionEnd ? referenceQueryAtCursor(element.value, element.selectionStart) : null
+    if (range?.start !== next?.start || range?.end !== next?.end || range?.query !== next?.query) setRange(next)
   }
 
   async function choose(candidate) {
@@ -105,7 +108,8 @@ export function ReferencePromptInput({ textareaRef, onValueChange, onCursor, onS
         onKeyDown?.(event)
         if (!event.defaultPrevented && (event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); onSubmit?.() }
       }} />
-    {open && <div className="wcc-creation-skill-picker wcc-reference-mention">
+    {open && <CanvasPopover className="wcc-creation-skill-picker wcc-reference-mention" anchorRef={input}
+      widthRef={input} onDismiss={() => setRange(null)}>
       <div className="wcc-creation-skill-picker-heading">引用资料</div>
       <div ref={list} className="wcc-creation-skill-options" id={`${id}-references`} role="listbox" aria-label="可引用的文件与卡片">
         {candidates.map((option, index) => <UiButton variant="custom" type="button" role="option" key={option.key}
@@ -117,7 +121,7 @@ export function ReferencePromptInput({ textareaRef, onValueChange, onCursor, onS
         : projectResults?.error ? <small role="status">项目文件搜索失败，可从文件栏添加。{projectResults.error}</small>
           : !candidates.length ? <small role="status">没有匹配资料，换个关键词或点「添加」。</small>
             : projectResults?.truncated && <small>结果有限，输入更具体的名称，或从文件栏添加。</small>}
-    </div>}
+    </CanvasPopover>}
     {error && <p className="wcc-creation-disabled-reason" role="status">{error}</p>}
   </div>
 }

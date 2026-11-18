@@ -1,5 +1,6 @@
 import { UiButton } from './ui/controls.jsx'
-import React, { useEffect, useRef, useState } from 'react'
+import { CanvasPopover } from './ui/canvas-popover.jsx'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import { useStore } from '@xyflow/react'
 import './canvas-chrome.css'
 
@@ -62,17 +63,18 @@ export function CanvasSearch({ width, panelOpen, hidden, query, onQuery, nodes, 
       <input ref={input} aria-label="搜索画布内容" placeholder="查找卡片…" value={query} onFocus={() => setFocused(true)} onChange={event => { onQuery(event.target.value); setFocused(true) }} />
       {query && <UiButton variant="custom" type="button" aria-label="清空搜索" onClick={() => { onQuery(''); input.current?.focus() }}>×</UiButton>}
       <UiButton variant="custom" type="button" aria-pressed={!allRelations} title={allRelations ? '点击淡化与所选卡片无关的连线' : '点击显示全部连线'} onClick={onRelations}>{allRelations ? '连线：全部' : '连线：相关'}</UiButton>
-      {focused && query.trim() && <div role="listbox" aria-label="画布搜索结果">{matches.length ? matches.map(node => <UiButton variant="custom" type="button" role="option" aria-selected={false} key={node.id} onMouseDown={event => event.preventDefault()} onClick={() => { onSelect(node); onQuery(''); setFocused(false) }}>{node.data.title}</UiButton>) : <p role="status">没找到相关卡片，换个关键词试试。</p>}</div>}
+      {!hidden && focused && query.trim() && <CanvasPopover anchorRef={input} placement="bottom-end" onDismiss={() => setFocused(false)}
+        role="listbox" aria-label="画布搜索结果">{matches.length ? matches.map(node => <UiButton variant="custom" type="button" role="option" aria-selected={false} key={node.id} onMouseDown={event => event.preventDefault()} onClick={() => { onSelect(node); onQuery(''); setFocused(false) }}>{node.data.title}</UiButton>) : <p role="status">没找到相关卡片，换个关键词试试。</p>}</CanvasPopover>}
     </> : <UiButton variant="custom" type="button" aria-label="搜索画布内容" title="查找卡片与文字" onClick={() => { onOpen?.(); setOpen(true) }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg></UiButton>}
   </div>
 }
 
-function ToolButton({ icon, label, shortcut, active, onClick, disabled, children, className = '' }) {
-  const title = shortcut ? `${label} · ${shortcut}` : label
-  return <UiButton variant="custom" type="button" className={`wcc-studio-button ${active ? 'is-active' : ''} ${className}`} title={title} aria-label={label} aria-pressed={active === undefined ? undefined : active} disabled={disabled || !onClick} onClick={onClick}>
+function ToolButton({ icon, label, shortcut, active, menuOpen, descriptionId, hint, onClick, disabled, children, className = '', buttonRef }) {
+  const title = [label, shortcut, hint].filter(Boolean).join(' · ')
+  return <UiButton ref={buttonRef} variant="custom" type="button" className={`wcc-studio-button ${active ? 'is-active' : ''} ${className}`} title={title} aria-label={label} aria-describedby={descriptionId} aria-pressed={active} aria-haspopup={menuOpen === undefined ? undefined : 'menu'} aria-expanded={menuOpen} disabled={disabled || !onClick} onClick={onClick}>
     {icon && <CanvasIcon name={icon} />}
     {children}
-    <span className="wcc-studio-tooltip" aria-hidden="true">{label}{shortcut && <kbd>{shortcut}</kbd>}</span>
+    <span className="wcc-studio-tooltip" aria-hidden="true">{hint ? `${label} · ${hint}` : label}{shortcut && <kbd>{shortcut}</kbd>}</span>
   </UiButton>
 }
 
@@ -93,7 +95,7 @@ function ZoomValue({ onReset }) {
 export function CanvasChrome({
   tool = 'select', onTool, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected, onArrange, canArrange,
   onToggleMap, showMap = false, onAddMaterial, onAddElement, onUndo, onRedo, canUndo, canRedo,
-  onInspect, onAI, onTasks, onAssets, taskCount = 0, runningCount = 0, pendingCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
+  onInspect, onAI, onTasks, onAssets, pendingCount = 0, completedCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
   hasSelection = selectedCount > 0, busy = false, pickingReferences = false,
 }) {
   const status = {
@@ -105,6 +107,9 @@ export function CanvasChrome({
     else if (!['select', 'hand'].includes(value)) onAddElement?.(value)
   }
   const controlsDisabled = Boolean(busy)
+  const taskStatusId = useId()
+  const taskCount = pendingCount + completedCount
+  const taskStatus = [pendingCount && `${pendingCount} 个任务待确认`, completedCount && `${completedCount} 个新成果待查看`].filter(Boolean).join('，')
   return <div className={`wcc-studio-chrome${sidebar ? ' is-panel-open' : ''}`}>
     <div className="wcc-studio-tools wcc-studio-surface" role="toolbar" aria-label="白板工具" aria-orientation="vertical">
       {TOOLS.map(([value, label, shortcut], index) => <React.Fragment key={value}>
@@ -126,7 +131,11 @@ export function CanvasChrome({
       <ToolButton icon="refresh" label="刷新画布" onClick={onRefresh} disabled={controlsDisabled} />
       <span className="wcc-studio-divider" aria-hidden="true" />
       <ToolButton icon="inspect" label="内容详情" active={typeof sidebar === 'string' ? sidebar === 'inspect' : undefined} onClick={onInspect} className="wcc-studio-panel-button"><span>内容</span></ToolButton>
-      <ToolButton icon="material" label="创作任务" active={sidebar === 'tasks'} onClick={onTasks} className="wcc-studio-panel-button"><span>{runningCount ? `运行 ${runningCount}` : '任务'}{pendingCount ? ` · 待办 ${pendingCount}` : ''}</span></ToolButton>
+      <ToolButton icon="material" label="创作任务" active={sidebar === 'tasks'} onClick={onTasks} hint={taskStatus} descriptionId={taskStatus ? taskStatusId : undefined} className="wcc-studio-panel-button">
+        <span>任务</span>
+        {taskCount > 0 && <span className="wcc-studio-task-badge" aria-hidden="true">{taskCount > 99 ? '99+' : taskCount}</span>}
+      </ToolButton>
+      <span id={taskStatusId} className="wtt-visually-hidden" role="status">{taskStatus}</span>
       <ToolButton icon="inspect" label="资产看板" onClick={onAssets} className="wcc-studio-panel-button"><span>资产</span></ToolButton>
       <ToolButton icon="ai" label="AI 创作" active={typeof sidebar === 'string' ? sidebar === 'ai' : undefined} onClick={onAI} className="wcc-studio-panel-button is-ai"><span>AI 创作</span></ToolButton>
     </div>
@@ -154,6 +163,7 @@ export function SelectionActions({
   mediaActionLabel, onMediaAction,
 }) {
   const [alignOpen, setAlignOpen] = useState(false)
+  const alignButton = useRef(null)
   const style = x === undefined ? undefined : { left: x, top: y ?? 86 }
   return <div className={`wcc-studio-selection wcc-studio-surface${x === undefined ? '' : ' is-positioned'}`} style={style} role="toolbar" aria-label={`已选 ${selectedCount} 个对象的操作`} onPointerDown={event => event.stopPropagation()}>
     <span className="wcc-studio-selection-count">{selectedCount} 项</span>
@@ -164,11 +174,17 @@ export function SelectionActions({
     <span className="wcc-studio-divider" aria-hidden="true" />
     {canGroup && <ToolButton icon="group" label="编组" shortcut="⌘/Ctrl G" onClick={onGroup} disabled={busy} />}
     {canUngroup && <ToolButton icon="ungroup" label="解除分组" shortcut="⌘/Ctrl Shift G" onClick={onUngroup} disabled={busy} />}
-    {selectedCount > 1 && <div className="wcc-studio-align-wrap">
-      <ToolButton icon="align" label="对齐与分布" active={alignOpen} onClick={() => setAlignOpen(value => !value)} disabled={busy || !onAlign} />
-      {alignOpen && <div className="wcc-studio-align-menu" role="menu" aria-label="对齐与分布">
+    {selectedCount > 1 && <div className="wcc-studio-align-wrap" onKeyDown={event => {
+      if (!alignOpen || event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      setAlignOpen(false)
+      alignButton.current?.focus({ preventScroll: true })
+    }}>
+      <ToolButton buttonRef={alignButton} icon="align" label="对齐与分布" menuOpen={alignOpen} onClick={() => setAlignOpen(value => !value)} disabled={busy || !onAlign} />
+      {alignOpen && <CanvasPopover anchorRef={alignButton} onDismiss={() => setAlignOpen(false)} className="wcc-studio-align-menu" role="menu" aria-label="对齐与分布">
         {[['left', '左对齐'], ['top', '顶部对齐'], ['horizontal', '水平等距']].map(([value, label]) => <UiButton variant="custom" type="button" key={value} role="menuitem" onClick={() => { onAlign?.(value); setAlignOpen(false) }} disabled={busy || (value === 'horizontal' && selectedCount < 3)}><CanvasIcon name={value === 'horizontal' ? 'distribute' : value} size={16} /><span>{label}</span></UiButton>)}
-      </div>}
+      </CanvasPopover>}
     </div>}
     {canDuplicate && <ToolButton icon="duplicate" label="复制白板元素" shortcut="⌘/Ctrl D" onClick={onDuplicate} disabled={busy} />}
     {canDelete && <ToolButton icon="trash" label="删除节点" onClick={onDelete} disabled={busy} />}

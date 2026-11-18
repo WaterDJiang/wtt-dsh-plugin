@@ -3,6 +3,7 @@ import { loadConversationReferenceFiles } from './conversation-references.mjs'
 import { CanvasReferencePickerContext, ReferencePickOverlay } from './canvas-reference-picker.jsx'
 import { sameReference, pinnedReference, referencePickReason, addPickedReferences, togglePickedReference } from './canvas-reference-picker.mjs'
 import { DialogBody, DialogFooter, DialogHeader, PanelHeader, UiButton, UiIcon } from './ui/controls.jsx'
+import { CanvasPopover } from './ui/canvas-popover.jsx'
 import {DeleteNodesDialog,ProjectRecycleDialog} from './canvas-recycle.jsx'
 import { TaskControlDialog } from './task-control.jsx'
 import { CardNameDialog } from './card-name-dialog.jsx'
@@ -41,6 +42,7 @@ import { BaoyuSlides } from './baoyu-slides.jsx'
 import { createPendingContext, generationStateSignature, isActiveTaskPhase, unconfirmedExecution, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from './pending-card-state.mjs'
 
 import { taskInteractions, interactionLabel } from './skill-interactions.mjs'
+import { useCanvasTaskNotices } from './canvas-task-notices.mjs'
 import { SkillConfirmation } from './skill-confirmation.jsx'
 import { attachCanvasGestures } from './canvas-gestures.mjs'
 import { cardCapabilities, cardTextDraftKey, cardDisplayTitle, cardContentAccept } from './card-capabilities.mjs'
@@ -102,7 +104,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const [openMenu, setOpenMenu] = useState(false)
   const [openApps, setOpenApps] = useState(null)
   const openMenuId = useId()
-  const openMenuRef = useRef(null)
+  const openMenuButton = useRef(null)
   const caps = cardCapabilities(data)
   const textDraft = caps.writeBack.mode === 'draft'
   const openTarget = caps.openWith ? { ...caps.openWith, hash: data.sourceHash,
@@ -111,12 +113,6 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const openPath = openTarget?.path
   const openVersion = openTarget?.versionId
   useEffect(() => { setOpenMenu(false); setOpenApps(null) }, [openPath, openVersion, data.sourceHash])
-  useEffect(() => {
-    if (!openMenu) return
-    const close = event => { if (!openMenuRef.current?.contains(event.target)) setOpenMenu(false) }
-    document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
-  }, [openMenu])
   async function loadOpenApps() {
     if (!openTarget || !data.onLoadOpenApps || (openApps && !openApps.error)) return
     const loading = { loading: true }
@@ -153,16 +149,17 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         value={data.outputCard?.versionId || data.currentMaterialVersionId}
         onChange={value => data.outputCard ? data.onVersionChange?.(value) : data.onMaterialVersionView?.(value)} />}
         {!caps.versioned && data.number != null && <span className="wcc-version">v{String(data.number).padStart(3, '0')}</span>}
-      {(openTarget || data.onUploadContent || data.onRename) && <div className="wcc-card-open-wrap" ref={openMenuRef} onKeyDown={event => {
+      {(openTarget || data.onUploadContent || data.onRename) && <div className="wcc-card-open-wrap" onKeyDown={event => {
         if (!openMenu) return
         event.stopPropagation()
         if (event.key !== 'Escape') return
         event.preventDefault(); setOpenMenu(false)
-        requestAnimationFrame(() => openMenuRef.current?.querySelector(':scope > button')?.focus({ preventScroll: true }))
+        openMenuButton.current?.focus({ preventScroll: true })
       }}>
-        <UiButton variant="ghost" size="compact" iconOnly className="nodrag nopan" aria-label={`卡片操作：${title}`} title="卡片操作" aria-expanded={openMenu} aria-controls={openMenu ? openMenuId : undefined}
+        <UiButton ref={openMenuButton} variant="ghost" size="compact" iconOnly className="nodrag nopan" aria-label={`卡片操作：${title}`} title="卡片操作" aria-expanded={openMenu} aria-controls={openMenu ? openMenuId : undefined}
           onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setOpenMenu(value => !value) }}><UiIcon name="more" /></UiButton>
-        {openMenu && <div id={openMenuId} className="wcc-card-open-menu nodrag nopan nowheel" role="group" aria-label="卡片操作" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+        {openMenu && <CanvasPopover id={openMenuId} anchorRef={openMenuButton} placement="bottom-end" onDismiss={() => setOpenMenu(false)}
+          className="wcc-card-open-menu nodrag nopan nowheel" role="group" aria-label="卡片操作" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
           {data.onUploadContent && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onUploadContent() }}>上传文件</UiButton>}
           {data.onRename && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRename() }}>重命名</UiButton>}
           {openTarget && <>
@@ -179,7 +176,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
           </details>
           <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRevealFile?.(openTarget) }}><UiIcon name="folder" size={14} />显示所在文件夹</UiButton>
           </>}
-        </div>}
+        </CanvasPopover>}
       </div>}
       <span className="wcc-grip" aria-hidden="true">⠿</span></div>
     </header>
@@ -374,7 +371,7 @@ function GroupDialog({ busy, onClose, onSubmit }) {
 }
 
 function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
-  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile }) {
+  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile, desktopTaskNotices }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
@@ -383,7 +380,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const modelSelectionRef = useRef(modelSelection)
   modelSelectionRef.current = modelSelection
   const [watchedStatuses, setWatchedStatuses] = useState(new Map())
-  const effectiveStatuses = new Map([...(nativeSessionStatuses || []), ...watchedStatuses])
+  const effectiveStatuses = useMemo(() => new Map([...(nativeSessionStatuses || []), ...watchedStatuses]), [nativeSessionStatuses, watchedStatuses])
   const nativeStatusesRef = useRef(effectiveStatuses)
   nativeStatusesRef.current = effectiveStatuses
   const cache = useRef(creationCache || { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false })
@@ -480,6 +477,29 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   const interactions = taskInteractions(tasks, effectiveStatuses, requirement.id)
   const interactionsRef = useRef(interactions)
   interactionsRef.current = interactions
+  const pendingTaskIds = new Set(interactions.map(entry => entry.task.id))
+  const taskNotices = useCanvasTaskNotices({ projectId, canvasId: requirement.id, ready: active && Boolean(board),
+    tasks, statuses: effectiveStatuses, pendingIds: pendingTaskIds })
+  useEffect(() => {
+    if (!active || !desktopTaskNotices) return
+    return () => desktopTaskNotices.leave({ projectId, canvasId: requirement.id, cwd: project.path })
+  }, [active, desktopTaskNotices, projectId, requirement.id, project.path])
+  useEffect(() => {
+    if (active && hasLoadedBoard && taskNotices.seen !== null) {
+      desktopTaskNotices?.observe({ projectId, canvasId: requirement.id, cwd: project.path, title: requirement.title },
+        tasks, effectiveStatuses, taskNotices.seen)
+    }
+  }, [active, hasLoadedBoard, desktopTaskNotices, projectId, project.path, requirement.id, requirement.title, tasks, effectiveStatuses, taskNotices.seen])
+  const runningOutsideCards = JSON.stringify(tasks.filter(task => task.kind === 'ai' && !task.outputCardId
+    && effectiveStatuses.get(task.sessionId)?.running === true).map(task => task.sessionId).sort())
+  const previousOutsideCardRuns = useRef('[]')
+  useEffect(() => {
+    const previous = JSON.parse(previousOutsideCardRuns.current)
+    previousOutsideCardRuns.current = active ? runningOutsideCards : '[]'
+    if (active && previous.some(id => nativeStatusesRef.current.get(id)?.running === false)) {
+      void refreshTasks().catch(cause => { if (mounted.current) setError(messageOf(cause)) })
+    }
+  }, [active, runningOutsideCards])
 
   useEffect(() => {
     if (!creationVisible || !['image', 'video'].includes(creation?.outputType)) return
@@ -1882,7 +1902,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     try {
       const roots = new Map(nodesRef.current.map(node => [node.id, node.parentId || node.id]))
       const relations = edgesRef.current.map(edge => ({ ...edge, source: roots.get(edge.source), target: roots.get(edge.target) }))
-      const arranged = arrangeCardBlocks(movable.map(bounds), fixed.map(bounds), relations)
+      const arranged = arrangeCardBlocks(movable.map(node => {
+        if (node.type !== 'content') return bounds(node)
+        const { title, outputCard, artifactKind, kind } = node.data
+        const version = outputCard?.versions[0]
+        return { ...bounds(node), title, ...(version && ['artifact', 'outline', 'word'].includes(kind) && {
+          taskId: version.taskId, outputType: artifactKind || outputCard.type,
+        }) }
+      }), fixed.map(bounds), relations)
       const offsets = new Map(movable.map(node => [node.id, {
         x: arranged.get(node.id).x - node.position.x, y: arranged.get(node.id).y - node.position.y,
       }]))
@@ -3116,7 +3143,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }, [graphInputBlocked])
 
   return <CanvasConversationReferenceContext.Provider value={{ start: startConversationReferencePick, busy: Boolean(busy) || loading || pickingReferences }}><div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
-    if (!event.target.closest('input,textarea,button,select,summary,[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
+    if (!event.target.closest('input,textarea,button,select,summary,[popover],[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-large-canvas={nodes.length >= LARGE_CANVAS_THRESHOLD || undefined} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
@@ -3173,7 +3200,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           onArrange={arrangeCards} canArrange={canArrange}
           sidebar={creationVisible ? 'ai' : sidebar ? tab : false} onInspect={() => sidebar && tab === 'inspect' ? setSidebar(false) : openPanel('inspect')}
           onAI={() => { cancelCardOpen(); creationIntent.current += 1; if (creationVisible) closeCreation(); else if (creationRef.current) { cache.current.visible = true; setCreationVisible(true); setSidebar(false) } else openSelectedCreation() }} selectedCount={selectedNodes.length}
-          onTasks={() => sidebar && tab === 'tasks' ? setSidebar(false) : openPanel('tasks')} onAssets={() => { setAssetsOpen(true); setSidebar(false); setDeckPreview(null); setOutcomeView(null);setDocumentView(null) }} taskCount={tasks.length} runningCount={tasks.filter(task => task.runtimeState?.phase === 'generating' && !interactions.some(entry => entry.task.id === task.id)).length} pendingCount={interactions.length}
+          onTasks={() => sidebar && tab === 'tasks' ? setSidebar(false) : openPanel('tasks')} onAssets={() => { setAssetsOpen(true); setSidebar(false); setDeckPreview(null); setOutcomeView(null);setDocumentView(null) }}
+          pendingCount={pendingTaskIds.size} completedCount={taskNotices.unseen.size}
           saveStatus={loading ? '加载中' : draftCount ? 'draft' : saveStatus} onRefresh={refresh} onRetry={saveStatus === 'conflict' ? refresh : () => void saveLayout(true)} busy={!!busy || loading || !board} />
         {interactions.length > 0 && <details className="wcc-skill-inbox"><summary>待你处理 · {interactions.length}</summary><div>{interactions.map(entry => <UiButton variant="custom" type="button" key={entry.key} onClick={() => openSkillReview(entry)}>{entry.interaction.questions?.[0]?.header || entry.interaction.questions?.[0]?.question?.slice(0, 120) || '执行权限待确认'}<small>{entry.task.title}</small></UiButton>)}</div></details>}
         {showSelectionActions && <CanvasViewportLayer follow={active}>{view => <SelectionActions {...selectionPosition(view)} selectedCount={selectedNodes.length}
@@ -3309,7 +3337,9 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           <div className="wcc-ai-placeholder"><p>点击卡片可切换创作对象，各卡片草稿分别保留；已提交任务的引用独立保存。</p><UiButton variant="quiet" onClick={openSelectedCreation}>打开卡片创作框</UiButton></div>
         </div>
         <div hidden={tab !== 'tasks'} className="wcc-task-panel" role="tabpanel" id={`${panelId}-tasks-panel`} aria-labelledby={`${panelId}-tasks-tab`}>
-          <CourseTasks tasks={tasks} pendingTaskIds={interactions.map(entry => entry.task.id)} loadTask={loadTask} onOpenArtifact={openArtifact} onOpenSession={openTaskSession} onResumeMediaTask={resumeMediaTask} busy={!!busy}
+          <CourseTasks tasks={tasks} pendingTaskIds={pendingTaskIds} newTaskIds={taskNotices.unseen} onViewTask={taskNotices.markSeen}
+            onOpenPending={id => openSkillReview(interactionsRef.current.find(entry => entry.task.id === id))}
+            loadTask={loadTask} onOpenArtifact={openArtifact} onOpenSession={openTaskSession} onResumeMediaTask={resumeMediaTask} busy={!!busy}
             getDownloadHref={versionId => endpoint({ download: versionId }).href} getFileDownloadHref={id => endpoint({ downloadArtifact: id }).href} />
         </div>
       </aside>

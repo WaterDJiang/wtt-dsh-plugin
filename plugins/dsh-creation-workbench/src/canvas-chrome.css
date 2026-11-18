@@ -95,8 +95,13 @@
 .wtt-course-canvas .wcc-studio-save-status.is-conflict { color: var(--wtt-ui-warning, #b16935); }
 .wtt-course-canvas .wcc-studio-save-status.is-saving { color: var(--wtt-ui-muted, #5170be); }
 .wtt-course-canvas .wcc-studio-chrome button.wcc-studio-retry { color: var(--wtt-ui-warning, #9b5f32); min-width: 0; padding-inline: 4px; font-size:var(--wtt-text-xs); }
-.wtt-course-canvas .wcc-studio-panel-button span:not(.wcc-studio-tooltip),
+.wtt-course-canvas .wcc-studio-panel-button > span:not(.wcc-studio-tooltip, .wcc-studio-task-badge),
 .wtt-course-canvas .wcc-studio-selection .is-ai span:not(.wcc-studio-tooltip) { padding-right: 2px; }
+.wtt-course-canvas .wcc-studio-task-badge {
+  display: grid; place-items: center; min-width: 16px; height: 16px; padding-inline: 3px;
+  border-radius: 999px; font-size: var(--wtt-text-xs); font-weight: 600; line-height: 1;
+  background: var(--wtt-ui-accent-fill); color: var(--wtt-ui-on-accent);
+}
 .wtt-course-canvas .wcc-studio-status-dock .wcc-studio-tooltip,
 .wtt-course-canvas .wcc-studio-selection .wcc-studio-tooltip {
   top: calc(100% + 9px);
@@ -145,7 +150,8 @@
   .wtt-course-canvas .wcc-studio-status-dock { gap: 0; max-width: calc(100% - 80px); padding: 4px; }
   .wtt-course-canvas .wcc-studio-save-status { padding-inline: 4px; }
   .wtt-course-canvas .wcc-studio-save-status > span { display: none; }
-  .wtt-course-canvas .wcc-studio-chrome .wcc-studio-panel-button > span:not(.wcc-studio-tooltip) { display: none; }
+  .wtt-course-canvas .wcc-studio-chrome .wcc-studio-panel-button > span:not(.wcc-studio-tooltip, .wcc-studio-task-badge) { display: none; }
+  .wtt-course-canvas .wcc-studio-task-badge { position: absolute; top: -5px; right: -4px; }
   .wtt-course-canvas .wcc-studio-selection { max-width: calc(100% - 78px); padding: 4px; }
 }
 @media (max-height: 620px) {

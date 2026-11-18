@@ -75,3 +75,39 @@ test('group blocks move atomically and a 300-card graph retains layers without o
  const groupPositions=arrangeCardBlocks(groups,[],[source('upstream-group','downstream')]);
  assert(groupPositions.get('upstream-group').x+650<groupPositions.get('downstream').x);
 });
+
+function visualOrder(blocks, positions) {
+  const located = blocks.map(card => ({ ...card, ...positions.get(card.id) }));
+  return located.sort((a, b) => a.y - b.y || a.x - b.x).map(card => card.id);
+}
+
+test('numbered sibling results use a compact natural reading order and avoid occupied space', () => {
+  const codes = ['G10', 'G02', 'C02', 'G01', 'G7', 'G06', 'G04', 'C01', 'G03', 'G09', 'G05', 'G08'];
+  const results = codes.map((id, i) => ({ ...block(id, 500 + i % 3 * 400, i * 14, 320 + i % 3 * 20, 240 + i % 2 * 60), title: `${id} 分镜` }));
+  const blocks = [block('source'), ...results];
+  const edges = results.map(card => source('source', card.id));
+  const fixed = [block('fixed', 720, 50, 160, 220)];
+  const positions = arrangeCardBlocks(blocks, fixed, edges);
+  assert.deepEqual(visualOrder(results, positions), ['C01', 'C02', 'G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G7', 'G08', 'G09', 'G10']);
+  assert.equal(new Set(results.map(card => positions.get(card.id).y)).size, 4);
+  for (const card of results) assert(positions.get('source').x + blocks[0].width < positions.get(card.id).x);
+  clear(blocks, fixed, positions);
+  assert.deepEqual(arrangeCardBlocks(blocks.map(card => ({ ...card, ...positions.get(card.id) })), fixed, edges), positions);
+});
+
+test('unlinked grid uses explicit numbering, originating task and generated type without alphabetizing ordinary materials', () => {
+  const blocks = [
+    { ...block('material-z', 0, 0), title: '参考 Z' },
+    { ...block('g10', 50, 0), title: 'Ｇ１０ 主分镜' },
+    { ...block('task-2-image', 10, 10), title: '镜头图', outputType: 'image', taskId: 'task-2' },
+    { ...block('task-1-text-10', 100, 20), title: '草稿 10', outputType: 'text', taskId: 'task-1' },
+    { ...block('material-a', 90, 50), title: '参考 A' },
+    { ...block('g2', 120, 90), title: 'g-2 主分镜' },
+    { ...block('task-1-image', 50, 130), title: '镜头图', outputType: 'image', taskId: 'task-1' },
+    { ...block('task-1-text-2', 140, 150), title: '草稿 2', outputType: 'text', taskId: 'task-1' },
+  ];
+  const positions = arrangeCardBlocks(blocks, []);
+  assert.deepEqual(visualOrder(blocks, positions), ['g2', 'g10', 'task-1-image', 'task-1-text-2', 'task-1-text-10', 'task-2-image', 'material-z', 'material-a']);
+  clear(blocks, [], positions);
+  assert.deepEqual(arrangeCardBlocks(blocks.map(card => ({ ...card, ...positions.get(card.id) })), []), positions);
+});

@@ -24,7 +24,7 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本为 **0.57.6**。卡片创作框采用 DSH 原生模型菜单，可搜索模型和选择推理等级。[使用说明](plugins/dsh-creation-workbench/README.md#0576-的主要改进) · [更新日志](CHANGELOG.md)
+当前版本为 **0.57.7**。画布可按系列编号排版，技能菜单会避开边缘，DSH 桌面版可接收任务通知。[使用说明](plugins/dsh-creation-workbench/README.md#0577-的主要改进) · [更新日志](CHANGELOG.md)
 
 使用社区市场 `dshmarket` 时，打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」就点 **立即更新**。如果旧版的「代码来源」写的是 `path:plugins/...`，在原 DSH 配置用上面的安装串覆盖安装一次，以后可以直接从市场更新。
 

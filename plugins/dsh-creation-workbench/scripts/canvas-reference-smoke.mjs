@@ -81,6 +81,19 @@ export async function checkReferenceSelection(page, canvas, fixture, api) {
   await card('anchor').locator('.wcc-card-body').click({ position: { x: 30, y: 60 } });
   await composer.waitFor();
   await composer.locator('textarea').first().fill('保留提示词，不调用模型');
+  if (!process.env.WTT_REFERENCE_BEFORE) {
+    const trigger = composer.getByRole('button', { name: '选择技能', exact: true });
+    const search = composer.getByRole('combobox', { name: '搜索技能', exact: true });
+    const height = (await composer.boundingBox()).height;
+    await trigger.click();
+    await search.waitFor();
+    assert(await search.evaluate(input => input.closest('[popover]')?.matches(':popover-open')), '技能菜单应脱离卡片滚动区');
+    assert.equal((await composer.boundingBox()).height, height, '展开技能不改变创作框高度');
+    await search.press('Escape');
+    await search.waitFor({ state: 'hidden' });
+    await frame();
+    assert(await trigger.evaluate(button => button === document.activeElement), 'Escape 将焦点还给技能按钮');
+  }
   const original = await board(), viewport = await canvas.locator('.react-flow__viewport').getAttribute('style');
   const manualEdge = canvas.locator('.react-flow__edge').first();
   await manualEdge.waitFor({ state: 'attached' }); await manualEdge.dispatchEvent('click', { bubbles: true, metaKey: true }); await frame();
