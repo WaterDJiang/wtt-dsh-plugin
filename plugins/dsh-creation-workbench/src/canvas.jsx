@@ -10,6 +10,7 @@ import { CardNameDialog } from './card-name-dialog.jsx'
 import {PROJECT_FILE_DRAG, ProjectFilePreview} from './project-explorer.jsx'
 import { SvgSourceView } from './svg-source-view.jsx'
 import {SavedPptPreview} from './saved-ppt-preview.jsx'
+import { VideoPreview } from './video-preview.jsx'
 import { OutcomeViewer } from './outcome-viewer.jsx'
 import { UserError } from './user-feedback.jsx'
 import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -39,7 +40,7 @@ import './studio-polish.css'
 import { useDockLayout } from './dock-layout.jsx'
 import { PptEditor } from './ppt-editor.jsx'
 import { BaoyuSlides } from './baoyu-slides.jsx'
-import { createPendingContext, generationStateSignature, isActiveTaskPhase, unconfirmedExecution, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from './pending-card-state.mjs'
+import { createPendingContext, generationStateSignature, isActiveTaskPhase, nativeTaskPollMode, unconfirmedExecution, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from './pending-card-state.mjs'
 
 import { taskInteractions, interactionLabel } from './skill-interactions.mjs'
 import { useCanvasTaskNotices } from './canvas-task-notices.mjs'
@@ -49,6 +50,7 @@ import { cardCapabilities, cardTextDraftKey, cardDisplayTitle, cardContentAccept
 import { VersionSelect } from './version-select.jsx'
 
 const LARGE_CANVAS_THRESHOLD = 80
+const SETTLED_TASK_REFRESH_MS = 12_000
 const LABELS = { requirement: '背景', material: '素材', excerpt: '摘录', outline: '课程大纲', word: 'Word 文档', whiteboard: '白板', artifact: '成果文件', generation: '创作任务' }
 const OUTPUT_LABELS = { text: '文本', image: '图片', video: '视频', outline: '课程大纲', pptx: 'PPT', exercise: '课堂练习', script: '讲师逐字稿', storyboard: 'PPT 分镜', support: '制作资料', material: '素材卡', excerpt: '摘录卡', word: 'Word 文档' }
 const EMPTY_MATERIAL = { title: '', content: '', sourcePath: '' }
@@ -204,7 +206,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         extracted={data.extracted !== false} mime={data.generatedFile?.mime || data.importedFile?.mime} src={data.videoPreview || data.imagePreview}
         status={data.status || 'ready'} downloadHref={data.downloadHref} artifactId={data.artifactKind === 'pptx' ? data.refId : undefined}
         hash={data.sourceHash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={data.onOpenDeck} onOpenMedia={data.onOpenDetails} />
-        : data.videoPreview ? <><video className="wcc-imported-thumbnail nodrag nopan" aria-label={`预览视频：${data.title}`} src={data.videoPreview} controls preload="metadata" playsInline onError={() => setVideoError(true)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClickCapture={event => { event.preventDefault(); event.stopPropagation(); data.onOpenDetails?.() }} />{videoError && <small>此浏览器无法播放，可下载原件。</small>}</> : data.imagePreview ? <img className="wcc-imported-thumbnail" src={data.imagePreview} alt={data.title} loading="lazy" draggable={false} /> : <p className="wcc-card-excerpt">{data.kind === 'requirement' && typeof data.requirementBackground === 'string' ? data.requirementBackground.slice(0, 260) || '暂无背景信息。' : data.excerpt || (data.kind === 'word' ? '选中查看所属版本与下载文件。' : data.content?.slice(0, 260)) || '选中查看详细内容。'}</p>}
+        : data.videoPreview ? <><VideoPreview className="wcc-imported-thumbnail nodrag nopan" aria-label={`预览视频：${data.title}`} src={data.videoPreview} deferDesktopSeek onError={() => setVideoError(true)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClickCapture={event => { event.preventDefault(); event.stopPropagation(); data.onOpenDetails?.() }} />{videoError && <small>此浏览器无法播放，可下载原件。</small>}</> : data.imagePreview ? <img className="wcc-imported-thumbnail" src={data.imagePreview} alt={data.title} loading="lazy" draggable={false} /> : <p className="wcc-card-excerpt">{data.kind === 'requirement' && typeof data.requirementBackground === 'string' ? data.requirementBackground.slice(0, 260) || '暂无背景信息。' : data.excerpt || (data.kind === 'word' ? '选中查看所属版本与下载文件。' : data.content?.slice(0, 260)) || '选中查看详细内容。'}</p>}
     </div>
     {(fileDeck || data.slideProject) && <div className="wcc-outcome-actions nodrag nopan" onPointerDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()}>
       {fileDeck && <UiButton variant="quiet" size="compact" onClick={e=>{e.stopPropagation();data.onOpenOutcome?.(fileDeck.sourceRef)}}>查看 PPTX{fileDeck.role==='attachment'?' · 附件':''}</UiButton>}
@@ -230,7 +232,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
     </footer>
     <Handle type="source" position={Position.Right} isConnectable={isConnectable} aria-label={`从 ${data.title} 连线`} />
     {selected && data.kind !== 'generation' && <NodeToolbar isVisible position={Position.Right} offset={12}>
-      <UiButton variant="custom" className="wcc-card-create nodrag nopan" aria-label={`用 ${title} 继续创作`} title="用这张卡创作" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onCreate?.(id) }}>＋</UiButton>
+      <UiButton variant="custom" className="wcc-card-create nodrag nopan" aria-label={`用 ${title} 继续创作`} title="用这张卡创作" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onCreate?.(id, event.currentTarget) }}>＋</UiButton>
     </NodeToolbar>}
   </article>
 })
@@ -1325,7 +1327,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }
   }
 
-  function openSelectionComposition(anchorId) {
+  function openSelectionCreationMenu(trigger, anchorId) {
     if (busy || loading || operationLock.current) return
     const selected = nodesRef.current.filter(node => isObject(node) && node.selected)
     if (selected.length < 2) return
@@ -1334,19 +1336,25 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const reason = referencePickReason(node.data) || (!usableCreationSource(node.data) ? '这张卡还没有已保存的内容' : '')
       if (reason) { setError(`「${contentCardTitle(node.data)}」${reason}，请核对后重试。`); return }
     }
-    const anchor = selected.find(node => node.id === anchorId) || selected[0]
-    void beginComposition(anchor.data, 'text', { referenceCards: selected.map(node => node.data) })
-  }
-
-  function openNodeMenu(id) {
     cancelCardOpen()
     creationIntent.current += 1
+    const anchor = selected.find(node => node.id === anchorId) || selected[0]
+    const graph = graphRef.current.getBoundingClientRect()
+    const button = trigger.getBoundingClientRect()
+    setCreationMenu({ anchor: anchor.data, referenceCards: selected.map(node => node.data), trigger,
+      position: { x: Math.max(12, Math.min(graph.width - 272, button.left - graph.left)),
+        y: Math.max(12, Math.min(graph.height - 260, button.bottom - graph.top)) } })
+  }
+
+  function openNodeMenu(id, trigger) {
     const node = nodesRef.current.find(item => item.id === id)
     if (!node) return
     if (node.selected && nodesRef.current.some(item => item.id !== id && isObject(item) && item.selected)) {
-      openSelectionComposition(id)
+      openSelectionCreationMenu(trigger, id)
       return
     }
+    cancelCardOpen()
+    creationIntent.current += 1
     selectCard(id)
     const point = absolutePosition(node, nodesRef.current), viewport = viewportRef.current
     const size = canvasSizeRef.current
@@ -1416,13 +1424,19 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   useEffect(() => {
     let stopped = false
     let timer
+    let nextSettledCheck = Date.now() + SETTLED_TASK_REFRESH_MS
     async function poll() {
-      const nativeWaiting = tasksRef.current.some(task => task.kind === 'ai' && task.outputCardId && !['draft', 'failed'].includes(task.dispatchStatus || task.status)
-        && (!task.cardVersionId || isActiveTaskPhase(task.runtimeState?.phase) || publishedTaskGeneration(task, nativeStatusesRef.current.get(task.sessionId))))
-        || [...cache.current.outputTracking.values()].some(entry => entry.projectId === projectId && entry.requirementId === requirement.id
-          && tasksRef.current.some(task => task.id === entry.taskId && task.kind === 'ai' && !['draft', 'failed'].includes(task.dispatchStatus || task.status)))
-        || generationStateSignature(tasksRef.current) !== generationStateSignature(boardRef.current?.tasks)
-      if (nativeWaiting) {
+      let fast = false, slow = false
+      for (const task of tasksRef.current) {
+        const entry = cache.current.outputTracking.get(task.id)
+        const tracked = entry?.projectId === projectId && entry?.requirementId === requirement.id
+        const mode = nativeTaskPollMode(task, nativeStatusesRef.current.get(task.sessionId), tracked)
+        if (mode === 'fast') { fast = true; break }
+        if (mode === 'slow') slow = true
+      }
+      const boardNeedsRefresh = generationStateSignature(tasksRef.current) !== generationStateSignature(boardRef.current?.tasks)
+      if (fast || boardNeedsRefresh || (slow && Date.now() >= nextSettledCheck)) {
+        nextSettledCheck = Date.now() + SETTLED_TASK_REFRESH_MS
         try {
           const nextTasks = await refreshTasks()
           if (stopped) return
@@ -3014,6 +3028,10 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   function chooseNewType(type){
     const menu=creationMenu
     if(!menu)return
+    if (menu.referenceCards) {
+      if (!busy && !loading && !operationLock.current) void beginComposition(menu.anchor, type, { referenceCards: menu.referenceCards })
+      return
+    }
     if(!menu.blank){openCreation(menu.anchor,type,undefined,{explicitNew:true});return}
     const anchor={id:`canvas:${requirement.id}`,kind:'canvas',title:'新建内容',position:menu.point}
     openCreation(anchor,type,undefined,{explicitNew:true,blank:true,outputPosition:menu.point})
@@ -3237,13 +3255,14 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           saveStatus={loading ? '加载中' : draftCount ? 'draft' : saveStatus} onRefresh={refresh} onRetry={saveStatus === 'conflict' ? refresh : () => void saveLayout(true)} busy={!!busy || loading || !board} />
         {interactions.length > 0 && <details className="wcc-skill-inbox"><summary>待你处理 · {interactions.length}</summary><div>{interactions.map(entry => <UiButton variant="custom" type="button" key={entry.key} onClick={() => openSkillReview(entry)}>{entry.interaction.questions?.[0]?.header || entry.interaction.questions?.[0]?.question?.slice(0, 120) || '执行权限待确认'}<small>{entry.task.title}</small></UiButton>)}</div></details>}
         {showSelectionActions && <CanvasViewportLayer follow={active}>{view => <SelectionActions {...selectionPosition(view)} selectedCount={selectedNodes.length}
-          onInspect={() => openPanel('inspect')} onAI={() => openPanel('ai')} onCreateFromSelection={() => openSelectionComposition()} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
+          onInspect={() => openPanel('inspect')} onAI={() => openPanel('ai')} onCreateFromSelection={event => openSelectionCreationMenu(event.currentTarget)} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
           mediaActionLabel={selectedCard?.mediaActionLabel} onMediaAction={selectedCard?.onMediaAction}
           canUngroup={hasSelectedGroup} onUngroup={ungroup} onAlign={alignSelection}
           canPromote={onlyWhiteboard && selectedNodes.length === 1 && !!selectedCard?.text?.trim()} onPromote={promoteWhiteboard}
           canDuplicate={onlyWhiteboard} onDuplicate={duplicateElements} canDelete={selectedNodes.length>0} onDelete={removeElements} />}</CanvasViewportLayer>}
         {contextMenu && <CanvasContextMenu {...contextMenu} items={contextItems} onClose={() => setContextMenu(null)} />}
-        {creationMenu && <NodeCreateMenu caption={creationMenu.blank?'新建卡片':undefined} position={creationMenu.position} items={creationMenuItems(creationMenu.blank?{kind:'canvas'}:creationMenu.anchor).map(item=>creationMenu.blank?{...item,description:undefined}:item)} onAction={chooseNewType} onClose={() => setCreationMenu(null)} />}
+        {creationMenu && <NodeCreateMenu caption={creationMenu.blank ? '新建卡片' : creationMenu.referenceCards ? '用选中卡片创作' : undefined}
+          trigger={creationMenu.trigger} position={creationMenu.position} items={creationMenuItems(creationMenu.blank?{kind:'canvas'}:creationMenu.anchor).map(item=>creationMenu.blank?{...item,description:undefined}:item)} onAction={chooseNewType} onClose={() => setCreationMenu(null)} />}
         {board && !loading && !loadError && <div className="wcc-canvas-hint">V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 空白双击新建 · 卡片双击编辑</div>}
         {draggingFile && <div className="wcc-drop-overlay">松开以添加到画布</div>}
         {projectBar}
@@ -3326,7 +3345,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
             {selectedCard.importedFile && <>
               
               {selectedCard.importedFile.mime?.startsWith('image/') && selectedCard.sourceStatus === 'ready' && <img className="wcc-imported-preview" src={endpoint({ materialFile: selectedCard.refId, preview: '1' }).href} alt={selectedCard.title} />}
-              {selectedCard.importedFile.mime?.startsWith('video/') && selectedCard.sourceStatus === 'ready' && <video className="wcc-imported-preview" src={endpoint({ materialFile: selectedCard.refId, preview: '1' }).href} aria-label={`原视频预览：${selectedCard.title}`} controls preload="metadata" playsInline onError={() => setNotice('此浏览器无法播放该视频，可下载原件后用本机播放器打开。')} />}
+              {selectedCard.importedFile.mime?.startsWith('video/') && selectedCard.sourceStatus === 'ready' && <VideoPreview className="wcc-imported-preview" src={endpoint({ materialFile: selectedCard.refId, preview: '1' }).href} aria-label={`原视频预览：${selectedCard.title}`} onError={() => setNotice('此浏览器无法播放该视频，可下载原件后用本机播放器打开。')} />}
               {selectedCard.importedFile.media?.warning && <p className="wcc-warning">{selectedCard.importedFile.media.warning}</p>}
               {(selectedCard.importedFile.truncated || selectedCard.importedFile.extractionError) && <p className="wcc-inline-warning">{selectedCard.importedFile.truncated ? '正文超出 1 MB，本次保存了提取节选。' : selectedCard.importedFile.extractionError}</p>}
             </>}
@@ -3347,7 +3366,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
               {mediaSizeLabel(selectedCard.generatedFile) && <p className="wcc-muted">实际文件：{mediaSizeLabel(selectedCard.generatedFile)}</p>}
               <a className="wcc-download" href={endpoint({ downloadArtifact: selectedCard.refId }).href} download>下载{OUTPUT_LABELS[selectedCard.artifactKind] || '成果文件'}</a>
               {selectedCard.generatedFile?.mime?.startsWith('image/') && selectedCard.status === 'ready' && <img className="wcc-imported-preview" src={endpoint({ downloadArtifact: selectedCard.refId, preview: '1' }).href} alt={selectedCard.title} />}
-              {selectedCard.generatedFile?.mime?.startsWith('video/') && selectedCard.status === 'ready' && <video className="wcc-imported-preview" src={endpoint({ downloadArtifact: selectedCard.refId, preview: '1' }).href} aria-label={`生成视频预览：${selectedCard.title}`} controls preload="metadata" playsInline onError={() => setNotice('此浏览器无法播放生成的视频，可下载后用本机播放器打开。')} />}
+              {selectedCard.generatedFile?.mime?.startsWith('video/') && selectedCard.status === 'ready' && <VideoPreview className="wcc-imported-preview" src={endpoint({ downloadArtifact: selectedCard.refId, preview: '1' }).href} aria-label={`生成视频预览：${selectedCard.title}`} onError={() => setNotice('此浏览器无法播放生成的视频，可下载后用本机播放器打开。')} />}
               {selectedCard.extracted === false ? <p className="wcc-inline-warning">这里展示文件信息。点击预览或下载，查看完整内容。</p> : <SourceReader key={selectedSourceId} card={creationSource(selectedCard)} onExcerpt={addExcerpt} onOpenSource={openExcerptSource} busy={!!busy} error={excerptError} />}
               <UiButton variant="quiet" className="wcc-text-button" onClick={openSelectedCreation}>基于此成果文件继续创作 →</UiButton>
             </> : selectedCard.kind === 'word' ? <>

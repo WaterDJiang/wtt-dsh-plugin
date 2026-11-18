@@ -6,7 +6,7 @@ const surface = { position: 'fixed', inset: '0 auto auto 0', margin: 0, minWidth
 
 // The top layer escapes the composer's scrolling region and React Flow's
 // transformed nodes, while retaining their DOM, focus and theme inheritance.
-export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, placement = 'bottom-start', onDismiss, ...props }) {
+export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusRef, placement = 'bottom-start', onDismiss, ...props }) {
   const panelRef = useRef(null)
   const dismiss = useRef(onDismiss)
   dismiss.current = onDismiss
@@ -31,6 +31,7 @@ export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, placem
     const spacing = parseFloat(computed.getPropertyValue('--wtt-space-2')) || 8
     const bounds = { boundary, padding: spacing }
     let revision = 0
+    let focusPending = Boolean(initialFocusRef)
     panel.style.visibility = 'hidden'
     panel.showPopover()
 
@@ -57,8 +58,13 @@ export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, placem
         if (request !== revision) return
         panel.style.left = `${x}px`
         panel.style.top = `${y}px`
-        panel.style.visibility = middlewareData.hide.referenceHidden ? 'hidden' : 'visible'
+        const visible = !middlewareData.hide.referenceHidden
+        panel.style.visibility = visible ? 'visible' : 'hidden'
         panel.dataset.placement = side
+        if (visible && focusPending) {
+          focusPending = false
+          initialFocusRef.current?.focus({ preventScroll: true })
+        }
       })
     }
 
@@ -74,7 +80,7 @@ export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, placem
       panel.style.maxHeight = ''
       panel.style.width = ''
     }
-  }, [native, open, anchorRef, anchor, widthRef, placement])
+  }, [native, open, anchorRef, anchor, widthRef, initialFocusRef, placement])
 
   return <div {...props} ref={panelRef} hidden={!open} popover={native ? 'manual' : undefined}
     style={native ? surface : undefined} />

@@ -54,6 +54,14 @@ export function isActiveTaskPhase(phase) {
   return ['generating', 'awaiting-input', 'awaiting-approval'].includes(phase);
 }
 
+export function nativeTaskPollMode(task, status, tracked) {
+  if (task.kind !== 'ai' || !task.outputCardId || pendingRetryAllowed(task)) return;
+  const { phase, settled } = task.runtimeState || {};
+  if (status?.running === true || status?.pendingInteraction || isActiveTaskPhase(phase)) return 'fast';
+  if (task.cardVersionId && !tracked) return;
+  return settled === true && ['idle', 'failed'].includes(phase) ? 'slow' : 'fast';
+}
+
 export function publishedTaskGeneration(task, status) {
   if (task?.kind !== 'ai' || !task.cardVersionId || !task.sessionId) return;
   const pending = nativePendingState({ taskId: task.id, sessionId: task.sessionId, status: task.dispatchStatus || task.status,

@@ -328,6 +328,14 @@ export class ArtifactPreview {
     } finally { this.#directory(attempt); rmSync(attempt, { recursive: true, force: true }); }
   }
 
+  prewarm({ id, hash }) {
+    clearTimeout(this.prewarmTimer);
+    this.prewarmTimer = setTimeout(() => {
+      if (!this.closed && !this.service.store.closed && this.inflight.size === 0) void this.get(id, { hash });
+    }, 250);
+    this.prewarmTimer.unref();
+  }
+
   async get(id, { hash } = {}) {
     let artifact, renderer;
     try {
@@ -434,7 +442,11 @@ export class ArtifactPreview {
     return { bytes, mime: 'image/png', name: page.file, hash: page.hash, artifactHash: artifact.hash, width: page.width, height: page.height };
   }
 
-  close() { this.closed = true; for (const child of this.children) child.previewStop?.(); }
+  close() {
+    this.closed = true;
+    clearTimeout(this.prewarmTimer);
+    for (const child of this.children) child.previewStop?.();
+  }
 }
 
 export const createArtifactPreview = (service, options) => new ArtifactPreview(service, options);

@@ -1,5 +1,6 @@
 import { PanelHeader, UiButton } from './ui/controls.jsx'
 import React, { useEffect, useRef, useState } from 'react'
+import { VideoPreview } from './video-preview.jsx'
 import './output-preview.css'
 
 const fileBlocked = status => ['missing', 'changed', 'modified', 'unavailable'].includes(status)
@@ -64,7 +65,7 @@ export function OutputPreview({ type = 'text', title, content, extracted = true,
     {unavailable ? <p className="wtt-output-preview-note" role="status">此版本文件已缺失或变化，无法沿用旧预览，请核对原文件。</p>
       : type === 'pptx' ? <PptCover artifactId={artifactId} hash={hash} loadPreview={loadPreview} getPageHref={getPageHref} src={src} title={title} onOpen={onOpenDeck} compact={compact} />
         : type === 'image' && src && !failed ? <img key={identity} className="wtt-output-image" src={src} alt={title || '生成图片'} loading="lazy" decoding="async" draggable={false} onError={() => setMediaError(identity)} />
-          : type === 'video' && src && !failed ? <video key={identity} className="wtt-output-video nodrag nopan nowheel" src={src} controls preload="metadata" playsInline aria-label={title || '生成视频'}
+          : type === 'video' && src && !failed ? <VideoPreview key={identity} className="wtt-output-video nodrag nopan nowheel" src={src} deferDesktopSeek={compact} aria-label={title || '生成视频'}
             onError={() => setMediaError(identity)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClickCapture={event => { if (compact && onOpenMedia) { event.preventDefault(); event.stopPropagation(); onOpenMedia() } }} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} />
             : ['image', 'video'].includes(type) ? <p className="wtt-output-preview-note" role="status">{failed ? type === 'video' ? '浏览器无法播放此版本，可下载原视频查看。' : '此版本图片未能加载，可下载原图查看。' : emptyMessage || '尚未取得可预览的文件。'}</p>
               : hasText ? <pre className={`wtt-output-text${compact ? '' : ' nodrag nowheel'}`}>{previewText}</pre>

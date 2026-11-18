@@ -27,6 +27,7 @@ import { ProjectFiles } from './project-files.mjs';
 import { ExternalDocuments, openWithApplications } from './external-documents.mjs';
 import { Outcomes } from './outcomes.mjs';
 import { CardFileContent } from './card-file-content.mjs';
+import { createArtifactPreview } from './artifact-preview.mjs';
 
 const localSkillDirectory = name => ['.codex', '.agents', '.claude'].map(parent => path.join(os.homedir(), parent, 'skills', name)).find(directory => existsSync(path.join(directory, 'SKILL.md'))) || path.join(os.homedir(), '.codex', 'skills', name);
 
@@ -98,6 +99,9 @@ export class WorkbenchService {
     };
     this.assets = new AssetLedger(this);
     this.cardFiles = new CardFileContent(this);
+    if (config.prewarmArtifactPreviews) this.store.prewarmPptPreview = artifact => {
+      try { this.artifactPreview().prewarm(artifact); } catch { /* On-demand previews report environment errors. */ }
+    };
     config.attachProduction?.(this);
   }
 
@@ -112,6 +116,7 @@ export class WorkbenchService {
     }
     if (changed) { this.productionChecks.clear(); this.pythonCheck = null; }
     if (this.deck?.previewRenderer) this.deck.previewRenderer.script = path.resolve(this.pptSkillDir, 'scripts/render_course_pptx.py');
+    if (this.previewRenderer) this.previewRenderer.script = path.resolve(this.pptSkillDir, 'scripts/render_course_pptx.py');
   }
   selectCapabilitySource({ source }) {
     if (source !== 'local') throw new Error('已停止提供插件内置课程技能，请在技能设置中选择本机技能文件夹。');
@@ -718,5 +723,7 @@ export class WorkbenchService {
     return { bytes: await readFile(await this.#managedFile(version.wordPath)), name: `课程大纲-v${version.number}.docx` };
   }
 
-  close() { this.svgDecks.close(); this.slides.close(); this.deck.close(); this.media.close(); this.store.close(); }
+  artifactPreview() { return this.previewRenderer ??= createArtifactPreview(this); }
+
+  close() { this.previewRenderer?.close(); this.svgDecks.close(); this.slides.close(); this.deck.close(); this.media.close(); this.store.close(); }
 }

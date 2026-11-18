@@ -223,7 +223,7 @@ async function checkMediaAttachment(page, canvas, requirementId, attachment) {
     assert(primary.cardOutput.versionId);
     assert.equal(service.tasks.get(attachment.registration.taskId).files.length, 1);
   } finally { service.close(); }
-  await attachmentButton.waitFor({ state: 'hidden' });
+  await attachmentButton.waitFor({ state: 'hidden', timeout: 18_000 });
   const published = pending.locator(`video[src*="${primary.id}"]`);
   await published.waitFor();
   await published.evaluate(async el => {

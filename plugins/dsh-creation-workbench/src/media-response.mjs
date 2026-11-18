@@ -1,5 +1,6 @@
 export function importedFileResponse(file, { method = 'GET', range, preview = false, headers = {} } = {}) {
-  const size = file.bytes.byteLength
+  const size = file.bytes?.byteLength ?? file.size
+  const body = (start, end) => file.bytes ? file.bytes.slice(start, end + 1) : file.stream(start, end)
   const media = /^(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm))$/.test(file.mime)
   if (preview && !media) throw new Error('此文件格式不支持预览')
   const responseHeaders = { ...headers, 'Content-Type': file.mime,
@@ -7,7 +8,7 @@ export function importedFileResponse(file, { method = 'GET', range, preview = fa
     'Content-Disposition': `${preview ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
     'Content-Length': String(size), ...(preview ? { 'Accept-Ranges': 'bytes' } : {}) }
   if (method === 'HEAD') return new Response(null, { headers: responseHeaders })
-  if (!preview || !range) return new Response(file.bytes.slice(), { headers: responseHeaders })
+  if (!preview || !range) return new Response(body(0, size - 1), { headers: responseHeaders })
   const match = /^bytes=(\d*)-(\d*)$/.exec(range)
   let start, end
   if (match && (match[1] || match[2])) {
@@ -17,6 +18,6 @@ export function importedFileResponse(file, { method = 'GET', range, preview = fa
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start >= size || end < start) {
     return new Response(null, { status: 416, headers: { ...responseHeaders, 'Content-Length': '0', 'Content-Range': `bytes */${size}` } })
   }
-  return new Response(file.bytes.slice(start, end + 1), { status: 206,
+  return new Response(body(start, end), { status: 206,
     headers: { ...responseHeaders, 'Content-Length': String(end - start + 1), 'Content-Range': `bytes ${start}-${end}/${size}` } })
 }

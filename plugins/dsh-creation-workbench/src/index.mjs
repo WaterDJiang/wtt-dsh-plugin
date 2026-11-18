@@ -7,7 +7,6 @@ import { IMPORT_MAX_BYTES } from './material-import.mjs';
 import { createWorkbenchSkillCatalog } from './skill-catalog.mjs';
 import { extractSkillNames } from './skill-commands.mjs';
 import { importedFileResponse } from './media-response.mjs';
-import { createArtifactPreview } from './artifact-preview.mjs';
 import { createNativeTaskStateTracker } from './native-task-state.mjs';
 import { createTaskControl } from './task-control.mjs';
 import { readReviewImage } from './review-image.mjs';
@@ -36,7 +35,7 @@ export function apply(ctx, config = {}) {
   const taskControl = createTaskControl(ctx, taskRuntime);
   const productionObserver = createProductionObserver(ctx);
   ctx.effect(() => () => productionObserver.close());
-  const projects = new ProjectRegistry({ ...config, mediaServiceAccess,
+  const projects = new ProjectRegistry({ ...config, mediaServiceAccess, prewarmArtifactPreviews: true,
     attachProduction: productionObserver.attach, readProductionUsage: productionObserver.read, refreshProductionUsage: productionObserver.refresh,
     deliverSlideComments: async (sessionId, message) => {
       const agent = ctx.get("agents")?.get(sessionId);
@@ -44,7 +43,8 @@ export function apply(ctx, config = {}) {
       if (agent.status === 'idle') agent.followup(message); else agent.inject(message);
     }, runtimeStateReader: (task, service) => {
       const state = taskRuntime.read(task, service), budget = service.production?.usage(task.id)?.budgetStop;
-      return budget && state?.phase !== 'generating' ? { phase: 'idle', message: budget } : state;
+      return budget && state?.phase !== 'generating'
+        ? { phase: 'idle', message: budget, ...(state?.settled ? { settled: true } : {}) } : state;
     } });
   ctx.effect(() => () => taskRuntime.close());
   registerWorkbenchSkills(ctx, projects.get());
@@ -63,7 +63,6 @@ export function apply(ctx, config = {}) {
 
   ctx.effect(() => () => { void catalogReady.then(catalog => catalog.close()).catch(() => {}); });
   ctx.effect(() => () => projects.close());
-  const previews = new Map();
   const documentPreviews = new Map();
   const environmentFor = async service => {
     const result = service.environment();
@@ -74,11 +73,6 @@ export function apply(ctx, config = {}) {
     return result;
   };
   const documentsFor = service => { if (!documentPreviews.has(service)) documentPreviews.set(service, new DocumentPreview(service)); return documentPreviews.get(service); };
-  const previewFor = service => {
-    if (!previews.has(service)) previews.set(service, createArtifactPreview(service));
-    return previews.get(service);
-  };
-  ctx.effect(() => () => { for (const preview of previews.values()) preview.close(); previews.clear(); });
   async function verifyTaskSkills(service, taskId) {
     const refs = service.tasks.get(taskId).input.skillRefs || [];
     if (!refs.length) return;
@@ -234,11 +228,11 @@ export function apply(ctx, config = {}) {
               'Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",'Cache-Control':'no-store'}});
             return importedFileResponse(file, { method: request.method, range: request.headers.get('range'), preview: true, headers });
           }
-          if (url.searchParams.has('artifactPreview')) return Response.json(await previewFor(service).get(url.searchParams.get('artifactPreview'), {
+          if (url.searchParams.has('artifactPreview')) return Response.json(await service.artifactPreview().get(url.searchParams.get('artifactPreview'), {
             ...(url.searchParams.has('hash') ? { hash: url.searchParams.get('hash') } : {}),
           }), { headers });
           if (url.searchParams.has('artifactPreviewPage')) {
-            const file = await previewFor(service).readPage(url.searchParams.get('artifactPreviewPage'), Number(url.searchParams.get('page')), { hash: url.searchParams.get('hash') });
+            const file = await service.artifactPreview().readPage(url.searchParams.get('artifactPreviewPage'), Number(url.searchParams.get('page')), { hash: url.searchParams.get('hash') });
             return importedFileResponse(file, { method: request.method, range: request.headers.get('range'), preview: true, headers });
           }
           if (url.searchParams.has('artifact')) return Response.json(service.tasks.files.get(url.searchParams.get('artifact')), { headers });
@@ -248,8 +242,14 @@ export function apply(ctx, config = {}) {
             return importedFileResponse(file, { method: request.method, range: request.headers.get('range'), preview, headers });
           }
           if (url.searchParams.has('downloadArtifact')) {
-            const file = await service.tasks.files.download(url.searchParams.get('downloadArtifact'));
-            return importedFileResponse(file, { method: request.method, range: request.headers.get('range'), preview: url.searchParams.get('preview') === '1', headers });
+            const artifactId = url.searchParams.get('downloadArtifact');
+            const preview = url.searchParams.get('preview') === '1';
+            const options = { method: request.method, range: request.headers.get('range'), headers };
+            if (preview) {
+              const video = await service.tasks.files.videoPreviewResponse(artifactId, { ...options, signal: request.signal });
+              if (video) return video;
+            }
+            return importedFileResponse(await service.tasks.files.download(artifactId), { ...options, preview });
           }
           if (url.searchParams.has('download')) {
             const file = await service.download(url.searchParams.get('download'));

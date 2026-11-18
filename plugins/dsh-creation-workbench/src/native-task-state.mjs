@@ -159,6 +159,7 @@ export function createNativeTaskStateTracker(ctx) {
           .get(task.id, task.sessionId);
         if (state?.phase === 'generating') return live || { phase: 'unknown', message: UNKNOWN_MESSAGE };
         if (state) return { ...state,
+          ...(['idle', 'failed'].includes(state.phase) ? { settled: true } : {}),
           ...(state.phase === 'idle' ? { message: state.message.replace(/，尚未登记正式产物/gu, '') } : {}),
           ...(state.code === null ? { code: undefined } : {}), ...(state.status === null ? { status: undefined } : {}) };
         return live;

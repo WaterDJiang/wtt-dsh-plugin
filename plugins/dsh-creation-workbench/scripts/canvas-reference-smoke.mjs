@@ -295,8 +295,15 @@ async function checkSelectionComposition(page, canvas, fixture, api, artifacts) 
   const plus = canvas.getByRole('toolbar', { name: '已选 3 个对象的操作' }).getByRole('button', { name: '用选中卡片创作', exact: true });
   const cardPlus = canvas.getByRole('button', { name: '用 框选正文 继续创作', exact: true });
   const close = () => composer.getByRole('button', { name: '关闭卡片创作框' }).click();
+  const typeMenu = canvas.getByRole('menu', { name: '用选中卡片创作', exact: true });
+  const types = [
+    [plus, '文本', 'text'],
+    [cardPlus, 'PPT', 'pptx'],
+    [plus, '图片', 'image'],
+    [cardPlus, '视频', 'video'],
+  ];
   let lastDraftId;
-  for (const trigger of [plus, cardPlus]) {
+  for (const [trigger, label, type] of types) {
     const [left, right] = await Promise.all([textCard.boundingBox(), imageCard.boundingBox()]);
     await page.mouse.move(left.x - 8, left.y - 8);
     await page.mouse.down();
@@ -306,14 +313,43 @@ async function checkSelectionComposition(page, canvas, fixture, api, artifacts) 
     assert.deepEqual(await selected(), [fixture.text, fixture.history.id, fixture.image].sort());
     const viewport = canvas.locator('.react-flow__viewport');
     const viewBefore = await viewport.getAttribute('style');
+    const originalSelection = await selected();
+    const countBefore = (await readBoard()).nodes.length;
+    await trigger.click();
+    await typeMenu.waitFor();
+    assert.deepEqual(await typeMenu.getByRole('menuitem').allTextContents(), ['文本', 'PPT', '图片', '视频']);
+    assert.deepEqual(await selected(), originalSelection);
+    assert.equal((await readBoard()).nodes.length, countBefore, '选择类型前不创建草稿');
+    const [menuBox, graphBox] = await Promise.all([typeMenu.boundingBox(), canvas.locator('.wcc-graph').boundingBox()]);
+    assert(menuBox.x >= graphBox.x && menuBox.y >= graphBox.y && menuBox.x + menuBox.width <= graphBox.x + graphBox.width + 1
+      && menuBox.y + menuBox.height <= graphBox.y + graphBox.height + 1, '类型菜单应在画布内');
+    if (type === 'text') {
+      await typeMenu.getByRole('menuitem', { name: '文本', exact: true }).evaluate(button => {
+        if (document.activeElement !== button) throw new Error('打开菜单后焦点未进入首项');
+      });
+      await page.keyboard.press('Escape');
+      await typeMenu.waitFor({ state: 'hidden' });
+      assert(await trigger.evaluate(button => document.activeElement === button), '取消后焦点回到加号');
+      assert.deepEqual(await selected(), originalSelection);
+      assert.equal((await readBoard()).nodes.length, countBefore);
+      await trigger.click();
+      await typeMenu.waitFor();
+    }
     const created = page.waitForResponse(response => new URL(response.url()).pathname === api.pathname
       && response.request().method() === 'POST' && response.request().postDataJSON()?.action === 'create-output-draft');
-    await trigger.click();
+    if (type === 'video') {
+      await typeMenu.getByRole('menuitem', { name: '文本', exact: true }).focus();
+      await page.keyboard.press('End');
+      assert(await typeMenu.getByRole('menuitem', { name: label, exact: true }).evaluate(button => document.activeElement === button));
+      await page.keyboard.press('Enter');
+    } else await typeMenu.getByRole('menuitem', { name: label, exact: true }).click();
     const reply = await created;
     assert(reply.ok(), await reply.text());
     const result = await reply.json();
     lastDraftId = result.node.id;
     const data = reply.request().postDataJSON().data;
+    assert.equal(data.outputType, type);
+    assert.equal(result.card.type, type);
     assert.deepEqual([...data.selectedCardIds].sort(), expectedIds);
     assert.deepEqual(new Map(data.sourceRefs.map(ref => [ref.cardId, ref.hash])), expectedHashes);
     assert.deepEqual(result.composition.references.map(ref => ref.id).sort(), expectedIds);
@@ -325,7 +361,7 @@ async function checkSelectionComposition(page, canvas, fixture, api, artifacts) 
     await input.waitFor();
     assert.equal(await input.inputValue(), '');
     assert.deepEqual((await readBoard()).tasks, before.tasks, '点加号只打开草稿，用户发送前不创建任务');
-    if (artifacts && trigger === plus) await page.screenshot({ path: path.join(artifacts, 'box-selection-compose.png') });
+    if (artifacts && type === 'video') await page.screenshot({ path: path.join(artifacts, 'box-selection-compose.png') });
     await close();
   }
   const count = (await readBoard()).nodes.length;
@@ -342,11 +378,29 @@ async function checkSelectionComposition(page, canvas, fixture, api, artifacts) 
   await cardPlus.click();
   await canvas.getByRole('menu', { name: '从卡片创建内容' }).getByRole('menuitem', { name: /文本/ }).waitFor();
   await page.keyboard.press('Escape');
-  await card(lastDraftId).getByRole('button', { name: '用 AI 创作', exact: true }).click();
+  const desktop = page.viewportSize();
+  await textCard.getByRole('heading').click();
+  await historyCard.getByRole('heading').click({ modifiers: ['Meta'] });
+  await imageCard.getByRole('heading').click({ modifiers: ['Meta'] });
+  await plus.waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await plus.click();
+  await typeMenu.waitFor();
+  const narrow = await typeMenu.boundingBox();
+  assert(narrow.x >= 0 && narrow.x + narrow.width <= 391 && narrow.y + narrow.height <= 844, '窄屏菜单应可完整浏览');
+  if (artifacts) await page.screenshot({ path: path.join(artifacts, 'box-selection-menu-390.png') });
+  await page.keyboard.press('Escape');
+  await typeMenu.waitFor({ state: 'hidden' });
+  await page.setViewportSize(desktop);
+  const search = canvas.getByRole('textbox', { name: '搜索画布内容', exact: true });
+  await search.fill('新视频');
+  await canvas.getByRole('option', { name: '新视频', exact: true }).click();
+  await card(lastDraftId).getByRole('button', { name: /填写要求/ }).click();
   await composer.locator('.wcc-creation-reference-chip').nth(2).waitFor();
   assert.equal(await composer.locator('.wcc-creation-reference-chip').count(), 3);
+  await composer.getByText('视频', { exact: true }).first().waitFor();
   await close();
-  console.log('PASS 框选三卡、浮动和卡边加号、历史版本哈希、无效选中、单卡菜单、重新打开草稿');
+  console.log('PASS 两个多选加号、四种类型、取消保留选择与焦点、历史版本哈希、无效选中、单卡菜单、重开视频草稿、390px 菜单');
 }
 
 async function checkReferencePerformance(page, canvas, fixture, artifacts) {

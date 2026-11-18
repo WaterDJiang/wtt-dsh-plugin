@@ -3,6 +3,7 @@ import { LazyDetails, UiButton } from './ui/controls.jsx'
 import { CanvasPopover } from './ui/canvas-popover.jsx'
 import { skillLabel, skillSearchText } from './skill-presentation.mjs'
 import { UserError } from './user-feedback.jsx'
+import { VideoPreview } from './video-preview.jsx'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { extractSkillNames, skillQueryAtCursor, pptEngineForSelection } from './skill-commands.mjs'
 import { SkillSettings } from './skill-settings.jsx'
@@ -208,28 +209,31 @@ function ImportedReferenceFile({ card, getHref }) {
     {file.mime?.startsWith('image/') && (card.sourceStatus || card.status) === 'ready' && <img className="wcc-creation-imported-preview" src={preview} alt={`文件预览：${cardTitle(card)}`} loading="lazy" decoding="async" />}
     {file.mime?.startsWith('video/') && !card.referenceNote?.includes('转写') && <p className="wcc-creation-preview-note">视频文件，尚未转写或解析画面。</p>}
     {file.mime?.startsWith('video/') && (card.sourceStatus || card.status) === 'ready' && <>
-      <video className="wcc-creation-imported-video" src={preview} controls preload="metadata" playsInline aria-label={`视频预览：${cardTitle(card)}`} onError={() => setVideoError(true)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} />
+      <VideoPreview className="wcc-creation-imported-video" src={preview} deferDesktopSeek aria-label={`视频预览：${cardTitle(card)}`} onError={() => setVideoError(true)} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} />
       {videoError && <p className="wcc-creation-preview-note" role="status">浏览器无法播放此视频，可下载原文件在本机查看。</p>}
     </>}
   </div>
 }
 
-export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [], onAction, onClose }) {
+export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, trigger, items = [], onAction, onClose }) {
   const menu = useRef(null)
+  const firstItem = useRef(null)
   const previousFocus = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const floating = Boolean(trigger && typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function')
   useEffect(() => {
+    if (floating) return
     previousFocus.current = document.activeElement
-    const first = menu.current?.querySelector('button:not(:disabled)')
-    ;(first || menu.current)?.focus()
+    ;(firstItem.current || menu.current)?.focus({ preventScroll: true })
     const dismiss = event => { if (!menu.current?.contains(event.target)) closeRef.current?.() }
     document.addEventListener('pointerdown', dismiss, true)
     return () => document.removeEventListener('pointerdown', dismiss, true)
-  }, [])
+  }, [floating])
 
   function closeWithFocus() {
-    previousFocus.current?.focus?.()
+    const opener = trigger || previousFocus.current
+    opener?.focus({ preventScroll: true })
     onClose?.()
   }
 
@@ -239,21 +243,29 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, items = [],
     if (event.key === 'Tab') { closeWithFocus(); return }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
-    const buttons = [...menu.current.querySelectorAll('button:not(:disabled)')]
+    const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
     if (!buttons.length) return
     const index = buttons.indexOf(document.activeElement)
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : event.key === 'ArrowDown' ? (index + 1) % buttons.length : (index - 1 + buttons.length) % buttons.length
     buttons[next].focus()
   }
 
-  return <div ref={menu} className="wcc-node-create-menu nodrag nopan nowheel" style={{ left: position.x, top: position.y }} role="menu" aria-label={caption || "从卡片创建内容"} tabIndex={-1}
-    onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onKeyDown={keyboard}>
+  const menuProps = { className: 'wcc-node-create-menu nodrag nopan nowheel', role: 'menu',
+    'aria-label': caption || '从卡片创建内容', tabIndex: -1, onKeyDown: keyboard,
+    onPointerDown: event => event.stopPropagation(), onClick: event => event.stopPropagation(),
+    onDoubleClick: event => event.stopPropagation() }
+  const firstEnabled = items.find(item => !item.disabled)?.id
+  const content = <>
     <p className="wcc-create-menu-caption">{caption || '用这张卡创作'}</p>
-    {items.map(item => <UiButton variant="custom" key={item.id} type="button" role="menuitem" disabled={item.disabled} title={(item.disabled && item.reason) || item.description || item.label}
+    {items.map(item => <UiButton ref={item.id === firstEnabled ? firstItem : undefined} variant="custom" key={item.id}
+      type="button" role="menuitem" disabled={item.disabled} title={(item.disabled && item.reason) || item.description || item.label}
       onClick={() => { onAction?.(item.id); onClose?.() }}>
       <span className={`wcc-create-menu-icon is-${item.id}`}><CreationIcon type={item.id} size={15} /></span><span><strong>{item.label || KIND_LABELS[item.id] || item.id}</strong>{item.disabled && item.reason && <small>{item.reason}</small>}</span>
     </UiButton>)}
-  </div>
+  </>
+  return floating
+    ? <CanvasPopover {...menuProps} anchor={trigger} initialFocusRef={firstItem} onDismiss={onClose}>{content}</CanvasPopover>
+    : <div {...menuProps} ref={menu} style={{ left: position.x, top: position.y }}>{content}</div>
 }
 
 export function CardComposer({

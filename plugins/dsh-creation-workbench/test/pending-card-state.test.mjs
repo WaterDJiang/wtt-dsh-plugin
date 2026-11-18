@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPendingContext, generationStateSignature, nativePendingState, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from '../src/pending-card-state.mjs';
+import { createPendingContext, generationStateSignature, nativePendingState, nativeTaskPollMode, pendingCardTitle, pendingContinueAllowed, pendingLabel, pendingRetryAllowed, publishedTaskGeneration } from '../src/pending-card-state.mjs';
 import { usableCreationSource } from '../src/creation-context.mjs';
 
 function fixture() {
@@ -13,6 +13,18 @@ function fixture() {
           sources: [{ cardId: 'material:source-a', kind: 'material', hash: 'a'.repeat(64), content: '提交时原文' }] } },
       pendingGeneration: { taskId: 'task-a', status: 'failed', phase: 'failed', error: '发送失败' } } };
 }
+
+test('only a durably ended native turn backs off, with an immediate return to fast polling for a resumed turn', () => {
+  const task = { kind: 'ai', outputCardId: 'card', dispatchStatus: 'accepted', runtimeState: { phase: 'idle' } };
+  assert.equal(nativeTaskPollMode(task, { running: false }), 'fast');
+  task.runtimeState.settled = true;
+  assert.equal(nativeTaskPollMode(task, { running: false }), 'slow');
+  assert.equal(nativeTaskPollMode(task, { running: true }), 'fast');
+  assert.equal(nativeTaskPollMode(task, { pendingInteraction: { kind: 'question' } }), 'fast');
+  assert.equal(nativeTaskPollMode({ ...task, cardVersionId: 'version' }), undefined);
+  assert.equal(nativeTaskPollMode({ ...task, cardVersionId: 'version' }, { running: true }), 'fast');
+  assert.equal(nativeTaskPollMode({ ...task, dispatchStatus: 'failed' }), undefined);
+});
 
 test('pending editor restores the exact task snapshots without inventing a successful version or referenceable placeholder', () => {
   const input = fixture();

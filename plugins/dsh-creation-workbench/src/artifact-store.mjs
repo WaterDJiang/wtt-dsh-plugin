@@ -1,9 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { closeSync, openSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs';
+import { closeSync, constants, openSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs';
+import { open } from 'node:fs/promises';
 import path from 'node:path';
+import { importedFileResponse } from './media-response.mjs';
 import { artifactFormat, validateArtifact, GENERATED_MEDIA_MAX_BYTES } from './artifact-validation.mjs';
 
 const MAX_BYTES = GENERATED_MEDIA_MAX_BYTES;
+const mediaChunkBytes = 1024 * 1024;
+const fileSignature = info => [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(':');
 const sha = value => createHash('sha256').update(value).digest('hex');
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const id = (value, name) => { if (!uuid(value)) throw new Error(`${name}无效`); return value.toLowerCase(); };
@@ -42,7 +46,7 @@ export class ArtifactStore {
     if (!file.startsWith(this.store.workspaceRoot + path.sep) || realpathSync(file) !== file) throw new Error('产物路径不能使用符号链接或越出项目目录');
     const info = statSync(file);
     if (!info.isFile() || !info.size || info.size > MAX_BYTES) throw new Error('产物必须是非空且不超过 200 MB 的真实文件');
-    return { file, info, signature: [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(':') };
+    return { file, info, signature: fileSignature(info) };
   }
 
   #hash(file) {
@@ -60,9 +64,10 @@ export class ArtifactStore {
       const inspected = this.#inspect(row.path);
       if (inspected.info.size !== row.byte_size) return 'changed';
       const cached = this.cache.get(row.id);
-      if (cached?.signature === inspected.signature) return cached.status;
+      if (cached?.signature === inspected.signature && cached.hash === row.hash && cached.path === row.path) return cached.status;
       const status = this.#hash(inspected.file) === row.hash ? 'ready' : 'changed';
-      this.cache.set(row.id, { signature: inspected.signature, status });
+      if (this.#inspect(row.path).signature !== inspected.signature) return 'changed';
+      this.cache.set(row.id, { signature: inspected.signature, hash: row.hash, path: row.path, status });
       return status;
     } catch (error) { return error.code === 'ENOENT' ? 'missing' : 'unavailable'; }
   }
@@ -73,11 +78,15 @@ export class ArtifactStore {
       createdAt: row.created_at, sourceCardIds: JSON.parse(row.source_card_ids_json), status: this.#state(row), ...(this.store.deliverables?.info(`artifact:${row.id}`) ? { delivery: this.store.deliverables.info(`artifact:${row.id}`) } : {}) };
   }
 
-  get(artifactId) {
+  #row(artifactId) {
     if (this.store.closed) throw new Error('工作台已关闭');
     const row = this.db.prepare('SELECT * FROM task_files WHERE id=?').get(id(artifactId, '文件产物标识'));
     if (!row) throw new Error('文件产物不存在');
-    return this.#value(row);
+    return row;
+  }
+
+  get(artifactId) {
+    return this.#value(this.#row(artifactId));
   }
 
   list(requirementId, taskId) {
@@ -101,6 +110,89 @@ export class ArtifactStore {
   async download(artifactId) {
     const { artifact, bytes } = this.read(artifactId);
     return { bytes, name: path.basename(artifact.path), mime: artifact.mime };
+  }
+
+  async videoPreviewResponse(artifactId, { signal, ...options } = {}) {
+    const row = this.#row(artifactId);
+    if (!/^video\/(mp4|webm)$/.test(row.mime)) return null;
+    const { file, info, signature } = this.#inspect(row.path);
+    const changed = () => new Error('产物文件已被外部修改，不能继续使用旧登记');
+    if (info.size !== row.byte_size) throw changed();
+    signal?.throwIfAborted();
+    const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const assertCurrent = async () => {
+      signal?.throwIfAborted();
+      if (this.store.closed || fileSignature(await handle.stat()) !== signature || this.#inspect(row.path).signature !== signature) throw changed();
+    };
+    let handedOff = false;
+    try {
+      await assertCurrent();
+      const cached = this.cache.get(row.id);
+      let status = cached?.signature === signature && cached.hash === row.hash && cached.path === row.path ? cached.status : undefined;
+      if (!status) {
+        const digest = createHash('sha256'), block = Buffer.allocUnsafe(mediaChunkBytes);
+        let position = 0;
+        while (position < info.size) {
+          signal?.throwIfAborted();
+          const { bytesRead } = await handle.read(block, 0, Math.min(info.size - position, block.length), position);
+          if (!bytesRead) throw changed();
+          digest.update(block.subarray(0, bytesRead));
+          position += bytesRead;
+        }
+        await assertCurrent();
+        status = digest.digest('hex') === row.hash ? 'ready' : 'changed';
+        this.cache.set(row.id, { signature, hash: row.hash, path: row.path, status });
+      }
+      if (status !== 'ready') throw changed();
+      return importedFileResponse({
+        name: path.basename(row.path), mime: row.mime, size: info.size,
+        stream(start, end) {
+          let position = start, closed = false, abort;
+          const close = () => {
+            if (closed) return;
+            closed = true;
+            signal?.removeEventListener('abort', abort);
+            return handle.close();
+          };
+          const stream = new ReadableStream({
+            start(controller) {
+              abort = () => {
+                if (closed) return;
+                controller.error(signal.reason);
+                void close()?.catch(() => {});
+              };
+              if (signal?.aborted) abort();
+              else signal?.addEventListener('abort', abort, { once: true });
+            },
+            async pull(controller) {
+              try {
+                await assertCurrent();
+                const chunk = Buffer.allocUnsafe(Math.min(end - position + 1, mediaChunkBytes));
+                const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
+                if (closed) return;
+                if (!bytesRead) throw changed();
+                await assertCurrent();
+                if (closed) return;
+                position += bytesRead;
+                controller.enqueue(chunk.subarray(0, bytesRead));
+                if (position > end) {
+                  controller.close();
+                  await close();
+                }
+              } catch (cause) {
+                if (!closed) controller.error(cause);
+                await close();
+              }
+            },
+            cancel: close,
+          }, { highWaterMark: 0 });
+          handedOff = true;
+          return stream;
+        },
+      }, { ...options, preview: true });
+    } finally {
+      if (!handedOff) await handle.close();
+    }
   }
 
   #saved(artifactId, deferSync = false) {
@@ -215,7 +307,12 @@ export class ArtifactStore {
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
-    return this.#registrationReceipt(task, artifactId, deferSync);
+    const artifact = this.#registrationReceipt(task, artifactId, deferSync);
+    if (kind === 'pptx' && artifact.status === 'ready' && this.store.prewarmPptPreview
+      && this.db.prepare("SELECT 1 FROM output_card_outputs WHERE source_ref=? AND role='primary'").get(`artifact:${artifact.id}`)) {
+      this.store.prewarmPptPreview(artifact);
+    }
+    return artifact;
   }
 
   async registerBatch({ taskId, files }, { sessionId, signal, ...validationOptions } = {}) {

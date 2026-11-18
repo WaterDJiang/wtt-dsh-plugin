@@ -110,6 +110,7 @@ test('accepted provider 405 becomes a compact durable failure without changing d
   f.agents.get(f.boundTask.sessionId).status = 'idle';
   const value = f.tracker.read(f.boundTask, f.service);
   assert.equal(value.phase, 'failed'); assert.equal(value.status, 405); assert.equal(value.code, 'PI_AI_ERROR');
+  assert.equal(value.settled, true);
   assert.match(value.message, /405 Not Allowed/);
   assert.doesNotMatch(value.message, /<html>|do not show|sample-secret|another-secret|fakeKey/);
   assert.deepEqual(f.db.prepare('SELECT * FROM course_tasks').all(), original);
@@ -127,6 +128,7 @@ test('a later turn start clears old failure while stale or cross-project events 
   let row = f.db.prepare('SELECT * FROM task_runtime_states').get();
   assert.equal(row.phase, 'generating'); assert.equal(row.seq, 5); assert.equal(row.code, null);
   assert.equal(f.tracker.read(f.boundTask, f.service).phase, 'unknown');
+  assert.equal(f.tracker.read(f.boundTask, f.service).settled, undefined);
   f.emit(failure(10, 3), { id: f.session.id, header: { id: f.session.id, cwd: '/project-b' } });
   row = f.db.prepare('SELECT * FROM task_runtime_states').get();
   assert.equal(row.seq, 5);
