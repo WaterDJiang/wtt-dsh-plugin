@@ -156,7 +156,7 @@ export function CanvasChrome({
 }
 
 export function SelectionActions({
-  x, y, selectedCount = 1, onInspect, onAI, onGroup, onUngroup,
+  x, y, selectedCount = 1, onInspect, onAI, onCreateFromSelection, onGroup, onUngroup,
   canGroup = selectedCount > 1, canUngroup = false, onAlign, busy = false,
   onPromote, canPromote = false, onDuplicate, canDuplicate = false,
   onDelete, canDelete = false,
@@ -168,7 +168,8 @@ export function SelectionActions({
   return <div className={`wcc-studio-selection wcc-studio-surface${x === undefined ? '' : ' is-positioned'}`} style={style} role="toolbar" aria-label={`已选 ${selectedCount} 个对象的操作`} onPointerDown={event => event.stopPropagation()}>
     <span className="wcc-studio-selection-count">{selectedCount} 项</span>
     <ToolButton icon="inspect" label="查看内容" onClick={onInspect} />
-    {onMediaAction ? <ToolButton icon={mediaActionLabel === '打开对话' ? 'chat' : 'ai'} label={mediaActionLabel} onClick={onMediaAction} className="is-ai"><span>{mediaActionLabel === '打开对话' ? '对话' : mediaActionLabel}</span></ToolButton>
+    {selectedCount > 1 ? <ToolButton icon="plus" label="用选中卡片创作" onClick={onCreateFromSelection} disabled={busy} className="is-ai" />
+      : onMediaAction ? <ToolButton icon={mediaActionLabel === '打开对话' ? 'chat' : 'ai'} label={mediaActionLabel} onClick={onMediaAction} className="is-ai"><span>{mediaActionLabel === '打开对话' ? '对话' : mediaActionLabel}</span></ToolButton>
       : <ToolButton icon="ai" label="交给 AI" onClick={onAI} className="is-ai"><span>交给 AI</span></ToolButton>}
     {canPromote && <ToolButton icon="material" label="保存为素材" onClick={onPromote} disabled={busy} />}
     <span className="wcc-studio-divider" aria-hidden="true" />

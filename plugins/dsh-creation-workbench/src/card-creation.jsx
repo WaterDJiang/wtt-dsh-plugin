@@ -260,7 +260,7 @@ export function CardComposer({
   visible = true, suspended = false, position = { x: 0, y: 0 }, context, references: referenceItems = [], availableReferences = [], creationTypes = [],
   instruction = '', onInstructionChange, onReferencesChange, onPickCanvasReferences, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onClose, onSend, onAction,
   searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewImageHref,
-  busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onTaskControl, actionContent, hideSubmit = false,
+  busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onOpenNativeConversation, onTaskControl, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
   mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onMediaOptionsChange, onGenerationMethodChange, onMediaProviderChange, onGenerateMedia, onResumeMedia, onNewMedia,
   nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, modelLoading, modelError,
@@ -684,6 +684,11 @@ export function CardComposer({
     <div className="wcc-creation-conversation-heading" hidden={(!hasExecution && !reviewingResult) || (revisionEditing && !taskMode)}>
       {reviewingResult && <UiButton variant="quiet" size="compact" onClick={() => { setConversationOpen(false); setRevisionEditing(true); requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus({ preventScroll: true })) }}>基于此版修改</UiButton>}
       {hasExecution && <UiButton variant="ghost" size="compact" aria-expanded={conversationOpen} aria-controls={`${id}-conversation`} disabled={conversationOpening === conversationScope} onClick={() => void toggleConversation()}>{conversationOpening === conversationScope ? '正在打开…' : reviewingResult ? '原对话' : '任务对话'}<CreationIcon type={conversationOpen ? 'collapse' : 'expand'} size={13} /></UiButton>}
+      {reviewingResult && executionExpanded && context?.sessionId && onOpenNativeConversation && <UiButton variant="ghost" size="compact"
+        onClick={() => {
+          try { onOpenNativeConversation(context.sessionId) }
+          catch (cause) { setConversationError({ scope: conversationScope, message: referenceErrorMessage(cause) }) }
+        }}>在 DSH 对话页继续</UiButton>}
       {executionExpanded && <div className="wcc-review-jumps">
         {onOpenReviewDraft && reviewDraft && <UiButton variant="quiet" size="compact"
           title={reviewDraft.name} onClick={openReviewDraft}>查看待审稿</UiButton>}

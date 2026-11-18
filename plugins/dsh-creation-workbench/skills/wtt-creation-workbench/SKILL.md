@@ -11,6 +11,7 @@ description: 在当前项目按用户选择的技能创作，读取任务冻结�
 - 保持会话 cwd 为项目根。任务目录内制作，过程稿放 working，正式文件放 delivery。只读修订基准和已保存版本，改动另存。详细校验报告落盘，回执只报真实结果、错误位置和文件路径。
 - 由绑定主会话用 `course_register_artifact` 登记实际校验过的文件。多文件用 `course_register_artifacts`，首个匹配主文件优先并传 `primary=true`。按任务冻结的展示规则处理：独立成果省略 primary，跟随主卡的附件显式传 `presentation=attachment`；primary=false不代表附件。每个文件使用新 UUID operationId，重试复用原值。首个匹配产物发布同卡新版本，分镜、预览和附件不冒充主产物。保存大纲用 `course_save_outline`，传 requirementId、完整 Markdown 和实际使用的冻结 sourceCardIds；若有 taskId 必须传入。Word 由工作台从指定大纲版本导出。
 - 图片／视频任务只限定成果格式：使用用户显式选择的 Skill，不默认调用任何个人技能或供应商。真实图片用 kind=image，真实视频用 kind=video 登记到本任务 delivery，沿用绑定主会话、路径、格式和 hash 校验。同一卡片可承载不同生成方式的版本。
+- 已确认的主视频先以 `kind=video`、`primary=true` 登记，核对回执 `cardOutput.role=primary` 与 `versionId`。如果回执提示主视频误作附件，确认后用原 `path`、`title` 和 `kind=video`、新 `operationId` 与 `primary=true` 纠正，省略 `presentation`。保留确实需要跟随原卡的附件。
 - 任务允许按文件拆卡时，根据实际确认的交付清单登记全部独立成品；交付7张图就登记7项 image，第一张复用起始容器，其余自动扩成独立图片卡。候选、过程稿、报告和未确认文件不按正式图片登记。子任务负责制作，由绑定主会话复核汇总后登记；成功项保留，失败项如实报告并单项重试。
 - 普通文本用 kind=text；分镜用 storyboard；正式原生 PPTX 须通过可编辑性检查；练习正式文件限 PDF／CSV，逐字稿限 Markdown／DOCX／PDF。按任务指明的入口制作，勿自动添加其他技能。图像和视频附件只提供已核验文件信息，未读取画面、文字或语音时如实说明。
 - 宝玉任务在指定的 working/slides 内制作真实可编辑工程，用 `course_attach_slide_project` 登记草稿；编辑、批注和导出由工作台负责。用户在右栏保存新版才归档正式文件。按批注修改可变工程，保留原页、素材与交付快照；不自行启动另一编辑器或用普通登记绕过导出校验。

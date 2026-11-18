@@ -109,6 +109,39 @@ export class ArtifactStore {
     return this.get(artifactId);
   }
 
+  #registrationReceipt(task, artifactId, deferSync) {
+    const artifact = this.#saved(artifactId, deferSync);
+    if (task.input.outputType !== 'video' || artifact.kind !== 'video') return artifact;
+    const row = this.db.prepare('SELECT card_id AS cardId, version_id AS versionId, role FROM output_card_outputs WHERE source_ref=? AND task_id=?')
+      .get(`artifact:${artifactId}`, task.id);
+    if (!row) return artifact;
+    const cardOutput = { ...row };
+    if (cardOutput.role === 'attachment' && !cardOutput.versionId && artifact.status === 'ready') {
+      cardOutput.warning = '视频已作为附件保存，原卡本任务尚无正式版本。若已确认这是正式视频，请用原 path、title 和 kind=video，传 primary=true 和新 operationId 重调登记，省略 presentation。';
+    }
+    return { ...artifact, cardOutput };
+  }
+
+  #promoteVideoAttachment(task, file, title) {
+    if (file.task_id !== task.id || file.requirement_id !== task.requirement_id || file.kind !== 'video') {
+      throw new Error('该路径已登记产物，不能覆盖旧记录，请使用新文件名');
+    }
+    const sourceRef = `artifact:${file.id}`;
+    const binding = this.store.cards.binding(task.id);
+    const owner = this.db.prepare('SELECT card_id, role, version_id FROM output_card_outputs WHERE source_ref=? AND task_id=?').get(sourceRef, task.id);
+    if (!binding || !owner || owner.card_id !== binding.outputCardId || owner.role !== 'attachment') {
+      throw new Error('该路径已登记产物，不能覆盖旧记录，请使用新文件名');
+    }
+    if (owner.version_id || binding.cardVersionId) throw new Error('本任务已经有正式视频版本，不能用同一登记路径替换既有主产物');
+    if (file.title !== title) throw new Error('纠正视频主产物时请使用原登记标题');
+    const previous = this.#inspect(file.path);
+    if (this.#hash(previous.file) !== file.hash || this.#inspect(file.path).signature !== previous.signature) {
+      throw new Error('已登记视频文件已变化，不能沿用旧登记纠正主产物');
+    }
+    this.store.cards.recordOutput(task.id, sourceRef, { primary: true });
+    return file.id;
+  }
+
   async register(input, { sessionId, deferSync = false, ...validationOptions } = {}) {
     if (this.store.closed) throw new Error('工作台已关闭');
     if (input?.primary !== undefined && typeof input.primary !== 'boolean') throw new Error('主产物标识必须是布尔值');
@@ -140,36 +173,49 @@ export class ArtifactStore {
       return previous.result_id;
     };
     const replayed = replay();
-    if (replayed) return this.#saved(replayed, deferSync);
-    if (this.db.prepare('SELECT id FROM task_files WHERE path=?').get(relative)) throw new Error('该路径已登记产物，不能覆盖旧记录，请使用新文件名');
-    const inspected = this.#inspect(relative);
-    const bytes = readFileSync(inspected.file);
-    const hash = sha(bytes);
-    const { mime, validation } = await validateArtifact(kind, relative, bytes, validationOptions);
-    if (this.store.closed) throw new Error('工作台已关闭，未登记产物');
-    const after = this.#inspect(relative);
-    if (this.#hash(after.file) !== hash) throw new Error('验证期间产物文件发生变化，未登记');
-    const sourceCardIds = [...new Set((task.input.sources || []).map(source => source.cardId))];
+    if (replayed) return this.#registrationReceipt(task, replayed, deferSync);
+    const correctVideo = kind === 'video' && outputType === 'video' && input.primary === true;
+    const findRegistered = this.db.prepare('SELECT id, task_id, requirement_id, kind, title, path, hash FROM task_files WHERE path=?');
+    const registered = findRegistered.get(relative);
+    if (registered && !correctVideo) throw new Error('该路径已登记产物，不能覆盖旧记录，请使用新文件名');
+    let fresh;
+    if (!registered) {
+      const inspected = this.#inspect(relative);
+      const bytes = readFileSync(inspected.file);
+      const hash = sha(bytes);
+      const { mime, validation } = await validateArtifact(kind, relative, bytes, validationOptions);
+      if (this.store.closed) throw new Error('工作台已关闭，未登记产物');
+      const after = this.#inspect(relative);
+      if (this.#hash(after.file) !== hash) throw new Error('验证期间产物文件发生变化，未登记');
+      fresh = { mime, validation, hash, byteSize: bytes.length };
+    }
     this.db.exec('BEGIN IMMEDIATE');
     let artifactId;
     try {
       this.#task(task.id, sessionId);
       artifactId = replay();
       if (!artifactId) {
-        if (this.db.prepare('SELECT id FROM task_files WHERE path=?').get(relative)) throw new Error('该路径已登记产物，不能覆盖旧记录，请使用新文件名');
-        artifactId = randomUUID();
+        const existing = findRegistered.get(relative);
         const now = new Date().toISOString();
-        this.db.prepare('INSERT INTO task_files VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(artifactId, task.requirement_id, task.id, kind, title, relative,
-          hash, bytes.length, mime, JSON.stringify(validation), JSON.stringify(sourceCardIds), now);
+        if (existing) {
+          if (!correctVideo) throw new Error('该路径已登记产物，不能覆盖旧记录，请使用新文件名');
+          artifactId = this.#promoteVideoAttachment(task, existing, title);
+        } else {
+          if (!fresh) throw new Error('已有视频登记发生变化，请重新核对文件');
+          artifactId = randomUUID();
+          const sourceCardIds = [...new Set((task.input.sources || []).map(source => source.cardId))];
+          this.db.prepare('INSERT INTO task_files VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(artifactId, task.requirement_id, task.id, kind, title, relative,
+            fresh.hash, fresh.byteSize, fresh.mime, JSON.stringify(fresh.validation), JSON.stringify(sourceCardIds), now);
+          this.store.cards.recordOutput(task.id, `artifact:${artifactId}`, {
+            primary: input.presentation ? false : input.primary, separate: separate && !input.presentation,
+          });
+        }
         this.db.prepare('INSERT INTO operations VALUES (?,?,?,?)').run(operationId, 'register-artifact', fingerprint, artifactId);
-        this.store.cards.recordOutput(task.id, `artifact:${artifactId}`, {
-          primary: input.presentation ? false : input.primary, separate: separate && !input.presentation,
-        });
         this.db.prepare("UPDATE course_tasks SET status='output',error=NULL,updated_at=? WHERE id=?").run(now, task.id);
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
-    return this.#saved(artifactId, deferSync);
+    return this.#registrationReceipt(task, artifactId, deferSync);
   }
 
   async registerBatch({ taskId, files }, { sessionId, signal, ...validationOptions } = {}) {
@@ -188,7 +234,7 @@ export class ArtifactStore {
           const file = await this.register({ ...input, taskId: task.id }, { ...validationOptions, sessionId, deferSync: true });
           saved = true;
           results.push({ ...entry, ok: file.status === 'ready', id: file.id, path: file.path, hash: file.hash,
-            status: file.status, ...(file.status === 'ready' ? {} : { error: '已登记文件缺失、外改或不可用，请核对原文件；未覆盖旧登记' }) });
+            status: file.status, ...(file.cardOutput ? { cardOutput: file.cardOutput } : {}), ...(file.status === 'ready' ? {} : { error: '已登记文件缺失、外改或不可用，请核对原文件；未覆盖旧登记' }) });
         } catch (error) { results.push({ ...entry, ok: false, error: error.message || String(error) }); }
       }
     } finally {

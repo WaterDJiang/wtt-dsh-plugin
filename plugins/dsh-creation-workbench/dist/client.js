@@ -34682,6 +34682,9 @@ function OutcomeViewer({
   }, [selectionKey, source?.format]);
   const canModify = source && manifest?.cardId && externalFormats.includes(source.format);
   const downloadHref = file?.artifactId ? endpoint2({ downloadArtifact: file.artifactId }).href : source ? endpoint2({ projectFileDownload: source.originalPath, hash: source.hash }).href : void 0;
+  const seekableVideo = source?.format === "mp4" || source?.format === "webm";
+  const videoRef = seekableVideo ? source.sourceRef : null;
+  const videoHref = seekableVideo ? endpoint2({ preview: "1", ...videoRef?.startsWith("artifact:") ? { downloadArtifact: videoRef.slice("artifact:".length) } : videoRef?.startsWith("material:") ? { materialFile: videoRef.slice("material:".length) } : { projectFileDownload: source.originalPath, hash: source.hash } }).href : downloadHref;
   const isImage = source && (source.mime?.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif"].includes(source.format?.toLowerCase()));
   const imageHref = isImage && target.projectPath ? endpoint2({ reviewImage: source.originalPath, hash: source.hash }).href : downloadHref;
   const otherWebProject = source?.format === "pptx" && manifest?.slideProject?.artifactId !== file?.artifactId;
@@ -34732,7 +34735,7 @@ function OutcomeViewer({
       onClose,
       closeLabel: "\u5173\u95ED\u6210\u679C\u9884\u89C8"
     }
-  ), /* @__PURE__ */ import_react26.default.createElement(PanelToolbar, null, choices(false), onAdd2 && source && /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react26.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react26.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react26.default.createElement(UserError, { error }) : source ? isImage ? /* @__PURE__ */ import_react26.default.createElement(OutputPreview, { type: "image", title: source.name, src: imageHref, status: source.status }) : source.format === "mp4" || source.format === "webm" || source.format === "mov" ? /* @__PURE__ */ import_react26.default.createElement("video", { key: selectionKey, src: downloadHref, controls: true, preload: "metadata", playsInline: true, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react26.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react26.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
+  ), /* @__PURE__ */ import_react26.default.createElement(PanelToolbar, null, choices(false), onAdd2 && source && /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react26.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react26.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react26.default.createElement(UserError, { error }) : source ? isImage ? /* @__PURE__ */ import_react26.default.createElement(OutputPreview, { type: "image", title: source.name, src: imageHref, status: source.status }) : seekableVideo || source.format === "mov" ? /* @__PURE__ */ import_react26.default.createElement("video", { key: selectionKey, src: videoHref, controls: true, preload: "metadata", playsInline: true, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react26.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react26.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
 }
 
 // src/canvas.jsx
@@ -44103,6 +44106,7 @@ function SelectionActions({
   selectedCount = 1,
   onInspect,
   onAI,
+  onCreateFromSelection,
   onGroup,
   onUngroup,
   canGroup = selectedCount > 1,
@@ -44121,7 +44125,7 @@ function SelectionActions({
   const [alignOpen, setAlignOpen] = (0, import_react29.useState)(false);
   const alignButton = (0, import_react29.useRef)(null);
   const style3 = x2 === void 0 ? void 0 : { left: x2, top: y2 ?? 86 };
-  return /* @__PURE__ */ import_react29.default.createElement("div", { className: `wcc-studio-selection wcc-studio-surface${x2 === void 0 ? "" : " is-positioned"}`, style: style3, role: "toolbar", "aria-label": `\u5DF2\u9009 ${selectedCount} \u4E2A\u5BF9\u8C61\u7684\u64CD\u4F5C`, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "wcc-studio-selection-count" }, selectedCount, " \u9879"), /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "inspect", label: "\u67E5\u770B\u5185\u5BB9", onClick: onInspect }), onMediaAction ? /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: mediaActionLabel === "\u6253\u5F00\u5BF9\u8BDD" ? "chat" : "ai", label: mediaActionLabel, onClick: onMediaAction, className: "is-ai" }, /* @__PURE__ */ import_react29.default.createElement("span", null, mediaActionLabel === "\u6253\u5F00\u5BF9\u8BDD" ? "\u5BF9\u8BDD" : mediaActionLabel)) : /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "ai", label: "\u4EA4\u7ED9 AI", onClick: onAI, className: "is-ai" }, /* @__PURE__ */ import_react29.default.createElement("span", null, "\u4EA4\u7ED9 AI")), canPromote && /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "material", label: "\u4FDD\u5B58\u4E3A\u7D20\u6750", onClick: onPromote, disabled: busy }), /* @__PURE__ */ import_react29.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), canGroup && /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "group", label: "\u7F16\u7EC4", shortcut: "\u2318/Ctrl G", onClick: onGroup, disabled: busy }), canUngroup && /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "ungroup", label: "\u89E3\u9664\u5206\u7EC4", shortcut: "\u2318/Ctrl Shift G", onClick: onUngroup, disabled: busy }), selectedCount > 1 && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-studio-align-wrap", onKeyDown: (event) => {
+  return /* @__PURE__ */ import_react29.default.createElement("div", { className: `wcc-studio-selection wcc-studio-surface${x2 === void 0 ? "" : " is-positioned"}`, style: style3, role: "toolbar", "aria-label": `\u5DF2\u9009 ${selectedCount} \u4E2A\u5BF9\u8C61\u7684\u64CD\u4F5C`, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "wcc-studio-selection-count" }, selectedCount, " \u9879"), /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "inspect", label: "\u67E5\u770B\u5185\u5BB9", onClick: onInspect }), selectedCount > 1 ? /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "plus", label: "\u7528\u9009\u4E2D\u5361\u7247\u521B\u4F5C", onClick: onCreateFromSelection, disabled: busy, className: "is-ai" }) : onMediaAction ? /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: mediaActionLabel === "\u6253\u5F00\u5BF9\u8BDD" ? "chat" : "ai", label: mediaActionLabel, onClick: onMediaAction, className: "is-ai" }, /* @__PURE__ */ import_react29.default.createElement("span", null, mediaActionLabel === "\u6253\u5F00\u5BF9\u8BDD" ? "\u5BF9\u8BDD" : mediaActionLabel)) : /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "ai", label: "\u4EA4\u7ED9 AI", onClick: onAI, className: "is-ai" }, /* @__PURE__ */ import_react29.default.createElement("span", null, "\u4EA4\u7ED9 AI")), canPromote && /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "material", label: "\u4FDD\u5B58\u4E3A\u7D20\u6750", onClick: onPromote, disabled: busy }), /* @__PURE__ */ import_react29.default.createElement("span", { className: "wcc-studio-divider", "aria-hidden": "true" }), canGroup && /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "group", label: "\u7F16\u7EC4", shortcut: "\u2318/Ctrl G", onClick: onGroup, disabled: busy }), canUngroup && /* @__PURE__ */ import_react29.default.createElement(ToolButton, { icon: "ungroup", label: "\u89E3\u9664\u5206\u7EC4", shortcut: "\u2318/Ctrl Shift G", onClick: onUngroup, disabled: busy }), selectedCount > 1 && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wcc-studio-align-wrap", onKeyDown: (event) => {
     if (!alignOpen || event.key !== "Escape") return;
     event.preventDefault();
     event.stopPropagation();
@@ -46113,6 +46117,7 @@ function CardComposer({
   conversationVisible = true,
   onOpenConversation,
   onPrepareContinuation,
+  onOpenNativeConversation,
   onTaskControl,
   actionContent,
   hideSubmit = false,
@@ -46600,7 +46605,21 @@ function CardComposer({
       setConversationOpen(false);
       setRevisionEditing(true);
       requestAnimationFrame(() => composer.current?.querySelector("textarea")?.focus({ preventScroll: true }));
-    } }, "\u57FA\u4E8E\u6B64\u7248\u4FEE\u6539"), hasExecution && /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-expanded": conversationOpen, "aria-controls": `${id2}-conversation`, disabled: conversationOpening === conversationScope, onClick: () => void toggleConversation() }, conversationOpening === conversationScope ? "\u6B63\u5728\u6253\u5F00\u2026" : reviewingResult ? "\u539F\u5BF9\u8BDD" : "\u4EFB\u52A1\u5BF9\u8BDD", /* @__PURE__ */ import_react43.default.createElement(CreationIcon, { type: conversationOpen ? "collapse" : "expand", size: 13 })), executionExpanded && /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-review-jumps" }, onOpenReviewDraft && reviewDraft && /* @__PURE__ */ import_react43.default.createElement(
+    } }, "\u57FA\u4E8E\u6B64\u7248\u4FEE\u6539"), hasExecution && /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-expanded": conversationOpen, "aria-controls": `${id2}-conversation`, disabled: conversationOpening === conversationScope, onClick: () => void toggleConversation() }, conversationOpening === conversationScope ? "\u6B63\u5728\u6253\u5F00\u2026" : reviewingResult ? "\u539F\u5BF9\u8BDD" : "\u4EFB\u52A1\u5BF9\u8BDD", /* @__PURE__ */ import_react43.default.createElement(CreationIcon, { type: conversationOpen ? "collapse" : "expand", size: 13 })), reviewingResult && executionExpanded && context?.sessionId && onOpenNativeConversation && /* @__PURE__ */ import_react43.default.createElement(
+      UiButton,
+      {
+        variant: "ghost",
+        size: "compact",
+        onClick: () => {
+          try {
+            onOpenNativeConversation(context.sessionId);
+          } catch (cause) {
+            setConversationError({ scope: conversationScope, message: referenceErrorMessage(cause) });
+          }
+        }
+      },
+      "\u5728 DSH \u5BF9\u8BDD\u9875\u7EE7\u7EED"
+    ), executionExpanded && /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-review-jumps" }, onOpenReviewDraft && reviewDraft && /* @__PURE__ */ import_react43.default.createElement(
       UiButton,
       {
         variant: "quiet",
@@ -48804,11 +48823,12 @@ var ContentCard = (0, import_react55.memo)(function ContentCard2({ id: id2, data
   const execution = data.publishedGeneration || nativePendingState(data.pendingGeneration, data.nativeSessionStatus);
   const pending = execution?.published && !isActiveTaskPhase(execution.phase) ? void 0 : execution;
   const format = caps.format;
+  const pendingMedia = data.pendingMediaPreview;
   const fileDeck = data.defaultOutcome?.format === "pptx" ? data.defaultOutcome : null;
   const purpose = caps.purpose;
   const title = contentCardTitle(data);
   const titleHint = [title, data.defaultOutcome?.name !== title && data.defaultOutcome?.name].filter(Boolean).join("\n");
-  const formatLabel = data.defaultOutcome?.format?.toUpperCase() || (format === "document" && documentExtension ? documentExtension : { text: "\u6587\u672C", pptx: "PPT", image: "\u56FE\u7247", video: "\u89C6\u9891", document: "\u6587\u6863" }[format] || "\u5185\u5BB9");
+  const formatLabel = (pendingMedia?.format || data.defaultOutcome?.format)?.toUpperCase() || (format === "document" && documentExtension ? documentExtension : { text: "\u6587\u672C", pptx: "PPT", image: "\u56FE\u7247", video: "\u89C6\u9891", document: "\u6587\u6863" }[format] || "\u5185\u5BB9");
   (0, import_react55.useEffect)(() => {
     setVideoError(false);
   }, [data.videoPreview]);
@@ -48933,7 +48953,17 @@ var ContentCard = (0, import_react55.memo)(function ContentCard2({ id: id2, data
     /* @__PURE__ */ import_react55.default.createElement("span", { className: "wcc-generation-indicator", "aria-hidden": "true" }),
     /* @__PURE__ */ import_react55.default.createElement("strong", null, pending.phase === "idle" && data.slideProject && !fileDeck ? "\u5DE5\u7A0B\u8349\u7A3F\u5F85\u4FDD\u5B58" : pending.phase === "generating" && data.kind !== "generation" && !pending.published ? "\u65B0\u7248\u751F\u6210\u4E2D" : pendingLabel(pending)),
     /* @__PURE__ */ import_react55.default.createElement("span", null, data.composition ? "\u586B\u5199\u8981\u6C42 \u2192" : pendingContinueAllowed(pending) ? "\u7EE7\u7EED\u4EFB\u52A1 \u2192" : "\u67E5\u770B\u4EFB\u52A1 \u2192")
-  ), textDraft ? null : fileDeck ? /* @__PURE__ */ import_react55.default.createElement(OutputPreview, { compact: true, type: "pptx", title: fileDeck.name, status: fileDeck.status, artifactId: fileDeck.artifactId, hash: fileDeck.hash, loadPreview: data.loadDeckPreview, getPageHref: data.getDeckPageHref, onOpenDeck: () => data.onOpenOutcome?.(fileDeck.sourceRef) }) : data.kind === "generation" && data.slideProject ? /* @__PURE__ */ import_react55.default.createElement(SlideDraftCover, { project: data.slideProject, title: data.title, loadCover: data.loadSlideCover, onOpen: data.onOpenDeck, running: pending?.phase === "generating" }) : data.kind === "generation" ? /* @__PURE__ */ import_react55.default.createElement("p", { className: "wcc-card-generation-message" }, pending?.error || (pending?.nativeLabel ? "\u5728\u539F\u4EFB\u52A1\u7684\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u4E2D\u7EE7\u7EED\u3002" : pending?.message) || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u5C06\u5728\u8FD9\u91CC\u663E\u793A\u3002") : data.outputCard ? /* @__PURE__ */ import_react55.default.createElement(
+  ), textDraft ? null : pendingMedia ? /* @__PURE__ */ import_react55.default.createElement(import_react55.default.Fragment, null, pending?.error && /* @__PURE__ */ import_react55.default.createElement("p", { className: "wcc-card-generation-message" }, pending.error), /* @__PURE__ */ import_react55.default.createElement(
+    OutputPreview,
+    {
+      compact: true,
+      type: pendingMedia.type,
+      title: pendingMedia.title,
+      mime: pendingMedia.mime,
+      src: pendingMedia.src,
+      onOpenMedia: () => data.onOpenOutcome?.(pendingMedia.sourceRef)
+    }
+  )) : fileDeck ? /* @__PURE__ */ import_react55.default.createElement(OutputPreview, { compact: true, type: "pptx", title: fileDeck.name, status: fileDeck.status, artifactId: fileDeck.artifactId, hash: fileDeck.hash, loadPreview: data.loadDeckPreview, getPageHref: data.getDeckPageHref, onOpenDeck: () => data.onOpenOutcome?.(fileDeck.sourceRef) }) : data.kind === "generation" && data.slideProject ? /* @__PURE__ */ import_react55.default.createElement(SlideDraftCover, { project: data.slideProject, title: data.title, loadCover: data.loadSlideCover, onOpen: data.onOpenDeck, running: pending?.phase === "generating" }) : data.kind === "generation" ? /* @__PURE__ */ import_react55.default.createElement("p", { className: "wcc-card-generation-message" }, pending?.error || (pending?.nativeLabel ? "\u5728\u539F\u4EFB\u52A1\u7684\u300C\u4EFB\u52A1\u5BF9\u8BDD\u300D\u4E2D\u7EE7\u7EED\u3002" : pending?.message) || "\u6210\u679C\u6587\u4EF6\u4FDD\u5B58\u540E\u5C06\u5728\u8FD9\u91CC\u663E\u793A\u3002") : data.outputCard ? /* @__PURE__ */ import_react55.default.createElement(
     OutputPreview,
     {
       compact: true,
@@ -48965,7 +48995,21 @@ var ContentCard = (0, import_react55.memo)(function ContentCard2({ id: id2, data
   }, title: fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? "\u540C\u4EFB\u52A1\u7684\u5176\u4ED6\u7F51\u9875\u5DE5\u7A0B\uFF0C\u672A\u5173\u8054\u5F53\u524DPPTX" : void 0 }, fileDeck && data.slideProject.artifactId !== fileDeck.artifactId ? "\u5176\u4ED6\u7F51\u9875\u5DE5\u7A0B" : "\u7F16\u8F91\u7F51\u9875\u8BFE\u4EF6")), data.mediaActionLabel && /* @__PURE__ */ import_react55.default.createElement("div", { className: "wcc-card-media-actions nodrag nopan", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react55.default.createElement(UiButton, { variant: "quiet", onClick: (event) => {
     event.stopPropagation();
     if (event.detail <= 1) data.onMediaAction?.();
-  } }, /* @__PURE__ */ import_react55.default.createElement(CanvasIcon, { name: data.mediaHasConversation ? "chat" : "ai", size: 16 }), data.mediaActionLabel)), /* @__PURE__ */ import_react55.default.createElement("footer", { hidden: data.kind === "generation" && Boolean(data.slideProject), className: warning ? "wcc-card-footer is-warning" : "wcc-card-footer", title: data.projectFile?.path || data.sourcePath || data.path || "" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "wcc-state-dot" }), ["artifact", "outline", "word"].includes(data.kind) ? /* @__PURE__ */ import_react55.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-card-file nodrag nopan", "aria-label": `\u663E\u793A\u6240\u5728\u6587\u4EF6\u5939\uFF1A${data.delivery?.fileName || data.title}`, title: data.delivery?.error || data.delivery?.path || "\u5728\u6587\u4EF6\u5939\u4E2D\u663E\u793A\u6B64\u7248\u672C", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => {
+  } }, /* @__PURE__ */ import_react55.default.createElement(CanvasIcon, { name: data.mediaHasConversation ? "chat" : "ai", size: 16 }), data.mediaActionLabel)), /* @__PURE__ */ import_react55.default.createElement("footer", { hidden: data.kind === "generation" && Boolean(data.slideProject) && !pendingMedia, className: warning ? "wcc-card-footer is-warning" : "wcc-card-footer", title: data.projectFile?.path || data.sourcePath || data.path || "" }, /* @__PURE__ */ import_react55.default.createElement("span", { className: "wcc-state-dot" }), pendingMedia ? /* @__PURE__ */ import_react55.default.createElement(
+    UiButton,
+    {
+      variant: "custom",
+      type: "button",
+      className: "wcc-card-file nodrag nopan",
+      onPointerDown: (event) => event.stopPropagation(),
+      onDoubleClick: (event) => event.stopPropagation(),
+      onClick: (event) => {
+        event.stopPropagation();
+        data.onOpenOutcome?.(pendingMedia.sourceRef);
+      }
+    },
+    /* @__PURE__ */ import_react55.default.createElement("span", null, pendingMedia.type === "video" ? "\u67E5\u770B\u89C6\u9891\u9644\u4EF6" : "\u67E5\u770B\u56FE\u7247\u9644\u4EF6")
+  ) : ["artifact", "outline", "word"].includes(data.kind) ? /* @__PURE__ */ import_react55.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-card-file nodrag nopan", "aria-label": `\u663E\u793A\u6240\u5728\u6587\u4EF6\u5939\uFF1A${data.delivery?.fileName || data.title}`, title: data.delivery?.error || data.delivery?.path || "\u5728\u6587\u4EF6\u5939\u4E2D\u663E\u793A\u6B64\u7248\u672C", onPointerDown: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onClick: (event) => {
     event.stopPropagation();
     data.onOpenFile?.();
   } }, /* @__PURE__ */ import_react55.default.createElement("span", null, data.delivery?.fileName || "\u6574\u7406\u5E76\u5B9A\u4F4D\u6587\u4EF6"), /* @__PURE__ */ import_react55.default.createElement("small", null, data.delivery?.version === 0 ? "\u5236\u4F5C\u8D44\u6599" : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, "0")}`), /* @__PURE__ */ import_react55.default.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react55.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" }))) : data.projectFile ? /* @__PURE__ */ import_react55.default.createElement("span", null, data.projectFile.status === "ready" ? "\u6587\u4EF6\u5F15\u7528" : "\u539F\u6587\u4EF6\u5DF2\u53D8\u5316 \xB7 \u5F15\u7528\u4FDD\u7559") : stateLabel({ ...data, pendingGeneration: pending })), /* @__PURE__ */ import_react55.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable, "aria-label": `\u4ECE ${data.title} \u8FDE\u7EBF` }), selected2 && data.kind !== "generation" && /* @__PURE__ */ import_react55.default.createElement(NodeToolbar, { isVisible: true, position: Position.Right, offset: 12 }, /* @__PURE__ */ import_react55.default.createElement(UiButton, { variant: "custom", className: "wcc-card-create nodrag nopan", "aria-label": `\u7528 ${title} \u7EE7\u7EED\u521B\u4F5C`, title: "\u7528\u8FD9\u5F20\u5361\u521B\u4F5C", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => {
@@ -49139,6 +49183,7 @@ function CanvasContent({
   conversationSessionId,
   onSessionRestore,
   onPrepareContinuation,
+  onOpenNativeConversation,
   refreshSignal,
   draftCache,
   creationCache,
@@ -50024,7 +50069,7 @@ function CanvasContent({
     setOutcomeView(null);
     setDocumentView(null);
   }
-  async function beginComposition(card, outputType, { blank = false, outputPosition, seed } = {}) {
+  async function beginComposition(card, outputType, { blank = false, outputPosition, seed, referenceCards } = {}) {
     cancelCardOpen();
     const intent = ++creationIntent.current, epoch = epochRef.current;
     setBusy("create-draft");
@@ -50036,13 +50081,13 @@ function CanvasContent({
       const occupied = nodesRef.current.filter(isObject).map((node) => ({ ...node.data, position: absolutePosition(node, nodesRef.current), ...nodeSize2(node) }));
       const position = outputPosition || visibleCreationPosition(anchor, occupied, viewportRef.current, canvasSizeRef.current);
       const frame2 = createCardContext({ projectId, requirement, anchor, blank, outputType, outputPosition: position });
-      if (seed) frame2.references = JSON.parse(JSON.stringify(seed.references));
+      const references = seed ? seed.references : referenceCards ? updateCreationReferences(frame2, referenceCards).references : frame2.references;
       const result = await request("create-output-draft", {
         requirementId: requirement.id,
         outputType,
         position,
-        selectedCardIds: frame2.references.map((source) => source.id),
-        sourceRefs: frame2.references.map((source) => ({ cardId: source.id, hash: source.sourceHash })),
+        selectedCardIds: references.map((source) => source.id),
+        sourceRefs: references.map((source) => ({ cardId: source.id, hash: source.sourceHash })),
         operationId: crypto.randomUUID()
       });
       if (!mounted.current || epoch !== epochRef.current) return;
@@ -50295,11 +50340,33 @@ function CanvasContent({
       }
     }
   }
+  function openSelectionComposition(anchorId) {
+    if (busy || loading || operationLock.current) return;
+    const selected2 = nodesRef.current.filter((node) => isObject(node) && node.selected);
+    if (selected2.length < 2) return;
+    for (const node of selected2) {
+      if (node.type === "whiteboard") {
+        setError("\u767D\u677F\u6587\u5B57\u8BF7\u5148\u4FDD\u5B58\u4E3A\u7D20\u6750\uFF0C\u518D\u4F5C\u4E3A\u521B\u4F5C\u6765\u6E90\u3002");
+        return;
+      }
+      const reason = referencePickReason(node.data) || (!usableCreationSource(node.data) ? "\u8FD9\u5F20\u5361\u8FD8\u6CA1\u6709\u5DF2\u4FDD\u5B58\u7684\u5185\u5BB9" : "");
+      if (reason) {
+        setError(`\u300C${contentCardTitle(node.data)}\u300D${reason}\uFF0C\u8BF7\u6838\u5BF9\u540E\u91CD\u8BD5\u3002`);
+        return;
+      }
+    }
+    const anchor = selected2.find((node) => node.id === anchorId) || selected2[0];
+    void beginComposition(anchor.data, "text", { referenceCards: selected2.map((node) => node.data) });
+  }
   function openNodeMenu(id2) {
     cancelCardOpen();
     creationIntent.current += 1;
     const node = nodesRef.current.find((item) => item.id === id2);
     if (!node) return;
+    if (node.selected && nodesRef.current.some((item) => item.id !== id2 && isObject(item) && item.selected)) {
+      openSelectionComposition(id2);
+      return;
+    }
     selectCard(id2);
     const point = absolutePosition(node, nodesRef.current), viewport = viewportRef.current;
     const size3 = canvasSizeRef.current;
@@ -50762,6 +50829,12 @@ function CanvasContent({
       const publishedGeneration = !node.data.pendingGeneration || node.data.pendingGeneration.published ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : void 0;
       const shownVersion = card?.versions.find((version2) => version2.id === card.versionId);
       const mediaFormat = ["image", "video"].includes(cardCapabilities(node.data).format);
+      let pendingMediaPreview;
+      if (node.data.kind === "generation" && ["image", "video"].includes(card?.type) && node.data.outcomeFiles?.length) {
+        const matches3 = (file) => file?.status === "ready" && file.mime?.startsWith(`${card.type}/`);
+        const preview = matches3(node.data.defaultOutcome) ? node.data.defaultOutcome : node.data.outcomeFiles.find(matches3);
+        if (preview) pendingMediaPreview = { ...preview, type: card.type, src: endpoint2({ downloadArtifact: preview.artifactId, preview: "1" }).href };
+      }
       const mediaHasConversation = mediaFormat && Boolean(taskById.get(shownVersion?.taskId)?.sessionId);
       const mediaActionLabel = mediaHasConversation ? "\u6253\u5F00\u5BF9\u8BDD" : mediaFormat && node.data.kind !== "generation" && usableCreationSource(node.data) ? "\u7528 AI \u521B\u4F5C" : void 0;
       return { ...node, ...measured?.width > 0 && measured?.height > 0 ? { measured } : {}, data: {
@@ -50774,6 +50847,7 @@ function CanvasContent({
           setRenameCard(node.data);
         },
         publishedGeneration,
+        pendingMediaPreview,
         mediaHasConversation,
         mediaActionLabel,
         onMediaAction: mediaActionLabel ? () => openMediaAction(node.id) : void 0,
@@ -52673,6 +52747,7 @@ function CanvasContent({
       selectedCount: selectedNodes.length,
       onInspect: () => openPanel("inspect"),
       onAI: () => openPanel("ai"),
+      onCreateFromSelection: () => openSelectionComposition(),
       canGroup: selectedNodes.length >= 2,
       onGroup: () => setGroupDialog(true),
       mediaActionLabel: selectedCard?.mediaActionLabel,
@@ -52774,6 +52849,7 @@ function CanvasContent({
       conversationVisible: Boolean(creation?.sessionId && creation.sessionId === conversationSessionId),
       onOpenConversation: openCreationConversation,
       onPrepareContinuation,
+      onOpenNativeConversation,
       actionContent: creation?.outputType === "material" ? /* @__PURE__ */ import_react55.default.createElement("div", { className: "wcc-creation-material-fields" }, /* @__PURE__ */ import_react55.default.createElement("label", null, "\u7D20\u6750\u540D\u79F0", /* @__PURE__ */ import_react55.default.createElement("input", { "aria-label": "\u5173\u8054\u7D20\u6750\u540D\u79F0", disabled: !!busy, maxLength: 200, value: creation.materialTitle || "", onChange: (event) => updateCreation(creation.key, { materialTitle: event.target.value, error: "" }) })), /* @__PURE__ */ import_react55.default.createElement("label", null, "\u7D20\u6750\u6B63\u6587", /* @__PURE__ */ import_react55.default.createElement("textarea", { "aria-label": "\u5173\u8054\u7D20\u6750\u6B63\u6587", disabled: !!busy, rows: 5, value: creation.materialContent || "", onChange: (event) => updateCreation(creation.key, { materialContent: event.target.value, error: "" }) }))) : creation?.outputType === "excerpt" ? /* @__PURE__ */ import_react55.default.createElement(SourceReader, { key: creation.key, card: creation.anchor, draft: creation.excerptDraft, onDraftChange: (draft) => updateCreation(creation.key, { excerptDraft: draft }), initialRange: creation.excerptDraft?.selection, onExcerpt: (values) => addExcerpt(values, true), onOpenSource: openExcerptSource, busy: !!busy, error: excerptError }) : creation?.outputType === "word" ? /* @__PURE__ */ import_react55.default.createElement("div", { className: "wcc-creation-word-preview" }, /* @__PURE__ */ import_react55.default.createElement("strong", null, "\u9501\u5B9A\u5927\u7EB2 v", creation.anchor.number), /* @__PURE__ */ import_react55.default.createElement("p", null, "\u5BFC\u51FA\u6B64\u5361\u7ED1\u5B9A\u7684\u5DF2\u4FDD\u5B58\u7248\u672C\uFF1B\u70B9\u51FB\u5176\u4ED6\u5361\u7247\u53EF\u5207\u6362\u76EE\u6807\uFF0C\u5404\u81EA\u8349\u7A3F\u4FDD\u7559\u3002"), (board?.nodes || []).some((card) => card.kind === "word" && card.refId === creation.anchor.refId) && /* @__PURE__ */ import_react55.default.createElement("a", { className: "wcc-download", href: endpoint2({ download: creation.anchor.refId }).href, download: true }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C Word")) : void 0
     }
   ))), deskVisible && deskVersion && /* @__PURE__ */ import_react55.default.createElement(
@@ -53218,6 +53294,7 @@ function WorkbenchPage({
   onStartCanvas,
   onRestoreCanvas,
   onPrepareContinuation,
+  onOpenNativeConversation,
   onWatchTaskSessions,
   acquirePreviewSession,
   acquireEditingSession,
@@ -53718,7 +53795,11 @@ function WorkbenchPage({
       modelError,
       nativeSessionStatuses,
       onWatchTaskSessions,
-      onPrepareContinuation
+      onPrepareContinuation,
+      onOpenNativeConversation: onOpenNativeConversation && ((sessionId) => {
+        if (!active || canvasSessions.current.get(selectedId)?.sessionId !== sessionId) throw new Error("\u8BF7\u91CD\u65B0\u6253\u5F00\u6B64\u7248\u672C\u7684\u539F\u5BF9\u8BDD\u3002");
+        onOpenNativeConversation(sessionId);
+      })
     }
   ), !selected2 && recycleRequest && /* @__PURE__ */ import_react57.default.createElement(ProjectRecycleDialog, { request, endpoint: (q2) => endpoint(q2, project.id), onClose: () => setRecycleRequest(null), onChanged: () => setFileRefresh((v2) => v2 + 1) }), view === "canvas" && !selected2 && projectFileSelection && /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-empty-file-preview" }, /* @__PURE__ */ import_react57.default.createElement(ProjectFilePreview, { selection: projectFileSelection, endpoint: (q2) => endpoint(q2, project.id), onClose: () => setProjectFileSelection(null) })), view === "canvas" && workspace && !selected2 && /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-page-empty" }, /* @__PURE__ */ import_react57.default.createElement(BookIcon, null), /* @__PURE__ */ import_react57.default.createElement("h2", null, "\u521B\u5EFA\u4E00\u5F20\u753B\u5E03"), /* @__PURE__ */ import_react57.default.createElement("p", null, "\u62D6\u5165\u6587\u4EF6\uFF0C\u7EE7\u7EED\u521B\u4F5C\u3002"), /* @__PURE__ */ import_react57.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", onClick: () => setShowNew(true) }, "\u65B0\u5EFA\u753B\u5E03")), loading && !workspace ? /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-page-empty", role: "status" }, /* @__PURE__ */ import_react57.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u548C\u5DF2\u4FDD\u5B58\u7248\u672C\u2026")) : workspace && view === "list" && /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-workspace-layout" }, /* @__PURE__ */ import_react57.default.createElement("aside", { className: "wtt-requirements", "aria-label": "\u9879\u76EE\u753B\u5E03" }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-list-heading" }, /* @__PURE__ */ import_react57.default.createElement("h2", null, "\u753B\u5E03"), /* @__PURE__ */ import_react57.default.createElement("span", null, workspace.requirements?.length || 0)), (workspace.requirements?.length || 0) > 0 && /* @__PURE__ */ import_react57.default.createElement("input", { className: "wtt-search", "aria-label": "\u641C\u7D22\u753B\u5E03", value: filter2, onChange: (event) => setFilter(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u5BA2\u6237\u6216\u53D7\u4F17" }), /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-requirement-list" }, filtered.map((requirement) => /* @__PURE__ */ import_react57.default.createElement(UiButton, { variant: "custom", key: requirement.id, className: `wtt-requirement-item ${requirement.id === selectedId ? "is-selected" : ""}`, "aria-current": requirement.id === selectedId ? "true" : void 0, disabled: Boolean(busy), onClick: () => selectRequirement(requirement) }, /* @__PURE__ */ import_react57.default.createElement("strong", null, requirement.title), /* @__PURE__ */ import_react57.default.createElement("span", null, requirement.background?.slice(0, 70) || "\u6682\u672A\u586B\u5199\u80CC\u666F\u4FE1\u606F"), /* @__PURE__ */ import_react57.default.createElement("small", null, requirement.versions?.length ? `${requirement.versions.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "\u5C1A\u65E0\u5927\u7EB2"))), !filtered.length && /* @__PURE__ */ import_react57.default.createElement("p", { className: "wtt-list-empty" }, filter2 ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03\u3002")), /* @__PURE__ */ import_react57.default.createElement(EnvironmentStatus, { dependencies: workspace.dependencies })), /* @__PURE__ */ import_react57.default.createElement("main", { className: "wtt-detail" }, !selected2 ? /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-page-empty" }, /* @__PURE__ */ import_react57.default.createElement(BookIcon, null), /* @__PURE__ */ import_react57.default.createElement("h2", null, "\u521B\u5EFA\u4E00\u5F20\u753B\u5E03"), /* @__PURE__ */ import_react57.default.createElement("p", null, "\u4F7F\u7528\u5DF2\u6709\u8D44\u6599\u7EE7\u7EED\u521B\u4F5C\u3002"), /* @__PURE__ */ import_react57.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", onClick: () => setShowNew(true) }, "\u65B0\u5EFA\u753B\u5E03")) : /* @__PURE__ */ import_react57.default.createElement(import_react57.default.Fragment, null, /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-detail-heading" }, /* @__PURE__ */ import_react57.default.createElement("div", null, /* @__PURE__ */ import_react57.default.createElement("h2", null, selected2.title), /* @__PURE__ */ import_react57.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", disabled: Boolean(busy), onClick: showRename }, "\u91CD\u547D\u540D\u753B\u5E03")), /* @__PURE__ */ import_react57.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: Boolean(busy), onClick: startCourse }, busy === "prepare-course" ? "\u6B63\u5728\u51C6\u5907\u4F1A\u8BDD\u2026" : "\u751F\u6210\u8BFE\u7A0B\u5927\u7EB2")), /* @__PURE__ */ import_react57.default.createElement("p", { className: "wtt-session-hint" }, "\u6839\u636E\u753B\u5E03\u80CC\u666F\u751F\u6210\u5927\u7EB2\uFF0C\u786E\u8BA4\u6B65\u9AA4\u5728 DSH \u5BF9\u8BDD\u4E2D\u5B8C\u6210\u3002"), /* @__PURE__ */ import_react57.default.createElement(RequirementBrief, { requirement: selected2 }), /* @__PURE__ */ import_react57.default.createElement("section", { className: "wtt-outline-section", "aria-labelledby": outlineTitleId }, /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-outline-heading" }, /* @__PURE__ */ import_react57.default.createElement("h3", { id: outlineTitleId }, "\u8BFE\u7A0B\u5927\u7EB2"), /* @__PURE__ */ import_react57.default.createElement("span", { className: "wtt-muted" }, activeVersion ? `\u6B63\u5728\u67E5\u770B v${activeVersion.number}${dirty ? " \xB7 \u6709\u672A\u4FDD\u5B58\u4FEE\u6539" : ""}` : "\u5C1A\u672A\u4FDD\u5B58\u7248\u672C")), versions.length > 0 && /* @__PURE__ */ import_react57.default.createElement("div", { className: "wtt-versions", "aria-label": "\u5927\u7EB2\u7248\u672C" }, [...versions].sort((a, b2) => b2.number - a.number).map((version2) => /* @__PURE__ */ import_react57.default.createElement(UiButton, { variant: "custom", key: version2.id, className: `wtt-version ${version2.id === versionId ? "is-selected" : ""}`, "aria-pressed": version2.id === versionId, title: formatTime(version2.createdAt), disabled: Boolean(busy), onClick: () => chooseVersion(version2) }, "v", version2.number, /* @__PURE__ */ import_react57.default.createElement("span", null, formatTime(version2.createdAt))))), /* @__PURE__ */ import_react57.default.createElement("label", { className: "wtt-outline-editor" }, /* @__PURE__ */ import_react57.default.createElement("span", { className: "wtt-visually-hidden" }, "\u5927\u7EB2 Markdown \u5185\u5BB9"), /* @__PURE__ */ import_react57.default.createElement("textarea", { value: markdown, disabled: Boolean(busy), onChange: (event) => {
     setMarkdown(event.target.value);
@@ -53879,6 +53960,7 @@ function apply2(ctx) {
       onStart: (prepared, shouldOpen) => startCourseSession(ctx, prepared, shouldOpen),
       onStartCanvas: (prepared, sessionId, lifecycle) => acquireCourseConversation(ctx, prepared, sessionId, lifecycle),
       onRestoreCanvas: (sessionId, project) => restoreCourseConversation(ctx, { sessionId, cwd: project.path, projectId: project.id }),
+      onOpenNativeConversation: (sessionId) => ctx.uiWorkspace.openSession(sessionId),
       onPrepareContinuation: (sessionId) => {
         const binding = ctx.sessions.binding(sessionId);
         if (!binding) throw new Error("\u8BF7\u91CD\u65B0\u6253\u5F00\u539F\u4EFB\u52A1\u5BF9\u8BDD\uFF0C\u518D\u7EE7\u7EED\u4EFB\u52A1\u3002");

@@ -583,6 +583,7 @@ export class WorkbenchService {
     if (['image', 'video'].includes(type)) return [...shared,
       `本次输出为${type === 'image' ? '图片' : '视频'}，卡片只承载文件，不指定生成模型或供应商。只使用用户明确选择的 Skill；没有可用生成能力时询问用户，不自动调用即梦或其他付费服务。`,
       '沿所选 Skill 的原有确认步骤制作；完成后将真实文件复制到本任务 delivery，保留原文件。由绑定主会话核验后以 kind=' + type + ' 登记，不用提示词、远程链接或占位文件冒充成果。',
+      ...(type === 'video' ? ['已确认的主视频先以 kind=video、primary=true 登记，并核对回执 cardOutput.role=primary 与版本 ID。若误以 presentation=attachment 登记，保留原 path 和 title，省略 presentation，用新 operationId 和 primary=true 纠正。仅跟随原卡的附件保留 presentation=attachment。'] : []),
       ...(task.input.outputPresentation === 'cards' ? ['按实际交付清单登记全部独立成品，可随完成逐项登记或批量登记；例如交付7张图就登记7个 image 文件，第一张复用原容器，其余自动创建独立图片卡，不需要用户先建7个容器。候选图、过程稿和未确认版本不得计入正式成品；失败项保留错误，修复后复用原 operationId 重试。'] : []),
     ];
     if (type === 'text') {

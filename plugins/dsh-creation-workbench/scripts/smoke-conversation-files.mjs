@@ -106,6 +106,154 @@ async function seedMedia(service, requirementId) {
   return { old, video, image, upload, sessions };
 }
 
+async function seedMediaAttachment(service, sessions) {
+  const { id } = service.store.createCanvas({ title: '媒体附件预览', operationId: randomUUID() });
+  const createVideo = instruction => service.createTask({ requirementId: id, outputType: 'video', generation: { mode: 'new' },
+    instruction, selectedCardIds: [], sourceRefs: [], operationId: randomUUID() });
+  const { task, prepared } = createVideo('只有附件的视频');
+  const { task: empty } = createVideo('未登记视频的卡片');
+  const sessionId = `media-smoke-${randomUUID()}`;
+  const relative = path.join(prepared.deliveryDirectory, 'attachment.mp4');
+  const bytes = await readFile(path.join(workspace, 'working/video.mp4'));
+  await writeFile(path.join(workspace, relative), bytes);
+  service.tasks.bindSession({ taskId: task.id, sessionId });
+  const registration = { taskId: task.id, path: relative, kind: 'video', title: '已登记视频附件' };
+  const file = await service.tasks.files.register({ ...registration, presentation: 'attachment', operationId: randomUUID() }, { sessionId });
+  assert.equal(file.cardOutput.role, 'attachment');
+  assert.equal(file.cardOutput.versionId, null);
+  assert.match(file.cardOutput.warning, /尚无正式版本/);
+  const emptySource = `courses/${id}/tasks/${empty.id}/delivery/未登记.mp4`;
+  await writeFile(path.join(workspace, emptySource), bytes);
+  const { material } = await service.importMaterial({ requirementId: id, filename: '导入视频.mp4', bytes, operationId: randomUUID() });
+  sessions.push({ sessionId, marker: '已完成的视频附件测试' });
+  const pendingId = `output:${task.outputCardId}`, emptyId = `output:${empty.outputCardId}`;
+  assert.equal(service.cards.describePending({ requirementId: id, cardId: task.outputCardId }).node.outputCard.versionId, null);
+  service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision,
+    positions: { [pendingId]: { x: 115, y: 140 }, [emptyId]: { x: 810, y: 140 }, [`material:${material.id}`]: { x: 810, y: 705 } }, viewport: { x: 20, y: 45, zoom: .68 } });
+  return { id, pendingId, emptyId, importedId: material.id, sessionId, file, registration };
+}
+
+async function checkVideoRange(page, video) {
+  const url = new URL(await video.getAttribute('src'), page.url());
+  const response = await page.request.get(url.href, { headers: { Range: 'bytes=32-79' } });
+  const original = await readFile(path.join(workspace, 'working/video.mp4'));
+  assert.equal(response.status(), 206, '播放地址必须响应区间请求');
+  assert.equal(response.headers()['content-range'], `bytes 32-79/${original.length}`);
+  assert.deepEqual(await response.body(), original.subarray(32, 80));
+}
+
+async function dragVideoTimeline(page, video) {
+  await video.evaluate(async el => { await el.play(); el.pause(); });
+  await video.hover();
+  // Chromium exposes the real native timeline via CDP, including a scaled canvas card.
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const src = await video.getAttribute('src');
+    const { root } = await cdp.send('DOM.getDocument');
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `video[src=${JSON.stringify(src)}]` });
+    const { node } = await cdp.send('DOM.describeNode', { nodeId, pierce: true, depth: -1 });
+    function findTimeline(element) {
+      const attributes = element.attributes || [];
+      const pseudo = attributes.indexOf('pseudo');
+      if (pseudo >= 0 && attributes[pseudo + 1] === '-webkit-media-controls-timeline') return element;
+      return [...(element.children || []), ...(element.shadowRoots || [])].map(findTimeline).find(Boolean);
+    }
+    const timeline = findTimeline(node);
+    assert(timeline, '找不到原生视频时间条');
+    const { model } = await cdp.send('DOM.getBoxModel', { backendNodeId: timeline.backendNodeId });
+    const [left, top, right, , , bottom] = model.content;
+    const y = (top + bottom) / 2;
+    const position = fraction => left + (right - left) * fraction;
+    const drag = async (from, to) => {
+      await page.mouse.move(position(from), y);
+      await page.mouse.down();
+      await page.mouse.move(position(to), y, { steps: 12 });
+      await page.mouse.up();
+    };
+    await drag(.15, .78);
+    assert(await video.evaluate(el => el.currentTime > el.duration * .65), '原生进度条应可向后拖到未播位置');
+    await drag(.78, .25);
+    assert(await video.evaluate(el => el.currentTime < el.duration * .45), '原生进度条应可回拖到前面');
+  } finally { await cdp.detach(); }
+}
+
+async function checkMediaAttachment(page, canvas, requirementId, attachment) {
+  const selector = page.getByRole('combobox', { name: '当前画布', exact: true });
+  await selector.selectOption(attachment.id);
+  const card = id => canvas.locator(`article[data-card-id="${id}"]`);
+  const pending = card(attachment.pendingId), empty = card(attachment.emptyId);
+  const video = pending.locator(`video[src*="${attachment.file.id}"]`);
+  await video.waitFor();
+  await video.evaluate(async el => {
+    el.muted = true;
+    await el.play();
+    assertVideoReady(el);
+    el.pause();
+    function assertVideoReady(element) { if (element.videoWidth !== 320 || element.duration < 7) throw new Error('卡片没有解码已登记视频'); }
+  });
+  await empty.waitFor();
+  assert.equal(await empty.locator('video').count(), 0, '任务目录有 MP4 也须经登记才可预览');
+  assert.equal(await pending.locator('select').count(), 0, '预览附件不会产生版本');
+  const attachmentButton = pending.getByRole('button', { name: '查看视频附件', exact: true });
+  await page.screenshot({ path: path.join(artifacts, 'media-attachment-preview.png') });
+  await attachmentButton.click();
+  const preview = canvas.getByRole('complementary', { name: '成果文件预览' });
+  await preview.locator('video').waitFor();
+  await checkVideoRange(page, video);
+  await checkVideoRange(page, preview.locator('video'));
+  await dragVideoTimeline(page, preview.locator('video'));
+  const downloadHref = await preview.getByRole('link', { name: '下载当前文件' }).getAttribute('href');
+  const download = await page.request.get(new URL(downloadHref, page.url()).href, { headers: { Range: 'bytes=32-79' } });
+  assert.equal(download.status(), 200);
+  assert.match(download.headers()['content-disposition'], /^attachment/);
+  assert.deepEqual(await download.body(), await readFile(path.join(workspace, 'working/video.mp4')));
+  const fileHref = await preview.locator('video').getAttribute('src');
+  assert(new URL(fileHref, page.url()).searchParams.get('sourceRef') === `artifact:${attachment.file.id}`
+    || new URL(fileHref, page.url()).searchParams.get('downloadArtifact') === attachment.file.id, '侧栏预览必须指向该附件');
+  await preview.getByRole('button', { name: '关闭成果预览' }).click();
+
+  const service = new WorkbenchService({ workspaceRoot: workspace });
+  let primary;
+  try {
+    primary = await service.tasks.files.register({ ...attachment.registration, primary: true, operationId: randomUUID() },
+      { sessionId: attachment.sessionId });
+    assert.equal(primary.id, attachment.file.id);
+    assert.equal(primary.hash, attachment.file.hash);
+    assert.equal(primary.cardOutput.role, 'primary');
+    assert(primary.cardOutput.versionId);
+    assert.equal(service.tasks.get(attachment.registration.taskId).files.length, 1);
+  } finally { service.close(); }
+  await attachmentButton.waitFor({ state: 'hidden' });
+  const published = pending.locator(`video[src*="${primary.id}"]`);
+  await published.waitFor();
+  await published.evaluate(async el => {
+    el.muted = true;
+    await el.play();
+    if (el.videoWidth !== 320) throw new Error('转为正式版本后原卡无法解码同一个视频');
+    el.pause();
+  });
+  await pending.getByText('V001', { exact: true }).waitFor();
+  await pending.getByRole('heading').click();
+  await canvas.getByRole('button', { name: /^用 .* 继续创作$/ }).click();
+  await canvas.getByRole('menu', { name: '从卡片创建内容' }).getByRole('menuitem', { name: '文本', exact: true }).click();
+  const reference = canvas.locator('.wcc-card-composer:visible .wcc-creation-reference-chip');
+  await reference.getByRole('button', { name: /^查看引用 / }).waitFor();
+  assert.equal(await reference.count(), 1);
+  assert.equal(await reference.evaluate(el => el.classList.contains('is-unavailable')), false);
+  await canvas.getByRole('button', { name: '关闭卡片创作框' }).click();
+  const importedVideo = card(`material:${attachment.importedId}`).locator('video');
+  await importedVideo.waitFor();
+  await checkVideoRange(page, importedVideo);
+  await importedVideo.dblclick({ position: { x: 80, y: 8 } });
+  const importedPreview = preview.locator('video');
+  await importedPreview.waitFor();
+  assert.equal(new URL(await importedPreview.getAttribute('src'), page.url()).searchParams.get('materialFile'), attachment.importedId);
+  await checkVideoRange(page, importedPreview);
+  await preview.getByRole('button', { name: '关闭成果预览' }).click();
+  await selector.selectOption(requirementId);
+  console.log('PASS MP4 附件预览、完整下载、侧栏原生拖动、同路径纠正及创作引用');
+}
+
 async function checkMedia(page, canvas, media) {
   const card = id => canvas.locator(`article[data-card-id="${id}"]`);
   const videoCard = card(media.video.id), imageCard = card(media.image.id), upload = card(media.upload);
@@ -128,6 +276,7 @@ async function checkMedia(page, canvas, media) {
   await body.evaluate(el => { if (el.paused) throw new Error('点击原生播放键后视频仍暂停'); });
   await page.mouse.click(bounds.x + bounds.width * .6, bounds.y + bounds.height - 6);
   assert(await body.evaluate(el => el.currentTime > 1), '原生进度条可用');
+  await dragVideoTimeline(page, body);
   assert.equal(await chat.count(), 0);
   await action(videoCard).click({ position: { x: 8, y: 10 } });
   await chat.getByText(media.video.marker, { exact: true }).waitFor();
@@ -145,6 +294,7 @@ async function checkMedia(page, canvas, media) {
   await videoCard.locator('select').selectOption(media.old.versionId);
   const preview = canvas.getByRole('complementary', { name: '成果文件预览' });
   await preview.locator('video').waitFor();
+  await checkVideoRange(page, preview.locator('video'));
   await preview.getByRole('button', { name: '关闭成果预览' }).click();
   await action(videoCard).click();
   await chat.getByText(media.old.marker, { exact: true }).waitFor(); await close();
@@ -196,6 +346,7 @@ try {
     const canvas = service.store.createCanvas({ title: '对话媒体链接冒烟', operationId: randomUUID() });
     if (mediaMode) {
       f = { requirementId: canvas.id, media: await seedMedia(service, canvas.id) };
+      f.media.attachment = await seedMediaAttachment(service, f.media.sessions);
     } else {
       const task = service.createTask({ requirementId: canvas.id, outputType: 'text', selectedCardIds: [], selectedSkills: [], sourceRefs: [], generation: { mode: 'new' }, instruction: '合成媒体审核任务', operationId: randomUUID() }).task;
       f = { requirementId: canvas.id, sessionId: 'file-smoke-' + randomUUID(), callId: randomUUID() };
@@ -229,6 +380,7 @@ try {
     await page.getByRole('button', { name: 'WTT 创作工作台', exact: true }).click(); await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(f.requirementId);
     const canvas = page.locator('.wtt-course-canvas:visible');
     if (mediaMode) {
+      await checkMediaAttachment(page, canvas, f.requirementId, f.media.attachment);
       await checkMedia(page, canvas, f.media);
       assert.deepEqual(errors, []); assert.deepEqual(logs, []);
     } else if (fileMode) {
@@ -273,7 +425,9 @@ try {
     const image = canvas.locator('.wtt-outcome-viewer img'); await image.waitFor(); await image.evaluate(async img => { await img.decode(); if (img.naturalWidth !== 41 || img.naturalHeight !== 27) throw new Error('图片内容不匹配'); });
     assert.equal(await review.isVisible(), false); await page.screenshot({ path: path.join(artifacts, 'image.png') }); await close();
     await chat.getByRole('button', { name: '视频片段', exact: true }).click();
-    const video = canvas.locator('.wtt-outcome-viewer video'); await video.waitFor(); await video.evaluate(async item => { await item.play(); item.pause(); if (item.videoWidth !== 32) throw new Error('视频未正确解码'); }); await close();
+    const video = canvas.locator('.wtt-outcome-viewer video'); await video.waitFor();
+    await checkVideoRange(page, video);
+    await video.evaluate(async item => { await item.play(); item.pause(); if (item.videoWidth !== 32) throw new Error('视频未正确解码'); }); await close();
     await chat.getByRole('button', { name: '导演文档', exact: true }).click(); await canvas.getByText('导演文档唯一正文。', { exact: false }).waitFor(); await close();
     assert.deepEqual(await readState(), before, '查看文件不能回答问题或改写原session');
     await review.getByRole('button', { name: '回到卡片对话', exact: true }).click();

@@ -128,11 +128,12 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
   const execution = data.publishedGeneration || nativePendingState(data.pendingGeneration, data.nativeSessionStatus)
   const pending = execution?.published && !isActiveTaskPhase(execution.phase) ? undefined : execution
   const format = caps.format
+  const pendingMedia = data.pendingMediaPreview
   const fileDeck = data.defaultOutcome?.format === 'pptx' ? data.defaultOutcome : null
   const purpose = caps.purpose
   const title = contentCardTitle(data)
   const titleHint = [title, data.defaultOutcome?.name !== title && data.defaultOutcome?.name].filter(Boolean).join('\n')
-  const formatLabel = data.defaultOutcome?.format?.toUpperCase() || (format === 'document' && documentExtension ? documentExtension : { text: '文本', pptx: 'PPT', image: '图片', video: '视频', document: '文档' }[format] || '内容')
+  const formatLabel = (pendingMedia?.format || data.defaultOutcome?.format)?.toUpperCase() || (format === 'document' && documentExtension ? documentExtension : { text: '文本', pptx: 'PPT', image: '图片', video: '视频', document: '文档' }[format] || '内容')
   useEffect(() => { setVideoError(false) }, [data.videoPreview])
   const warning = data.delivery?.status === 'failed' || /missing|modified|changed|unavailable|缺失|变化|外改/.test(`${data.status || ''} ${data.sourceStatus || ''} ${data.projectFile?.status || ''}`)
   return <article className={`wcc-card wcc-card-${data.kind}${selected ? ' is-selected' : ''}${data.skillTodo ? ' has-skill-todo' : ''}`} aria-label={`${formatLabel}${purpose ? ` · ${purpose}` : ''}卡：${title}`} data-card-format={format || undefined} data-card-id={id} data-card-draft={data.composition ? true : undefined}>
@@ -195,7 +196,11 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenPending?.() }} title={pending.error || pending.message}>
         <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' && !pending.published ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : pendingContinueAllowed(pending) ? '继续任务 →' : '查看任务 →'}</span>
       </UiButton>}
-      {textDraft ? null : fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
+      {textDraft ? null : pendingMedia ? <>
+        {pending?.error && <p className="wcc-card-generation-message">{pending.error}</p>}
+        <OutputPreview compact type={pendingMedia.type} title={pendingMedia.title} mime={pendingMedia.mime} src={pendingMedia.src}
+          onOpenMedia={() => data.onOpenOutcome?.(pendingMedia.sourceRef)} />
+      </> : fileDeck ? <OutputPreview compact type="pptx" title={fileDeck.name} status={fileDeck.status} artifactId={fileDeck.artifactId} hash={fileDeck.hash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={()=>data.onOpenOutcome?.(fileDeck.sourceRef)} /> : data.kind === 'generation' && data.slideProject ? <SlideDraftCover project={data.slideProject} title={data.title} loadCover={data.loadSlideCover} onOpen={data.onOpenDeck} running={pending?.phase === 'generating'} /> : data.kind === 'generation' ? <p className="wcc-card-generation-message">{pending?.error || (pending?.nativeLabel ? '在原任务的「任务对话」中继续。' : pending?.message) || '成果文件保存后将在这里显示。'}</p> : data.outputCard ? <OutputPreview compact type={data.outputCard.type} title={data.title} content={data.content || data.excerpt}
         extracted={data.extracted !== false} mime={data.generatedFile?.mime || data.importedFile?.mime} src={data.videoPreview || data.imagePreview}
         status={data.status || 'ready'} downloadHref={data.downloadHref} artifactId={data.artifactKind === 'pptx' ? data.refId : undefined}
         hash={data.sourceHash} loadPreview={data.loadDeckPreview} getPageHref={data.getDeckPageHref} onOpenDeck={data.onOpenDeck} onOpenMedia={data.onOpenDetails} />
@@ -214,8 +219,12 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         {data.mediaActionLabel}
       </UiButton>
     </div>}
-    <footer hidden={data.kind === 'generation' && Boolean(data.slideProject)} className={warning ? 'wcc-card-footer is-warning' : 'wcc-card-footer'} title={data.projectFile?.path || data.sourcePath || data.path || ''}>
-      <span className="wcc-state-dot" />{['artifact', 'outline', 'word'].includes(data.kind) ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan" aria-label={`显示所在文件夹：${data.delivery?.fileName || data.title}`} title={data.delivery?.error || data.delivery?.path || '在文件夹中显示此版本'} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenFile?.() }}>
+    <footer hidden={data.kind === 'generation' && Boolean(data.slideProject) && !pendingMedia} className={warning ? 'wcc-card-footer is-warning' : 'wcc-card-footer'} title={data.projectFile?.path || data.sourcePath || data.path || ''}>
+      <span className="wcc-state-dot" />{pendingMedia ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan"
+        onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
+        onClick={event => { event.stopPropagation(); data.onOpenOutcome?.(pendingMedia.sourceRef) }}>
+        <span>{pendingMedia.type === 'video' ? '查看视频附件' : '查看图片附件'}</span>
+      </UiButton> : ['artifact', 'outline', 'word'].includes(data.kind) ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan" aria-label={`显示所在文件夹：${data.delivery?.fileName || data.title}`} title={data.delivery?.error || data.delivery?.path || '在文件夹中显示此版本'} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenFile?.() }}>
         <span>{data.delivery?.fileName || '整理并定位文件'}</span><small>{data.delivery?.version === 0 ? '制作资料' : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, '0')}`}</small><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z" /></svg>
       </UiButton> : data.projectFile ? <span>{data.projectFile.status==='ready'?'文件引用':'原文件已变化 · 引用保留'}</span> : stateLabel({ ...data, pendingGeneration: pending })}
     </footer>
@@ -370,7 +379,7 @@ function GroupDialog({ busy, onClose, onSubmit }) {
   </dialog>
 }
 
-function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
+function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, onOpenNativeConversation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
   nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile, desktopTaskNotices }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
@@ -1112,7 +1121,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     creationRef.current=next;setCreation(next);setCreationVisible(true);setCreationMenu(null);setSidebar(false);setFocusOpen(false);setDeckPreview(null);setOutcomeView(null);setDocumentView(null);
   }
 
-  async function beginComposition(card,outputType,{blank=false,outputPosition,seed}={}){
+  async function beginComposition(card,outputType,{blank=false,outputPosition,seed,referenceCards}={}){
     cancelCardOpen();const intent=++creationIntent.current,epoch=epochRef.current;
     setBusy('create-draft');setCreationMenu(null);
     try{
@@ -1122,9 +1131,9 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       const occupied=nodesRef.current.filter(isObject).map(node=>({...node.data,position:absolutePosition(node,nodesRef.current),...nodeSize(node)}));
       const position=outputPosition||visibleCreationPosition(anchor,occupied,viewportRef.current,canvasSizeRef.current);
       const frame=createCardContext({projectId,requirement,anchor,blank,outputType,outputPosition:position});
-      if(seed)frame.references=JSON.parse(JSON.stringify(seed.references));
+      const references = seed ? seed.references : referenceCards ? updateCreationReferences(frame, referenceCards).references : frame.references;
       const result=await request('create-output-draft',{requirementId:requirement.id,outputType,position,
-        selectedCardIds:frame.references.map(source=>source.id),sourceRefs:frame.references.map(source=>({cardId:source.id,hash:source.sourceHash})),operationId:crypto.randomUUID()});
+        selectedCardIds:references.map(source=>source.id),sourceRefs:references.map(source=>({cardId:source.id,hash:source.sourceHash})),operationId:crypto.randomUUID()});
       if(!mounted.current||epoch!==epochRef.current)return;
       await loadBoard({selectIds:[result.node.id],preserveViewport:true,selectionIntent:intent});
       if(creationIntent.current!==intent||!activeRef.current)return;
@@ -1316,11 +1325,28 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }
   }
 
+  function openSelectionComposition(anchorId) {
+    if (busy || loading || operationLock.current) return
+    const selected = nodesRef.current.filter(node => isObject(node) && node.selected)
+    if (selected.length < 2) return
+    for (const node of selected) {
+      if (node.type === 'whiteboard') { setError('白板文字请先保存为素材，再作为创作来源。'); return }
+      const reason = referencePickReason(node.data) || (!usableCreationSource(node.data) ? '这张卡还没有已保存的内容' : '')
+      if (reason) { setError(`「${contentCardTitle(node.data)}」${reason}，请核对后重试。`); return }
+    }
+    const anchor = selected.find(node => node.id === anchorId) || selected[0]
+    void beginComposition(anchor.data, 'text', { referenceCards: selected.map(node => node.data) })
+  }
+
   function openNodeMenu(id) {
     cancelCardOpen()
     creationIntent.current += 1
     const node = nodesRef.current.find(item => item.id === id)
     if (!node) return
+    if (node.selected && nodesRef.current.some(item => item.id !== id && isObject(item) && item.selected)) {
+      openSelectionComposition(id)
+      return
+    }
     selectCard(id)
     const point = absolutePosition(node, nodesRef.current), viewport = viewportRef.current
     const size = canvasSizeRef.current
@@ -1701,6 +1727,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         ? publishedTaskGeneration(task, nativeStatusesRef.current.get(task?.sessionId)) : undefined
       const shownVersion = card?.versions.find(version => version.id === card.versionId)
       const mediaFormat = ['image', 'video'].includes(cardCapabilities(node.data).format)
+      let pendingMediaPreview
+      if (node.data.kind === 'generation' && ['image', 'video'].includes(card?.type) && node.data.outcomeFiles?.length) {
+        const matches = file => file?.status === 'ready' && file.mime?.startsWith(`${card.type}/`)
+        const preview = matches(node.data.defaultOutcome) ? node.data.defaultOutcome : node.data.outcomeFiles.find(matches)
+        if (preview) pendingMediaPreview = { ...preview, type: card.type, src: endpoint({ downloadArtifact: preview.artifactId, preview: '1' }).href }
+      }
       const mediaHasConversation = mediaFormat && Boolean(taskById.get(shownVersion?.taskId)?.sessionId)
       const mediaActionLabel = mediaHasConversation ? '打开对话'
         : mediaFormat && node.data.kind !== 'generation' && usableCreationSource(node.data) ? '用 AI 创作' : undefined
@@ -1708,7 +1740,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       return { ...node, ...(measured?.width > 0 && measured?.height > 0 ? { measured } : {}), data: { ...node.data, onCreate: openNodeMenu,
       onUploadContent: cardContentAccept(node.data) ? () => chooseCardFile(node.data) : undefined,
       onRename: () => { closeCreation(); setRenameError(''); setRenameCard(node.data) },
-      publishedGeneration,
+      publishedGeneration, pendingMediaPreview,
       mediaHasConversation, mediaActionLabel, onMediaAction: mediaActionLabel ? () => openMediaAction(node.id) : undefined,
       onEditText: () => openTextEditor(node.data),
       onResizeStart: beginResize, onResizeEnd: finishCardResize,
@@ -3205,7 +3237,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           saveStatus={loading ? '加载中' : draftCount ? 'draft' : saveStatus} onRefresh={refresh} onRetry={saveStatus === 'conflict' ? refresh : () => void saveLayout(true)} busy={!!busy || loading || !board} />
         {interactions.length > 0 && <details className="wcc-skill-inbox"><summary>待你处理 · {interactions.length}</summary><div>{interactions.map(entry => <UiButton variant="custom" type="button" key={entry.key} onClick={() => openSkillReview(entry)}>{entry.interaction.questions?.[0]?.header || entry.interaction.questions?.[0]?.question?.slice(0, 120) || '执行权限待确认'}<small>{entry.task.title}</small></UiButton>)}</div></details>}
         {showSelectionActions && <CanvasViewportLayer follow={active}>{view => <SelectionActions {...selectionPosition(view)} selectedCount={selectedNodes.length}
-          onInspect={() => openPanel('inspect')} onAI={() => openPanel('ai')} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
+          onInspect={() => openPanel('inspect')} onAI={() => openPanel('ai')} onCreateFromSelection={() => openSelectionComposition()} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
           mediaActionLabel={selectedCard?.mediaActionLabel} onMediaAction={selectedCard?.onMediaAction}
           canUngroup={hasSelectedGroup} onUngroup={ungroup} onAlign={alignSelection}
           canPromote={onlyWhiteboard && selectedNodes.length === 1 && !!selectedCard?.text?.trim()} onPromote={promoteWhiteboard}
@@ -3245,7 +3277,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       busy={!!busy || loading || !!creation?.mediaRestoring} error={creation?.error}
       sendLabel={creation?.outputType === 'material' ? '保存关联素材' : creation?.outputType === 'word' ? '导出当前版本 Word' : `开始创作 ${OUTPUT_LABELS[creation?.outputType] || ''}`}
       canSend={!!creation && !creation.mediaRecoveryError && (creation.pendingTaskId ? pendingRetryAllowed(creation.pendingGeneration) && creation.generationMethod !== 'api' : creation.outputType === 'material' ? !!creation.materialTitle?.trim() && !!creation.materialContent?.trim() : creation.outputType === 'word' ? ['outline', 'word'].includes(creation.anchor.kind) : !!creation.instruction.trim() && (!!creation.generation || creation.references.length > 0) && creation.references.length <= 24)}
-      hideSubmit={creation?.outputType === 'excerpt'} conversation={pptOwnsConversation ? null : conversation} conversationVisible={Boolean(creation?.sessionId && creation.sessionId === conversationSessionId)} onOpenConversation={openCreationConversation} onPrepareContinuation={onPrepareContinuation}
+      hideSubmit={creation?.outputType === 'excerpt'} conversation={pptOwnsConversation ? null : conversation} conversationVisible={Boolean(creation?.sessionId && creation.sessionId === conversationSessionId)} onOpenConversation={openCreationConversation} onPrepareContinuation={onPrepareContinuation} onOpenNativeConversation={onOpenNativeConversation}
       actionContent={creation?.outputType === 'material' ? <div className="wcc-creation-material-fields">
         <label>素材名称<input aria-label="关联素材名称" disabled={!!busy} maxLength={200} value={creation.materialTitle || ''} onChange={event => updateCreation(creation.key, { materialTitle: event.target.value, error: '' })} /></label>
         <label>素材正文<textarea aria-label="关联素材正文" disabled={!!busy} rows={5} value={creation.materialContent || ''} onChange={event => updateCreation(creation.key, { materialContent: event.target.value, error: '' })} /></label>

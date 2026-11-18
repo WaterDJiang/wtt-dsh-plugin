@@ -112,6 +112,74 @@ test('new media defaults do not rewrite the frozen attachment mode of an existin
   assert.equal(cards.length, 1); assert.equal(cards[0].outputCard.versions[0].outputs.length, 2);
 });
 
+test('a misregistered video can publish the original file to the original card once', async t => {
+  const { root, service, requirement } = fixture(t);
+  const { task, prepared } = service.createTask({ requirementId: requirement.id, outputType: 'video', instruction: '交付一支主视频',
+    selectedCardIds: [], generation: { mode: 'new' }, operationId: randomUUID() });
+  const taskId = task.id, sessionId = 'video-registration';
+  service.tasks.bindSession({ taskId, sessionId });
+  assert.match(prepared.prompt, /cardOutput.role=primary/);
+
+  const video = spawnSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=32x24:d=0.25',
+    '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', 'frag_keyframe+empty_moov', '-f', 'mp4', 'pipe:1']);
+  assert.equal(video.status, 0, video.stderr?.toString() || String(video.error || ''));
+  const makeFile = title => {
+    const relative = path.posix.join(prepared.deliveryDirectory, title + '.mp4');
+    writeFileSync(path.join(root, relative), video.stdout);
+    return { path: relative, title, kind: 'video', presentation: 'attachment', operationId: randomUUID() };
+  };
+  const main = makeFile('主视频'), other = makeFile('补充视频');
+  const register = (input, session = sessionId) => service.tasks.files.register({ ...input, taskId }, { sessionId: session });
+  const batch = files => service.tasks.files.registerBatch({ taskId, files }, { sessionId });
+  const { results: [original, supplement], succeeded } = await batch([main, other]);
+  assert.equal(succeeded, 2);
+  assert.equal(original.cardOutput.cardId, task.outputCardId);
+  assert.equal(original.cardOutput.role, 'attachment');
+  assert.equal(original.cardOutput.versionId, null);
+  assert.match(original.cardOutput.warning, /primary=true/);
+  assert.equal(service.tasks.get(taskId).cardVersionId, undefined);
+
+  const primary = { path: main.path, title: main.title, kind: 'video', primary: true, operationId: randomUUID() };
+  await assert.rejects(register({ ...primary, operationId: main.operationId }), /操作标识已用于不同内容/);
+  await assert.rejects(register(primary, 'unbound-video-session'), /会话/);
+  await assert.rejects(register({ ...primary, title: '另一个标题' }), /原登记标题/);
+  await assert.rejects(register({ ...main, operationId: randomUUID() }), /路径已登记/);
+
+  const mainPath = path.join(root, main.path);
+  writeFileSync(mainPath, Buffer.concat([video.stdout, Buffer.from('changed')]));
+  await assert.rejects(register(primary), /已变化/);
+  assert.equal(service.tasks.get(taskId).cardVersionId, undefined);
+  writeFileSync(mainPath, video.stdout);
+
+  const { results: [published] } = await batch([primary]);
+  assert.equal(published.ok, true, published.error);
+  assert.equal(published.id, original.id);
+  assert.equal(published.hash, original.hash);
+  assert.equal(published.path, original.path);
+  assert.deepEqual(readFileSync(mainPath), video.stdout);
+  const updated = service.tasks.get(taskId);
+  assert.equal(updated.files.length, 2);
+  assert.deepEqual(published.cardOutput, { cardId: task.outputCardId, versionId: updated.cardVersionId, role: 'primary' });
+  const cards = service.canvas.getBoard(requirement.id).nodes.filter(node => node.taskId === taskId && node.outputCard);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].id, `output:${task.outputCardId}`);
+  const ref = { cardId: `artifact:${original.id}`, hash: original.hash };
+  assert.equal(cards[0].sourceId, ref.cardId);
+  assert.equal(cards[0].outputCard.versions.length, 1);
+  assert.equal(cards[0].outputCard.versions[0].number, 1);
+  assert.equal(service.canvas.validateSourceRefs(requirement.id, [ref])[0].hash, original.hash);
+  for (const request of [primary, main]) {
+    const replay = await register(request);
+    assert.equal(replay.id, original.id);
+    assert.deepEqual(replay.cardOutput, published.cardOutput);
+  }
+  const otherReplay = await register(other);
+  assert.equal(otherReplay.id, supplement.id);
+  assert.deepEqual(otherReplay.cardOutput, { ...published.cardOutput, role: 'attachment' });
+  await assert.rejects(register({ ...primary, path: other.path, title: other.title, operationId: randomUUID() }), /已经有正式视频版本/);
+  assert.equal(service.canvas.getBoard(requirement.id).nodes.find(node => node.id === cards[0].id).outputCard.versions.length, 1);
+});
+
 test('20 real files batch once, mirror once, return compact results and preserve one card version on replay/restart', async t => {
   const { root, service, requirement, taskId, file, batch } = fixture(t);
   const files = Array.from({ length: 20 }, (_, i) => file(`${i + 1}.md`, `# 第${i + 1}项`, { primary: i === 0 }));

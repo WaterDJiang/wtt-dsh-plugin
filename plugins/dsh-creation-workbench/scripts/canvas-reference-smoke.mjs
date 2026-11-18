@@ -20,12 +20,16 @@ export async function seedReferenceSelection(workspace, run) {
       const { material } = await service.importMaterial({ requirementId: id, filename: name, bytes: await readFile(path.join(workspace, name)), operationId: randomUUID() });
       ids[key] = `material:${material.id}`;
     }
-    const output = service.createOutputDraft({ requirementId: id, outputType: 'text', selectedCardIds: [], sourceRefs: [], position: { x: 500, y: 150 }, operationId: randomUUID() });
-    const upload = async (node, filename, content) => service.cardFiles.upload({ requirementId: id, nodeId: node.id, versionId: node.outputCard?.versionId || null, headVersionId: node.outputCard?.latestVersionId || null, sourceHash: node.sourceHash || null, filename, bytes: Buffer.from(content), operationId: randomUUID() });
-    await upload(output.node, '历史第一版.md', '# 历史第一版');
-    const v1 = service.canvas.getBoard(id).nodes.find(n => n.id === output.node.id);
-    await upload(v1, '历史第二版.md', '# 历史第二版');
-    ids.historical = output.node.id;
+    async function publishTwoVersions(requirementId) {
+      const output = service.createOutputDraft({ requirementId, outputType: 'text', selectedCardIds: [], sourceRefs: [], position: { x: 500, y: 150 }, operationId: randomUUID() });
+      const upload = async (node, filename, content) => service.cardFiles.upload({ requirementId, nodeId: node.id, versionId: node.outputCard?.versionId || null, headVersionId: node.outputCard?.latestVersionId || null, sourceHash: node.sourceHash || null, filename, bytes: Buffer.from(content), operationId: randomUUID() });
+      await upload(output.node, '历史第一版.md', '# 历史第一版');
+      const first = service.canvas.getBoard(requirementId).nodes.find(node => node.id === output.node.id);
+      await upload(first, '历史第二版.md', '# 历史第二版');
+      return first;
+    }
+    const v1 = await publishTwoVersions(id);
+    ids.historical = v1.id;
     const elements = [{ id: `whiteboard:${randomUUID()}`, kind: 'note', text: '白板文字快照', width: 200, height: 140, colour: 'cream' },
       { id: `whiteboard:${randomUUID()}`, kind: 'note', text: '', width: 200, height: 140, colour: 'cream' },
       { id: `whiteboard:${randomUUID()}`, kind: 'note', text: '迟到响应白板', width: 200, height: 140, colour: 'cream' }];
@@ -41,6 +45,17 @@ export async function seedReferenceSelection(workspace, run) {
     const before = service.canvas.getBoard(id);
     const { id: otherId } = service.store.createCanvas({ title: '引用切换归属', operationId: randomUUID() });
     const { material: otherMaterial } = service.canvas.addMaterial({ requirementId: otherId, title: '另一个草稿', content: '不能被旧引用覆盖', operationId: randomUUID() });
+    const { id: selectionId } = service.store.createCanvas({ title: '框选卡片加号创作', operationId: randomUUID() });
+    const selectionMaterial = title => `material:${service.canvas.addMaterial({ requirementId: selectionId, title, content: `# ${title}`, operationId: randomUUID() }).material.id}`;
+    const selectionText = selectionMaterial('框选正文'), selectionOutside = selectionMaterial('框外资料');
+    const selectionV1 = await publishTwoVersions(selectionId);
+    const selectionImage = `material:${(await service.importMaterial({ requirementId: selectionId, filename: '框选图片.png', bytes: await readFile(path.join(workspace, 'reference.png')), operationId: randomUUID() })).material.id}`;
+    const selectionDraft = service.createOutputDraft({ requirementId: selectionId, outputType: 'text', selectedCardIds: [], sourceRefs: [], position: { x: 1290, y: 200 }, operationId: randomUUID() }).node.id;
+    service.canvas.saveBoard({ requirementId: selectionId, expectedRevision: service.canvas.getBoard(selectionId).revision,
+      positions: { [selectionText]: { x: 125, y: 215 }, [selectionV1.id]: { x: 505, y: 215 }, [selectionImage]: { x: 885, y: 215 }, [selectionDraft]: { x: 125, y: 560 }, [selectionOutside]: { x: 885, y: 560 } },
+      sizes: { [selectionV1.id]: { width: 320, height: 256 }, [selectionDraft]: { width: 320, height: 256 } }, viewport: { x: 28, y: 24, zoom: .64 } });
+    const selectionCase = { id: selectionId, text: selectionText, image: selectionImage, draft: selectionDraft,
+      history: { id: selectionV1.id, sourceId: selectionV1.sourceId, hash: selectionV1.sourceHash } };
     const performanceCases = [];
     if (process.env.WTT_REFERENCE_PERF) for (const count of [100, 300]) {
       const { id: canvasId } = service.store.createCanvas({ title: `${count} 卡引用性能`, operationId: randomUUID() });
@@ -53,7 +68,7 @@ export async function seedReferenceSelection(workspace, run) {
         positions: Object.fromEntries(cards.map((node, i) => [node, { x: 100 + i % 15 * 360, y: 150 + Math.floor(i / 15) * 300 }])), viewport: { x: 20, y: 10, zoom: .65 } });
       performanceCases.push({ id: canvasId, cards, count });
     }
-    return { id, ids, before, performanceCases, otherId, otherNodeId: `material:${otherMaterial.id}`, historical: { id: v1.sourceId, hash: v1.sourceHash } };
+    return { id, ids, before, performanceCases, selectionCase, otherId, otherNodeId: `material:${otherMaterial.id}`, historical: { id: v1.sourceId, hash: v1.sourceHash } };
   } finally { service.close(); }
 }
 
@@ -256,7 +271,82 @@ export async function checkReferenceSelection(page, canvas, fixture, api) {
   } finally { await page.unroute('**/api/wtt-creation-workbench**', captureTask); }
   if (artifacts) await writeFile(path.join(artifacts, 'reference-result.json'), JSON.stringify({ fixture, submittedSources: submittedInput?.sourceRefs, originalViewport: viewport, savedNodes: saved.nodes.map(n => ({ id: n.id, position: n.position })) }, null, 2));
   await checkReferencePerformance(page, canvas, fixture, artifacts);
+  await checkSelectionComposition(page, canvas, fixture.selectionCase, api, artifacts);
   console.log('PASS 可视化多选、取消、历史版本哈希、键盘、框选伸缩、快照失败恢复、迟到隔离、@、电脑导入、锁定、主题、390px');
+}
+
+async function checkSelectionComposition(page, canvas, fixture, api, artifacts) {
+  const selector = page.getByRole('combobox', { name: '当前画布', exact: true });
+  await selector.selectOption(fixture.id);
+  const card = id => canvas.locator(`article[data-card-id="${id}"]`);
+  const historyCard = card(fixture.history.id), textCard = card(fixture.text), imageCard = card(fixture.image);
+  const composer = canvas.locator('.wcc-card-composer:visible');
+  const url = new URL(api); url.searchParams.set('canvas', fixture.id);
+  const readBoard = async () => { const reply = await page.request.get(url.href); assert(reply.ok()); return reply.json(); };
+  const selected = () => canvas.locator('.react-flow__node.selected').evaluateAll(nodes => nodes.map(node => node.dataset.id).sort());
+  const version = historyCard.getByRole('combobox');
+  await version.selectOption(await version.locator('option').first().getAttribute('value'));
+  await historyCard.locator('.wtt-output-text').filter({ hasText: '历史第一版' }).waitFor();
+  const closeOutcome = canvas.getByRole('button', { name: '关闭成果预览', exact: true });
+  if (await closeOutcome.isVisible()) await closeOutcome.click();
+  const before = await readBoard(), expectedIds = [fixture.text, fixture.history.sourceId, fixture.image].sort();
+  const expectedHashes = new Map([fixture.text, fixture.image].map(id => [id, before.nodes.find(node => node.id === id).sourceHash]));
+  expectedHashes.set(fixture.history.sourceId, fixture.history.hash);
+  const plus = canvas.getByRole('toolbar', { name: '已选 3 个对象的操作' }).getByRole('button', { name: '用选中卡片创作', exact: true });
+  const cardPlus = canvas.getByRole('button', { name: '用 框选正文 继续创作', exact: true });
+  const close = () => composer.getByRole('button', { name: '关闭卡片创作框' }).click();
+  let lastDraftId;
+  for (const trigger of [plus, cardPlus]) {
+    const [left, right] = await Promise.all([textCard.boundingBox(), imageCard.boundingBox()]);
+    await page.mouse.move(left.x - 8, left.y - 8);
+    await page.mouse.down();
+    await page.mouse.move(right.x + right.width + 8, right.y + right.height + 8, { steps: 10 });
+    await page.mouse.up();
+    await plus.waitFor();
+    assert.deepEqual(await selected(), [fixture.text, fixture.history.id, fixture.image].sort());
+    const viewport = canvas.locator('.react-flow__viewport');
+    const viewBefore = await viewport.getAttribute('style');
+    const created = page.waitForResponse(response => new URL(response.url()).pathname === api.pathname
+      && response.request().method() === 'POST' && response.request().postDataJSON()?.action === 'create-output-draft');
+    await trigger.click();
+    const reply = await created;
+    assert(reply.ok(), await reply.text());
+    const result = await reply.json();
+    lastDraftId = result.node.id;
+    const data = reply.request().postDataJSON().data;
+    assert.deepEqual([...data.selectedCardIds].sort(), expectedIds);
+    assert.deepEqual(new Map(data.sourceRefs.map(ref => [ref.cardId, ref.hash])), expectedHashes);
+    assert.deepEqual(result.composition.references.map(ref => ref.id).sort(), expectedIds);
+    const chips = composer.locator('.wcc-creation-reference-chip');
+    await chips.nth(2).waitFor();
+    assert.equal(await chips.count(), 3);
+    assert.equal(await viewport.getAttribute('style'), viewBefore);
+    const input = composer.getByRole('textbox', { name: '创作要求', exact: true });
+    await input.waitFor();
+    assert.equal(await input.inputValue(), '');
+    assert.deepEqual((await readBoard()).tasks, before.tasks, '点加号只打开草稿，用户发送前不创建任务');
+    if (artifacts && trigger === plus) await page.screenshot({ path: path.join(artifacts, 'box-selection-compose.png') });
+    await close();
+  }
+  const count = (await readBoard()).nodes.length;
+  await textCard.getByRole('heading').click();
+  await card(fixture.draft).getByRole('heading').click({ modifiers: ['Meta'] });
+  await canvas.getByRole('toolbar', { name: '已选 2 个对象的操作' }).getByRole('button', { name: '用选中卡片创作' }).click();
+  await canvas.getByText(/这张卡还没有已保存的内容/).waitFor();
+  assert.deepEqual(await selected(), [fixture.text, fixture.draft].sort());
+  assert.equal((await readBoard()).nodes.length, count);
+  await canvas.focus();
+  await page.keyboard.press('Escape');
+  await textCard.getByRole('heading').click();
+  assert.deepEqual(await selected(), [fixture.text]);
+  await cardPlus.click();
+  await canvas.getByRole('menu', { name: '从卡片创建内容' }).getByRole('menuitem', { name: /文本/ }).waitFor();
+  await page.keyboard.press('Escape');
+  await card(lastDraftId).getByRole('button', { name: '用 AI 创作', exact: true }).click();
+  await composer.locator('.wcc-creation-reference-chip').nth(2).waitFor();
+  assert.equal(await composer.locator('.wcc-creation-reference-chip').count(), 3);
+  await close();
+  console.log('PASS 框选三卡、浮动和卡边加号、历史版本哈希、无效选中、单卡菜单、重新打开草稿');
 }
 
 async function checkReferencePerformance(page, canvas, fixture, artifacts) {

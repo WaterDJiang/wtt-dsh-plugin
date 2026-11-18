@@ -64,6 +64,12 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
   const canModify = source && manifest?.cardId && externalFormats.includes(source.format)
   const downloadHref = file?.artifactId ? endpoint({ downloadArtifact: file.artifactId }).href
     : source ? endpoint({ projectFileDownload: source.originalPath, hash: source.hash }).href : undefined
+  const seekableVideo = source?.format === 'mp4' || source?.format === 'webm'
+  const videoRef = seekableVideo ? source.sourceRef : null
+  const videoHref = seekableVideo ? endpoint({ preview: '1', ...(videoRef?.startsWith('artifact:')
+    ? { downloadArtifact: videoRef.slice('artifact:'.length) }
+    : videoRef?.startsWith('material:') ? { materialFile: videoRef.slice('material:'.length) }
+      : { projectFileDownload: source.originalPath, hash: source.hash }) }).href : downloadHref
   const isImage = source && (source.mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(source.format?.toLowerCase()))
   const imageHref = isImage && target.projectPath
     ? endpoint({ reviewImage: source.originalPath, hash: source.hash }).href : downloadHref
@@ -96,7 +102,7 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     {file?.role === 'attachment' && <div className="wtt-outcome-status" role="status">附件 · 未作为正式版本归档</div>}
     <div className="wtt-outcome-viewer-body">{error ? <UserError error={error} /> : source
       ? isImage ? <OutputPreview type="image" title={source.name} src={imageHref} status={source.status} />
-        : source.format === 'mp4' || source.format === 'webm' || source.format === 'mov' ? <video key={selectionKey} src={downloadHref} controls preload="metadata" playsInline aria-label={source.name} />
+        : seekableVideo || source.format === 'mov' ? <video key={selectionKey} src={videoHref} controls preload="metadata" playsInline aria-label={source.name} />
         : renderNativePreview?.(source) || <UserError error="DSH 原生文件预览尚未连接。" />
       : <p role="status">正在读取成果文件…</p>}</div>
   </aside>
