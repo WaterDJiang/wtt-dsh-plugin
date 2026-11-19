@@ -1,4 +1,6 @@
 .wcc-task-stage-actions{display:flex;flex:0 0 auto;gap:var(--wtt-space-2);padding:var(--wtt-space-2) var(--wtt-space-3)}
+.wcc-task-stage-actions.is-budget-paused{align-items:center;flex-wrap:wrap}
+.wcc-task-stage-actions.is-budget-paused p{flex:1 1 200px;margin:0;color:var(--wtt-ui-muted)}
 .wcc-card-composer.is-task-stage.is-conversation-open{height:min(560px,calc(100% - var(--wcc-creation-y,16px) - 14px))}
 .wcc-card-composer.is-task-stage .wcc-creation-error,.wcc-card-composer.is-task-stage .wcc-creation-disabled-reason{flex:0 0 auto;margin:var(--wtt-space-2) var(--wtt-space-3)}
 

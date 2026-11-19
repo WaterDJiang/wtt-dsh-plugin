@@ -61,6 +61,7 @@ export class TaskStore {
         const state = this.runtimeStateReader(task);
         if (state && ['generating', 'awaiting-input', 'awaiting-approval', 'idle', 'failed', 'unknown'].includes(state.phase)) {
           task.runtimeState = { phase: state.phase, ...(state.settled === true ? { settled: true } : {}),
+            ...(state.budgetStopped === true ? { budgetStopped: true } : {}),
             ...(typeof state.message === 'string' && state.message ? { message: state.message } : {}) };
         }
       } catch (error) { task.runtimeState = { phase: 'unknown', message: `运行状态读取失败：${error.message || String(error)}` }; }

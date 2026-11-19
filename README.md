@@ -60,7 +60,7 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本 **0.58.7**。[更新日志](CHANGELOG.md)
+当前版本 **0.58.8**。[更新日志](CHANGELOG.md)
 
 保存编辑并等任务结束后，打开 **插件 → 发现 → WTT 创作工作台 → 更新**。看到「新版本已经开始运行」即可回到画布。DSH 明确提示「需要重启」时，再按提示操作。
 

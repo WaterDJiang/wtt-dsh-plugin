@@ -37,6 +37,8 @@ test('production budgets distinguish unknown usage, count auxiliary summary cost
   assert.equal(service.production.inspect(task.id).usage.inputTokens, 400);
   assert.equal(service.production.inspect(task.id).usage.outputTokens, 60);
   assert.match(service.production.check(task.id), /达到模型回合预算/);
+  service.production.setTaskBudget({ taskId: task.id, contextMode: 'economy', maxSteps: 5, maxInputTokens: 400, maxOutputTokens: 2000 });
+  assert.match(service.production.budgetStop(task.id), /累计输入/, 'a different exhausted limit keeps the task visibly paused');
   service.production.setTaskBudget({ taskId: task.id, contextMode: 'economy', maxSteps: 5, maxInputTokens: 20000, maxOutputTokens: 2000 });
   assert.equal(service.production.check(task.id), null);
   assert.equal(service.production.inspect(task.id).usage.inputTokens, 400, 'raising budget does not add summary costs twice');
@@ -54,6 +56,10 @@ test('native pre-step budget guard rejects another model request without executi
   let next = false;
   assert.deepEqual(await listeners.get('agent/pre-step')({ agent }, async () => { next = true; return { kind: 'enter', messages: [] } }), { kind: 'reject' });
   assert.equal(next, false); assert.deepEqual(agent.inbox, ['keep me']); assert.ok(service.tasks.get(task.id));
+  service.production.setTaskBudget({ taskId: task.id, contextMode: 'economy', maxSteps: 3, maxInputTokens: 100, maxOutputTokens: 100 });
+  assert.equal(next, false, 'saving a higher limit does not start a model request');
+  assert.deepEqual(await listeners.get('agent/pre-step')({ agent }, async () => { next = true; return { kind: 'enter', messages: [] } }), { kind: 'enter', messages: [] });
+  assert.equal(next, true, 'the same Agent can admit the next user-submitted turn');
 });
 
 test('handoff freezes exact files, keeps confirmations separate and preserves original bytes', async t => {

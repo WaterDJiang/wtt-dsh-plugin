@@ -3,12 +3,12 @@ import { UserError } from './user-feedback.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { answerTaskInteraction, buildQuestionAnswer, interactionLabel, questionFingerprint } from './skill-interactions.mjs'
 import { OutputPreview } from './output-preview.jsx'
-import { reviewImagesFromInteraction } from './conversation-file.mjs'
-import { ReviewImageGallery } from './review-image-gallery.jsx'
+import { reviewMediaFromInteraction } from './conversation-file.mjs'
+import { ReviewMediaGallery } from './review-image-gallery.jsx'
 import './skill-confirmation.css'
 
 export function SkillConfirmation({ entry, currentEntry, position, draftCache, loadOutputs, verifyOutputs, onClose, onOpenNative, onOpenOutput,
-  loadDeckPreview, getDeckPageHref, projectRoot, getReviewImageHref, renderConversation, hidden = false }) {
+  loadDeckPreview, getDeckPageHref, projectRoot, getReviewMediaHref, renderConversation, hidden = false }) {
   const [drafts, setDrafts] = useState(() => draftCache.get(entry.key) || {})
   const [outputs, setOutputs] = useState(null)
   const [previewError, setPreviewError] = useState('')
@@ -20,7 +20,7 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
   const current = currentEntry()
   const stale = current?.key !== entry.key || current?.interaction !== pending || questionFingerprint(current?.interaction) !== questionFingerprint(pending)
   const permission = pending.kind === 'approval'
-  const images = !stale && !sent ? reviewImagesFromInteraction(projectRoot, pending) : []
+  const reviewMedia = !stale && !sent ? reviewMediaFromInteraction(projectRoot, pending) : []
   const nativeChat = Boolean(renderConversation && entry.task.sessionId)
   useEffect(() => {
     mounted.current = true
@@ -54,11 +54,11 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
     <div className="wcc-skill-confirmation-body">
       <p className="wcc-skill-scope">回答后继续这次任务。本次确认不会发送文件给客户。</p>
       {sent ? <p role="status">回答已提交。请关闭浮窗查看原任务进展；达到预算时需调整后继续。</p> : stale ? <p role="status">此问题已结束或已更新。请关闭后打开当前待办。</p> : <>
-      {images.length > 0 && getReviewImageHref && <ReviewImageGallery key={`${entry.key}:${questionFingerprint(pending)}`}
-        images={images} getHref={getReviewImageHref} onOpen={image => {
+      {reviewMedia.length > 0 && getReviewMediaHref && <ReviewMediaGallery key={`${entry.key}:${questionFingerprint(pending)}`}
+        items={reviewMedia} getHref={getReviewMediaHref} onOpen={item => {
           const latest = currentEntry()
           return latest?.key === entry.key && questionFingerprint(latest.interaction) === questionFingerprint(pending)
-            && reviewImagesFromInteraction(projectRoot, latest.interaction).some(value => value.path === image.path && value.hash === image.hash)
+            && reviewMediaFromInteraction(projectRoot, latest.interaction).some(value => value.path === item.path && value.hash === item.hash)
         }} />}
       {nativeChat ? <section className="wcc-skill-chat" aria-label="当前任务原始对话">{renderConversation(entry.task)}</section>
         : permission ? <p>AI 需要你的授权才能继续。请打开任务对话，查看具体操作后决定是否允许。</p> : (pending.questions || []).map(question => <fieldset key={question.id} disabled={disabled}>

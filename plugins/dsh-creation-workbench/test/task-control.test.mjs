@@ -57,6 +57,35 @@ test('scope changes, foreign canvas, rebound session and foreign Agent directory
   assert.deepEqual(f.calls, []);
 });
 
+test('budget stop exposes only exhausted limits and raising them preserves the task, project defaults and other limits', async t => {
+  const f = fixture(t), task = f.create(), other = f.create();
+  const agent = f.attach(task);
+  agent.status = 'idle';
+  agent.inbox.nextTurn = [];
+  const original = f.service.production.policy();
+  f.service.production.setTaskBudget({ taskId: task.id, ...original, maxInputTokens: 100 });
+  f.service.production.sample(task.id, { tokenUsage: { uncachedInputTokens: 50, cacheReadTokens: 60, cacheWriteTokens: 0, outputTokens: 20 } });
+  f.service.production.check(task.id);
+  f.service.tasks.runtimeStateReader = entry => f.service.production.budgetStop(entry.id)
+    ? { phase: 'idle', budgetStopped: true, message: f.service.production.budgetStop(entry.id) }
+    : { phase: 'idle' };
+  const plan = await f.control.inspect(f.service, f.input(task));
+  assert.deepEqual(plan.budgetLimits, [{ key: 'maxInputTokens', label: '累计输入', used: 110, limit: 100, unit: 'Token' }]);
+  const request = { ...f.input(task), token: plan.token, limits: [{ key: 'maxInputTokens', previous: 100, value: 200 }] };
+  await assert.rejects(f.control.raiseBudget(f.service, { ...request, requirementId: randomUUID() }), /不属于/);
+  await assert.rejects(f.control.raiseBudget(f.service, { ...request, limits: [{ ...request.limits[0], previous: 99 }] }), /重新核对/);
+  await assert.rejects(f.control.raiseBudget(f.service, { ...request, limits: [{ ...request.limits[0], value: 110 }] }), /大于当前用量/);
+  await f.control.raiseBudget(f.service, request);
+  assert.deepEqual(f.service.production.inspect(task.id).policy, { ...original, maxInputTokens: 200 });
+  assert.deepEqual(f.service.production.inspect(other.id).policy, original);
+  assert.deepEqual(f.service.production.policy(), original);
+  assert.equal(f.service.production.budgetStop(task.id), null);
+  assert.equal(f.service.production.check(task.id), null);
+  assert.equal(f.service.tasks.get(task.id).sessionId, agent.id);
+  await assert.rejects(f.control.raiseBudget(f.service, request), /状态已变化/);
+  assert.deepEqual(f.calls, []);
+});
+
 test('a stop request is not reported complete before the native Agent actually exits', async t => {
   const f = fixture(t), task = f.create(), agent = f.attach(task);
   agent.cancel = () => {}; agent.whenIdle = () => new Promise(() => {});

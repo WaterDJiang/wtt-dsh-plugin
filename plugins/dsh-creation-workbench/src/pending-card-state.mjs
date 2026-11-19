@@ -9,6 +9,7 @@ export function pendingLabel(pending) {
   if (pending?.mediaJob?.status === 'cancelled') return '已取消排队';
   if (pending?.published && pending.phase === 'generating') return '任务仍在运行';
   if (pending?.phase === 'idle') {
+    if (pending.budgetStopped) return '预算已达上限';
     if (pending.message?.startsWith('本轮执行已取消') || pending.message?.startsWith('本轮执行已停止')) return '本轮已中断';
     if (pending.message?.startsWith('本轮达到输出上限')) return '已达输出上限';
   }
@@ -46,7 +47,7 @@ export function pendingRetryAllowed(taskOrPending) {
 }
 
 export function pendingContinueAllowed(pending) {
-  return Boolean(pending?.sessionId && !pending.mediaJob && ['accepted', 'output'].includes(pending.status)
+  return Boolean(pending?.sessionId && !pending.mediaJob && !pending.budgetStopped && ['accepted', 'output'].includes(pending.status)
     && ['idle', 'failed'].includes(pending.phase));
 }
 

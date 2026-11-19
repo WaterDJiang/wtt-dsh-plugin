@@ -116,30 +116,36 @@ function probeMedia(file, extension, { ffprobe, signal }) {
   });
 }
 
+export const isVideoContainer = (bytes, extension) => extension === '.mp4' ? mp4Container(bytes) : webmContainer(bytes);
+
+export async function inspectVideoFile(file, metadata, { ffprobe = 'ffprobe', signal } = {}) {
+  const report = await probeMedia(file, metadata.extension, { ffprobe, signal });
+  signal?.throwIfAborted();
+  const streams = Array.isArray(report.streams) ? report.streams : [];
+  const video = streams.find(stream => stream.codec_type === 'video' && stream.disposition?.attached_pic !== 1
+    && Number.isFinite(stream.width) && stream.width > 0 && Number.isFinite(stream.height) && stream.height > 0);
+  const audio = streams.find(stream => stream.codec_type === 'audio');
+  if (!video || !report.format?.format_name?.includes(metadata.extension === '.mp4' ? 'mp4' : 'webm')) throw new Error('文件未包含有效的视频流或容器不匹配');
+  const browserCompatible = metadata.extension === '.mp4'
+    ? video.codec_name === 'h264' && video.pix_fmt === 'yuv420p' && (!audio || audio.codec_name === 'aac')
+    : ['vp8', 'vp9'].includes(video.codec_name) && video.pix_fmt === 'yuv420p' && (!audio || ['opus', 'vorbis'].includes(audio.codec_name));
+  const duration = Number(report.format.duration);
+  const media = { kind: 'video', validated: true, container: metadata.extension.slice(1), videoCodec: video.codec_name,
+    ...(audio ? { audioCodec: audio.codec_name } : {}), width: video.width, height: video.height,
+    ...(Number.isFinite(duration) && duration >= 0 ? { durationSeconds: duration } : {}), browserCompatible,
+    ...(!browserCompatible ? { warning: '视频容器与视频流已核对；此编码的浏览器播放兼容性需实际确认，原件可下载。' } : {}) };
+  return { content: '', mime: metadata.mime, extractionStatus: 'unparsed', truncated: false, extractionError: '视频已保留，未转写音频或解析画面', media };
+}
+
 async function inspectVideo(bytes, metadata, { ffprobe = 'ffprobe', signal } = {}) {
   let temporary;
   try {
     const buffer = Buffer.from(bytes);
-    if (!(metadata.extension === '.mp4' ? mp4Container(buffer) : webmContainer(buffer))) throw new Error('真实容器与文件扩展名不符或视频文件损坏');
+    if (!isVideoContainer(buffer, metadata.extension)) throw new Error('真实容器与文件扩展名不符或视频文件损坏');
     temporary = mkdtempSync(path.join(os.tmpdir(), 'wtt-media-probe-'));
     const file = path.join(temporary, `source${metadata.extension}`);
     writeFileSync(file, buffer, { flag: 'wx', mode: 0o600 });
-    const report = await probeMedia(file, metadata.extension, { ffprobe, signal });
-    signal?.throwIfAborted();
-    const streams = Array.isArray(report.streams) ? report.streams : [];
-    const video = streams.find(stream => stream.codec_type === 'video' && stream.disposition?.attached_pic !== 1
-      && Number.isFinite(stream.width) && stream.width > 0 && Number.isFinite(stream.height) && stream.height > 0);
-    const audio = streams.find(stream => stream.codec_type === 'audio');
-    if (!video || !report.format?.format_name?.includes(metadata.extension === '.mp4' ? 'mp4' : 'webm')) throw new Error('文件未包含有效的视频流或容器不匹配');
-    const browserCompatible = metadata.extension === '.mp4'
-      ? video.codec_name === 'h264' && video.pix_fmt === 'yuv420p' && (!audio || audio.codec_name === 'aac')
-      : ['vp8', 'vp9'].includes(video.codec_name) && video.pix_fmt === 'yuv420p' && (!audio || ['opus', 'vorbis'].includes(audio.codec_name));
-    const duration = Number(report.format.duration);
-    const media = { kind: 'video', validated: true, container: metadata.extension.slice(1), videoCodec: video.codec_name,
-      ...(audio ? { audioCodec: audio.codec_name } : {}), width: video.width, height: video.height,
-      ...(Number.isFinite(duration) && duration >= 0 ? { durationSeconds: duration } : {}), browserCompatible,
-      ...(!browserCompatible ? { warning: '视频容器与视频流已核对；此编码的浏览器播放兼容性需实际确认，原件可下载。' } : {}) };
-    return { content: '', mime: metadata.mime, extractionStatus: 'unparsed', truncated: false, extractionError: '视频已保留，未转写音频或解析画面', media };
+    return await inspectVideoFile(file, metadata, { ffprobe, signal });
   } catch (error) {
     signal?.throwIfAborted();
     const reason = error.code === 'ENOENT' ? '本机 ffprobe 不可用，未完成视频格式验证' : `视频格式验证失败：${error.message}`.slice(0, 350);

@@ -2,11 +2,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, constants, openSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import path from 'node:path';
-import { importedFileResponse } from './media-response.mjs';
+import { mediaChunkBytes, streamedMediaResponse } from './media-response.mjs';
 import { artifactFormat, validateArtifact, GENERATED_MEDIA_MAX_BYTES } from './artifact-validation.mjs';
 
 const MAX_BYTES = GENERATED_MEDIA_MAX_BYTES;
-const mediaChunkBytes = 1024 * 1024;
 const fileSignature = info => [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(':');
 const sha = value => createHash('sha256').update(value).digest('hex');
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -153,52 +152,9 @@ export class ArtifactStore {
         this.cache.set(row.id, { signature, hash: row.hash, path: row.path, status });
       }
       if (status !== 'ready') throw changed();
-      return importedFileResponse({
-        name: path.basename(row.path), mime: row.mime, size: info.size,
-        stream(start, end) {
-          let position = start, closed = false, abort;
-          const close = () => {
-            if (closed) return;
-            closed = true;
-            signal?.removeEventListener('abort', abort);
-            return handle.close();
-          };
-          const stream = new ReadableStream({
-            start(controller) {
-              abort = () => {
-                if (closed) return;
-                controller.error(signal.reason);
-                void close()?.catch(() => {});
-              };
-              if (signal?.aborted) abort();
-              else signal?.addEventListener('abort', abort, { once: true });
-            },
-            async pull(controller) {
-              try {
-                await assertCurrent();
-                const chunk = Buffer.allocUnsafe(Math.min(end - position + 1, mediaChunkBytes));
-                const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
-                if (closed) return;
-                if (!bytesRead) throw changed();
-                await assertCurrent();
-                if (closed) return;
-                position += bytesRead;
-                controller.enqueue(chunk.subarray(0, bytesRead));
-                if (position > end) {
-                  controller.close();
-                  await close();
-                }
-              } catch (cause) {
-                if (!closed) controller.error(cause);
-                await close();
-              }
-            },
-            cancel: close,
-          }, { highWaterMark: 0 });
-          handedOff = true;
-          return stream;
-        },
-      }, { ...options, preview: true });
+      handedOff = true;
+      return await streamedMediaResponse({ name: path.basename(row.path), mime: row.mime, size: info.size },
+        { ...options, preview: true, handle, assertCurrent, changed, signal });
     } finally {
       if (!handedOff) await handle.close();
     }

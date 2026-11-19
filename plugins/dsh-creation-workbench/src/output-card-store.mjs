@@ -293,6 +293,7 @@ export class OutputCardStore {
       failed: '生成失败，请查看原任务', unknown: '状态待核对，请查看执行' };
     return { taskId: task.id, outputType: task.input.outputType || 'outline', status, phase,
       message: message || messages[phase], sessionId: task.sessionId,
+      ...(phase === 'idle' && task.runtimeState?.budgetStopped ? { budgetStopped: true } : {}),
       ...(task.cardVersionId ? { published: true } : {}),
       ...(task.error || mediaJob?.error ? { error: mediaJob?.error || task.error } : {}),
       ...(mediaJob ? { mediaJob, canResume: Boolean(mediaJob.canResume) } : {}) };

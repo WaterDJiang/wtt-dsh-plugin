@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewImagesFromQuestion, reviewImagesFromInteraction, reviewImagesForActiveQuestion } from '../src/conversation-file.mjs'
+import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewMediaFromQuestion, reviewMediaFromInteraction, reviewMediaForActiveQuestion } from '../src/conversation-file.mjs'
 
 test('card chat opens project-relative and same-project absolute file links', () => {
   const root = '/tmp/项目'
@@ -46,11 +46,11 @@ test('the review opens only the explicit draft and pins it to the checksum in th
 test('image choices in native plain-text questions retain paths, order and exact SHA-256', () => {
   const root = '/tmp/项目', hash = 'AB'.repeat(32)
   const question = `候选及 SHA-256：\n1. [首张](courses/task/working/a.png) —\n${hash}\n2. ![第二张](<courses/task/working/有 空格.jpg>) SHA-256：\`${hash}\`\n3. \`courses/task/working/第三.webp\`；校验值：${hash}`
-  const images = reviewImagesFromQuestion(root, question + '\n' + question)
+  const images = reviewMediaFromQuestion(root, question + '\n' + question)
   assert.deepEqual(images.map(image => image.path), ['courses/task/working/a.png', 'courses/task/working/有 空格.jpg', 'courses/task/working/第三.webp'])
   assert(images.every(image => image.hash === hash.toLowerCase() && image.fromConversation))
   assert.equal(images[1].name, '有 空格.jpg')
-  assert.equal(reviewImagesFromQuestion(root, `[a](courses/%E5%9B%BE.png) — ${hash}`)[0].name, '图.png')
+  assert.equal(reviewMediaFromQuestion(root, `[a](courses/%E5%9B%BE.png) — ${hash}`)[0].name, '图.png')
 })
 
 test('image preview never guesses a hash from a different file, remote link, internal path or prose', () => {
@@ -61,22 +61,36 @@ test('image preview never guesses a hash from a different file, remote link, int
     `[a](%2e%2e/a.png) — ${hash}`, `[a](courses/a.svg) — ${hash}`, '[a](courses/a.png)',
     `[a](courses/a.png)\n[b](courses/b.md) — ${hash}`, `[a](courses/a.png) 请对比后使用 ${hash}`,
     `[a](courses/a.png) — ${hash}0`, `[a](courses/a.png) — \`${hash}0\``,
-  ]) assert.deepEqual(reviewImagesFromQuestion(root, question), [], question)
-  assert.deepEqual(reviewImagesFromQuestion(root, null), [])
+  ]) assert.deepEqual(reviewMediaFromQuestion(root, question), [], question)
+  assert.deepEqual(reviewMediaFromQuestion(root, null), [])
   const many = Array.from({ length: 30 }, (_, index) => `[${index}](courses/${index}.gif) — ${hash}`).join('\n')
-  assert.equal(reviewImagesFromQuestion(root, many).length, 24)
+  assert.equal(reviewMediaFromQuestion(root, many).length, 24)
+})
+
+test('candidate videos need a matching project path and checksum', () => {
+  const root = '/tmp/项目', hash = 'ab'.repeat(32)
+  const question = [
+    `[初剪](working/初剪%20V1.MP4) — SHA-256: ${hash}`,
+    `[候选](working/final.webm) — ${hash}`,
+    `[封面](working/cover.png) — ${hash}`,
+    `[外部](https://example.test/file.mp4) — ${hash}`,
+    `[内部](./.wtt-workbench/private.webm) — ${hash}`,
+    '[未验证](working/other.mp4)',
+  ].join('\n')
+  assert.deepEqual(reviewMediaFromQuestion(root, question).map(({ name, kind }) => [name, kind]),
+    [['初剪 V1.MP4', 'video'], ['final.webm', 'video'], ['cover.png', 'image']])
 })
 
 test('task reviews include candidates in detail and option descriptions without pairing hashes across fields or questions', () => {
   const root = '/tmp/项目', hash = 'ab'.repeat(32)
-  const images = reviewImagesFromInteraction(root, { questions: [
+  const images = reviewMediaFromInteraction(root, { questions: [
     { question: `对比 [原始](courses/base.png) — ${hash}`, detail: `[候选](courses/candidate.png) SHA256=${hash}`,
       options: [{ label: '第二张', description: `[对照](courses/option.jpg) — ${hash}` }, { label: '保留', description: `[重复](courses/base.png) — ${hash}` }] },
     { question: '[不能猜](courses/no-hash.png)', detail: hash },
     { question: hash },
   ] })
   assert.deepEqual(images.map(image => image.path), ['courses/base.png', 'courses/candidate.png', 'courses/option.jpg'])
-  assert.deepEqual(reviewImagesFromInteraction(root, null), [])
+  assert.deepEqual(reviewMediaFromInteraction(root, null), [])
 })
 
 test('card chat uses the open native question and rejects sources from a previous call or another question', () => {
@@ -87,10 +101,10 @@ test('card chat uses the open native question and rejects sources from a previou
     { question: text, detail: `[另一个问题](working/other.png) — ${hash}` },
   ] }
   const active = { callKey: key, questionId: `question-${key}-0`, text }
-  assert.deepEqual(reviewImagesForActiveQuestion(root, active, request).map(img => img.name), ['grid.png'])
-  assert.deepEqual(reviewImagesForActiveQuestion(root, { ...active, questionId: `question-${key}-1` }, request).map(img => img.name), ['other.png'])
-  assert.deepEqual(reviewImagesForActiveQuestion(root, active, { ...request, key: 'question:session-a:old-call' }), [])
-  assert.deepEqual(reviewImagesForActiveQuestion(root, { ...active, text: '先定风格' }, request), [])
+  assert.deepEqual(reviewMediaForActiveQuestion(root, active, request).map(img => img.name), ['grid.png'])
+  assert.deepEqual(reviewMediaForActiveQuestion(root, { ...active, questionId: `question-${key}-1` }, request).map(img => img.name), ['other.png'])
+  assert.deepEqual(reviewMediaForActiveQuestion(root, active, { ...request, key: 'question:session-a:old-call' }), [])
+  assert.deepEqual(reviewMediaForActiveQuestion(root, { ...active, text: '先定风格' }, request), [])
   const legacy = { questionId: 'legacy-heading', text: `[待审图](working/legacy.png) — ${hash}` }
-  assert.deepEqual(reviewImagesForActiveQuestion(root, legacy).map(img => img.name), ['legacy.png'])
+  assert.deepEqual(reviewMediaForActiveQuestion(root, legacy).map(img => img.name), ['legacy.png'])
 })

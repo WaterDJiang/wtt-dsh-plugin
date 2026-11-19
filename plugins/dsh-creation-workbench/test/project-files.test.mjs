@@ -1,7 +1,36 @@
 import {spawnSync} from 'node:child_process';
+import { projectVideoPreview } from '../src/project-video-preview.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,existsSync,rmSync,symlinkSync} from 'node:fs';import path from 'node:path';import {tmpdir} from 'node:os';import {randomUUID,createHash} from 'node:crypto';import {WorkbenchService} from '../src/service.mjs';import {apply} from '../src/index.mjs';
 function fixture(t){const root=mkdtempSync(path.join(tmpdir(),'cw37-')),service=new WorkbenchService({workspaceRoot:root}),req=service.store.createRequirement({background:'文件树验收',operationId:randomUUID()});t.after(()=>{service.close();rmSync(root,{recursive:true,force:true})});return {root,service,req,files:service.projectFiles}}
+test('project WebM ranges are bound to the checked file and exclude links and internal data', async t => {
+  const { root, files } = fixture(t)
+  const name = '候选.webm', file = path.join(root, name)
+  const encoded = spawnSync('ffmpeg', [
+    '-v', 'error', '-f', 'lavfi', '-i', 'color=s=32x32:r=10', '-t', '1', '-c:v', 'libvpx', file,
+  ], { encoding: 'utf8' })
+  assert.equal(encoded.status, 0, encoded.stderr)
+  const bytes = readFileSync(file), hash = createHash('sha256').update(bytes).digest('hex')
+  const info = await projectVideoPreview(files, name)
+  assert.equal(info.hash, hash)
+  assert.equal(info.videoError, undefined)
+  const preview = { preview: true, range: 'bytes=16-63' }
+  const response = await projectVideoPreview(files, name, { hash, response: preview })
+  assert.equal(response.status, 206)
+  assert.equal(response.headers.get('content-range'), `bytes 16-63/${bytes.length}`)
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes.subarray(16, 64))
+  const head = await projectVideoPreview(files, name, { hash, response: { ...preview, method: 'HEAD' } })
+  assert.equal(head.body, null)
+  assert.equal(head.headers.get('content-length'), String(bytes.length))
+  symlinkSync(file, path.join(root, '链接.webm'))
+  await assert.rejects(projectVideoPreview(files, '链接.webm'), /链接/)
+  writeFileSync(path.join(root, '.wtt-workbench', name), bytes)
+  await assert.rejects(projectVideoPreview(files, './.wtt-workbench/' + name), /当前项目/)
+  writeFileSync(file, 'altered')
+  await assert.rejects(projectVideoPreview(files, name, { hash, response: preview }), /已变化/)
+  await assert.rejects(projectVideoPreview(files, name, { response: preview }), /容器/)
+})
+
 test('project tree is lazy, directory-first and hides current control paths; visible links are not followed and create never overwrites',async t=>{
  const f=fixture(t);mkdirSync(path.join(f.root,'资料'));writeFileSync(path.join(f.root,'原件.md'),'原文');mkdirSync(path.join(f.root,'node_modules'));writeFileSync(path.join(f.root,'.secret'),'secret');symlinkSync(path.join(f.root,'资料'),path.join(f.root,'link'));
  mkdirSync(path.join(f.root,'courses','17f66d50','materials'),{recursive:true});writeFileSync(path.join(f.root,'courses','17f66d50','materials','素材.md'),'快照');

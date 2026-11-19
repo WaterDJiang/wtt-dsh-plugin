@@ -7,6 +7,13 @@ const STANDARD_REQUEST_LIMIT = 48_000;
 const SELECTION_REQUEST_LIMIT = 16_000;
 const number = value => Number.isFinite(value) && value >= 0 ? value : null;
 const tokenLimit = value => Number.isSafeInteger(value) && value > 0 ? value : Infinity;
+const budgetMetrics = [['modelRequests', 'maxSteps', '模型回合'], ['inputTokens', 'maxInputTokens', '累计输入'], ['outputTokens', 'maxOutputTokens', '输出']];
+const stopMessage = ({ label }) => `达到${label}预算，已在下一次模型请求前停止。文件和原任务保留；调整本任务预算后从原会话继续。`;
+
+function exceededLimits(usage, policy) {
+  return policy ? budgetMetrics.flatMap(([metric, key, label]) => number(usage[metric]) !== null && usage[metric] >= policy[key]
+    ? [{ key, label, used: usage[metric], limit: policy[key], unit: key === 'maxSteps' ? '次' : 'Token' }] : []) : [];
+}
 export function normalizePolicy(input) {
   if (!input || !['economy', 'host'].includes(input.contextMode)) throw new Error('请选择工作台节省模式或 DSH 默认模式');
   const result = { contextMode: input.contextMode };
@@ -94,7 +101,7 @@ export class ProductionControl {
     const override = this.db.prepare('SELECT value FROM production_settings WHERE id=?').get(`task:${taskId}`);
     const policy = override ? JSON.parse(override.value) : frozen.productionPolicy;
     const ratios = policy ? [usage.modelRequests / policy.maxSteps, usage.inputTokens / policy.maxInputTokens, usage.outputTokens / policy.maxOutputTokens].filter(Number.isFinite) : [];
-    return { taskId, usage, policy: policy || null, warning: ratios.some(value => value >= .8),
+    return { taskId, usage, policy: policy || null, warning: ratios.some(value => value >= .8), exceededLimits: exceededLimits(usage, policy),
       checkpoints: this.db.prepare('SELECT * FROM production_checkpoints WHERE task_id=? ORDER BY created_at DESC').all(taskId) };
   }
   async refresh(taskId) {
@@ -105,17 +112,25 @@ export class ProductionControl {
   setTaskBudget({ taskId, ...policy }) {
     this.taskRow(taskId); const next = normalizePolicy(policy);
     this.db.prepare('INSERT INTO production_settings VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(`task:${taskId}`, JSON.stringify(next));
-    const usage = this.usage(taskId); delete usage.budgetStop;
-    this.db.prepare('UPDATE production_usage SET data=? WHERE task_id=?').run(JSON.stringify(usage), taskId);
-    return this.inspect(taskId);
+    const result = this.inspect(taskId), [exceeded] = result.exceededLimits;
+    if (result.usage.budgetStop) {
+      if (exceeded) {
+        result.usage.budgetStop = stopMessage(exceeded);
+        this.db.prepare("UPDATE production_usage SET data=json_set(data,'$.budgetStop',?) WHERE task_id=?").run(result.usage.budgetStop, taskId);
+      } else {
+        delete result.usage.budgetStop;
+        this.db.prepare("UPDATE production_usage SET data=json_remove(data,'$.budgetStop') WHERE task_id=?").run(taskId);
+      }
+    }
+    return result;
+  }
+  budgetStop(taskId) {
+    return this.db.prepare("SELECT json_extract(data,'$.budgetStop') AS message FROM production_usage WHERE task_id=?").get(taskId)?.message;
   }
   check(taskId) {
-    const result = this.inspect(taskId), { policy, usage } = result;
-    if (!policy) return null;
-    const exceeded = [['modelRequests', 'maxSteps', '模型回合'], ['inputTokens', 'maxInputTokens', '累计输入'], ['outputTokens', 'maxOutputTokens', '输出']]
-      .find(([key, limit]) => number(usage[key]) !== null && usage[key] >= policy[limit]);
+    const { usage, exceededLimits: [exceeded] } = this.inspect(taskId);
     if (!exceeded) return null;
-    const message = `达到${exceeded[2]}预算，已在下一次模型请求前停止。文件和原任务保留；调整本任务预算后从原会话继续。`;
+    const message = stopMessage(exceeded);
     const value = { ...usage, budgetStop: message };
     this.db.prepare('INSERT INTO production_usage VALUES(?,?,?) ON CONFLICT(task_id) DO UPDATE SET data=excluded.data').run(taskId, JSON.stringify(value), new Date().toISOString());
     return message;

@@ -13,8 +13,8 @@ import { TaskInputSummary } from './task-input-summary.jsx'
 import { pendingContinueAllowed, pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
 import { ReferencePromptInput } from './reference-prompt-input.jsx'
 import { cardDisplayTitle } from './card-capabilities.mjs'
-import { reviewDraftFromQuestion, reviewImagesForActiveQuestion } from './conversation-file.mjs'
-import { ReviewImageGallery } from './review-image-gallery.jsx'
+import { reviewDraftFromQuestion, reviewMediaForActiveQuestion } from './conversation-file.mjs'
+import { ReviewMediaGallery } from './review-image-gallery.jsx'
 import { StepHandoff } from './project-agent-handoff.jsx'
 import './card-creation.css'
 import './task-stage.css'
@@ -272,7 +272,7 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, trigger, it
 export function CardComposer({
   visible = true, suspended = false, position = { x: 0, y: 0 }, context, references: referenceItems = [], availableReferences = [], creationTypes = [],
   instruction = '', onInstructionChange, onReferencesChange, onPickCanvasReferences, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onLocateReference, onClose, onSend, onAction,
-  searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewImageHref, pendingInteraction,
+  searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewMediaHref, pendingInteraction,
   busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onOpenNativeConversation, onTaskControl, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
   mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onMediaOptionsChange, onGenerationMethodChange, onMediaProviderChange, onGenerateMedia, onResumeMedia, onNewMedia,
@@ -320,6 +320,7 @@ export function CardComposer({
   const activeMediaCapabilities = legacyMedia ? mediaCapabilities : apiProvider
   const taskMode = (inputLocked || context?.pendingGeneration?.published) && !isMedia
   const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation)
+  const budgetPaused = taskMode && context.pendingGeneration?.phase === 'idle' && context.pendingGeneration.budgetStopped
   const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing
   const showInitialInput = !taskMode && !reviewingResult
   const stageStatus = taskMode ? pendingLabel(context.pendingGeneration) : reviewingResult ? '已保存' : ''
@@ -332,7 +333,7 @@ export function CardComposer({
   const executionExpanded = hasConversation && conversationOpen && !collapsed
   const reviewDraft = reviewQuestion?.scope === conversationScope && reviewDraftFromQuestion(projectRoot, reviewQuestion.text)
   const activeReviewQuestion = executionExpanded && reviewQuestion?.scope === conversationScope ? reviewQuestion : null
-  const reviewImages = useMemo(() => reviewImagesForActiveQuestion(projectRoot, activeReviewQuestion, pendingInteraction), [projectRoot, activeReviewQuestion, pendingInteraction])
+  const reviewMedia = useMemo(() => reviewMediaForActiveQuestion(projectRoot, activeReviewQuestion, pendingInteraction), [projectRoot, activeReviewQuestion, pendingInteraction])
   const frameTop = executionExpanded && Number.isFinite(position.canvasHeight)
     ? Math.max(12, Math.min(position.y, position.canvasHeight - Math.min(560, position.canvasHeight - 24))) : position.y
   const references = useMemo(() => uniqueCards(referenceItems), [referenceItems])
@@ -450,12 +451,12 @@ export function CardComposer({
     if (draft?.path === reviewDraft.path && draft.hash === reviewDraft.hash) onOpenReviewDraft(draft)
   }
 
-  function canOpenReviewImage(image) {
+  function canOpenReviewMedia(item) {
     const question = conversationPanel.current?.querySelector(ACTIVE_NATIVE_QUESTION)
     if (question?.getAttribute('aria-labelledby') !== reviewQuestion?.questionId
       || question?.parentElement?.dataset.questionKey !== reviewQuestion?.callKey
       || question?.querySelector('h2')?.textContent !== reviewQuestion?.text) return false
-    return reviewImages.some(current => current.path === image.path && current.hash === image.hash)
+    return reviewMedia.some(current => current.path === item.path && current.hash === item.hash)
   }
 
   useEffect(() => {
@@ -644,6 +645,10 @@ export function CardComposer({
         renderFile={reference=><>{reference.requirementId&&onLocateReference&&<UiButton size="compact" onClick={()=>onLocateReference(reference)}>定位来源</UiButton>}{getReferenceFileHref&&(reference.importedFile||reference.generatedFile)&&<ImportedReferenceFile card={reference} getHref={getReferenceFileHref}/>}</>} />
       {context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={context.pendingGeneration.error} />}
       {displayError && displayError !== context?.pendingGeneration?.error && <UserError className="wcc-creation-error" error={displayError} />}
+      {budgetPaused && <div className="wcc-task-stage-actions is-budget-paused">
+        <p role="status">{context.pendingGeneration.message}</p>
+        <UiButton variant="primary" size="compact" disabled={busy} onClick={onTaskControl}>调整任务预算</UiButton>
+      </div>}
       {canContinue && <div className="wcc-task-stage-actions"><UiButton variant="primary" size="compact" disabled={busy || conversationOpening === conversationScope}
         onClick={() => void toggleConversation(true, true)}>继续任务</UiButton></div>}
       {taskMode && pendingRetryAllowed(context.pendingGeneration) && <div className="wcc-task-stage-actions"><UiButton variant="primary" disabled={!ready} onClick={submit}>重试原任务</UiButton></div>}
@@ -716,8 +721,8 @@ export function CardComposer({
     </div>
     {!collapsed && conversationError?.scope === conversationScope && <UserError className="wcc-creation-error wcc-creation-task-error" error={conversationError.message} />}
     {!collapsed && conversationOpen && !hasConversation && <p className="wcc-creation-execution-note" role="status">此版本的执行会话尚未恢复，请重新展开或从任务中核对。</p>}
-    {executionExpanded && visible && !suspended && reviewImages.length > 0 && getReviewImageHref && <ReviewImageGallery
-      key={`${conversationScope}:${reviewQuestion.questionId}:${reviewImages.map(({path,hash})=>path+':'+hash).join('|')}`} images={reviewImages} getHref={getReviewImageHref} onOpen={canOpenReviewImage} />}
+    {executionExpanded && visible && !suspended && reviewMedia.length > 0 && getReviewMediaHref && <ReviewMediaGallery
+      key={`${conversationScope}:${reviewQuestion.questionId}:${reviewMedia.map(({path,hash})=>path+':'+hash).join('|')}`} items={reviewMedia} getHref={getReviewMediaHref} onOpen={canOpenReviewMedia} />}
     <div ref={conversationPanel} id={`${id}-conversation`} className="wcc-creation-conversation" hidden={!visible || collapsed || !conversationOpen || !hasConversation}>{conversation}</div>
     </div>
     <SkillSettings open={visible && skillSettingsOpen} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onSave={onSaveSkillSettings} onPreference={onUpdateSkillPreference} onClose={() => setSkillSettingsOpen(false)} />

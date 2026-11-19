@@ -8981,6 +8981,16 @@ dialog.wtt-project-picker[open] {
 .wtt-project-workbench .wcc-review-image-grid:has(> figure:only-child) {
   grid-template-columns: minmax(0, 1fr);
 }
+.wtt-project-workbench .wcc-review-image-grid button.wcc-review-video-trigger {
+  grid-column: 1/-1;
+  justify-content: flex-start;
+  min-width: 0;
+}
+.wtt-project-workbench .wcc-review-video-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .wtt-project-workbench .wcc-review-images figure {
   min-width: 0;
   margin: 0;
@@ -9054,6 +9064,10 @@ dialog.wtt-project-picker[open] {
   max-width: 100%;
   max-height: calc(100dvh - 100px);
   object-fit: contain;
+}
+.wtt-project-workbench .wcc-review-image-full .wtt-output-preview.is-video {
+  width: 100%;
+  min-width: 0;
 }
 
 /* src/card-creation.css */
@@ -9974,6 +9988,15 @@ dialog.wtt-project-picker[open] {
   flex: 0 0 auto;
   gap: var(--wtt-space-2);
   padding: var(--wtt-space-2) var(--wtt-space-3);
+}
+.wcc-task-stage-actions.is-budget-paused {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.wcc-task-stage-actions.is-budget-paused p {
+  flex: 1 1 200px;
+  margin: 0;
+  color: var(--wtt-ui-muted);
 }
 .wcc-card-composer.is-task-stage.is-conversation-open {
   height: min(560px, calc(100% - var(--wcc-creation-y,16px) - 14px));

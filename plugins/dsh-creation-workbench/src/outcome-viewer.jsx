@@ -105,7 +105,9 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     {file?.role === 'attachment' && <div className="wtt-outcome-status" role="status">附件 · 未作为正式版本归档</div>}
     <div className="wtt-outcome-viewer-body">{error ? <UserError error={error} /> : source
       ? isImage ? <OutputPreview type="image" title={source.name} src={imageHref} status={source.status} />
-        : seekableVideo || source.format === 'mov' ? <VideoPreview key={selectionKey} src={videoHref} aria-label={source.name} />
+        : seekableVideo ? <OutputPreview type="video" title={source.name} src={source.videoError ? undefined : videoHref} deferDesktopSeek={Boolean(target.projectPath)}
+          emptyMessage={source.videoError ? `${source.videoError}。可下载原视频查看。` : undefined} />
+          : source.format === 'mov' ? <VideoPreview key={selectionKey} src={videoHref} aria-label={source.name} />
         : renderNativePreview?.(source) || <UserError error="DSH 原生文件预览尚未连接。" />
       : <p role="status">正在读取成果文件…</p>}</div>
   </aside>

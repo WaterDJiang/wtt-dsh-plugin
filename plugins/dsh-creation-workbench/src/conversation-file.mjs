@@ -39,7 +39,7 @@ export function reviewDraftFromQuestion(root, question) {
   return drafts.size === 1 ? drafts.values().next().value : null
 }
 
-export function reviewImagesFromQuestion(root, question) {
+export function reviewMediaFromQuestion(root, question) {
   if (!root || !question) return []
   const text = String(question).slice(0, 65536), references = []
   const pattern = /!?\[[^\[\]\r\n]*\]\((?:<([^<>\r\n]+)>|([^()\r\n]+))\)|`([^`\r\n]+)`/gu
@@ -50,35 +50,37 @@ export function reviewImagesFromQuestion(root, question) {
     references.push({ file, start: match.index, end: match.index + match[0].length })
     if (references.length >= 200) break
   }
-  const images = new Map()
-  for (let index = 0; index < references.length && images.size < 24; index++) {
+  const media = new Map()
+  for (let index = 0; index < references.length && media.size < 24; index++) {
     const reference = references[index]
-    if (!/\.(png|jpe?g|webp|gif)$/i.test(reference.file)) continue
+    const kind = /\.(mp4|webm)$/i.test(reference.file) ? 'video'
+      : /\.(png|jpe?g|webp|gif)$/i.test(reference.file) ? 'image' : null
+    if (!kind) continue
     const tail = text.slice(reference.end, references[index + 1]?.start ?? text.length)
     const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：=]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu)
     if (!checksum) continue
     try {
       const selection = conversationFileSelection(root, reference.file)
       const hash = (checksum[1] || checksum[2]).toLowerCase()
-      images.set(`${selection.path}:${hash}`, { ...selection, hash })
+      media.set(`${selection.path}:${hash}`, { ...selection, hash, kind })
     } catch { /* Ignore files outside the selected project. */ }
   }
-  return [...images.values()]
+  return [...media.values()]
 }
 
-export function reviewImagesFromInteraction(root, interaction) {
-  const images = new Map()
+export function reviewMediaFromInteraction(root, interaction) {
+  const media = new Map()
   for (const question of interaction?.questions || []) {
     const parts = [question.question, question.detail, ...(question.options || []).flatMap(option => [option.label, option.description])]
-    for (const part of parts) for (const image of reviewImagesFromQuestion(root, part)) {
-      if (images.size >= 24) return [...images.values()]
-      images.set(`${image.path}:${image.hash}`, image)
+    for (const part of parts) for (const candidate of reviewMediaFromQuestion(root, part)) {
+      if (media.size >= 24) return [...media.values()]
+      media.set(`${candidate.path}:${candidate.hash}`, candidate)
     }
   }
-  return [...images.values()]
+  return [...media.values()]
 }
 
-export function reviewImagesForActiveQuestion(root, active, interaction) {
+export function reviewMediaForActiveQuestion(root, active, interaction) {
   if (!active?.questionId) return []
   // Use the live request only when it matches the native question currently shown.
   if (active.callKey && active.callKey === interaction?.key) {
@@ -86,8 +88,8 @@ export function reviewImagesForActiveQuestion(root, active, interaction) {
     if (active.questionId.startsWith(prefix)) {
       const index = active.questionId.slice(prefix.length)
       const question = /^\d+$/.test(index) && interaction.questions?.[Number(index)]
-      if (question?.question === active.text) return reviewImagesFromInteraction(root, { questions: [question] })
+      if (question?.question === active.text) return reviewMediaFromInteraction(root, { questions: [question] })
     }
   }
-  return reviewImagesFromQuestion(root, active.text)
+  return reviewMediaFromQuestion(root, active.text)
 }

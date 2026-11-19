@@ -3,8 +3,8 @@ import { seedProjectImages, checkProjectImages, checkProjectFileNavigation, chec
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { appendFile, mkdir, mkdtemp, open, readFile, stat, truncate, writeFile, rm, realpath } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -17,9 +17,10 @@ const fileMode = process.argv[2] === 'files';
 const navigationMode = process.argv[2] === 'navigation';
 const organizeMode = process.argv[2] === 'organize';
 const mediaMode = process.argv[2] === 'media';
+const budgetMode = process.argv[2] === 'budget';
 const referenceMode = process.argv[2] === 'references' || stressMode;
 const reviewMode = !process.argv[2];
-assert(!process.argv[2] || referenceMode || fileMode || mediaMode || navigationMode || organizeMode, '用法：node scripts/smoke-conversation-files.mjs [references|stress|files|media|navigation|organize]');
+assert(!process.argv[2] || referenceMode || fileMode || mediaMode || navigationMode || organizeMode || budgetMode, '用法：node scripts/smoke-conversation-files.mjs [references|stress|files|media|navigation|organize|budget]');
 const run = promisify(execFile), repo = fileURLToPath(new URL('../', import.meta.url));
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir => path.join(repo, dir, 'node_modules/playwright-core/index.mjs')).find(existsSync);
@@ -48,16 +49,16 @@ async function fixture(ctx) {
   if (handle) ctx.effect(() => () => handle.dispose());
   const s = handle?.agent.session || ctx.sessions.create(f.sessionId, { meta: { cwd: root } }), turn = 1, step = 0;
   const text = '仅合成验收，无模型调用。\n\n| 文件 | 审核 |\n| --- | --- |\n| [V2 双人中全景](working/image.png) | 合成图片 |\n| [视频片段](working/video.mp4) | 合成视频 |\n| [导演文档](working/document.md) | 合成文档 |';
-  if (f.conversationReferences) {
+  if (f.conversationReferences || f.budget) {
     s.append('turn/start', {turn});s.append('step/start',{turn,step});
     s.append('request/header',{reason:'initial',header:{config:{provider:'manual-fixture',model:'none'}}});
     s.append('user/message',createUserMessage({content:[{type:'text',text:'合成任务，没有初始引用。'}],source:{kind:'user'}}),{surfaceOp:'append'});
     s.append('assistant/message',{turn,step,message:createAssistantMessage({content:[{type:'text',text}],source:{provider:'manual-fixture',model:'none'}}),stream:[{type:'text-chunks',time0:Date.now(),index:0,dt:[],texts:[text]}]},{surfaceOp:'append'});
-    s.append('step/end',{turn,step});s.append('turn/end',{turn,reason:{kind:'completed'}});await ctx.sessions.flush(s);
+    s.append('step/end',{turn,step});s.append('turn/end',{turn,reason:{kind:f.budget ? 'blocked' : 'completed'}});await ctx.sessions.flush(s);
     ctx.effect(()=>ctx.connection.fetch.register({path:'/api/wtt-chat-file-fixture',methods:['GET'],requestBody:'buffered',fetch:async()=>Response.json({sessionId:s.id,seq:s.seq,callId:f.callId})}));return;
   }
   const args = JSON.stringify({ questions: [{ id: 'review', header: '合成审核', question: '是否采用这份合成内容？',
-    options: [{ label: '采用', description: f.imageHash ? `[四帧拼图](working/review-grid.png) — SHA-256: ${f.imageHash}` : '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
+    options: [{ label: '采用', description: f.imageHash ? `[四帧拼图](working/review-grid.png) — SHA-256: ${f.imageHash}\n[预览视频](working/video.mp4) — SHA-256: ${f.videoHash}` : '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
   s.append('turn/start', { turn }); s.append('step/start', { turn, step });
   s.append('request/header', { reason: 'initial', header: { config: { provider: 'manual-fixture', model: 'none' },
     tools: [{ name: 'ask_user_question', description: '合成问题', parameters: { type: 'object', properties: { questions: { type: 'array' }, timeout: { type: 'number' } } } }] } });
@@ -139,10 +140,15 @@ async function seedMediaAttachment(service, sessions) {
 async function checkVideoRange(page, video) {
   const url = new URL(await video.getAttribute('src'), page.url());
   const response = await page.request.get(url.href, { headers: { Range: 'bytes=32-79' } });
-  const original = await readFile(path.join(workspace, 'working/video.mp4'));
+  const original = await open(path.join(workspace, 'working/video.mp4'));
+  const bytes = Buffer.alloc(48);
+  try {
+    const { size } = await original.stat();
+    assert.equal(response.headers()['content-range'], `bytes 32-79/${size}`);
+    assert.equal((await original.read(bytes, 0, bytes.length, 32)).bytesRead, bytes.length);
+  } finally { await original.close(); }
   assert.equal(response.status(), 206, '播放地址必须响应区间请求');
-  assert.equal(response.headers()['content-range'], `bytes 32-79/${original.length}`);
-  assert.deepEqual(await response.body(), original.subarray(32, 80));
+  assert.deepEqual(await response.body(), bytes);
 }
 
 async function dragVideoTimeline(page, video) {
@@ -354,7 +360,15 @@ for i, (stamp, color) in enumerate(zip(("00:00", "00:04", "00:08", "00:12"), ("#
     draw.text((x + 16, y + 145), stamp, fill="white", font_size=18)
 image.save(sys.argv[1])`, reviewImage]);
   }
-  await run('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', mediaMode ? 'testsrc2=s=320x180:d=8' : 'color=c=blue:s=32x24:d=0.3', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(workspace, 'working/video.mp4')]);
+  const videoFile = path.join(workspace, 'working/video.mp4');
+  await run('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', mediaMode ? 'testsrc2=s=320x180:d=8' : 'color=c=blue:s=32x24:d=3', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', videoFile]);
+  if (reviewMode) {
+    // Pad an otherwise valid MP4 with a free box above the importer size limit.
+    const { size } = await stat(videoFile), boxSize = 21 * 1024 * 1024;
+    const box = Buffer.alloc(8); box.writeUInt32BE(boxSize); box.write('free', 4);
+    await appendFile(videoFile, box);
+    await truncate(videoFile, size + boxSize);
+  }
   const projectImages = fileMode ? await seedProjectImages(workspace, run) : null;
   if(navigationMode||organizeMode)for(const folder of ['分镜 A','分镜 B']){
     await mkdir(path.join(workspace,folder));
@@ -376,8 +390,21 @@ image.save(sys.argv[1])`, reviewImage]);
     } else {
       const task = service.createTask({ requirementId: canvas.id, outputType: 'text', selectedCardIds: [], selectedSkills: [], sourceRefs: [], generation: { mode: 'new' }, instruction: '合成媒体审核任务', operationId: randomUUID() }).task;
       f = { requirementId: canvas.id, sessionId: 'file-smoke-' + randomUUID(), callId: randomUUID() };
-      if (reviewMode) f.imageHash = createHash('sha256').update(await readFile(reviewImage)).digest('hex');
+      if (reviewMode) {
+        f.imageHash = createHash('sha256').update(await readFile(reviewImage)).digest('hex');
+        const digest = createHash('sha256');
+        for await (const chunk of createReadStream(videoFile)) digest.update(chunk);
+        f.videoHash = digest.digest('hex');
+      }
       service.tasks.bindSession({ taskId: task.id, sessionId: f.sessionId });
+      if (budgetMode) {
+        f.budget = true;
+        f.taskId = task.id;
+        service.tasks.setDispatch({ taskId: task.id, status: 'accepted' });
+        service.production.setTaskBudget({ taskId: task.id, ...service.production.policy(), maxSteps: 1 });
+        service.production.sample(task.id, { sessionStats: { steps: 1 } });
+        assert.match(service.production.check(task.id), /达到模型回合预算/);
+      }
       if (referenceMode) { f.conversationReferences = await (stressMode ? seedConversationReferenceStress : seedConversationReferences)(service, canvas.id, workspace, run); f.taskId = task.id; f.taskInput = service.tasks.get(task.id).input; assert(f.taskInput); }
     }
     await writeFile(path.join(workspace, 'fixture.json'), JSON.stringify(f));
@@ -422,6 +449,41 @@ image.save(sys.argv[1])`, reviewImage]);
       const expectedFailures = logs.filter(message => message === 'Failed to load resource: the server responded with a status of 400 (Bad Request)');
       assert.equal(expectedFailures.length, process.env.WTT_FILE_LAYOUT_ONLY === '1' ? 0 : 3, '仅损坏、变化和缺失图片返回400');
       assert.deepEqual(logs.filter(message => !expectedFailures.includes(message) && !layoutWarnings.includes(message)), []);
+    } else if (budgetMode) {
+      const readState = () => page.request.get(new URL('/api/wtt-chat-file-fixture', login).href).then(reply => reply.json());
+      const before = await readState();
+      const task = canvas.locator('.wcc-card-composer:visible');
+      await canvas.getByRole('button', { name: /预算已达上限.*查看任务/ }).click();
+      await task.getByText(/达到模型回合预算/).waitFor();
+      assert.equal(await task.getByRole('button', { name: '继续任务', exact: true }).count(), 0);
+      const input = task.locator('[contenteditable="true"]:visible');
+      await input.fill('保留已写的文件，输出同一版新渲染');
+      await task.getByRole('button', { name: '调整任务预算', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: '任务控制', exact: true });
+      await dialog.getByText('模型回合已用 1 / 1 次', { exact: true }).waitFor();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await dialog.screenshot({ path: path.join(artifacts, 'budget-390.png') });
+      const limit = dialog.getByRole('spinbutton', { name: '模型回合新上限（次）', exact: true });
+      await limit.fill('1');
+      assert.equal(await limit.evaluate(element => element.validity.rangeUnderflow), true);
+      await limit.fill('10');
+      await dialog.getByRole('button', { name: '保存新上限', exact: true }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      const continueTask = task.getByRole('button', { name: '继续任务', exact: true });
+      await continueTask.click();
+      assert.equal(await input.innerText(), '保留已写的文件，输出同一版新渲染');
+      assert.deepEqual(await readState(), before, '调整预算和继续按钮只准备原生草稿');
+      const verify = new WorkbenchService({ workspaceRoot: workspace });
+      try {
+        assert.equal(verify.production.inspect(f.taskId).policy.maxSteps, 10);
+        assert.equal(verify.production.check(f.taskId), null);
+        assert.equal(verify.tasks.get(f.taskId).sessionId, before.sessionId);
+      } finally { verify.close(); }
+      await page.screenshot({ path: path.join(artifacts, 'continuation.png') });
+      assert.deepEqual(errors, []);
+      assert.deepEqual(logs.filter(message => !message.includes('[React Flow]: The parent container needs a width and a height')), []);
+      console.log('PASS 预算暂停、任务控制调整、原会话草稿及未自动发送');
     } else if (referenceMode) {
       await (stressMode ? checkConversationReferenceStress : checkConversationReferences)(page, canvas, f.conversationReferences, artifacts);
       const verify = new WorkbenchService({ workspaceRoot: workspace });
@@ -454,6 +516,16 @@ image.save(sys.argv[1])`, reviewImage]);
     assert.equal(new URL(await candidateImage.getAttribute('src')).searchParams.get('hash'), f.imageHash);
     await page.screenshot({ path: path.join(artifacts, 'review-image-390.png') });
     await viewer.getByRole('button', { name: '关闭候选图片', exact: true }).click();
+    const playCandidate = review.getByRole('button', { name: '播放候选视频 2：video.mp4', exact: true });
+    await playCandidate.click();
+    const videoDialog = page.getByRole('dialog', { name: '候选 2 · video.mp4', exact: true });
+    const reviewVideo = videoDialog.locator('video');
+    await reviewVideo.waitFor();
+    await checkVideoRange(page, reviewVideo);
+    await dragVideoTimeline(page, reviewVideo);
+    assert.equal(await reviewVideo.evaluate(item => item.videoWidth), 32, '待审视频应正确解码');
+    await page.screenshot({ path: path.join(artifacts, 'review-video-390.png') });
+    await videoDialog.getByRole('button', { name: '关闭候选视频', exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled());
     const addCanvasAsset = chat.getByRole('button', { name: '从画布添加资产', exact: true });
@@ -474,7 +546,9 @@ image.save(sys.argv[1])`, reviewImage]);
     await chat.getByRole('button', { name: '视频片段', exact: true }).click();
     const video = canvas.locator('.wtt-outcome-viewer video'); await video.waitFor();
     await checkVideoRange(page, video);
-    await video.evaluate(async item => { await item.play(); item.pause(); if (item.videoWidth !== 32) throw new Error('视频未正确解码'); }); await close();
+    await dragVideoTimeline(page, video);
+    assert.equal(await video.evaluate(item => item.videoWidth), 32, '对话视频应正确解码');
+    await close();
     await chat.getByRole('button', { name: '导演文档', exact: true }).click(); await canvas.getByText('导演文档唯一正文。', { exact: false }).waitFor(); await close();
     assert.deepEqual(await readState(), before, '查看文件不能回答问题或改写原session');
     await review.getByRole('button', { name: '回到卡片对话', exact: true }).click();
@@ -483,6 +557,10 @@ image.save(sys.argv[1])`, reviewImage]);
     await cardThumbnail.locator('img').evaluate(img => img.decode());
     await cardThumbnail.click();
     await viewer.getByRole('button', { name: '关闭候选图片', exact: true }).click();
+    await canvas.getByRole('button', { name: '播放候选视频 2：video.mp4', exact: true }).click();
+    await reviewVideo.waitFor();
+    await checkVideoRange(page, reviewVideo);
+    await videoDialog.getByRole('button', { name: '关闭候选视频', exact: true }).click();
     assert.deepEqual(await readState(), before, '看图不回答原生问题，也不改写会话');
     await main.getByRole('button', { name: 'V2 双人中全景', exact: true }).click(); await image.waitFor();
     await canvas.getByRole('button', { name: '关闭成果预览', exact: true }).click();
@@ -491,7 +569,7 @@ image.save(sys.argv[1])`, reviewImage]);
     const layoutWarning = '[React Flow]: The parent container needs a width and a height to render the graph. Help: https://reactflow.dev/error#004';
     assert.equal(logs.filter(message => message === layoutWarning).length, 2, '窄视口切换的既有画布尺寸警告不可增加');
     assert.deepEqual(logs.filter(message => message !== layoutWarning), []);
-    console.log('PASS 待审图片在两处对话解码、放大和保留原问题；原对话表格图片／视频／文档通过');
+    console.log('PASS 待审图片与候选视频可在两处对话查看并保留原问题；大于 20 MiB 的 MP4 可播放、双向拖动');
     }
     console.log('PAGE', new URL(page.url()).origin, await page.title());
   } catch (error) {

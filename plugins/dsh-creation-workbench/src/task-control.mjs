@@ -39,13 +39,36 @@ export function createTaskControl(ctx, runtime) {
       ? await ctx.waterfall('workspace/session-activity', { sessionId: task.sessionId }, () => Promise.resolve([])) : [];
     const state = agent?.status === 'running' || activity.length ? 'running' : task.runtimeState?.phase || 'unknown';
     const queued = Boolean(agent?.inbox?.nextTurn?.length || agent?.inbox?.nextStep?.length);
+    const budgetLimits = state === 'idle' && !queued && task.runtimeState?.budgetStopped
+      ? service.production.inspect(task.id).exceededLimits : [];
     return { ...common, kind: 'native', state, canStop: Boolean(agent && typeof agent.cancel === 'function' && (state === 'running' || agent.inbox?.nextTurn?.length || agent.inbox?.nextStep?.length)),
       stopLabel: common.relatedCount > 1 ? '停止这组任务' : '停止任务',
-      message: agent ? state === 'running' || queued ? '停止当前对话、待执行内容及关联活动，已保存成果保留。' : '当前会话已不在执行，任务记录和已保存成果保留。'
+      ...(budgetLimits.length ? { budgetLimits } : {}),
+      message: budgetLimits.length ? '任务因预算已达上限暂停。保存新上限后，可回原对话继续。'
+        : agent ? state === 'running' || queued ? '停止当前对话、待执行内容及关联活动，已保存成果保留。' : '当前会话已不在执行，任务记录和已保存成果保留。'
         : ['idle', 'failed'].includes(state) ? '已核对到本轮结束记录，已保存成果保留。' : '当前没有找到可停止的原生会话。可再次核对，或仅移除卡片；不能确认外部执行已停止。' };
   }
   return {
     inspect,
+    async raiseBudget(service, input) {
+      const current = await inspect(service, input, false);
+      if (input.token !== current.token || input.token !== scope(service, bound(service, input)).token || !current.budgetLimits?.length) {
+        throw new Error('任务状态已变化，请重新核对预算。');
+      }
+      const { policy, exceededLimits } = service.production.inspect(current.taskId);
+      const { limits } = input;
+      if (!Array.isArray(limits) || limits.length !== exceededLimits.length || !exceededLimits.length) {
+        throw new Error('预算已变化，请重新核对。');
+      }
+      for (const { key, limit, used } of exceededLimits) {
+        const update = limits.find(item => item?.key === key);
+        if (update?.previous !== limit || !Number.isSafeInteger(update.value) || update.value <= used) {
+          throw new Error('请重新核对并填写大于当前用量的新上限。');
+        }
+        policy[key] = update.value;
+      }
+      return service.production.setTaskBudget({ ...policy, taskId: current.taskId });
+    },
     async stop(service, input) {
       const current = await inspect(service, input, false);
       if (input.token !== current.token) throw new Error('关联任务或会话已变化，请重新核对停止范围');

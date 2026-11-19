@@ -2357,6 +2357,7 @@ function pendingLabel(pending) {
   if (pending?.mediaJob?.status === "cancelled") return "\u5DF2\u53D6\u6D88\u6392\u961F";
   if (pending?.published && pending.phase === "generating") return "\u4EFB\u52A1\u4ECD\u5728\u8FD0\u884C";
   if (pending?.phase === "idle") {
+    if (pending.budgetStopped) return "\u9884\u7B97\u5DF2\u8FBE\u4E0A\u9650";
     if (pending.message?.startsWith("\u672C\u8F6E\u6267\u884C\u5DF2\u53D6\u6D88") || pending.message?.startsWith("\u672C\u8F6E\u6267\u884C\u5DF2\u505C\u6B62")) return "\u672C\u8F6E\u5DF2\u4E2D\u65AD";
     if (pending.message?.startsWith("\u672C\u8F6E\u8FBE\u5230\u8F93\u51FA\u4E0A\u9650")) return "\u5DF2\u8FBE\u8F93\u51FA\u4E0A\u9650";
   }
@@ -2387,7 +2388,7 @@ function pendingRetryAllowed(taskOrPending) {
   return ["draft", "failed"].includes(taskOrPending?.dispatchStatus || taskOrPending?.status);
 }
 function pendingContinueAllowed(pending) {
-  return Boolean(pending?.sessionId && !pending.mediaJob && ["accepted", "output"].includes(pending.status) && ["idle", "failed"].includes(pending.phase));
+  return Boolean(pending?.sessionId && !pending.mediaJob && !pending.budgetStopped && ["accepted", "output"].includes(pending.status) && ["idle", "failed"].includes(pending.phase));
 }
 function isActiveTaskPhase(phase) {
   return ["generating", "awaiting-input", "awaiting-approval"].includes(phase);
@@ -14493,6 +14494,7 @@ function ProjectRecycleDialog({ request, endpoint: endpoint2, onClose, onChanged
 var import_react21 = __toESM(require("react"), 1);
 function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged, onRemove: onRemove2 }) {
   const dialog = (0, import_react21.useRef)(null), mounted = (0, import_react21.useRef)(false), epoch = (0, import_react21.useRef)(0);
+  const budgetFormId = (0, import_react21.useId)();
   const [model, setModel] = (0, import_react21.useState)(null), [loading, setLoading] = (0, import_react21.useState)(true);
   const [busy, setBusy] = (0, import_react21.useState)(false), [error, setError] = (0, import_react21.useState)("");
   async function inspect() {
@@ -14540,8 +14542,26 @@ function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged,
       if (mounted.current) setBusy(false);
     }
   }
+  async function saveBudget(event) {
+    event.preventDefault();
+    if (busy || loading || !model?.budgetLimits?.length) return;
+    const values = new FormData(event.currentTarget);
+    const limits = model.budgetLimits.map(({ key, limit }) => ({ key, previous: limit, value: Number(values.get(key)) }));
+    setBusy(true);
+    setError("");
+    try {
+      await request("raise-task-budget", { taskId, requirementId, token: model.token, limits });
+      await onChanged();
+      if (mounted.current) onClose();
+    } catch (cause) {
+      if (mounted.current) setError(cause.message);
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }
   const removable = model && !model.stopping && ["unknown", "paused", "cancelled", "idle", "failed", "succeeded"].includes(model.state);
-  const action = model?.canStop ? model.stopLabel : model?.job?.canResume ? "\u7EE7\u7EED\u8DDF\u8FDB" : removable && onRemove2 ? "\u79FB\u9664\u5361\u7247" : null;
+  const budgetLimits = model?.budgetLimits;
+  const action = model?.canStop ? model.stopLabel : model?.job?.canResume ? "\u7EE7\u7EED\u8DDF\u8FDB" : removable && onRemove2 && !budgetLimits ? "\u79FB\u9664\u5361\u7247" : null;
   return /* @__PURE__ */ import_react21.default.createElement(
     "dialog",
     {
@@ -14556,8 +14576,8 @@ function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged,
       }
     },
     /* @__PURE__ */ import_react21.default.createElement(DialogHeader, { title: "\u4EFB\u52A1\u63A7\u5236", titleId: "wtt-task-control-title", onClose, busy }),
-    /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-body" }, loading && /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u4EFB\u52A1\u2026"), model && /* @__PURE__ */ import_react21.default.createElement(import_react21.default.Fragment, null, /* @__PURE__ */ import_react21.default.createElement("strong", null, model.title), /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, model.message), model.relatedCount > 1 && /* @__PURE__ */ import_react21.default.createElement("details", { open: true }, /* @__PURE__ */ import_react21.default.createElement("summary", null, "\u540C\u4E00\u5BF9\u8BDD\u5173\u8054 ", model.relatedCount, " \u9879\u4EFB\u52A1"), /* @__PURE__ */ import_react21.default.createElement("ul", null, model.relatedTasks.map((task) => /* @__PURE__ */ import_react21.default.createElement("li", { key: task.id }, task.title))), model.relatedCount > model.relatedTasks.length && /* @__PURE__ */ import_react21.default.createElement("p", null, "\u53E6\u6709 ", model.relatedCount - model.relatedTasks.length, " \u9879"))), error && /* @__PURE__ */ import_react21.default.createElement(UserError, { error })),
-    /* @__PURE__ */ import_react21.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", disabled: busy || loading, onClick: () => void inspect() }, "\u91CD\u65B0\u6838\u5BF9"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: onClose }, "\u5173\u95ED"), action && /* @__PURE__ */ import_react21.default.createElement(
+    /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-body" }, loading && /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u4EFB\u52A1\u2026"), model && /* @__PURE__ */ import_react21.default.createElement(import_react21.default.Fragment, null, /* @__PURE__ */ import_react21.default.createElement("strong", null, model.title), /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, model.message), budgetLimits && /* @__PURE__ */ import_react21.default.createElement("form", { id: budgetFormId, onSubmit: saveBudget }, budgetLimits.map(({ key, label: label2, used, limit, unit }) => /* @__PURE__ */ import_react21.default.createElement("div", { key }, /* @__PURE__ */ import_react21.default.createElement("p", null, label2, "\u5DF2\u7528 ", used.toLocaleString(), " / ", limit.toLocaleString(), " ", unit), /* @__PURE__ */ import_react21.default.createElement("label", { className: "wtt-field" }, label2, "\u65B0\u4E0A\u9650\uFF08", unit, "\uFF09", /* @__PURE__ */ import_react21.default.createElement("input", { name: key, type: "number", inputMode: "numeric", min: Math.floor(used) + 1, step: "1", disabled: busy || loading, required: true }))))), model.relatedCount > 1 && /* @__PURE__ */ import_react21.default.createElement("details", { open: true }, /* @__PURE__ */ import_react21.default.createElement("summary", null, "\u540C\u4E00\u5BF9\u8BDD\u5173\u8054 ", model.relatedCount, " \u9879\u4EFB\u52A1"), /* @__PURE__ */ import_react21.default.createElement("ul", null, model.relatedTasks.map((task) => /* @__PURE__ */ import_react21.default.createElement("li", { key: task.id }, task.title))), model.relatedCount > model.relatedTasks.length && /* @__PURE__ */ import_react21.default.createElement("p", null, "\u53E6\u6709 ", model.relatedCount - model.relatedTasks.length, " \u9879"))), error && /* @__PURE__ */ import_react21.default.createElement(UserError, { error })),
+    /* @__PURE__ */ import_react21.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", disabled: busy || loading, onClick: () => void inspect() }, "\u91CD\u65B0\u6838\u5BF9"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: onClose }, "\u5173\u95ED"), budgetLimits && /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", variant: "primary", type: "submit", form: budgetFormId, disabled: busy || loading }, "\u4FDD\u5B58\u65B0\u4E0A\u9650"), action && /* @__PURE__ */ import_react21.default.createElement(
       UiButton,
       {
         size: "compact",
@@ -46216,6 +46236,7 @@ function OutputPreview({
   loadPreview,
   getPageHref,
   compact = false,
+  deferDesktopSeek = compact,
   emptyMessage,
   onOpenMedia
 }) {
@@ -46231,7 +46252,7 @@ function OutputPreview({
       key: identity4,
       className: "wtt-output-video nodrag nopan nowheel",
       src,
-      deferDesktopSeek: compact,
+      deferDesktopSeek,
       "aria-label": title || "\u751F\u6210\u89C6\u9891",
       onError: () => setMediaError(identity4),
       onPointerDown: (event) => event.stopPropagation(),
@@ -46450,7 +46471,16 @@ function OutcomeViewer({
       onClose,
       closeLabel: "\u5173\u95ED\u6210\u679C\u9884\u89C8"
     }
-  ), /* @__PURE__ */ import_react38.default.createElement(PanelToolbar, null, choices(false), onPinProjectFile && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", "aria-pressed": Boolean(projectFilePinned), onClick: onPinProjectFile }, projectFilePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u9884\u89C8"), onLocateProjectFile && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", onClick: onLocateProjectFile }, "\u5728\u9879\u76EE\u6587\u4EF6\u4E2D\u5B9A\u4F4D"), onAdd2 && source && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react38.default.createElement(UserError, { error }) : source ? isImage ? /* @__PURE__ */ import_react38.default.createElement(OutputPreview, { type: "image", title: source.name, src: imageHref, status: source.status }) : seekableVideo || source.format === "mov" ? /* @__PURE__ */ import_react38.default.createElement(VideoPreview, { key: selectionKey, src: videoHref, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react38.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react38.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
+  ), /* @__PURE__ */ import_react38.default.createElement(PanelToolbar, null, choices(false), onPinProjectFile && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", "aria-pressed": Boolean(projectFilePinned), onClick: onPinProjectFile }, projectFilePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u9884\u89C8"), onLocateProjectFile && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", onClick: onLocateProjectFile }, "\u5728\u9879\u76EE\u6587\u4EF6\u4E2D\u5B9A\u4F4D"), onAdd2 && source && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react38.default.createElement(UserError, { error }) : source ? isImage ? /* @__PURE__ */ import_react38.default.createElement(OutputPreview, { type: "image", title: source.name, src: imageHref, status: source.status }) : seekableVideo ? /* @__PURE__ */ import_react38.default.createElement(
+    OutputPreview,
+    {
+      type: "video",
+      title: source.name,
+      src: source.videoError ? void 0 : videoHref,
+      deferDesktopSeek: Boolean(target.projectPath),
+      emptyMessage: source.videoError ? `${source.videoError}\u3002\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002` : void 0
+    }
+  ) : source.format === "mov" ? /* @__PURE__ */ import_react38.default.createElement(VideoPreview, { key: selectionKey, src: videoHref, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react38.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react38.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
 }
 
 // src/canvas.jsx
@@ -47932,7 +47962,7 @@ function reviewDraftFromQuestion(root2, question) {
   }
   return drafts.size === 1 ? drafts.values().next().value : null;
 }
-function reviewImagesFromQuestion(root2, question) {
+function reviewMediaFromQuestion(root2, question) {
   if (!root2 || !question) return [];
   const text2 = String(question).slice(0, 65536), references = [];
   const pattern = /!?\[[^\[\]\r\n]*\]\((?:<([^<>\r\n]+)>|([^()\r\n]+))\)|`([^`\r\n]+)`/gu;
@@ -47947,44 +47977,45 @@ function reviewImagesFromQuestion(root2, question) {
     references.push({ file, start: match.index, end: match.index + match[0].length });
     if (references.length >= 200) break;
   }
-  const images = /* @__PURE__ */ new Map();
-  for (let index2 = 0; index2 < references.length && images.size < 24; index2++) {
+  const media = /* @__PURE__ */ new Map();
+  for (let index2 = 0; index2 < references.length && media.size < 24; index2++) {
     const reference = references[index2];
-    if (!/\.(png|jpe?g|webp|gif)$/i.test(reference.file)) continue;
+    const kind = /\.(mp4|webm)$/i.test(reference.file) ? "video" : /\.(png|jpe?g|webp|gif)$/i.test(reference.file) ? "image" : null;
+    if (!kind) continue;
     const tail = text2.slice(reference.end, references[index2 + 1]?.start ?? text2.length);
     const checksum = tail.match(/^[\s—–:：;；,-]*(?:(?:草稿\s*)?(?:sha[- ]?256|哈希|校验值)\s*[:：=]?\s*)?(?:`([a-f\d]{64})`|([a-f\d]{64})(?![a-f\d]))/iu);
     if (!checksum) continue;
     try {
       const selection2 = conversationFileSelection(root2, reference.file);
       const hash = (checksum[1] || checksum[2]).toLowerCase();
-      images.set(`${selection2.path}:${hash}`, { ...selection2, hash });
+      media.set(`${selection2.path}:${hash}`, { ...selection2, hash, kind });
     } catch {
     }
   }
-  return [...images.values()];
+  return [...media.values()];
 }
-function reviewImagesFromInteraction(root2, interaction) {
-  const images = /* @__PURE__ */ new Map();
+function reviewMediaFromInteraction(root2, interaction) {
+  const media = /* @__PURE__ */ new Map();
   for (const question of interaction?.questions || []) {
     const parts = [question.question, question.detail, ...(question.options || []).flatMap((option) => [option.label, option.description])];
-    for (const part of parts) for (const image of reviewImagesFromQuestion(root2, part)) {
-      if (images.size >= 24) return [...images.values()];
-      images.set(`${image.path}:${image.hash}`, image);
+    for (const part of parts) for (const candidate of reviewMediaFromQuestion(root2, part)) {
+      if (media.size >= 24) return [...media.values()];
+      media.set(`${candidate.path}:${candidate.hash}`, candidate);
     }
   }
-  return [...images.values()];
+  return [...media.values()];
 }
-function reviewImagesForActiveQuestion(root2, active, interaction) {
+function reviewMediaForActiveQuestion(root2, active, interaction) {
   if (!active?.questionId) return [];
   if (active.callKey && active.callKey === interaction?.key) {
     const prefix = `question-${active.callKey}-`;
     if (active.questionId.startsWith(prefix)) {
       const index2 = active.questionId.slice(prefix.length);
       const question = /^\d+$/.test(index2) && interaction.questions?.[Number(index2)];
-      if (question?.question === active.text) return reviewImagesFromInteraction(root2, { questions: [question] });
+      if (question?.question === active.text) return reviewMediaFromInteraction(root2, { questions: [question] });
     }
   }
-  return reviewImagesFromQuestion(root2, active.text);
+  return reviewMediaFromQuestion(root2, active.text);
 }
 
 // src/review-image-gallery.jsx
@@ -47996,8 +48027,9 @@ function CandidateImage({ image, number, href, onOpen }) {
     setAttempt((value) => value + 1);
   } }, "\u91CD\u65B0\u52A0\u8F7D")) : /* @__PURE__ */ import_react50.default.createElement(UiButton, { variant: "custom", className: "wcc-review-image-thumb", "aria-label": `\u653E\u5927\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onClick: onOpen }, /* @__PURE__ */ import_react50.default.createElement("img", { key: attempt, src: href, alt: `\u5019\u9009\u56FE\u7247 ${number}`, loading: "lazy", decoding: "async", onError: () => setFailed(true) })), /* @__PURE__ */ import_react50.default.createElement("figcaption", { title: image.name }, number, " \xB7 ", image.name));
 }
-function ImageDialog({ image, number, getHref, onClose }) {
+function CandidateDialog({ image, number, getHref, onClose }) {
   const dialog = (0, import_react50.useRef)(null), titleId = (0, import_react50.useId)(), [failed, setFailed] = (0, import_react50.useState)(false);
+  const video = image.kind === "video";
   (0, import_react50.useEffect)(() => {
     const trigger = document.activeElement, element = dialog.current;
     element.showModal();
@@ -48025,26 +48057,41 @@ function ImageDialog({ image, number, getHref, onClose }) {
         titleId,
         downloadHref: getHref(image, false),
         onClose,
-        closeLabel: "\u5173\u95ED\u5019\u9009\u56FE\u7247"
+        closeLabel: video ? "\u5173\u95ED\u5019\u9009\u89C6\u9891" : "\u5173\u95ED\u5019\u9009\u56FE\u7247"
       }
     ),
-    /* @__PURE__ */ import_react50.default.createElement("div", { className: "wcc-review-image-full" }, failed ? /* @__PURE__ */ import_react50.default.createElement("p", { role: "alert" }, "\u56FE\u7247\u6682\u65F6\u65E0\u6CD5\u9884\u89C8\uFF0C\u8BF7\u5173\u95ED\u540E\u91CD\u65B0\u6838\u5BF9\u6587\u4EF6\u4E0E\u6821\u9A8C\u503C\u3002") : /* @__PURE__ */ import_react50.default.createElement("img", { src: getHref(image, true), alt: `\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onError: () => setFailed(true) }))
+    /* @__PURE__ */ import_react50.default.createElement("div", { className: "wcc-review-image-full" }, video ? /* @__PURE__ */ import_react50.default.createElement(OutputPreview, { type: "video", title: image.name, src: getHref(image, true), deferDesktopSeek: true }) : failed ? /* @__PURE__ */ import_react50.default.createElement("p", { role: "alert" }, "\u56FE\u7247\u6682\u65F6\u65E0\u6CD5\u9884\u89C8\uFF0C\u8BF7\u5173\u95ED\u540E\u91CD\u65B0\u6838\u5BF9\u6587\u4EF6\u4E0E\u6821\u9A8C\u503C\u3002") : /* @__PURE__ */ import_react50.default.createElement("img", { src: getHref(image, true), alt: `\u5019\u9009\u56FE\u7247 ${number}\uFF1A${image.name}`, onError: () => setFailed(true) }))
   );
 }
-function ReviewImageGallery({ images, getHref, onOpen }) {
+function ReviewMediaGallery({ items, getHref, onOpen }) {
   const [all, setAll] = (0, import_react50.useState)(false), [opened, setOpened] = (0, import_react50.useState)(null);
-  return /* @__PURE__ */ import_react50.default.createElement("details", { className: "wcc-review-images", open: true }, /* @__PURE__ */ import_react50.default.createElement("summary", null, "\u5019\u9009\u56FE\u7247 \xB7 ", images.length), /* @__PURE__ */ import_react50.default.createElement("div", { className: "wcc-review-image-grid" }, (all ? images : images.slice(0, 3)).map((image, index2) => /* @__PURE__ */ import_react50.default.createElement(
+  const videos = items.filter((item) => item.kind === "video").length;
+  const label2 = !videos ? "\u5019\u9009\u56FE\u7247" : videos === items.length ? "\u5019\u9009\u89C6\u9891" : "\u5F85\u5BA1\u5A92\u4F53";
+  const open = (item, index2) => {
+    if (onOpen(item)) setOpened(index2);
+  };
+  return /* @__PURE__ */ import_react50.default.createElement("details", { className: "wcc-review-images", open: true }, /* @__PURE__ */ import_react50.default.createElement("summary", null, label2, " \xB7 ", items.length), /* @__PURE__ */ import_react50.default.createElement("div", { className: "wcc-review-image-grid" }, (all ? items : items.slice(0, 3)).map((image, index2) => image.kind === "video" ? /* @__PURE__ */ import_react50.default.createElement(
+    UiButton,
+    {
+      key: `${image.path}:${image.hash}`,
+      variant: "ghost",
+      className: "wcc-review-video-trigger",
+      "aria-label": `\u64AD\u653E\u5019\u9009\u89C6\u9891 ${index2 + 1}\uFF1A${image.name}`,
+      title: image.name,
+      onClick: () => open(image, index2)
+    },
+    /* @__PURE__ */ import_react50.default.createElement(UiIcon, { name: "video" }),
+    /* @__PURE__ */ import_react50.default.createElement("span", null, image.name)
+  ) : /* @__PURE__ */ import_react50.default.createElement(
     CandidateImage,
     {
       key: `${image.path}:${image.hash}`,
       image,
       number: index2 + 1,
       href: getHref(image, true),
-      onOpen: () => {
-        if (onOpen(image)) setOpened(index2);
-      }
+      onOpen: () => open(image, index2)
     }
-  ))), images.length > 3 && /* @__PURE__ */ import_react50.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setAll((value) => !value) }, all ? "\u6536\u8D77" : `\u5C55\u5F00\u5176\u4F59 ${images.length - 3} \u5F20`), opened !== null && /* @__PURE__ */ import_react50.default.createElement(ImageDialog, { image: images[opened], number: opened + 1, getHref, onClose: () => setOpened(null) }));
+  ))), items.length > 3 && /* @__PURE__ */ import_react50.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setAll((value) => !value) }, all ? "\u6536\u8D77" : `\u5C55\u5F00\u5176\u4F59 ${items.length - 3} ${videos ? "\u9879" : "\u5F20"}`), opened !== null && /* @__PURE__ */ import_react50.default.createElement(CandidateDialog, { image: items[opened], number: opened + 1, getHref, onClose: () => setOpened(null) }));
 }
 
 // src/card-creation.jsx
@@ -48380,7 +48427,7 @@ function CardComposer({
   onReferenceProjectFile,
   projectRoot,
   onOpenReviewDraft,
-  getReviewImageHref,
+  getReviewMediaHref,
   pendingInteraction,
   busy = false,
   error,
@@ -48466,6 +48513,7 @@ function CardComposer({
   const activeMediaCapabilities = legacyMedia ? mediaCapabilities : apiProvider;
   const taskMode = (inputLocked || context?.pendingGeneration?.published) && !isMedia;
   const canContinue = taskMode && pendingContinueAllowed(context.pendingGeneration) && Boolean(onPrepareContinuation);
+  const budgetPaused = taskMode && context.pendingGeneration?.phase === "idle" && context.pendingGeneration.budgetStopped;
   const reviewingResult = revising && !isMedia && !ACTION_TYPES.has(outputType) && !taskMode && !revisionEditing;
   const showInitialInput = !taskMode && !reviewingResult;
   const stageStatus = taskMode ? pendingLabel(context.pendingGeneration) : reviewingResult ? "\u5DF2\u4FDD\u5B58" : "";
@@ -48478,7 +48526,7 @@ function CardComposer({
   const executionExpanded = hasConversation && conversationOpen && !collapsed;
   const reviewDraft = reviewQuestion?.scope === conversationScope && reviewDraftFromQuestion(projectRoot, reviewQuestion.text);
   const activeReviewQuestion = executionExpanded && reviewQuestion?.scope === conversationScope ? reviewQuestion : null;
-  const reviewImages = (0, import_react51.useMemo)(() => reviewImagesForActiveQuestion(projectRoot, activeReviewQuestion, pendingInteraction), [projectRoot, activeReviewQuestion, pendingInteraction]);
+  const reviewMedia = (0, import_react51.useMemo)(() => reviewMediaForActiveQuestion(projectRoot, activeReviewQuestion, pendingInteraction), [projectRoot, activeReviewQuestion, pendingInteraction]);
   const frameTop = executionExpanded && Number.isFinite(position.canvasHeight) ? Math.max(12, Math.min(position.y, position.canvasHeight - Math.min(560, position.canvasHeight - 24))) : position.y;
   const references = (0, import_react51.useMemo)(() => uniqueCards(referenceItems), [referenceItems]);
   const activeReferenceWork = referenceWork.get(context?.key);
@@ -48613,10 +48661,10 @@ function CardComposer({
     const draft = reviewDraftFromQuestion(projectRoot, question?.querySelector("h2")?.textContent);
     if (draft?.path === reviewDraft.path && draft.hash === reviewDraft.hash) onOpenReviewDraft(draft);
   }
-  function canOpenReviewImage(image) {
+  function canOpenReviewMedia(item) {
     const question = conversationPanel.current?.querySelector(ACTIVE_NATIVE_QUESTION);
     if (question?.getAttribute("aria-labelledby") !== reviewQuestion?.questionId || question?.parentElement?.dataset.questionKey !== reviewQuestion?.callKey || question?.querySelector("h2")?.textContent !== reviewQuestion?.text) return false;
-    return reviewImages.some((current) => current.path === image.path && current.hash === image.hash);
+    return reviewMedia.some((current) => current.path === item.path && current.hash === item.hash);
   }
   (0, import_react51.useEffect)(() => {
     if (!visible || !executionExpanded || !conversationPanel.current) return;
@@ -48818,7 +48866,7 @@ function CardComposer({
         engine: engineSummary,
         renderFile: (reference) => /* @__PURE__ */ import_react51.default.createElement(import_react51.default.Fragment, null, reference.requirementId && onLocateReference && /* @__PURE__ */ import_react51.default.createElement(UiButton, { size: "compact", onClick: () => onLocateReference(reference) }, "\u5B9A\u4F4D\u6765\u6E90"), getReferenceFileHref && (reference.importedFile || reference.generatedFile) && /* @__PURE__ */ import_react51.default.createElement(ImportedReferenceFile, { card: reference, getHref: getReferenceFileHref }))
       }
-    ), context?.pendingGeneration?.error && /* @__PURE__ */ import_react51.default.createElement(UserError, { className: "wcc-creation-error", error: context.pendingGeneration.error }), displayError && displayError !== context?.pendingGeneration?.error && /* @__PURE__ */ import_react51.default.createElement(UserError, { className: "wcc-creation-error", error: displayError }), canContinue && /* @__PURE__ */ import_react51.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react51.default.createElement(
+    ), context?.pendingGeneration?.error && /* @__PURE__ */ import_react51.default.createElement(UserError, { className: "wcc-creation-error", error: context.pendingGeneration.error }), displayError && displayError !== context?.pendingGeneration?.error && /* @__PURE__ */ import_react51.default.createElement(UserError, { className: "wcc-creation-error", error: displayError }), budgetPaused && /* @__PURE__ */ import_react51.default.createElement("div", { className: "wcc-task-stage-actions is-budget-paused" }, /* @__PURE__ */ import_react51.default.createElement("p", { role: "status" }, context.pendingGeneration.message), /* @__PURE__ */ import_react51.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: onTaskControl }, "\u8C03\u6574\u4EFB\u52A1\u9884\u7B97")), canContinue && /* @__PURE__ */ import_react51.default.createElement("div", { className: "wcc-task-stage-actions" }, /* @__PURE__ */ import_react51.default.createElement(
       UiButton,
       {
         variant: "primary",
@@ -48908,13 +48956,13 @@ function CardComposer({
         onClick: openReviewDraft
       },
       "\u67E5\u770B\u5F85\u5BA1\u7A3F"
-    ), /* @__PURE__ */ import_react51.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u67E5\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react51.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u524D\u5F80\u786E\u8BA4"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react51.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react51.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), executionExpanded && visible && !suspended && reviewImages.length > 0 && getReviewImageHref && /* @__PURE__ */ import_react51.default.createElement(
-      ReviewImageGallery,
+    ), /* @__PURE__ */ import_react51.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(true) }, "\u67E5\u770B\u8FC7\u7A0B"), /* @__PURE__ */ import_react51.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => jumpToReview(false) }, "\u524D\u5F80\u786E\u8BA4"))), !collapsed && conversationError?.scope === conversationScope && /* @__PURE__ */ import_react51.default.createElement(UserError, { className: "wcc-creation-error wcc-creation-task-error", error: conversationError.message }), !collapsed && conversationOpen && !hasConversation && /* @__PURE__ */ import_react51.default.createElement("p", { className: "wcc-creation-execution-note", role: "status" }, "\u6B64\u7248\u672C\u7684\u6267\u884C\u4F1A\u8BDD\u5C1A\u672A\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u5C55\u5F00\u6216\u4ECE\u4EFB\u52A1\u4E2D\u6838\u5BF9\u3002"), executionExpanded && visible && !suspended && reviewMedia.length > 0 && getReviewMediaHref && /* @__PURE__ */ import_react51.default.createElement(
+      ReviewMediaGallery,
       {
-        key: `${conversationScope}:${reviewQuestion.questionId}:${reviewImages.map(({ path, hash }) => path + ":" + hash).join("|")}`,
-        images: reviewImages,
-        getHref: getReviewImageHref,
-        onOpen: canOpenReviewImage
+        key: `${conversationScope}:${reviewQuestion.questionId}:${reviewMedia.map(({ path, hash }) => path + ":" + hash).join("|")}`,
+        items: reviewMedia,
+        getHref: getReviewMediaHref,
+        onOpen: canOpenReviewMedia
       }
     ), /* @__PURE__ */ import_react51.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
     /* @__PURE__ */ import_react51.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) })
@@ -50500,7 +50548,7 @@ function SkillConfirmation({
   loadDeckPreview,
   getDeckPageHref,
   projectRoot,
-  getReviewImageHref,
+  getReviewMediaHref,
   renderConversation,
   hidden = false
 }) {
@@ -50515,7 +50563,7 @@ function SkillConfirmation({
   const current = currentEntry();
   const stale = current?.key !== entry.key || current?.interaction !== pending || questionFingerprint(current?.interaction) !== questionFingerprint(pending);
   const permission = pending.kind === "approval";
-  const images = !stale && !sent ? reviewImagesFromInteraction(projectRoot, pending) : [];
+  const reviewMedia = !stale && !sent ? reviewMediaFromInteraction(projectRoot, pending) : [];
   const nativeChat = Boolean(renderConversation && entry.task.sessionId);
   (0, import_react62.useEffect)(() => {
     mounted.current = true;
@@ -50572,15 +50620,15 @@ function SkillConfirmation({
       }
     },
     /* @__PURE__ */ import_react62.default.createElement(PanelHeader, { title: entry.task.title, subtitle: `\u4EFB\u52A1\u5F85\u786E\u8BA4 \xB7 ${interactionLabel(pending)}`, onClose, closeLabel: "\u9690\u85CF\u4EFB\u52A1\u5BF9\u8BDD" }),
-    /* @__PURE__ */ import_react62.default.createElement("div", { className: "wcc-skill-confirmation-body" }, /* @__PURE__ */ import_react62.default.createElement("p", { className: "wcc-skill-scope" }, "\u56DE\u7B54\u540E\u7EE7\u7EED\u8FD9\u6B21\u4EFB\u52A1\u3002\u672C\u6B21\u786E\u8BA4\u4E0D\u4F1A\u53D1\u9001\u6587\u4EF6\u7ED9\u5BA2\u6237\u3002"), sent ? /* @__PURE__ */ import_react62.default.createElement("p", { role: "status" }, "\u56DE\u7B54\u5DF2\u63D0\u4EA4\u3002\u8BF7\u5173\u95ED\u6D6E\u7A97\u67E5\u770B\u539F\u4EFB\u52A1\u8FDB\u5C55\uFF1B\u8FBE\u5230\u9884\u7B97\u65F6\u9700\u8C03\u6574\u540E\u7EE7\u7EED\u3002") : stale ? /* @__PURE__ */ import_react62.default.createElement("p", { role: "status" }, "\u6B64\u95EE\u9898\u5DF2\u7ED3\u675F\u6216\u5DF2\u66F4\u65B0\u3002\u8BF7\u5173\u95ED\u540E\u6253\u5F00\u5F53\u524D\u5F85\u529E\u3002") : /* @__PURE__ */ import_react62.default.createElement(import_react62.default.Fragment, null, images.length > 0 && getReviewImageHref && /* @__PURE__ */ import_react62.default.createElement(
-      ReviewImageGallery,
+    /* @__PURE__ */ import_react62.default.createElement("div", { className: "wcc-skill-confirmation-body" }, /* @__PURE__ */ import_react62.default.createElement("p", { className: "wcc-skill-scope" }, "\u56DE\u7B54\u540E\u7EE7\u7EED\u8FD9\u6B21\u4EFB\u52A1\u3002\u672C\u6B21\u786E\u8BA4\u4E0D\u4F1A\u53D1\u9001\u6587\u4EF6\u7ED9\u5BA2\u6237\u3002"), sent ? /* @__PURE__ */ import_react62.default.createElement("p", { role: "status" }, "\u56DE\u7B54\u5DF2\u63D0\u4EA4\u3002\u8BF7\u5173\u95ED\u6D6E\u7A97\u67E5\u770B\u539F\u4EFB\u52A1\u8FDB\u5C55\uFF1B\u8FBE\u5230\u9884\u7B97\u65F6\u9700\u8C03\u6574\u540E\u7EE7\u7EED\u3002") : stale ? /* @__PURE__ */ import_react62.default.createElement("p", { role: "status" }, "\u6B64\u95EE\u9898\u5DF2\u7ED3\u675F\u6216\u5DF2\u66F4\u65B0\u3002\u8BF7\u5173\u95ED\u540E\u6253\u5F00\u5F53\u524D\u5F85\u529E\u3002") : /* @__PURE__ */ import_react62.default.createElement(import_react62.default.Fragment, null, reviewMedia.length > 0 && getReviewMediaHref && /* @__PURE__ */ import_react62.default.createElement(
+      ReviewMediaGallery,
       {
         key: `${entry.key}:${questionFingerprint(pending)}`,
-        images,
-        getHref: getReviewImageHref,
-        onOpen: (image) => {
+        items: reviewMedia,
+        getHref: getReviewMediaHref,
+        onOpen: (item) => {
           const latest = currentEntry();
-          return latest?.key === entry.key && questionFingerprint(latest.interaction) === questionFingerprint(pending) && reviewImagesFromInteraction(projectRoot, latest.interaction).some((value) => value.path === image.path && value.hash === image.hash);
+          return latest?.key === entry.key && questionFingerprint(latest.interaction) === questionFingerprint(pending) && reviewMediaFromInteraction(projectRoot, latest.interaction).some((value) => value.path === item.path && value.hash === item.hash);
         }
       }
     ), nativeChat ? /* @__PURE__ */ import_react62.default.createElement("section", { className: "wcc-skill-chat", "aria-label": "\u5F53\u524D\u4EFB\u52A1\u539F\u59CB\u5BF9\u8BDD" }, renderConversation(entry.task)) : permission ? /* @__PURE__ */ import_react62.default.createElement("p", null, "AI \u9700\u8981\u4F60\u7684\u6388\u6743\u624D\u80FD\u7EE7\u7EED\u3002\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\uFF0C\u67E5\u770B\u5177\u4F53\u64CD\u4F5C\u540E\u51B3\u5B9A\u662F\u5426\u5141\u8BB8\u3002") : (pending.questions || []).map((question) => /* @__PURE__ */ import_react62.default.createElement("fieldset", { key: question.id, disabled }, /* @__PURE__ */ import_react62.default.createElement("legend", null, question.question.length > 240 ? question.header || "\u8BF7\u5BA1\u9605\u540E\u56DE\u7B54" : `${question.header ? `${question.header} \xB7 ` : ""}${question.question}`), question.question.length > 240 && /* @__PURE__ */ import_react62.default.createElement("pre", { className: "wcc-skill-plan" }, question.question), question.detail && /* @__PURE__ */ import_react62.default.createElement("pre", { className: "wcc-skill-plan" }, question.detail), /* @__PURE__ */ import_react62.default.createElement("div", { className: "wcc-skill-choices" }, (question.options || []).map((option) => /* @__PURE__ */ import_react62.default.createElement("label", { key: option.label }, /* @__PURE__ */ import_react62.default.createElement("input", { type: question.multiSelect ? "checkbox" : "radio", name: `${entry.key}:${question.id}`, checked: (drafts[question.id]?.selected || []).includes(option.label), onChange: (event) => {
@@ -51052,7 +51100,7 @@ var ContentCard = (0, import_react63.memo)(function ContentCard2({ id: id2, data
       title: pending.error || pending.message
     },
     /* @__PURE__ */ import_react63.default.createElement("span", { className: "wcc-generation-indicator", "aria-hidden": "true" }),
-    /* @__PURE__ */ import_react63.default.createElement("strong", null, pending.phase === "idle" && data.slideProject && !fileDeck ? "\u5DE5\u7A0B\u8349\u7A3F\u5F85\u4FDD\u5B58" : pending.phase === "generating" && data.kind !== "generation" && !pending.published ? "\u65B0\u7248\u751F\u6210\u4E2D" : pendingLabel(pending)),
+    /* @__PURE__ */ import_react63.default.createElement("strong", null, pending.phase === "idle" && !pending.budgetStopped && data.slideProject && !fileDeck ? "\u5DE5\u7A0B\u8349\u7A3F\u5F85\u4FDD\u5B58" : pending.phase === "generating" && data.kind !== "generation" && !pending.published ? "\u65B0\u7248\u751F\u6210\u4E2D" : pendingLabel(pending)),
     /* @__PURE__ */ import_react63.default.createElement("span", null, data.composition ? "\u586B\u5199\u8981\u6C42 \u2192" : pendingContinueAllowed(pending) ? "\u7EE7\u7EED\u4EFB\u52A1 \u2192" : "\u67E5\u770B\u4EFB\u52A1 \u2192")
   ), textDraft ? null : pendingMedia ? /* @__PURE__ */ import_react63.default.createElement(import_react63.default.Fragment, null, pending?.error && /* @__PURE__ */ import_react63.default.createElement("p", { className: "wcc-card-generation-message" }, pending.error), /* @__PURE__ */ import_react63.default.createElement(
     OutputPreview,
@@ -51311,6 +51359,11 @@ function CanvasContent({
 }) {
   const panelId = (0, import_react63.useId)();
   const endpoint2 = (query) => apiEndpoint(query, projectId);
+  const reviewMediaHref = (item, preview) => endpoint2({
+    [preview && item.kind !== "video" ? "reviewImage" : "projectFileDownload"]: item.path,
+    hash: item.hash,
+    ...preview && item.kind === "video" ? { preview: "1" } : {}
+  }).href;
   const flow = useReactFlow();
   const flowStore = useStoreApi();
   const updateNodeInternals2 = useUpdateNodeInternals();
@@ -55176,7 +55229,7 @@ function CanvasContent({
       projectRoot: project.path,
       onOpenReviewDraft: onPreviewProjectFile,
       pendingInteraction: effectiveStatuses.get(creation?.sessionId)?.pendingInteraction,
-      getReviewImageHref: (image, preview) => endpoint2({ [preview ? "reviewImage" : "projectFileDownload"]: image.path, hash: image.hash }).href,
+      getReviewMediaHref: reviewMediaHref,
       acceptedFileTypes: ".txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm",
       onLocateReference: (r) => {
         if (r.requirementId !== requirement.id) {
@@ -55428,7 +55481,7 @@ function CanvasContent({
       onClose: () => setSkillReview(null),
       hidden: pickingReferences || Boolean(projectFileSelection?.fromConversation),
       projectRoot: project?.path,
-      getReviewImageHref: (image, preview) => endpoint2({ reviewImage: image.path, hash: image.hash, ...preview ? { preview: "1" } : {} }).href,
+      getReviewMediaHref: reviewMediaHref,
       renderConversation: renderEditorConversation ? (task) => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: "\u4EFB\u52A1" }) : void 0,
       onOpenNative: () => {
         const sessionId = skillReview.entry.task.sessionId;

@@ -10,8 +10,10 @@ import { createWorkbenchSkillCatalog } from './skill-catalog.mjs';
 import { extractSkillNames } from './skill-commands.mjs';
 import { importedFileResponse } from './media-response.mjs';
 import { createNativeTaskStateTracker } from './native-task-state.mjs';
+import { isActiveTaskPhase } from './pending-card-state.mjs';
 import { createTaskControl } from './task-control.mjs';
 import { readReviewImage } from './review-image.mjs';
+import { projectVideoPreview } from './project-video-preview.mjs';
 import { editorParentOrigin } from './baoyu-runtime.mjs';
 import { createProductionObserver } from './production-control.mjs';
 import { DocumentPreview } from './document-preview.mjs';
@@ -44,9 +46,10 @@ export function apply(ctx, config = {}) {
       if (!agent) throw new Error('原课程会话未恢复，批注保留在工程内；请恢复执行与确认后重新发送批注');
       if (agent.status === 'idle') agent.followup(message); else agent.inject(message);
     }, runtimeStateReader: (task, service) => {
-      const state = taskRuntime.read(task, service), budget = service.production?.usage(task.id)?.budgetStop;
-      return budget && state?.phase !== 'generating'
-        ? { phase: 'idle', message: budget, ...(state?.settled ? { settled: true } : {}) } : state;
+      const state = taskRuntime.read(task, service);
+      if (isActiveTaskPhase(state?.phase)) return state;
+      const budget = service.production?.budgetStop(task.id);
+      return budget ? { phase: 'idle', message: budget, budgetStopped: true, ...(state?.settled ? { settled: true } : {}) } : state;
     } });
   ctx.effect(() => () => taskRuntime.close());
   registerWorkbenchSkills(ctx, projects.get());
@@ -150,9 +153,10 @@ export function apply(ctx, config = {}) {
           }
           if (url.searchParams.has('nativePreview')) {
             if (!projectId) throw new Error('文件预览必须指定项目。');
-            return Response.json(service.outcomes.preview({ requirementId: url.searchParams.get('requirementId'),
-              sourceRef: url.searchParams.get('nativePreview'), hash: url.searchParams.get('hash') || undefined,
-              ...(url.searchParams.has('projectPath') ? { projectPath: url.searchParams.get('projectPath') } : {}) }), { headers });
+            const projectPath = url.searchParams.get('projectPath'), hash = url.searchParams.get('hash') || undefined;
+            const video = projectPath && await projectVideoPreview(service.projectFiles, projectPath, { hash, signal: request.signal });
+            return Response.json(video || service.outcomes.preview({ requirementId: url.searchParams.get('requirementId'),
+              sourceRef: url.searchParams.get('nativePreview'), hash, ...(projectPath !== null ? { projectPath } : {}) }), { headers });
           }
           if(url.searchParams.has('projectFilePages')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(await service.projectFiles.documentPreview.get(url.searchParams.get('projectFilePages'),url.searchParams.get('hash')),{headers})}
           if(url.searchParams.has('projectFilePage')){if(!projectId)throw new Error('文件预览必须指定项目');const file=await service.projectFiles.documentPreview.page(url.searchParams.get('projectFilePage'),url.searchParams.get('hash'),Number(url.searchParams.get('page')));return new Response(request.method==='HEAD'?null:file.bytes,{headers:{...headers,'Content-Type':file.mime}})}
@@ -189,8 +193,12 @@ export function apply(ctx, config = {}) {
           if(url.searchParams.has('projectFileStat')){if(!projectId)throw new Error('文件预览必须指定项目');return Response.json(service.projectFiles.stat(url.searchParams.get('projectFileStat')),{headers})}
           if(url.searchParams.has('projectFileDownload')){
             if(!projectId)throw new Error('文件下载必须指定项目');
-            const file=service.projectFiles.read(url.searchParams.get('projectFileDownload'),url.searchParams.get('hash'));
-            const inline=url.searchParams.get('preview')==='1',info=inline?await service.projectFiles.preview(file.path):null;
+            const relative=url.searchParams.get('projectFileDownload'),hash=url.searchParams.get('hash');
+            const inline=url.searchParams.get('preview')==='1';
+            const video=await projectVideoPreview(service.projectFiles,relative,{hash,signal:request.signal,
+              response:{method:request.method,range:request.headers.get('range'),preview:inline,headers}});
+            if(video)return video;
+            const file=service.projectFiles.read(relative,hash),info=inline?await service.projectFiles.preview(file.path):null;
             if(inline&&!(info?.mime?.startsWith('image/')&&info.media?.validated||info?.mime?.startsWith('video/')&&info.media?.validated||info?.mime==='application/pdf'))throw new Error('此格式请下载查看');
             if(inline&&info?.mime==='application/pdf')return new Response(request.method==='HEAD'?null:file.bytes,{headers:{...headers,'Content-Type':'application/pdf','Content-Disposition':`inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,'Content-Security-Policy':"default-src 'none'; sandbox"}});
             return importedFileResponse({...file,mime:info?.mime||'application/octet-stream'},{method:request.method,range:request.headers.get('range'),preview:inline,headers});
@@ -399,6 +407,10 @@ export function apply(ctx, config = {}) {
         if (typeof action==='string' && action.startsWith('project-agent-')) {
           if (!projectId) throw Error('项目助手 必须指定项目');
           return Response.json(await coordinators.api(service,action.slice(14),data),{headers});
+        }
+        if (action === 'raise-task-budget') {
+          if (!projectId) throw new Error('任务控制必须指定当前项目');
+          return Response.json(await taskControl.raiseBudget(service, data || {}), { headers });
         }
         if (['inspect-task-control', 'stop-task-control'].includes(action)) {
           if (!projectId) throw new Error('任务控制必须指定当前项目');

@@ -1,3 +1,5 @@
+export const mediaChunkBytes = 1024 * 1024
+
 export function importedFileResponse(file, { method = 'GET', range, preview = false, headers = {} } = {}) {
   const size = file.bytes?.byteLength ?? file.size
   const body = (start, end) => file.bytes ? file.bytes.slice(start, end + 1) : file.stream(start, end)
@@ -20,4 +22,59 @@ export function importedFileResponse(file, { method = 'GET', range, preview = fa
   }
   return new Response(body(start, end), { status: 206,
     headers: { ...responseHeaders, 'Content-Length': String(end - start + 1), 'Content-Range': `bytes ${start}-${end}/${size}` } })
+}
+
+// Own the open file until the response finishes, is cancelled, or has no body.
+export async function streamedMediaResponse(file, { handle, assertCurrent, changed, signal, ...options }) {
+  let handedOff = false
+  try {
+    return importedFileResponse({
+      ...file,
+      stream(start, end) {
+        let position = start, closed = false, abort;
+        const close = () => {
+          if (closed) return;
+          closed = true;
+          signal?.removeEventListener('abort', abort);
+          return handle.close();
+        };
+        const stream = new ReadableStream({
+          start(controller) {
+            abort = () => {
+              if (closed) return;
+              controller.error(signal.reason);
+              void close()?.catch(() => {});
+            };
+            if (signal?.aborted) abort();
+            else signal?.addEventListener('abort', abort, { once: true });
+          },
+          async pull(controller) {
+            try {
+              await assertCurrent();
+              const chunk = Buffer.allocUnsafe(Math.min(end - position + 1, mediaChunkBytes));
+              const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
+              if (closed) return;
+              if (!bytesRead) throw changed();
+              await assertCurrent();
+              if (closed) return;
+              position += bytesRead;
+              controller.enqueue(chunk.subarray(0, bytesRead));
+              if (position > end) {
+                controller.close();
+                await close();
+              }
+            } catch (cause) {
+              if (!closed) controller.error(cause);
+              await close();
+            }
+          },
+          cancel: close,
+        }, { highWaterMark: 0 });
+        handedOff = true;
+        return stream;
+      },
+    }, options)
+  } finally {
+    if (!handedOff) await handle.close()
+  }
 }

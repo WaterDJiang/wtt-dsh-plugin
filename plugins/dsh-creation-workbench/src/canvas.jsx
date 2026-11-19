@@ -199,7 +199,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
       {pending && data.onTaskControl && <UiButton variant="quiet" size="compact" className="nodrag nopan" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onTaskControl() }}>任务控制</UiButton>}
       {pending && !data.skillTodo && !textDraft && <UiButton variant="custom" className={`wcc-card-generation-status nodrag nopan is-${pending.phase || 'unknown'}`} type="button"
         onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenPending?.() }} title={pending.error || pending.message}>
-        <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' && !pending.published ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : pendingContinueAllowed(pending) ? '继续任务 →' : '查看任务 →'}</span>
+        <span className="wcc-generation-indicator" aria-hidden="true" /><strong>{pending.phase === 'idle' && !pending.budgetStopped && data.slideProject && !fileDeck ? '工程草稿待保存' : pending.phase === 'generating' && data.kind !== 'generation' && !pending.published ? '新版生成中' : pendingLabel(pending)}</strong><span>{data.composition ? '填写要求 →' : pendingContinueAllowed(pending) ? '继续任务 →' : '查看任务 →'}</span>
       </UiButton>}
       {textDraft ? null : pendingMedia ? <>
         {pending?.error && <p className="wcc-card-generation-message">{pending.error}</p>}
@@ -388,6 +388,11 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
   nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile, onLocateProjectFile, onPinProjectFile, desktopTaskNotices }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
+  const reviewMediaHref = (item, preview) => endpoint({
+    [preview && item.kind !== 'video' ? 'reviewImage' : 'projectFileDownload']: item.path,
+    hash: item.hash,
+    ...(preview && item.kind === 'video' ? { preview: '1' } : {}),
+  }).href
   const flow = useReactFlow()
   const flowStore = useStoreApi()
   const updateNodeInternals = useUpdateNodeInternals()
@@ -3464,7 +3469,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
       searchProjectReferences={searchCreationFiles} onReferenceProjectFile={referenceCreationFile}
       projectRoot={project.path} onOpenReviewDraft={onPreviewProjectFile}
       pendingInteraction={effectiveStatuses.get(creation?.sessionId)?.pendingInteraction}
-      getReviewImageHref={(image, preview) => endpoint({ [preview ? 'reviewImage' : 'projectFileDownload']: image.path, hash: image.hash }).href}
+      getReviewMediaHref={reviewMediaHref}
       acceptedFileTypes=".txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm"
       onLocateReference={r=>{
         if(r.requirementId!==requirement.id){onAssetNavigate?.(r.requirementId,r.outputCardId||r.cardId,r.versionId);return}
@@ -3610,7 +3615,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
         y: 76, maxHeight: Math.max(160, canvasSize.height - 88),
       }}
       loadOutputs={loadSkillReviewOutputs} verifyOutputs={verifySkillReviewOutputs} onClose={() => setSkillReview(null)} hidden={pickingReferences || Boolean(projectFileSelection?.fromConversation)}
-      projectRoot={project?.path} getReviewImageHref={(image, preview) => endpoint({ reviewImage: image.path, hash: image.hash, ...(preview ? { preview: '1' } : {}) }).href}
+      projectRoot={project?.path} getReviewMediaHref={reviewMediaHref}
       renderConversation={renderEditorConversation ? task => renderEditorConversation({ identity: `review:${projectId}:${task.id}:${task.sessionId}`, sessionId: task.sessionId, label: '任务' }) : undefined}
       onOpenNative={() => { const sessionId = skillReview.entry.task.sessionId; setSkillReview(null); void openTaskSession(sessionId).then(() => { if (creationRef.current?.sessionId === sessionId) updateCreation(creationRef.current.key, { openExecutionRequest: crypto.randomUUID() }) }) }}
       loadDeckPreview={loadDeckPreview} getDeckPageHref={getDeckPageHref} onOpenOutput={output => { setSkillDeckPreview({ output, review: skillReview }); setSkillReview(null) }} />}

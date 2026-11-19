@@ -2,6 +2,8 @@
 .wtt-project-workbench .wcc-review-images>summary{cursor:pointer;color:var(--wtt-ui-muted);padding:var(--wtt-space-1) 0}
 .wtt-project-workbench .wcc-review-image-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--wtt-space-2);max-height:28dvh;overflow:auto;padding:var(--wtt-space-1)}
 .wtt-project-workbench .wcc-review-image-grid:has(>figure:only-child){grid-template-columns:minmax(0,1fr)}
+.wtt-project-workbench .wcc-review-image-grid button.wcc-review-video-trigger{grid-column:1/-1;justify-content:flex-start;min-width:0}
+.wtt-project-workbench .wcc-review-video-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wtt-project-workbench .wcc-review-images figure{min-width:0;margin:0}
 .wtt-project-workbench .wcc-review-image-thumb{display:block;width:100%;padding:0;aspect-ratio:4/3;border:1px solid var(--wtt-ui-line);border-radius:var(--wtt-radius-control);background:var(--wtt-ui-subtle);overflow:hidden;cursor:zoom-in}
 .wtt-project-workbench .wcc-review-image-grid>figure:only-child .wcc-review-image-thumb{max-height:min(180px,22dvh)}
@@ -14,3 +16,4 @@
 .wtt-project-workbench .wcc-review-image-dialog::backdrop{background:var(--wtt-ui-scrim)}
 .wtt-project-workbench .wcc-review-image-full{display:grid;place-items:center;min-height:0;overflow:auto;padding:var(--wtt-space-2)}
 .wtt-project-workbench .wcc-review-image-full img{display:block;max-width:100%;max-height:calc(100dvh - 100px);object-fit:contain}
+.wtt-project-workbench .wcc-review-image-full .wtt-output-preview.is-video{width:100%;min-width:0}

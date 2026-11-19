@@ -97,6 +97,10 @@ test('continue is available for a stopped accepted task and yields to live confi
   const failed = { ...stopped, phase: 'failed' };
   assert.equal(pendingContinueAllowed(nativePendingState(failed, { running: false })), true);
   assert.equal(pendingContinueAllowed(nativePendingState(failed, { running: true })), false);
+  const budget = { ...stopped, budgetStopped: true };
+  assert.equal(pendingLabel(nativePendingState(budget, { running: false })), '预算已达上限');
+  assert.equal(pendingContinueAllowed(budget), false);
+  assert.equal(pendingLabel(nativePendingState(budget, { pendingInteraction: { kind: 'approval' } })), '等待你授权');
 });
 
 test('published card execution can start or stop independently of its saved version', () => {
