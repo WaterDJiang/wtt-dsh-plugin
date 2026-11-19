@@ -13,6 +13,7 @@ import './project-agent.css';
 const labels={auto:'全自动',plan:'先规划后执行',step:'逐项确认'};
 const statuses={done:'已完成',running:'执行中',paused:'已暂停',approval:'待授权',stopped:'已停止',stopping:'停止待核对',blocked:'待核对',working:'执行中',ready:'待执行'};
 const reviewLabel='授权并执行';
+const assistantName='WTT 项目助手';
 function stored(storage,key,fallback){try{return JSON.parse(storage.getItem(key))??fallback;}catch{return fallback;}}
 function persist(storage,key,value){try{storage.setItem(key,JSON.stringify(value));}catch{/* Position is optional in read-only browser storage. */}}
 function ModeMenu({value,onChange,label='执行方式'}){
@@ -128,15 +129,16 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
   }
   const resizeGrip={
     onPointerDown(event){
-      if(event.button!==0)return;
+      if(event.button!==0||resizeStart.current)return;
       event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);
-      resizeStart.current={x:event.clientX,y:event.clientY,w:width,h:height,right:position.x*dx+width,top:position.y*dy};
+      resizeStart.current={pointerId:event.pointerId,x:event.clientX,y:event.clientY,w:width,h:height,right:position.x*dx+width,top:position.y*dy};
     },
     onPointerMove(event){
       const start=resizeStart.current;
-      if(start)start.result=resizeTo(start.w+start.x-event.clientX,start.h+event.clientY-start.y,start.right,start.top);
+      if(start?.pointerId===event.pointerId)start.result=resizeTo(start.w+start.x-event.clientX,start.h+event.clientY-start.y,start.right,start.top);
     },
-    onLostPointerCapture(){
+    onLostPointerCapture(event){
+      if(resizeStart.current?.pointerId!==event.pointerId)return;
       if(resizeStart.current?.result)saveResize(resizeStart.current.result);
       resizeStart.current=null;
     },
@@ -166,7 +168,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     persist(sessionStorage,key+':references',next);
   }
   const owner={
-    references,requirementId:requirement.id,showError:setError,
+    references,requirementId:requirement.id,showError:setError,chatActive:tab==='chat'&&!picking,
     addReferences(cards){
       const next=[...new Map([...references,...cards.map(toReference)].map(ref=>[ref.requirementId+':'+ref.sourceId,ref])).values()];
       if(next.length>24)throw Error('一次最多引用 24 张卡片，请先移除部分引用。');
@@ -183,7 +185,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
   };
   const locate=ref=>{toggle(false);canvasActions.current.locate(ref);};
   return <>
-    <ToolButton label="打开项目助手" buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
+    <ToolButton label={'打开'+assistantName} buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
       expanded={open} controlsId={open?panelId:undefined} description={waiting>0?waiting+' 项待确认':undefined}
       onClick={()=>toggle(!open)}>
       <img src={wattterAgentLogo} alt="" draggable={false}/>
@@ -191,8 +193,8 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     </ToolButton>
     {open&&canvas&&createPortal(<div className="wtt-agent-layer"><div id={panelId} className="wtt-agent-float is-open" data-picking={picking||undefined} style={{width,height,left:Math.round(clamp(position.x)*dx),top:Math.round(clamp(position.y)*dy)}}
       onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()} onWheel={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}>
-    <div className="wtt-agent-grip" {...grip}><PanelHeader title="项目助手" subtitle={requirement.title} onClose={()=>{toggle(false);launcher.current?.focus({preventScroll:true});}} closeLabel="收起项目助手"/></div>
-    <nav className="wtt-agent-nav" aria-label="项目助手视图">
+    <div className="wtt-agent-grip" {...grip}><PanelHeader title={assistantName} subtitle={requirement.title} onClose={()=>{toggle(false);launcher.current?.focus({preventScroll:true});}} closeLabel={'收起'+assistantName}/></div>
+    <nav className="wtt-agent-nav" aria-label={assistantName+'视图'}>
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='chat'} onClick={()=>setTab('chat')}>对话</UiButton>
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='plans'} aria-label="委托" onClick={()=>setTab('plans')}>委托{waiting>0&&<span className="wtt-agent-tab-count" title={waiting+' 项待确认'}>{waiting}</span>}</UiButton>
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='memory'} onClick={()=>setTab('memory')}>项目记忆{state?.suggestions.length>0&&<span className="wtt-agent-tab-count">{state.suggestions.length}</span>}</UiButton>
@@ -202,8 +204,8 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     {tab==='chat'&&state?.approvals>0&&<div className="wtt-agent-review">
       <UiButton variant="quiet" size="compact" onClick={()=>{setPage(0);setTab('plans');}}>查看待授权计划</UiButton>
     </div>}
-    <section className="wtt-agent-chat" aria-label="项目助手对话" hidden={tab!=='chat'}>
-      {session?<ProjectInputContext.Provider value={owner}>{renderConversation({identity:'project-agent:'+session,sessionId:session,label:'项目助手',editing:false,onSettled:()=>refresh().catch(e=>setError(e.message))})}</ProjectInputContext.Provider>
+    <section className="wtt-agent-chat" aria-label={assistantName+'对话'} hidden={tab!=='chat'}>
+      {session?<ProjectInputContext.Provider value={owner}>{renderConversation({identity:'project-agent:'+session,sessionId:session,label:assistantName,editing:false,onSettled:()=>refresh().catch(e=>setError(e.message))})}</ProjectInputContext.Provider>
         :!error&&<p className="wtt-agent-empty" role="status">正在打开对话…</p>}
     </section>
     {tab==='plans'&&<section className="wtt-agent-queue" aria-label="项目委托">
@@ -216,7 +218,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     </section>}
     {tab==='memory'&&<><ProjectMemoryPanel call={call} onChanged={()=>refresh().catch(e=>setError(e.message))} suggestions={state?.suggestions} onLocate={locate}/>
       {session&&<div className="wtt-agent-footer"><UiButton size="compact" onClick={async()=>{try{const v=await call('session',{replace:session});setSession(v.sessionId);setTab('chat');}catch(e){setError(e.message);}}}>用项目记忆开新对话</UiButton></div>}</>}
-    {size.w>600&&<UiButton variant="custom" className="wtt-agent-resize" aria-label="调整浮窗大小" title="拖动调整浮窗大小" {...resizeGrip}/>}
+    <UiButton variant="custom" className="wtt-agent-resize" aria-label="调整浮窗大小" title="拖动调整浮窗大小" {...resizeGrip}/>
   </div></div>,canvas)}
   </>;
 });

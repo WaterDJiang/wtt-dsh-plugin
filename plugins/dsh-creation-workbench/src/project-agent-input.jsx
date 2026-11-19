@@ -1,10 +1,57 @@
-import React,{useContext,useLayoutEffect,useRef,useState} from 'react';
+import React,{useCallback,useContext,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {CanvasConversationReferenceContext,ProjectInputContext} from './conversation-references.jsx';
 import {UiButton, UiIcon} from './ui/controls.jsx';
 import {CanvasPopover} from './ui/canvas-popover.jsx';
 import {skillSearchText} from './skill-presentation.mjs';
 
 const TOKEN='/项目';
+const noop=()=>{};
+
+function nativeSkillsOpen(controller){
+  const menu=controller?.menu?.getSnapshot();
+  return menu?.open&&menu.hit?.trigger==='/'&&menu.groups.some(group=>group.source==='skill');
+}
+
+// The host caret counts each command or reference chip as one character.
+function triggerDraft(draft,occurrences){
+  let offset=TOKEN.length;
+  let projected='\uFFFC';
+  for(const {offset:start,length} of occurrences){
+    projected+=draft.slice(offset,start)+'\uFFFC';
+    offset=start+length;
+  }
+  return projected+draft.slice(offset);
+}
+
+function typedSkillHit(draft,end,draftRev){
+  const before=draft.slice(0,end);
+  const match=/(?:^|[^\p{L}\p{N}_/])\/([^/\s]*)$/u.exec(before);
+  if(!match)return;
+  const query=match[1],start=end-query.length-1;
+  if(before[start-1]===':'&&start>1&&/\S/u.test(before[start-2]))return;
+  return {trigger:'/',query,quoted:false,position:'inline',span:{start,end,draftRev}};
+}
+
+function fitNativeMenu(tools){
+  const chat=tools?.closest('.wtt-agent-chat');
+  const anchor=chat?.querySelector('[data-composer-overlay]');
+  if(!anchor)return;
+  const composer=anchor.closest('[data-composer-card]');
+  function place(){
+    const top=tools.getBoundingClientRect().top;
+    const bounds=chat.getBoundingClientRect();
+    chat.style.setProperty('--wtt-agent-trigger-offset',`${anchor.getBoundingClientRect().top-top}px`);
+    chat.style.setProperty('--wtt-agent-trigger-space',`${Math.max(0,top-Math.max(0,bounds.top))}px`);
+  }
+  place();
+  const observer=new ResizeObserver(place);
+  for(const element of [chat,tools,composer])if(element)observer.observe(element);
+  return ()=>{
+    observer.disconnect();
+    chat.style.removeProperty('--wtt-agent-trigger-offset');
+    chat.style.removeProperty('--wtt-agent-trigger-space');
+  };
+}
 
 function waitForSkillCandidates(menu,signal){
   return new Promise(resolve=>{
@@ -14,8 +61,8 @@ function waitForSkillCandidates(menu,signal){
     const abort=()=>finish(false);
     const read=()=>{
       const current=menu.getSnapshot();
-      if(!current.open)finish(false);
-      else if(current.groups.some(group=>group.source==='skill'&&group.status==='ready'&&group.items.length))finish(true);
+      const skills=current.groups.find(group=>group.source==='skill');
+      if(!current.open||skills?.status==='ready')finish(Boolean(current.open&&skills?.items.length));
     };
     const stop=menu.subscribe(read);
     if(signal.aborted)abort();
@@ -41,22 +88,23 @@ export function projectInputBridge(ctx){
   return {owners,claim,begin(id,span){
     const scope=ctx.sessions.binding(id)?.ctx;
     return scope?.bail(scope,'slash/input-begin-command',{claim:claim(id),span});
-  },openSkills(id,span,draft,signal){
+  },skillController(id){
     const scope=ctx.sessions.binding(id)?.ctx;
-    if(!scope)throw Error('请等待对话加载后再选择技能。');
-    const controller=ctx.inputTriggers.sessionOf(scope);
+    return scope&&ctx.inputTriggers?.sessionOf(scope);
+  },async openSkills(controller,span,draft,signal){
     if(!controller?.toggleSource||!controller.menu)return false;
-    const closing=controller.launcher?.getSnapshot()==='skill'&&controller.menu.getSnapshot().open;
     controller.toggleSource('skill',{
       trigger:'/',query:'',quoted:false,position:draft.slice(0,span.start).trim()?'inline':'leading',span,
     });
-    return closing||waitForSkillCandidates(controller.menu,signal);
+    const found=await waitForSkillCandidates(controller.menu,signal);
+    if(!found&&!signal.aborted&&nativeSkillsOpen(controller))controller.dismiss();
+    return found;
   },async listSkills(id,signal){
     const result=await ctx.remote.skills.list({sessionId:id},signal);
     if(!result.ok)throw Error(result.error?.message||'技能目录暂时无法读取');
     return result.value.skills;
   },source:{trigger:'/',name:'wtt-project-agent',order:3,showGroupTitle:false,
-    async candidates({sessionId},{query}){return owners.has(sessionId)&&'项目'.includes(query)?[{name:'项目',label:'项目助手'}]:[];},
+    async candidates({sessionId},{query,position}){return owners.has(sessionId)&&position==='leading'&&'项目'.includes(query)?[{name:'项目',label:'WTT 项目助手'}]:[];},
     onPick(){return {text:TOKEN+' ',continue:true};},lexicon:()=>['项目'],
     matchSpace({sessionId},token){if(owners.has(sessionId)&&token===TOKEN)return {claim:claim(sessionId)};},
     async matchClaim({sessionId},token){if(owners.has(sessionId)&&token===TOKEN)return claim(sessionId);},
@@ -70,10 +118,58 @@ export function projectInputBridge(ctx){
 export function ProjectInputDock({sessionId,useInput,inputActions,bridge}){
   const owner=useContext(ProjectInputContext),latest=useRef(owner);
   const picker=useContext(CanvasConversationReferenceContext),pickButton=useRef(null),cancelPick=useRef(null),live=useRef(false);
-  const skillButton=useRef(null),skillQuery=useRef(null),skillAttempt=useRef(null);
+  const tools=useRef(null),skillButton=useRef(null),skillQuery=useRef(null),skillAttempt=useRef(null);
+  const typedSkillFrame=useRef(0);
+  const pressedOpen=useRef(false);
   const [skillMenu,setSkillMenu]=useState(null),[query,setQuery]=useState('');
   latest.current=owner;
   const draft=useInput(v=>v.draft),phase=useInput(v=>v.phase),draftRev=useInput(v=>v.draftRev);
+  const projectClaim=useInput(v=>v.claim?.token===TOKEN+' ');
+  const occurrences=useInput(v=>v.occurrences);
+  const controller=owner&&bridge.skillController(sessionId);
+  const subscribe=useCallback(notify=>controller?.menu?.subscribe(notify)??noop,[controller]);
+  const nativeOpen=useSyncExternalStore(subscribe,()=>controller?.menu?.getSnapshot().open??false);
+  useLayoutEffect(()=>{
+    if(nativeOpen&&owner?.chatActive)return fitNativeMenu(tools.current);
+  },[nativeOpen,owner?.chatActive,sessionId]);
+  useLayoutEffect(()=>{
+    if(!owner)return;
+    const window=skillButton.current?.ownerDocument.defaultView;
+    const chat=tools.current?.closest('.wtt-agent-chat');
+    if(!window||!chat)return;
+    function onPointerDown(event){
+      window.cancelAnimationFrame(typedSkillFrame.current);
+      const onSkillButton=skillButton.current?.contains(event.target);
+      const open=nativeSkillsOpen(controller);
+      // DSH dismisses dock clicks at document capture, before React receives click.
+      pressedOpen.current=onSkillButton&&open;
+      if(onSkillButton||(!open&&!skillAttempt.current)||chat.querySelector('[data-trigger-menu]')?.contains(event.target))return;
+      skillAttempt.current?.abort();
+      if(open)controller.dismiss();
+    }
+    function onKeyDown(event){
+      if(event.key!=='Escape'||!chat.contains(event.target))return;
+      window.cancelAnimationFrame(typedSkillFrame.current);
+      skillAttempt.current?.abort();
+      if(!nativeSkillsOpen(controller))return;
+      event.preventDefault();
+      event.stopPropagation();
+      controller.dismiss();
+    }
+    window.addEventListener('pointerdown',onPointerDown,true);
+    window.addEventListener('keydown',onKeyDown,true);
+    return ()=>{
+      window.removeEventListener('pointerdown',onPointerDown,true);
+      window.removeEventListener('keydown',onKeyDown,true);
+      if(nativeSkillsOpen(controller))controller.dismiss();
+    };
+  },[controller,!!owner]);
+  useLayoutEffect(()=>{
+    if(owner?.chatActive!==false)return;
+    skillAttempt.current?.abort();
+    if(nativeSkillsOpen(controller))controller.dismiss();
+    setSkillMenu(null);
+  },[controller,owner?.chatActive]);
   useLayoutEffect(()=>{
     if(!owner)return;
     live.current=true;
@@ -86,21 +182,42 @@ export function ProjectInputDock({sessionId,useInput,inputActions,bridge}){
     if(!bridge.begin(sessionId,{start:0,end:hasToken?TOKEN.length:0,draftRev})&&!hasToken)
       inputActions.setDraft(TOKEN+' '+draft);
   },[!!owner,phase,draft,draftRev,inputActions,bridge,sessionId]);
+  useLayoutEffect(()=>{
+    if(!owner?.chatActive||phase!=='claimed'||!projectClaim||!controller?.toggleSource||!draft.includes('/',TOKEN.length))return;
+    // Let DSH finish its editor selection updates before launching the skill list.
+    const frame=requestAnimationFrame(()=>{
+      if(controller.menu?.getSnapshot().hit?.trigger==='@')return;
+      const chat=tools.current?.closest('.wtt-agent-chat');
+      const focused=chat?.ownerDocument.activeElement;
+      if(!focused?.isContentEditable||!chat.contains(focused))return;
+      const {start,end,draftRev:revision}=inputActions.captureInsertion();
+      if(start!==end||revision!==draftRev)return;
+      const hit=typedSkillHit(triggerDraft(draft,occurrences??[]),end,revision);
+      if(!hit)return;
+      // A launched source survives the host's next claimed-input caret update.
+      if(controller.launcher?.getSnapshot()==='skill'&&nativeSkillsOpen(controller))controller.dismiss();
+      controller.toggleSource('skill',hit);
+    });
+    typedSkillFrame.current=frame;
+    return ()=>cancelAnimationFrame(frame);
+  },[owner?.chatActive,phase,projectClaim,draft,draftRev,occurrences,controller,inputActions]);
   if(!owner)return null;
   const locked=['adjudicating','submitting'].includes(phase);
-  async function openSkillMenu(){
-    if(visibleSkillMenu){setSkillMenu(null);return;}
-    skillAttempt.current?.abort();
+  async function openSkillMenu(event){
+    const wasOpen=event.detail>0&&pressedOpen.current;
+    pressedOpen.current=false;
+    if(visibleSkillMenu||wasOpen||nativeSkillsOpen(controller)||skillAttempt.current){
+      setSkillMenu(null);
+      skillAttempt.current?.abort();
+      if(nativeSkillsOpen(controller))controller.dismiss();
+      return;
+    }
     const attempt=new AbortController(),{signal}=attempt;
     skillAttempt.current=attempt;
-    document.addEventListener('pointerdown',event=>{
-      if(!skillButton.current?.contains(event.target)&&!event.target.closest?.('[data-trigger-menu]'))attempt.abort();
-    },{capture:true,signal});
-    document.addEventListener('keydown',event=>{if(event.key==='Escape')attempt.abort();},{capture:true,signal});
     try{
       inputActions.focus?.();
       const span=inputActions.captureInsertion();
-      if(await bridge.openSkills(sessionId,span,draft,signal)||signal.aborted)return;
+      if(await bridge.openSkills(controller,span,draft,signal)||signal.aborted)return;
       const skills=await bridge.listSkills(sessionId,signal);
       if(!signal.aborted){setQuery('');setSkillMenu({sessionId,span,skills});}
     }catch(error){if(!signal.aborted)owner.showError(error.message);}
@@ -126,14 +243,15 @@ export function ProjectInputDock({sessionId,useInput,inputActions,bridge}){
       });
     }catch(error){owner.showError(error.message);}
   }
-  return <div className="wtt-agent-input-tools" aria-label="项目助手输入工具">
+  const expanded=Boolean(visibleSkillMenu||nativeSkillsOpen(controller));
+  return <div ref={tools} className="wtt-agent-input-tools" aria-label="WTT 项目助手输入工具">
     <div className="wtt-agent-input-actions">
-      <UiButton ref={skillButton} size="compact" variant="ghost" disabled={locked} aria-label="技能"
-        onMouseDown={event=>event.preventDefault()} onClick={()=>void openSkillMenu()}>
-        技能 <span aria-hidden="true">⌄</span>
+      <UiButton ref={skillButton} size="compact" variant="ghost" disabled={locked} aria-label="技能" aria-expanded={expanded}
+        onMouseDown={event=>event.preventDefault()} onClick={openSkillMenu}>
+        技能 <span aria-hidden="true">{expanded?'⌃':'⌄'}</span>
       </UiButton>
       {visibleSkillMenu&&<CanvasPopover className="wtt-agent-skill-menu" anchorRef={skillButton} initialFocusRef={skillQuery}
-        placement="top-start" role="region" aria-label="选择技能" onDismiss={()=>setSkillMenu(null)}
+        boundary={tools.current?.closest('.wtt-agent-chat')} placement="top-start" role="region" aria-label="选择技能" onDismiss={()=>setSkillMenu(null)}
         onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();setSkillMenu(null);skillButton.current?.focus();}}}>
         {!!visibleSkillMenu.skills.length&&<input ref={skillQuery} value={query} aria-label="搜索技能" placeholder="搜索技能" onChange={event=>setQuery(event.target.value)}/>}
         {matchingSkills.map(skill=><UiButton key={skill.name} variant="ghost" disabled={locked} onClick={()=>insertSkill(skill.name)}>{skill.name}</UiButton>)}

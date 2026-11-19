@@ -6,7 +6,7 @@ const surface = { position: 'fixed', inset: '0 auto auto 0', margin: 0, minWidth
 
 // The top layer escapes the composer's scrolling region and React Flow's
 // transformed nodes, while retaining their DOM, focus and theme inheritance.
-export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusRef, placement = 'bottom-start', onDismiss, ...props }) {
+export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusRef, boundary, placement = 'bottom-start', onDismiss, ...props }) {
   const panelRef = useRef(null)
   const dismiss = useRef(onDismiss)
   dismiss.current = onDismiss
@@ -25,11 +25,11 @@ export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initia
     const target = anchorRef?.current || anchor
     const panel = panelRef.current
     if (!native || !open || !target || !panel) return
-    const boundary = target.closest('.wcc-graph') || target.closest('.wtt-course-canvas') || 'clippingAncestors'
+    const clippingBoundary = boundary || target.closest('.wcc-graph') || target.closest('.wtt-course-canvas') || 'clippingAncestors'
     const computed = getComputedStyle(panel)
     const { maxWidth, maxHeight } = computed
     const spacing = parseFloat(computed.getPropertyValue('--wtt-space-2')) || 8
-    const bounds = { boundary, padding: spacing }
+    const bounds = { boundary: clippingBoundary, padding: spacing }
     let revision = 0
     let focusPending = Boolean(initialFocusRef)
     panel.style.visibility = 'hidden'
@@ -69,8 +69,8 @@ export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initia
     }
 
     const stop = autoUpdate(target, panel, place, { animationFrame: true })
-    const resize = boundary === 'clippingAncestors' ? null : new ResizeObserver(place)
-    resize?.observe(boundary)
+    const resize = clippingBoundary === 'clippingAncestors' ? null : new ResizeObserver(place)
+    resize?.observe(clippingBoundary)
     return () => {
       revision += 1
       stop()
@@ -80,7 +80,7 @@ export function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initia
       panel.style.maxHeight = ''
       panel.style.width = ''
     }
-  }, [native, open, anchorRef, anchor, widthRef, initialFocusRef, placement])
+  }, [native, open, anchorRef, anchor, widthRef, initialFocusRef, boundary, placement])
 
   return <div {...props} ref={panelRef} hidden={!open} popover={native ? 'manual' : undefined}
     style={native ? surface : undefined} />

@@ -1299,6 +1299,8 @@
 /* src/theme.css */
 .wtt-project-workbench {
   color-scheme: light;
+  --wtt-ui-klein-blue: #002fa7;
+  --wtt-ui-assistant-glow: light-dark( color-mix(in srgb, var(--wtt-ui-klein-blue) 30%, transparent), color-mix(in srgb, var(--wtt-ui-klein-blue) 55%, #7195ff 20%) );
   --wtt-ui-card-text: light-dark(#376bc6, #78a9ff);
   --wtt-ui-card-pptx: light-dark(#b5681f, #ffb56b);
   --wtt-ui-card-image: light-dark(#4b832b, #8cd47a);
@@ -1964,6 +1966,13 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   box-shadow: 0 8px 30px var(--wtt-ui-shadow);
   overflow: hidden;
 }
+.wtt-agent-float.is-open {
+  border-color: var(--wtt-ui-klein-blue);
+  box-shadow:
+    0 0 0 1px var(--wtt-ui-assistant-glow),
+    0 0 18px var(--wtt-ui-assistant-glow),
+    0 8px 30px var(--wtt-ui-shadow);
+}
 .wtt-agent-float[data-picking] {
   visibility: hidden;
 }
@@ -2034,6 +2043,13 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   flex: 1;
   min-height: 0;
   min-width: 0;
+}
+.wtt-agent-chat {
+  isolation: isolate;
+}
+.wtt-agent-chat [data-composer-overlay] [data-trigger-menu] {
+  bottom: calc(var(--wtt-agent-trigger-offset,0px) + var(--wtt-space-2));
+  max-height: min(400px, max(0px, calc(var(--wtt-agent-trigger-space,400px) - var(--wtt-space-2) * 2))) !important;
 }
 .wtt-agent-chat [data-composer-command=\9879\76ee] {
   display: none;
@@ -2212,8 +2228,8 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   position: absolute;
   inset: auto auto 0 0;
   z-index: 2;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -2226,11 +2242,14 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   content: "";
   position: absolute;
   inset: auto auto 4px 4px;
-  width: 8px;
-  height: 8px;
-  border-inline-start: 1px solid currentColor;
-  border-block-end: 1px solid currentColor;
+  width: 10px;
+  height: 10px;
+  border-inline-start: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
   border-end-start-radius: 3px;
+}
+.wtt-agent-float button.wtt-agent-resize:is(:hover, :focus-visible) {
+  color: var(--wtt-ui-accent);
 }
 .wtt-agent-section,
 .wtt-agent-step {

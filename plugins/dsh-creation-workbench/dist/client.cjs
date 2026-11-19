@@ -132,7 +132,7 @@ var require_with_selector_development = __commonJS({
         return x2 === y2 && (0 !== x2 || 1 / x2 === 1 / y2) || x2 !== x2 && y2 !== y2;
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React54 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore6 = shim.useSyncExternalStore, useRef45 = React54.useRef, useEffect49 = React54.useEffect, useMemo11 = React54.useMemo, useDebugValue3 = React54.useDebugValue;
+      var React54 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore7 = shim.useSyncExternalStore, useRef45 = React54.useRef, useEffect49 = React54.useEffect, useMemo11 = React54.useMemo, useDebugValue3 = React54.useDebugValue;
       exports.useSyncExternalStoreWithSelector = function(subscribe, getSnapshot, getServerSnapshot, selector2, isEqual) {
         var instRef = useRef45(null);
         if (null === instRef.current) {
@@ -174,7 +174,7 @@ var require_with_selector_development = __commonJS({
           },
           [getSnapshot, getServerSnapshot, selector2, isEqual]
         );
-        var value = useSyncExternalStore6(subscribe, instRef[0], instRef[1]);
+        var value = useSyncExternalStore7(subscribe, instRef[0], instRef[1]);
         useEffect49(
           function() {
             inst.hasValue = true;
@@ -1889,7 +1889,7 @@ var surface = {
   overscrollBehavior: "contain",
   color: "inherit"
 };
-function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusRef, placement = "bottom-start", onDismiss, ...props }) {
+function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusRef, boundary, placement = "bottom-start", onDismiss, ...props }) {
   const panelRef = (0, import_react3.useRef)(null);
   const dismiss = (0, import_react3.useRef)(onDismiss);
   dismiss.current = onDismiss;
@@ -1906,11 +1906,11 @@ function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusR
     const target = anchorRef?.current || anchor;
     const panel = panelRef.current;
     if (!native || !open || !target || !panel) return;
-    const boundary = target.closest(".wcc-graph") || target.closest(".wtt-course-canvas") || "clippingAncestors";
+    const clippingBoundary = boundary || target.closest(".wcc-graph") || target.closest(".wtt-course-canvas") || "clippingAncestors";
     const computed = getComputedStyle(panel);
     const { maxWidth, maxHeight } = computed;
     const spacing = parseFloat(computed.getPropertyValue("--wtt-space-2")) || 8;
-    const bounds = { boundary, padding: spacing };
+    const bounds = { boundary: clippingBoundary, padding: spacing };
     let revision = 0;
     let focusPending = Boolean(initialFocusRef);
     panel.style.visibility = "hidden";
@@ -1952,8 +1952,8 @@ function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusR
       });
     }
     const stop3 = autoUpdate(target, panel, place, { animationFrame: true });
-    const resize = boundary === "clippingAncestors" ? null : new ResizeObserver(place);
-    resize?.observe(boundary);
+    const resize = clippingBoundary === "clippingAncestors" ? null : new ResizeObserver(place);
+    resize?.observe(clippingBoundary);
     return () => {
       revision += 1;
       stop3();
@@ -1963,7 +1963,7 @@ function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusR
       panel.style.maxHeight = "";
       panel.style.width = "";
     };
-  }, [native, open, anchorRef, anchor, widthRef, initialFocusRef, placement]);
+  }, [native, open, anchorRef, anchor, widthRef, initialFocusRef, boundary, placement]);
   return /* @__PURE__ */ import_react3.default.createElement(
     "div",
     {
@@ -1982,6 +1982,49 @@ var skillSearchText = (skill) => `${skillLabel(skill)} ${skill.name} ${skill.des
 
 // src/project-agent-input.jsx
 var TOKEN = "/\u9879\u76EE";
+var noop = () => {
+};
+function nativeSkillsOpen(controller) {
+  const menu = controller?.menu?.getSnapshot();
+  return menu?.open && menu.hit?.trigger === "/" && menu.groups.some((group) => group.source === "skill");
+}
+function triggerDraft(draft, occurrences) {
+  let offset3 = TOKEN.length;
+  let projected = "\uFFFC";
+  for (const { offset: start2, length } of occurrences) {
+    projected += draft.slice(offset3, start2) + "\uFFFC";
+    offset3 = start2 + length;
+  }
+  return projected + draft.slice(offset3);
+}
+function typedSkillHit(draft, end, draftRev) {
+  const before = draft.slice(0, end);
+  const match = /(?:^|[^\p{L}\p{N}_/])\/([^/\s]*)$/u.exec(before);
+  if (!match) return;
+  const query = match[1], start2 = end - query.length - 1;
+  if (before[start2 - 1] === ":" && start2 > 1 && /\S/u.test(before[start2 - 2])) return;
+  return { trigger: "/", query, quoted: false, position: "inline", span: { start: start2, end, draftRev } };
+}
+function fitNativeMenu(tools) {
+  const chat = tools?.closest(".wtt-agent-chat");
+  const anchor = chat?.querySelector("[data-composer-overlay]");
+  if (!anchor) return;
+  const composer = anchor.closest("[data-composer-card]");
+  function place() {
+    const top = tools.getBoundingClientRect().top;
+    const bounds = chat.getBoundingClientRect();
+    chat.style.setProperty("--wtt-agent-trigger-offset", `${anchor.getBoundingClientRect().top - top}px`);
+    chat.style.setProperty("--wtt-agent-trigger-space", `${Math.max(0, top - Math.max(0, bounds.top))}px`);
+  }
+  place();
+  const observer = new ResizeObserver(place);
+  for (const element of [chat, tools, composer]) if (element) observer.observe(element);
+  return () => {
+    observer.disconnect();
+    chat.style.removeProperty("--wtt-agent-trigger-offset");
+    chat.style.removeProperty("--wtt-agent-trigger-space");
+  };
+}
 function waitForSkillCandidates(menu, signal) {
   return new Promise((resolve) => {
     const finish = (visible) => {
@@ -1992,8 +2035,8 @@ function waitForSkillCandidates(menu, signal) {
     const abort = () => finish(false);
     const read = () => {
       const current = menu.getSnapshot();
-      if (!current.open) finish(false);
-      else if (current.groups.some((group) => group.source === "skill" && group.status === "ready" && group.items.length)) finish(true);
+      const skills = current.groups.find((group) => group.source === "skill");
+      if (!current.open || skills?.status === "ready") finish(Boolean(current.open && skills?.items.length));
     };
     const stop3 = menu.subscribe(read);
     if (signal.aborted) abort();
@@ -2033,12 +2076,11 @@ function projectInputBridge(ctx) {
   return { owners, claim, begin(id2, span) {
     const scope = ctx.sessions.binding(id2)?.ctx;
     return scope?.bail(scope, "slash/input-begin-command", { claim: claim(id2), span });
-  }, openSkills(id2, span, draft, signal) {
+  }, skillController(id2) {
     const scope = ctx.sessions.binding(id2)?.ctx;
-    if (!scope) throw Error("\u8BF7\u7B49\u5F85\u5BF9\u8BDD\u52A0\u8F7D\u540E\u518D\u9009\u62E9\u6280\u80FD\u3002");
-    const controller = ctx.inputTriggers.sessionOf(scope);
+    return scope && ctx.inputTriggers?.sessionOf(scope);
+  }, async openSkills(controller, span, draft, signal) {
     if (!controller?.toggleSource || !controller.menu) return false;
-    const closing = controller.launcher?.getSnapshot() === "skill" && controller.menu.getSnapshot().open;
     controller.toggleSource("skill", {
       trigger: "/",
       query: "",
@@ -2046,7 +2088,9 @@ function projectInputBridge(ctx) {
       position: draft.slice(0, span.start).trim() ? "inline" : "leading",
       span
     });
-    return closing || waitForSkillCandidates(controller.menu, signal);
+    const found2 = await waitForSkillCandidates(controller.menu, signal);
+    if (!found2 && !signal.aborted && nativeSkillsOpen(controller)) controller.dismiss();
+    return found2;
   }, async listSkills(id2, signal) {
     const result = await ctx.remote.skills.list({ sessionId: id2 }, signal);
     if (!result.ok) throw Error(result.error?.message || "\u6280\u80FD\u76EE\u5F55\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6");
@@ -2056,8 +2100,8 @@ function projectInputBridge(ctx) {
     name: "wtt-project-agent",
     order: 3,
     showGroupTitle: false,
-    async candidates({ sessionId }, { query }) {
-      return owners.has(sessionId) && "\u9879\u76EE".includes(query) ? [{ name: "\u9879\u76EE", label: "\u9879\u76EE\u52A9\u624B" }] : [];
+    async candidates({ sessionId }, { query, position }) {
+      return owners.has(sessionId) && position === "leading" && "\u9879\u76EE".includes(query) ? [{ name: "\u9879\u76EE", label: "WTT \u9879\u76EE\u52A9\u624B" }] : [];
     },
     onPick() {
       return { text: TOKEN + " ", continue: true };
@@ -2080,10 +2124,57 @@ function projectInputBridge(ctx) {
 function ProjectInputDock({ sessionId, useInput, inputActions, bridge }) {
   const owner = (0, import_react4.useContext)(ProjectInputContext), latest = (0, import_react4.useRef)(owner);
   const picker = (0, import_react4.useContext)(CanvasConversationReferenceContext), pickButton = (0, import_react4.useRef)(null), cancelPick = (0, import_react4.useRef)(null), live = (0, import_react4.useRef)(false);
-  const skillButton = (0, import_react4.useRef)(null), skillQuery = (0, import_react4.useRef)(null), skillAttempt = (0, import_react4.useRef)(null);
+  const tools = (0, import_react4.useRef)(null), skillButton = (0, import_react4.useRef)(null), skillQuery = (0, import_react4.useRef)(null), skillAttempt = (0, import_react4.useRef)(null);
+  const typedSkillFrame = (0, import_react4.useRef)(0);
+  const pressedOpen = (0, import_react4.useRef)(false);
   const [skillMenu, setSkillMenu] = (0, import_react4.useState)(null), [query, setQuery] = (0, import_react4.useState)("");
   latest.current = owner;
   const draft = useInput((v2) => v2.draft), phase = useInput((v2) => v2.phase), draftRev = useInput((v2) => v2.draftRev);
+  const projectClaim = useInput((v2) => v2.claim?.token === TOKEN + " ");
+  const occurrences = useInput((v2) => v2.occurrences);
+  const controller = owner && bridge.skillController(sessionId);
+  const subscribe = (0, import_react4.useCallback)((notify) => controller?.menu?.subscribe(notify) ?? noop, [controller]);
+  const nativeOpen = (0, import_react4.useSyncExternalStore)(subscribe, () => controller?.menu?.getSnapshot().open ?? false);
+  (0, import_react4.useLayoutEffect)(() => {
+    if (nativeOpen && owner?.chatActive) return fitNativeMenu(tools.current);
+  }, [nativeOpen, owner?.chatActive, sessionId]);
+  (0, import_react4.useLayoutEffect)(() => {
+    if (!owner) return;
+    const window2 = skillButton.current?.ownerDocument.defaultView;
+    const chat = tools.current?.closest(".wtt-agent-chat");
+    if (!window2 || !chat) return;
+    function onPointerDown2(event) {
+      window2.cancelAnimationFrame(typedSkillFrame.current);
+      const onSkillButton = skillButton.current?.contains(event.target);
+      const open = nativeSkillsOpen(controller);
+      pressedOpen.current = onSkillButton && open;
+      if (onSkillButton || !open && !skillAttempt.current || chat.querySelector("[data-trigger-menu]")?.contains(event.target)) return;
+      skillAttempt.current?.abort();
+      if (open) controller.dismiss();
+    }
+    function onKeyDown(event) {
+      if (event.key !== "Escape" || !chat.contains(event.target)) return;
+      window2.cancelAnimationFrame(typedSkillFrame.current);
+      skillAttempt.current?.abort();
+      if (!nativeSkillsOpen(controller)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      controller.dismiss();
+    }
+    window2.addEventListener("pointerdown", onPointerDown2, true);
+    window2.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window2.removeEventListener("pointerdown", onPointerDown2, true);
+      window2.removeEventListener("keydown", onKeyDown, true);
+      if (nativeSkillsOpen(controller)) controller.dismiss();
+    };
+  }, [controller, !!owner]);
+  (0, import_react4.useLayoutEffect)(() => {
+    if (owner?.chatActive !== false) return;
+    skillAttempt.current?.abort();
+    if (nativeSkillsOpen(controller)) controller.dismiss();
+    setSkillMenu(null);
+  }, [controller, owner?.chatActive]);
   (0, import_react4.useLayoutEffect)(() => {
     if (!owner) return;
     live.current = true;
@@ -2101,26 +2192,40 @@ function ProjectInputDock({ sessionId, useInput, inputActions, bridge }) {
     if (!bridge.begin(sessionId, { start: 0, end: hasToken ? TOKEN.length : 0, draftRev }) && !hasToken)
       inputActions.setDraft(TOKEN + " " + draft);
   }, [!!owner, phase, draft, draftRev, inputActions, bridge, sessionId]);
+  (0, import_react4.useLayoutEffect)(() => {
+    if (!owner?.chatActive || phase !== "claimed" || !projectClaim || !controller?.toggleSource || !draft.includes("/", TOKEN.length)) return;
+    const frame2 = requestAnimationFrame(() => {
+      if (controller.menu?.getSnapshot().hit?.trigger === "@") return;
+      const chat = tools.current?.closest(".wtt-agent-chat");
+      const focused = chat?.ownerDocument.activeElement;
+      if (!focused?.isContentEditable || !chat.contains(focused)) return;
+      const { start: start2, end, draftRev: revision } = inputActions.captureInsertion();
+      if (start2 !== end || revision !== draftRev) return;
+      const hit = typedSkillHit(triggerDraft(draft, occurrences ?? []), end, revision);
+      if (!hit) return;
+      if (controller.launcher?.getSnapshot() === "skill" && nativeSkillsOpen(controller)) controller.dismiss();
+      controller.toggleSource("skill", hit);
+    });
+    typedSkillFrame.current = frame2;
+    return () => cancelAnimationFrame(frame2);
+  }, [owner?.chatActive, phase, projectClaim, draft, draftRev, occurrences, controller, inputActions]);
   if (!owner) return null;
   const locked2 = ["adjudicating", "submitting"].includes(phase);
-  async function openSkillMenu() {
-    if (visibleSkillMenu) {
+  async function openSkillMenu(event) {
+    const wasOpen = event.detail > 0 && pressedOpen.current;
+    pressedOpen.current = false;
+    if (visibleSkillMenu || wasOpen || nativeSkillsOpen(controller) || skillAttempt.current) {
       setSkillMenu(null);
+      skillAttempt.current?.abort();
+      if (nativeSkillsOpen(controller)) controller.dismiss();
       return;
     }
-    skillAttempt.current?.abort();
     const attempt = new AbortController(), { signal } = attempt;
     skillAttempt.current = attempt;
-    document.addEventListener("pointerdown", (event) => {
-      if (!skillButton.current?.contains(event.target) && !event.target.closest?.("[data-trigger-menu]")) attempt.abort();
-    }, { capture: true, signal });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") attempt.abort();
-    }, { capture: true, signal });
     try {
       inputActions.focus?.();
       const span = inputActions.captureInsertion();
-      if (await bridge.openSkills(sessionId, span, draft, signal) || signal.aborted) return;
+      if (await bridge.openSkills(controller, span, draft, signal) || signal.aborted) return;
       const skills = await bridge.listSkills(sessionId, signal);
       if (!signal.aborted) {
         setQuery("");
@@ -2157,7 +2262,8 @@ function ProjectInputDock({ sessionId, useInput, inputActions, bridge }) {
       owner.showError(error.message);
     }
   }
-  return /* @__PURE__ */ import_react4.default.createElement("div", { className: "wtt-agent-input-tools", "aria-label": "\u9879\u76EE\u52A9\u624B\u8F93\u5165\u5DE5\u5177" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "wtt-agent-input-actions" }, /* @__PURE__ */ import_react4.default.createElement(
+  const expanded = Boolean(visibleSkillMenu || nativeSkillsOpen(controller));
+  return /* @__PURE__ */ import_react4.default.createElement("div", { ref: tools, className: "wtt-agent-input-tools", "aria-label": "WTT \u9879\u76EE\u52A9\u624B\u8F93\u5165\u5DE5\u5177" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "wtt-agent-input-actions" }, /* @__PURE__ */ import_react4.default.createElement(
     UiButton,
     {
       ref: skillButton,
@@ -2165,17 +2271,19 @@ function ProjectInputDock({ sessionId, useInput, inputActions, bridge }) {
       variant: "ghost",
       disabled: locked2,
       "aria-label": "\u6280\u80FD",
+      "aria-expanded": expanded,
       onMouseDown: (event) => event.preventDefault(),
-      onClick: () => void openSkillMenu()
+      onClick: openSkillMenu
     },
     "\u6280\u80FD ",
-    /* @__PURE__ */ import_react4.default.createElement("span", { "aria-hidden": "true" }, "\u2304")
+    /* @__PURE__ */ import_react4.default.createElement("span", { "aria-hidden": "true" }, expanded ? "\u2303" : "\u2304")
   ), visibleSkillMenu && /* @__PURE__ */ import_react4.default.createElement(
     CanvasPopover,
     {
       className: "wtt-agent-skill-menu",
       anchorRef: skillButton,
       initialFocusRef: skillQuery,
+      boundary: tools.current?.closest(".wtt-agent-chat"),
       placement: "top-start",
       role: "region",
       "aria-label": "\u9009\u62E9\u6280\u80FD",
@@ -3921,7 +4029,7 @@ function cc(names) {
 }
 
 // node_modules/d3-dispatch/src/dispatch.js
-var noop = { value: () => {
+var noop2 = { value: () => {
 } };
 function dispatch() {
   for (var i = 0, n = arguments.length, _2 = {}, t; i < n; ++i) {
@@ -3981,7 +4089,7 @@ function get(type, name2) {
 function set(type, name2, callback) {
   for (var i = 0, n = type.length; i < n; ++i) {
     if (type[i].name === name2) {
-      type[i] = noop, type = type.slice(0, i).concat(type.slice(i + 1));
+      type[i] = noop2, type = type.slice(0, i).concat(type.slice(i + 1));
       break;
     }
   }
@@ -13602,6 +13710,7 @@ var wattter_agent_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAA
 var labels = { auto: "\u5168\u81EA\u52A8", plan: "\u5148\u89C4\u5212\u540E\u6267\u884C", step: "\u9010\u9879\u786E\u8BA4" };
 var statuses = { done: "\u5DF2\u5B8C\u6210", running: "\u6267\u884C\u4E2D", paused: "\u5DF2\u6682\u505C", approval: "\u5F85\u6388\u6743", stopped: "\u5DF2\u505C\u6B62", stopping: "\u505C\u6B62\u5F85\u6838\u5BF9", blocked: "\u5F85\u6838\u5BF9", working: "\u6267\u884C\u4E2D", ready: "\u5F85\u6267\u884C" };
 var reviewLabel = "\u6388\u6743\u5E76\u6267\u884C";
+var assistantName = "WTT \u9879\u76EE\u52A9\u624B";
 function stored(storage, key, fallback) {
   try {
     return JSON.parse(storage.getItem(key)) ?? fallback;
@@ -13756,16 +13865,17 @@ var ProjectAgentFloat = import_react18.default.memo(function ProjectAgentFloat2(
   }
   const resizeGrip = {
     onPointerDown(event) {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || resizeStart.current) return;
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
-      resizeStart.current = { x: event.clientX, y: event.clientY, w: width, h: height, right: position.x * dx + width, top: position.y * dy };
+      resizeStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, w: width, h: height, right: position.x * dx + width, top: position.y * dy };
     },
     onPointerMove(event) {
       const start2 = resizeStart.current;
-      if (start2) start2.result = resizeTo(start2.w + start2.x - event.clientX, start2.h + event.clientY - start2.y, start2.right, start2.top);
+      if (start2?.pointerId === event.pointerId) start2.result = resizeTo(start2.w + start2.x - event.clientX, start2.h + event.clientY - start2.y, start2.right, start2.top);
     },
-    onLostPointerCapture() {
+    onLostPointerCapture(event) {
+      if (resizeStart.current?.pointerId !== event.pointerId) return;
       if (resizeStart.current?.result) saveResize(resizeStart.current.result);
       resizeStart.current = null;
     },
@@ -13835,6 +13945,7 @@ var ProjectAgentFloat = import_react18.default.memo(function ProjectAgentFloat2(
     references,
     requirementId: requirement.id,
     showError: setError,
+    chatActive: tab === "chat" && !picking,
     addReferences(cards) {
       const next = [...new Map([...references, ...cards.map(toReference)].map((ref) => [ref.requirementId + ":" + ref.sourceId, ref])).values()];
       if (next.length > 24) throw Error("\u4E00\u6B21\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u5F15\u7528\u3002");
@@ -13868,7 +13979,7 @@ var ProjectAgentFloat = import_react18.default.memo(function ProjectAgentFloat2(
   return /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, /* @__PURE__ */ import_react18.default.createElement(
     ToolButton,
     {
-      label: "\u6253\u5F00\u9879\u76EE\u52A9\u624B",
+      label: "\u6253\u5F00" + assistantName,
       buttonRef: launcher,
       className: `wtt-agent-launch${open ? " is-active" : ""}`,
       expanded: open,
@@ -13891,11 +14002,11 @@ var ProjectAgentFloat = import_react18.default.memo(function ProjectAgentFloat2(
       onWheel: (e) => e.stopPropagation(),
       onKeyDown: (e) => e.stopPropagation()
     },
-    /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-grip", ...grip }, /* @__PURE__ */ import_react18.default.createElement(PanelHeader, { title: "\u9879\u76EE\u52A9\u624B", subtitle: requirement.title, onClose: () => {
+    /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-grip", ...grip }, /* @__PURE__ */ import_react18.default.createElement(PanelHeader, { title: assistantName, subtitle: requirement.title, onClose: () => {
       toggle(false);
       launcher.current?.focus({ preventScroll: true });
-    }, closeLabel: "\u6536\u8D77\u9879\u76EE\u52A9\u624B" })),
-    /* @__PURE__ */ import_react18.default.createElement("nav", { className: "wtt-agent-nav", "aria-label": "\u9879\u76EE\u52A9\u624B\u89C6\u56FE" }, /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "chat", onClick: () => setTab("chat") }, "\u5BF9\u8BDD"), /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "plans", "aria-label": "\u59D4\u6258", onClick: () => setTab("plans") }, "\u59D4\u6258", waiting2 > 0 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "wtt-agent-tab-count", title: waiting2 + " \u9879\u5F85\u786E\u8BA4" }, waiting2)), /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "memory", onClick: () => setTab("memory") }, "\u9879\u76EE\u8BB0\u5FC6", state?.suggestions.length > 0 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "wtt-agent-tab-count" }, state.suggestions.length)), tab === "chat" && /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-mode-anchor" }, /* @__PURE__ */ import_react18.default.createElement(ModeMenu, { value: mode, onChange: (v2) => {
+    }, closeLabel: "\u6536\u8D77" + assistantName })),
+    /* @__PURE__ */ import_react18.default.createElement("nav", { className: "wtt-agent-nav", "aria-label": assistantName + "\u89C6\u56FE" }, /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "chat", onClick: () => setTab("chat") }, "\u5BF9\u8BDD"), /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "plans", "aria-label": "\u59D4\u6258", onClick: () => setTab("plans") }, "\u59D4\u6258", waiting2 > 0 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "wtt-agent-tab-count", title: waiting2 + " \u9879\u5F85\u786E\u8BA4" }, waiting2)), /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "memory", onClick: () => setTab("memory") }, "\u9879\u76EE\u8BB0\u5FC6", state?.suggestions.length > 0 && /* @__PURE__ */ import_react18.default.createElement("span", { className: "wtt-agent-tab-count" }, state.suggestions.length)), tab === "chat" && /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-mode-anchor" }, /* @__PURE__ */ import_react18.default.createElement(ModeMenu, { value: mode, onChange: (v2) => {
       setMode(v2);
       persist(localStorage, key + ":mode", v2);
     } }))),
@@ -13904,7 +14015,7 @@ var ProjectAgentFloat = import_react18.default.memo(function ProjectAgentFloat2(
       setPage(0);
       setTab("plans");
     } }, "\u67E5\u770B\u5F85\u6388\u6743\u8BA1\u5212")),
-    /* @__PURE__ */ import_react18.default.createElement("section", { className: "wtt-agent-chat", "aria-label": "\u9879\u76EE\u52A9\u624B\u5BF9\u8BDD", hidden: tab !== "chat" }, session ? /* @__PURE__ */ import_react18.default.createElement(ProjectInputContext.Provider, { value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: "\u9879\u76EE\u52A9\u624B", editing: false, onSettled: () => refresh().catch((e) => setError(e.message)) })) : !error && /* @__PURE__ */ import_react18.default.createElement("p", { className: "wtt-agent-empty", role: "status" }, "\u6B63\u5728\u6253\u5F00\u5BF9\u8BDD\u2026")),
+    /* @__PURE__ */ import_react18.default.createElement("section", { className: "wtt-agent-chat", "aria-label": assistantName + "\u5BF9\u8BDD", hidden: tab !== "chat" }, session ? /* @__PURE__ */ import_react18.default.createElement(ProjectInputContext.Provider, { value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: assistantName, editing: false, onSettled: () => refresh().catch((e) => setError(e.message)) })) : !error && /* @__PURE__ */ import_react18.default.createElement("p", { className: "wtt-agent-empty", role: "status" }, "\u6B63\u5728\u6253\u5F00\u5BF9\u8BDD\u2026")),
     tab === "plans" && /* @__PURE__ */ import_react18.default.createElement("section", { className: "wtt-agent-queue", "aria-label": "\u9879\u76EE\u59D4\u6258" }, !state?.plans?.length && /* @__PURE__ */ import_react18.default.createElement("p", { className: "wtt-agent-empty" }, state ? "\u6682\u65E0\u59D4\u6258" : "\u6B63\u5728\u8BFB\u53D6\u59D4\u6258\u2026"), /* @__PURE__ */ import_react18.default.createElement(Plans, { plans: state?.plans, act, locate, busy }), state?.total > 20 && /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react18.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875"))),
     tab === "memory" && /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, /* @__PURE__ */ import_react18.default.createElement(ProjectMemoryPanel, { call, onChanged: () => refresh().catch((e) => setError(e.message)), suggestions: state?.suggestions, onLocate: locate }), session && /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-footer" }, /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", onClick: async () => {
       try {
@@ -13915,7 +14026,7 @@ var ProjectAgentFloat = import_react18.default.memo(function ProjectAgentFloat2(
         setError(e.message);
       }
     } }, "\u7528\u9879\u76EE\u8BB0\u5FC6\u5F00\u65B0\u5BF9\u8BDD"))),
-    size3.w > 600 && /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "custom", className: "wtt-agent-resize", "aria-label": "\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", title: "\u62D6\u52A8\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", ...resizeGrip })
+    /* @__PURE__ */ import_react18.default.createElement(UiButton, { variant: "custom", className: "wtt-agent-resize", "aria-label": "\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", title: "\u62D6\u52A8\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", ...resizeGrip })
   )), canvas));
 });
 
@@ -35104,8 +35215,8 @@ function decodeTlds(encoded) {
 var defaults = {
   defaultProtocol: "http",
   events: null,
-  format: noop2,
-  formatHref: noop2,
+  format: noop3,
+  formatHref: noop3,
   nl2br: false,
   tagName: "a",
   target: null,
@@ -35234,7 +35345,7 @@ Options.prototype = {
     return renderFn(ir, token.t, token);
   }
 };
-function noop2(val) {
+function noop3(val) {
   return val;
 }
 function MultiToken(value, tokens) {
@@ -53702,7 +53813,7 @@ function CanvasContent({
       handoff,
       onHandoff: operateHandoff,
       handoffBusy,
-      handoffError: handoffError?.cardId === assistantCardId ? handoffError.message : null,
+      handoffError: handoffError && handoffError.cardId === assistantCardId ? handoffError.message : null,
       creationTypes: creation ? [...creationMenuItems(creation.anchor).map((item) => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...["outline", "exercise", "script"].map((id2) => ({ id: id2, label: "\u6587\u672C", available: true })), ...["word", "excerpt", "material"].map((id2) => ({ id: id2, label: OUTPUT_LABELS[id2], available: true }))] : productionTypes,
       skillCatalog,
       skillCatalogLoading,

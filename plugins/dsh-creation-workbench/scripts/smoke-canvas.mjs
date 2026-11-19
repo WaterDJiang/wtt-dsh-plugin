@@ -539,14 +539,18 @@ try {
       const { checkProjectAgentIdle }=await import('./project-agent-idle-audit.mjs');
       await checkProjectAgentIdle(page,canvas,api,agentModel);
     } else if(scenario==='agent'){
+      await card.locator('.wcc-card-body').click({position:{x:30,y:24}});
+      const materialComposer=canvas.locator('.wcc-card-composer:visible');
+      await materialComposer.locator('textarea').first().waitFor();
+      await materialComposer.getByRole('button',{name:'关闭卡片创作框'}).click();
       const toolbar=canvas.getByRole('toolbar',{name:'白板工具'});
-      const launcher=toolbar.getByRole('button',{name:'打开项目助手'});
+      const launcher=toolbar.getByRole('button',{name:'打开WTT 项目助手'});
       const before=await launcher.boundingBox();
       const materialTool=await toolbar.getByRole('button',{name:'添加素材'}).boundingBox();
       assert.equal(before.width,materialTool.width);
       assert.equal(before.x,materialTool.x);
       assert(before.y>=materialTool.y+materialTool.height);
-      assert.equal(await canvas.getByRole('button',{name:'打开项目助手'}).count(),1);
+      assert.equal(await canvas.getByRole('button',{name:'打开WTT 项目助手'}).count(),1);
       const logo=launcher.locator('img');
       await logo.evaluate(img=>img.decode());
       assert.equal(await logo.evaluate(img=>img.naturalWidth),128);
@@ -556,7 +560,9 @@ try {
       await canvas.focus();await page.keyboard.press('Meta+a');
       await launcher.focus();await launcher.press('Enter');
       const panel=canvas.locator('.wtt-agent-float.is-open');
-      await panel.getByRole('heading',{name:'项目助手',exact:true}).waitFor();
+      await panel.getByRole('heading',{name:'WTT 项目助手',exact:true}).waitFor();
+      assert.equal(await panel.evaluate(el=>getComputedStyle(el).borderColor),'rgb(0, 47, 167)');
+      assert.match(await panel.evaluate(el=>getComputedStyle(el).boxShadow),/18px/,'浮窗应有克莱因蓝外光晕');
       assert.equal(await launcher.getAttribute('aria-expanded'),'true');
       const firstPosition=await panel.boundingBox();
       const titleBar=await panel.locator('.wtt-agent-grip').boundingBox();
@@ -564,7 +570,7 @@ try {
       await page.mouse.move(titleBar.x-20,titleBar.y-16,{steps:8});await page.mouse.up();
       assert((await panel.boundingBox()).x<firstPosition.x-80);
       assert.deepEqual(await launcher.boundingBox(),before);
-      await panel.getByRole('button',{name:'收起项目助手'}).click();
+      await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       assert.equal(await launcher.evaluate(button=>button===document.activeElement),true);
       assert.equal(await launcher.getAttribute('aria-expanded'),'false');
       assert.equal(await panel.count(),0);
@@ -588,6 +594,18 @@ try {
       const input=panel.locator('[contenteditable=true]').last();
       const skillsButton=panel.getByRole('button',{name:'技能',exact:true});
       const fallbackSkillMenu=page.getByRole('region',{name:'选择技能',exact:true});
+      const skillOptions=noNativeSkillMenu?fallbackSkillMenu:panel.locator('[data-trigger-menu]').filter({hasText:'wtt-qa-layout'});
+      async function checkSkillMenuBounds(){
+        const menu=await skillOptions.boundingBox(),button=await skillsButton.boundingBox(),nav=await panel.getByRole('navigation',{name:'WTT 项目助手视图'}).boundingBox();
+        assert(menu&&button&&nav);
+        const viewport=page.viewportSize();
+        assert(menu.x>=0&&menu.x+menu.width<=viewport.width+1&&menu.y>=nav.y+nav.height-1&&menu.y+menu.height<=button.y+1,
+          '技能菜单须在页签与技能按钮之间：'+JSON.stringify({menu,button,nav,viewport}));
+        assert(await skillsButton.evaluate(button=>{
+          const box=button.getBoundingClientRect();
+          return button.contains(document.elementFromPoint(box.x+box.width/2,box.y+box.height/2));
+        }),'菜单展开后技能按钮仍须可以点击');
+      }
       async function pickSkill(){
         if(noNativeSkillMenu)await fallbackSkillMenu.getByRole('textbox',{name:'搜索技能'}).fill('wtt-qa-layout');
         await page.getByText('wtt-qa-layout',{exact:true}).filter({visible:true}).last().click();
@@ -597,6 +615,34 @@ try {
       assert(await routingLabel.isHidden(),'自动加入的项目指令不应显示在输入框');
       assert.doesNotMatch(await input.innerText(),/\/项目/u);
       if(fixture.referenceId){
+        if(!noNativeSkillMenu){
+          await input.click();await page.keyboard.type('/');
+          await skillOptions.waitFor({timeout:5000});
+          await checkSkillMenuBounds();
+          if(process.env.WTT_SMOKE_ARTIFACTS)await page.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-slash.png')});
+          await page.keyboard.press('Escape');await skillOptions.waitFor({state:'hidden'});
+          assert.match(await input.innerText(),/\//u);
+          await input.press('Backspace');
+          await page.keyboard.type('@"./');
+          await panel.locator('[data-trigger-menu] [id^="dsh-slash-option-reference-"]').first().waitFor();
+          assert.equal(await skillOptions.count(),0,'带斜杠的 @ 路径应继续打开文件引用');
+          await page.keyboard.press('Escape');
+          for(const char of '@"./')await input.press('Backspace');
+        }
+        await input.click();await page.keyboard.insertText('草稿验收');
+        await skillsButton.click();await skillOptions.waitFor();
+        await checkSkillMenuBounds();
+        await skillsButton.click();await skillOptions.waitFor({state:'hidden'});
+        await skillsButton.click();await skillOptions.waitFor();
+        await page.keyboard.press('Escape');await skillOptions.waitFor({state:'hidden'});
+        await skillsButton.click();await skillOptions.waitFor();
+        await panel.getByRole('heading',{name:'WTT 项目助手',exact:true}).click();await skillOptions.waitFor({state:'hidden'});
+        await skillsButton.click();await skillOptions.waitFor();
+        await plansTab.press('Enter');await chatTab.press('Enter');
+        await skillOptions.waitFor({state:'hidden'});
+        assert.match(await input.innerText(),/草稿验收/);
+        await input.press('End');
+        for(let i=0;i<'草稿验收'.length;i++)await input.press('Backspace');
         const oldSize=await panel.boundingBox();
         const grip=panel.getByRole('button',{name:'调整浮窗大小'});
         const handle=await grip.boundingBox();
@@ -612,7 +658,7 @@ try {
         },{w:oldSize.width,h:oldSize.height},{timeout:3000});
         const resized=await panel.boundingBox();
         assert(resized.width<oldSize.width-25&&resized.height<oldSize.height-25);
-        await panel.getByRole('button',{name:'收起项目助手'}).click();await launcher.click();
+        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await launcher.click();
         assert.equal((await panel.boundingBox()).width,resized.width);
         await panel.getByText('已选 2 张',{exact:true}).click();
         await panel.getByRole('button',{name:'移除引用 采访乙'}).click();
@@ -625,7 +671,22 @@ try {
         await panel.getByText('已选 2 张',{exact:true}).waitFor();
         await selectCanvas.selectOption(fixture.id);
         await input.click();await input.press('End');
-        await skillsButton.click();await pickSkill();
+        if(noNativeSkillMenu){
+          await skillsButton.click();await pickSkill();
+        }else{
+          await page.keyboard.insertText('正文技能 ');
+          await page.keyboard.type('/wtt-qa-lay');
+          await skillOptions.getByRole('option',{name:/wtt-qa-layout/}).waitFor();
+          await page.keyboard.press('Enter');
+          await skillOptions.waitFor({state:'hidden'});
+          assert.match(await input.innerText(),/正文技能\s+\/wtt-qa-layout/,'正文与选中的技能应保留');
+          await page.keyboard.type('/wtt-qa-lay');
+          await skillOptions.getByRole('option',{name:/wtt-qa-layout/}).waitFor();
+          await page.keyboard.press('Escape');
+          await skillOptions.waitFor({state:'hidden'});
+          for(const char of '/wtt-qa-lay')await input.press('Backspace');
+          console.log('PASS 斜杠搜索、键盘选择及已有技能后的再次触发');
+        }
         assert.match(await input.innerText(),/wtt-qa-layout/,'原生技能菜单须把调用插入草稿');
         await plansTab.click();await chatTab.click();
         assert.match(await input.innerText(),/wtt-qa-layout/,'切换页签须保留草稿');
@@ -665,7 +726,7 @@ try {
         }
         await approve.click();
       }
-      await panel.getByRole('button',{name:'收起项目助手'}).click();
+      await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       const checkHandoff=process.env.WTT_AGENT_SMOKE_HANDOFF==='1';
       assert(!checkHandoff||(mode==='plan'&&process.env.WTT_AGENT_SMOKE_QUESTION==='1'),'交接冒烟需要计划授权与原生提问');
       let adoptedVersion;
@@ -713,13 +774,13 @@ try {
         await launcher.click();await plansTab.click();await panel.getByRole('button',{name:'定位 V2',exact:true}).waitFor();
         assert.equal((await state()).plans[0].steps[1].taskId,null);
         await panel.getByRole('button',{name:'继续剩余步骤',exact:true}).click();
-        await panel.getByRole('button',{name:'收起项目助手'}).click();
+        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       }
       if(mode==='step'){
         await launcher.click();
         await plansTab.click();
         await panel.getByRole('button',{name:'执行此项',exact:true}).click({timeout:25000});
-        await panel.getByRole('button',{name:'收起项目助手'}).click();
+        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       }
       const deadline=Date.now()+40000;
       let live=await state();
@@ -766,6 +827,18 @@ try {
         const box=document.querySelector('.wtt-agent-float.is-open')?.getBoundingClientRect();
         return box&&box.width>0&&box.left>=0&&box.right<=innerWidth+1;
       },null,{timeout:3000});
+      if(fixture.referenceId){
+        await skillsButton.click();await skillOptions.waitFor();await checkSkillMenuBounds();
+        if(process.env.WTT_SMOKE_ARTIFACTS)await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-skills-narrow.png')});
+        const narrowHeight=(await panel.boundingBox()).height;
+        const grip=await panel.getByRole('button',{name:'调整浮窗大小'}).boundingBox();
+        assert(grip,'窄屏仍应提供可操作的缩放手柄');
+        await page.mouse.move(grip.x+grip.width/2,grip.y+grip.height/2);
+        await page.mouse.down();await page.mouse.move(grip.x+grip.width/2,grip.y+grip.height/2-28,{steps:6});await page.mouse.up();
+        await skillOptions.waitFor({state:'hidden'});
+        assert((await panel.boundingBox()).height<narrowHeight-20,'窄屏拖动手柄须缩小浮窗');
+        console.log('PASS 技能菜单在常规与窄视窗收起，打开菜单时可在窄屏拖动缩放');
+      }
       if(fixture.referenceId&&process.env.WTT_SMOKE_ARTIFACTS){
         await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-narrow.png')});
         await page.evaluate(()=>{
@@ -787,7 +860,7 @@ try {
         await page.keyboard.press('Escape');await fallbackSkillMenu.waitFor({state:'hidden'});
         console.log('PASS 原生技能菜单缺失时使用同一会话目录，搜索、插入、取消和窄屏均可用');
       }
-      await panel.getByRole('button',{name:'收起项目助手'}).click();await launcher.waitFor();
+      await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await launcher.waitFor();
       const compact=await launcher.boundingBox();
       const rail=await toolbar.boundingBox();
       assert(compact.x>=rail.x&&compact.x+compact.width<=rail.x+rail.width&&compact.y+compact.height<=680);

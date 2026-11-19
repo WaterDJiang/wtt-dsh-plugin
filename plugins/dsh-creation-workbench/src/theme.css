@@ -1,6 +1,11 @@
 /* CW-18：只消费宿主主题，变量仅作用于工作台；不改宿主或媒体像素。 */
 .wtt-project-workbench {
   color-scheme: light;
+  --wtt-ui-klein-blue: #002fa7;
+  --wtt-ui-assistant-glow: light-dark(
+    color-mix(in srgb, var(--wtt-ui-klein-blue) 30%, transparent),
+    color-mix(in srgb, var(--wtt-ui-klein-blue) 55%, #7195ff 20%)
+  );
   --wtt-ui-card-text: light-dark(#376bc6, #78a9ff);
   --wtt-ui-card-pptx: light-dark(#b5681f, #ffb56b);
   --wtt-ui-card-image: light-dark(#4b832b, #8cd47a);

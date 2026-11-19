@@ -3327,7 +3327,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     <CardComposer onPickCanvasReferences={startReferencePick} suspended={draggingCard} visible={composerVisible && !pickingReferences} position={composerPosition(view)} context={creation ? { ...creation,
       pendingGeneration: publishedExecution || nativePendingState(creation.pendingGeneration, effectiveStatuses.get(creation.pendingGeneration?.sessionId || creation.sessionId)) } : creation}
       references={creationReferences} availableReferences={availableReferences}
-      handoff={handoff} onHandoff={operateHandoff} handoffBusy={handoffBusy} handoffError={handoffError?.cardId===assistantCardId?handoffError.message:null}
+      handoff={handoff} onHandoff={operateHandoff} handoffBusy={handoffBusy} handoffError={handoffError && handoffError.cardId===assistantCardId ? handoffError.message : null}
       creationTypes={creation ? [...creationMenuItems(creation.anchor).map(item => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...['outline', 'exercise', 'script'].map(id => ({ id, label: '文本', available: true })), ...['word', 'excerpt', 'material'].map(id => ({ id, label: OUTPUT_LABELS[id], available: true }))] : productionTypes}
       skillCatalog={skillCatalog} skillCatalogLoading={skillCatalogLoading} skillCatalogError={skillCatalogError}
       onRefreshSkills={refreshSkillCatalog} onSaveSkillSettings={saveSkillSettings} onUpdateSkillPreference={updateSkillPreference}
