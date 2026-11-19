@@ -3463,6 +3463,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
       onReferencesChange={changeCreationReferences} onImportFiles={importCreationFiles}
       searchProjectReferences={searchCreationFiles} onReferenceProjectFile={referenceCreationFile}
       projectRoot={project.path} onOpenReviewDraft={onPreviewProjectFile}
+      pendingInteraction={effectiveStatuses.get(creation?.sessionId)?.pendingInteraction}
       getReviewImageHref={(image, preview) => endpoint({ [preview ? 'reviewImage' : 'projectFileDownload']: image.path, hash: image.hash }).href}
       acceptedFileTypes=".txt,.md,.csv,.json,.jsonl,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm"
       onLocateReference={r=>{

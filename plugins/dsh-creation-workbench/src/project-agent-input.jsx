@@ -76,9 +76,9 @@ export function projectInputBridge(ctx){
     async submit(text,_actx,attachments){
       const owner=owners.get(id);
       if(!owner&&!frozen)throw Error('请重新打开项目助手后发送');
-      const turn=frozen||await owner.current.freeze(id,text);
       const done=owner?.current.submitting?.();
       try {
+        const turn=frozen||await owner.current.freeze(id,text);
         const response=await ctx.remote.session.prompt({sessionId:id,requestId:turn.id,mode:'queue',
           content:[...attachments,{type:'text',text:turn.text}],clientTimeZone:Intl.DateTimeFormat().resolvedOptions().timeZone});
         if(!response.ok || response.value?.accepted!==true)throw Error(response.error?.message||'DSH 未返回受理回执，请核对原对话');
@@ -202,7 +202,7 @@ export function ProjectInputDock({sessionId,useInput,inputActions,bridge}){
     return ()=>cancelAnimationFrame(frame);
   },[owner?.chatActive,phase,projectClaim,draft,draftRev,occurrences,controller,inputActions]);
   if(!owner)return null;
-  const locked=['adjudicating','submitting'].includes(phase);
+  const locked=owner.switching||['adjudicating','submitting'].includes(phase);
   async function openSkillMenu(event){
     const wasOpen=event.detail>0&&pressedOpen.current;
     pressedOpen.current=false;

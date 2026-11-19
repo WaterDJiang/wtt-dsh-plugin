@@ -47,9 +47,12 @@ export class ProjectAgent {
   }
   sessionId(){return this.db.prepare('SELECT session_id AS id FROM pa_session').get()?.id;}
   async session(replace) {
-    if (replace!==undefined && replace!==this.sessionId()) throw Error('项目会话已更新，请刷新');
-    if (!replace && this.sessionId())return {sessionId:this.sessionId()};
-    if(!this.opening)this.opening=(async()=>{
+    const current=this.sessionId();
+    if(replace!==undefined && replace!==current)throw Error('项目会话已更新，请重新打开助手');
+    if(this.opening)return this.opening;
+    if(replace===undefined && current)return {sessionId:current};
+    if(current && this.host.sessionRunning?.(current))throw Error('项目助手正在回复，请等本轮结束后再新建对话');
+    this.opening=(async()=>{
       const id=await this.host.createSession(this.service);
       this.db.prepare('INSERT OR IGNORE INTO pa_owned_sessions VALUES(?)').run(id);
       this.host.bound?.(this.service,id);
@@ -97,12 +100,13 @@ export class ProjectAgent {
     return result;
   }
   turn({sessionId,requirementId,refs=[],mode,text}) {
+    if(this.opening)throw Error('项目会话正在切换，请稍后发送');
     this.requireSession(sessionId); if(!modes.includes(mode)||!checkText(text,8000))throw Error('执行档位或创作要求无效');
     this.canvas(requirementId);
     if(!Array.isArray(refs)||refs.length>24)throw Error('一次最多引用 24 张卡片');
     const sources=limitSourceContent(this.freezeByCanvas(refs,requirementId));
     const id=randomUUID();
-    this.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(id,sessionId,json({requirementId,mode,sources,text,skills:extractSkillNames(text)}));
+    this.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(id,sessionId,json({sessionId,requirementId,mode,sources,text,skills:extractSkillNames(text)}));
     return {id};
   }
   promptContext(sessionId,requestId){
@@ -230,20 +234,43 @@ export class ProjectAgent {
   }
   plans(page=0){
     if(!Number.isSafeInteger(page)||page<0||page>1000000)throw Error('委托页码无效');
-    return this.db.prepare("SELECT * FROM pa_plans ORDER BY CASE WHEN state='approval' THEN 0 WHEN state IN ('done','stopped') THEN 2 ELSE 1 END,rowid DESC LIMIT 20 OFFSET ?").all(page*20).map(plan=>{
-      const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps});
-      const change=this.change(plan.id);
-      return {...plan,scopeToken:this.approvalToken(plan.id),change:change&&{id:change.id,start:change.start,steps:change.data.map(describe)},
-        steps:this.steps(plan.id).map(s=>{
-          const binding=s.task_id?this.service.cards.binding(s.task_id):null;
-          const cardId=binding?.outputCardId;
-          const active=!['done','stopped','stopping'].includes(plan.state);
-          const consumers=cardId&&active&&(s.handoff||s.receipt)?this.waitingConsumers(s):[];
-          const choice=cardId&&active&&(s.handoff||consumers.length)?this.versionChoice({...s,card_id:cardId}):null;
-          return {id:s.id,...describe(s.data),state:s.state,authorized:!!s.authorized,error:s.error,interaction:s.interaction,
-            taskId:s.task_id,outputCardId:cardId,receipt:s.receipt,handoff:active&&Boolean(s.handoff),choice,consumers};
-        })};
-    });
+    return this.db.prepare("SELECT * FROM pa_plans ORDER BY CASE WHEN state='approval' THEN 0 WHEN state IN ('done','stopped') THEN 2 ELSE 1 END,rowid DESC LIMIT 20 OFFSET ?").all(page*20).map(plan=>this.planView(plan));
+  }
+  reviews(sessionId,page=0){
+    if(!Number.isSafeInteger(page)||page<0)throw Error('确认页码无效');
+    const read=this.db.prepare(`SELECT p.*,count(*) OVER() AS total,
+      CASE WHEN amendment.session_id=$session THEN 'change' WHEN p.state='approval' THEN 'plan' ELSE 'step' END AS kind,
+      s.id AS stepId
+      FROM pa_plans p JOIN pa_turns t ON t.id=p.id
+      LEFT JOIN pa_changes c ON c.plan_id=p.id AND c.state='pending'
+      LEFT JOIN pa_turns amendment ON amendment.id=c.id
+      LEFT JOIN pa_steps s ON s.id=(SELECT n.id FROM pa_steps n WHERE n.plan_id=p.id AND (n.state<>'done' OR n.handoff=1) ORDER BY n.seq LIMIT 1)
+      WHERE p.state IN ${openPlans} AND (amendment.session_id=$session OR (t.session_id=$session AND
+        (p.state='approval' OR (p.state='running' AND s.state='ready' AND s.authorized=0 AND s.handoff=0 AND (c.id IS NULL OR s.seq<c.start)))))
+      ORDER BY p.rowid LIMIT 1 OFFSET $page`);
+    const at=index=>read.get({session:sessionId??null,page:index});
+    let index=page,row=at(page);
+    if(!row&&page>0){
+      const first=at(0);
+      if(first){index=first.total-1;row=index?at(index):first;}
+    }
+    if(!row)return {total:0,page:0,item:null};
+    const {kind,stepId,total,...plan}=row;
+    return {total,page:index,item:{kind,stepId,plan:this.planView(plan)}};
+  }
+  planView(plan){
+    const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps});
+    const change=this.change(plan.id);
+    return {...plan,scopeToken:this.approvalToken(plan.id),change:change&&{id:change.id,start:change.start,steps:change.data.map(describe)},
+      steps:this.steps(plan.id).map(s=>{
+        const binding=s.task_id?this.service.cards.binding(s.task_id):null;
+        const cardId=binding?.outputCardId;
+        const active=!['done','stopped','stopping'].includes(plan.state);
+        const consumers=cardId&&active&&(s.handoff||s.receipt)?this.waitingConsumers(s):[];
+        const choice=cardId&&active&&(s.handoff||consumers.length)?this.versionChoice({...s,card_id:cardId}):null;
+        return {id:s.id,...describe(s.data),state:s.state,authorized:!!s.authorized,error:s.error,interaction:s.interaction,
+          taskId:s.task_id,outputCardId:cardId,receipt:s.receipt,handoff:active&&Boolean(s.handoff),choice,consumers};
+      })};
   }
   normalizeSteps(data,turn,offset=0) {
     if(!Array.isArray(data.steps)||!data.steps.length||data.steps.length+offset>20)throw Error('每份委托最多 20 项交付');
@@ -260,7 +287,7 @@ export class ProjectAgent {
       const scope=step.scope||'';
       if(typeof scope!=='string'||scope.length>120)throw Error('设定范围无效');
       const revisions=this.memory.effective([requirementId,scope].filter(Boolean)).map(s=>[s.id,s.revision]);
-      return {title:step.title,type:step.type,instruction:step.instruction,requirementId,revisions,deps:[...new Set(deps)],sources:limitSourceContent([...sources.values()]),scope,review:step.review===true};
+      return {title:step.title,type:step.type,instruction:step.instruction,requirementId,revisions,deps:[...new Set(deps)],sources:limitSourceContent([...sources.values()]),scope,review:step.review===true,sessionId:turn.sessionId};
     });
   }
   change(planId){
@@ -495,7 +522,8 @@ export class ProjectAgent {
           .run(json({...d,revisions,review:true}),s.id);
         return;
       }
-      const created=await this.host.createTask(this.service,{requirementId:d.requirementId,operationId:s.id,selectedCardIds:[],generation:{mode:'new'},outputType:d.type,instruction:d.instruction},limitSourceContent([...new Map(sources.map(r=>[r.cardId,r])).values()]),settings,allowed,d.title);
+      const origin=d.sessionId||this.db.prepare('SELECT session_id AS id FROM pa_turns WHERE id=?').get(id)?.id;
+      const created=await this.host.createTask(this.service,{requirementId:d.requirementId,operationId:s.id,selectedCardIds:[],generation:{mode:'new'},outputType:d.type,instruction:d.instruction},limitSourceContent([...new Map(sources.map(r=>[r.cardId,r])).values()]),settings,allowed,d.title,origin);
       if(!created)return;
       task=created.task;
       this.db.prepare("UPDATE pa_steps SET task_id=?,state='working',error=NULL WHERE id=?").run(task.id,s.id);

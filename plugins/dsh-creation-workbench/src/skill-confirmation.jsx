@@ -73,10 +73,8 @@ export function SkillConfirmation({ entry, currentEntry, position, draftCache, l
         </label>)}</div>
         <label className="wcc-skill-custom">{plan ? '修改意见／补充说明' : '你的回答／补充说明'}<textarea rows={3} maxLength={8000} value={drafts[question.id]?.custom || ''} onChange={event => edit(question.id, { custom: event.target.value })} placeholder={plan ? '有修改要求时填写，再点「提交修改意见」' : '选择选项，或直接填写回答'} /></label>
       </fieldset>)}</>}
-      {!permission && <details className="wcc-skill-preview" open><summary>本次已保存文件 · {outputs?.length ?? '读取中'}</summary>
-        <p>先核对下面的文件版本。尚未保存成文件的方案，请看上方内容。</p>
+      {!permission && outputs?.length !== 0 && <details className="wcc-skill-preview" open><summary>本次已保存文件 · {previewError ? '读取失败' : outputs?.length ?? '读取中'}</summary>
         {previewError && <p role="alert">预览读取失败：{previewError}</p>}
-        {outputs?.length === 0 && <p>还没有保存文件。请查看上方方案，或打开任务对话了解进度。</p>}
         {outputs?.map(output => <div key={output.versionId} className="wcc-skill-output"><strong>{output.node.title}{output.number ? ` · V${output.number}` : ''}</strong><details><summary>文件信息</summary><p>{output.node.path || output.node.sourcePath}</p><small>校验值：{output.node.sourceHash}</small></details>
           <OutputPreview type={output.type} title={output.node.title} content={output.node.content || output.node.excerpt} extracted={output.node.extracted !== false} status={output.node.status || 'ready'}
             artifactId={output.type === 'pptx' ? output.node.refId : undefined} hash={output.node.sourceHash} loadPreview={loadDeckPreview} getPageHref={getDeckPageHref}

@@ -30,8 +30,10 @@
 .wtt-project-workbench .wtt-purge-file{display:grid;gap:var(--wtt-space-1);margin-top:var(--wtt-space-2)}
 .wtt-project-workbench .wtt-purge-file>span{font-size:var(--wtt-text-sm);color:var(--wtt-ui-muted)}
 .wtt-project-workbench .wtt-recycle-dialog .wtt-purge-warning{color:var(--wtt-ui-danger);font-size:var(--wtt-text-md);font-weight:600}
-.wtt-project-workbench .wtt-purge-confirm{display:flex;align-items:flex-start;gap:var(--wtt-space-2);font-size:var(--wtt-text-sm);cursor:pointer}
-.wtt-project-workbench .wtt-purge-confirm input[type=checkbox]{appearance:auto;flex:none;width:16px;min-width:16px;height:16px;margin:2px 0;padding:0;accent-color:var(--wtt-ui-danger-fill)}
+.wtt-project-workbench .wtt-purge-footer{flex-wrap:wrap}
+.wtt-project-workbench .wtt-purge-confirm{display:flex;align-items:center;gap:var(--wtt-space-2);min-width:0;margin:0;margin-inline-end:auto;font-size:var(--wtt-text-sm);cursor:pointer}
+.wtt-project-workbench .wtt-purge-actions{display:flex;justify-content:flex-end;gap:var(--wtt-space-2)}
+.wtt-project-workbench .wtt-purge-confirm input[type=checkbox]{appearance:auto;flex:none;width:16px;min-width:16px;height:16px;margin:0;padding:0;accent-color:var(--wtt-ui-danger-fill)}
 @media(max-width:480px){.wtt-project-workbench .wtt-recycle-dialog footer{padding:10px 12px}.wtt-project-workbench .wtt-recycle-body{padding:12px}}
 
 .wtt-project-workbench .wtt-recycle-pages{display:flex;align-items:center;justify-content:space-between;gap:var(--wtt-space-2);font-size:var(--wtt-text-sm)}

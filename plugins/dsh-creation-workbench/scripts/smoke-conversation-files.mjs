@@ -5,7 +5,7 @@ import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,6 +18,7 @@ const navigationMode = process.argv[2] === 'navigation';
 const organizeMode = process.argv[2] === 'organize';
 const mediaMode = process.argv[2] === 'media';
 const referenceMode = process.argv[2] === 'references' || stressMode;
+const reviewMode = !process.argv[2];
 assert(!process.argv[2] || referenceMode || fileMode || mediaMode || navigationMode || organizeMode, '用法：node scripts/smoke-conversation-files.mjs [references|stress|files|media|navigation|organize]');
 const run = promisify(execFile), repo = fileURLToPath(new URL('../', import.meta.url));
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
@@ -56,7 +57,7 @@ async function fixture(ctx) {
     ctx.effect(()=>ctx.connection.fetch.register({path:'/api/wtt-chat-file-fixture',methods:['GET'],requestBody:'buffered',fetch:async()=>Response.json({sessionId:s.id,seq:s.seq,callId:f.callId})}));return;
   }
   const args = JSON.stringify({ questions: [{ id: 'review', header: '合成审核', question: '是否采用这份合成内容？',
-    options: [{ label: '采用', description: '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
+    options: [{ label: '采用', description: f.imageHash ? `[四帧拼图](working/review-grid.png) — SHA-256: ${f.imageHash}` : '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
   s.append('turn/start', { turn }); s.append('step/start', { turn, step });
   s.append('request/header', { reason: 'initial', header: { config: { provider: 'manual-fixture', model: 'none' },
     tools: [{ name: 'ask_user_question', description: '合成问题', parameters: { type: 'object', properties: { questions: { type: 'array' }, timeout: { type: 'number' } } } }] } });
@@ -340,6 +341,19 @@ try {
   await mkdir(path.join(workspace, 'working'), { recursive: true }); await mkdir(artifacts, { recursive: true });
   await writeFile(path.join(workspace, 'working/document.md'), '# 合成文档\n\n导演文档唯一正文。');
   await run('python3', ['-c', 'from PIL import Image;import sys;Image.new("RGB",(41,27),"blue").save(sys.argv[1])', path.join(workspace, 'working/image.png')]);
+  const reviewImage = path.join(workspace, 'working/review-grid.png');
+  if (reviewMode) {
+    await run('python3', ['-c', `from PIL import Image, ImageDraw
+import sys
+image = Image.new("RGB", (640, 360), "#151a27")
+draw = ImageDraw.Draw(image)
+for i, (stamp, color) in enumerate(zip(("00:00", "00:04", "00:08", "00:12"), ("#194c70", "#386b64", "#794d43", "#534a76"))):
+    x, y = (i % 2) * 320, (i // 2) * 180
+    draw.rectangle((x + 4, y + 4, x + 316, y + 176), fill=color)
+    draw.ellipse((x + 112, y + 35, x + 208, y + 131), outline="#f3dba5", width=5)
+    draw.text((x + 16, y + 145), stamp, fill="white", font_size=18)
+image.save(sys.argv[1])`, reviewImage]);
+  }
   await run('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', mediaMode ? 'testsrc2=s=320x180:d=8' : 'color=c=blue:s=32x24:d=0.3', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(workspace, 'working/video.mp4')]);
   const projectImages = fileMode ? await seedProjectImages(workspace, run) : null;
   if(navigationMode||organizeMode)for(const folder of ['分镜 A','分镜 B']){
@@ -362,6 +376,7 @@ try {
     } else {
       const task = service.createTask({ requirementId: canvas.id, outputType: 'text', selectedCardIds: [], selectedSkills: [], sourceRefs: [], generation: { mode: 'new' }, instruction: '合成媒体审核任务', operationId: randomUUID() }).task;
       f = { requirementId: canvas.id, sessionId: 'file-smoke-' + randomUUID(), callId: randomUUID() };
+      if (reviewMode) f.imageHash = createHash('sha256').update(await readFile(reviewImage)).digest('hex');
       service.tasks.bindSession({ taskId: task.id, sessionId: f.sessionId });
       if (referenceMode) { f.conversationReferences = await (stressMode ? seedConversationReferenceStress : seedConversationReferences)(service, canvas.id, workspace, run); f.taskId = task.id; f.taskInput = service.tasks.get(task.id).input; assert(f.taskInput); }
     }
@@ -425,6 +440,22 @@ try {
     await review.getByText('保留候选', { exact: true }).click(); assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled());
     const readState = () => page.request.get(new URL('/api/wtt-chat-file-fixture', login).href).then(reply => reply.json());
     const before = await readState();
+    const thumbnail = review.getByRole('button', { name: '放大候选图片 1：review-grid.png', exact: true });
+    await thumbnail.waitFor();
+    await thumbnail.locator('img').evaluate(img => img.decode());
+    assert.equal(await review.getByText('本次已保存文件 · 0', { exact: true }).count(), 0);
+    await review.screenshot({ path: path.join(artifacts, 'review-with-image.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await thumbnail.click();
+    const viewer = page.getByRole('dialog', { name: '候选 1 · review-grid.png', exact: true });
+    const candidateImage = viewer.locator('img');
+    await candidateImage.evaluate(img => img.decode());
+    assert.equal(await candidateImage.evaluate(img => img.naturalWidth), 640);
+    assert.equal(new URL(await candidateImage.getAttribute('src')).searchParams.get('hash'), f.imageHash);
+    await page.screenshot({ path: path.join(artifacts, 'review-image-390.png') });
+    await viewer.getByRole('button', { name: '关闭候选图片', exact: true }).click();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert(await review.getByRole('button', { name: '提交', exact: true }).isEnabled());
     const addCanvasAsset = chat.getByRole('button', { name: '从画布添加资产', exact: true });
     // A native question takeover can replace the entire message input and its dock.
     if (await chat.locator('[contenteditable="true"]:visible').count()) {
@@ -448,10 +479,19 @@ try {
     assert.deepEqual(await readState(), before, '查看文件不能回答问题或改写原session');
     await review.getByRole('button', { name: '回到卡片对话', exact: true }).click();
     const main = canvas.locator('.wtt-native-conversation:visible');
+    const cardThumbnail = canvas.getByRole('button', { name: '放大候选图片 1：review-grid.png', exact: true });
+    await cardThumbnail.locator('img').evaluate(img => img.decode());
+    await cardThumbnail.click();
+    await viewer.getByRole('button', { name: '关闭候选图片', exact: true }).click();
+    assert.deepEqual(await readState(), before, '看图不回答原生问题，也不改写会话');
     await main.getByRole('button', { name: 'V2 双人中全景', exact: true }).click(); await image.waitFor();
     await canvas.getByRole('button', { name: '关闭成果预览', exact: true }).click();
-    assert.equal(await page.getByRole('dialog', { name: '无法打开文件' }).count(), 0); assert.deepEqual(errors, []); assert.deepEqual(logs, []);
-    console.log('PASS 表格图片／视频／文档、真实解码播放、审核返回与未提交选择、原卡片chat');
+    assert.equal(await page.getByRole('dialog', { name: '无法打开文件' }).count(), 0);
+    assert.deepEqual(errors, []);
+    const layoutWarning = '[React Flow]: The parent container needs a width and a height to render the graph. Help: https://reactflow.dev/error#004';
+    assert.equal(logs.filter(message => message === layoutWarning).length, 2, '窄视口切换的既有画布尺寸警告不可增加');
+    assert.deepEqual(logs.filter(message => message !== layoutWarning), []);
+    console.log('PASS 待审图片在两处对话解码、放大和保留原问题；原对话表格图片／视频／文档通过');
     }
     console.log('PAGE', new URL(page.url()).origin, await page.title());
   } catch (error) {

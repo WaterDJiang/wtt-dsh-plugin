@@ -53,6 +53,64 @@ test('暂停、回执未知、重开和更换总会话均不会重新派发',asy
   await f.agent.session(f.session);assert.throws(()=>f.propose(),/已绑定/);await f.agent.control({id:f.turn.id,command:'stop'});await f.agent.tick();assert.equal(f.sent.length,1);
 });
 
+test('新会话以新画布为默认上下文，旧委托、技能范围和设定保留',async t=>{
+  const f=await fixture(t);
+  f.agent.memory.save({name:'画幅',body:'横屏'});
+  f.propose();
+  f.host.sessionRunning=id=>id===f.session;
+  await assert.rejects(f.agent.session(f.session),/正在回复/);
+  f.host.sessionRunning=()=>false;
+  const open=Promise.withResolvers();
+  const createSession=f.host.createSession;
+  f.host.createSession=()=>open.promise;
+  const replacement=f.agent.session(f.session), reopening=f.agent.session();
+  assert.throws(()=>f.agent.turn({sessionId:f.session,requirementId:f.a,mode:'plan',text:'旧消息'}),/正在切换/);
+  open.resolve(randomUUID());
+  const {sessionId}=await replacement;
+  assert.equal((await reopening).sessionId,sessionId);
+  f.host.createSession=createSession;
+  await assert.rejects(f.agent.session(f.session),/已更新/);
+  assert.equal(f.agent.reviews(sessionId).total,0);
+  const turn=f.agent.turn({sessionId,requirementId:f.b,mode:'plan',text:'从这里开始'});
+  f.agent.tool(sessionId,'plan',turn.id,{title:'新委托',steps:[{title:'新步骤',type:'text',instruction:'从当前画布开始'}]});
+  const current=f.agent.reviews(sessionId).item.plan;
+  assert.equal(current.steps[0].requirementId,f.b);
+  assert.deepEqual(current.steps[0].refs,[]);
+  assert.ok(f.agent.memory.effective().some(setting=>setting.name==='画幅'));
+  const old=f.agent.plans().find(plan=>plan.id===f.turn.id);
+  const createTask=f.host.createTask;
+  f.host.createTask=(...args)=>{assert.equal(args[6],f.session);return createTask(...args);};
+  await f.agent.control({id:old.id,command:'approve-plan',scopeToken:old.scopeToken});
+  await f.agent.tick();
+  assert.equal(f.sent.length,1);
+});
+
+test('对话授权分页按会话读取计划、当前步骤和该会话提出的范围变更',async t=>{
+  const f=await fixture(t,'step');
+  f.propose();
+  const input=(sessionId,text)=>f.agent.turn({sessionId,requirementId:f.b,mode:'plan',text});
+  const data={title:'额外交付',steps:[{type:'text',title:'摘要',instruction:'写摘要'}]};
+  const second=input(f.session,'再写摘要');
+  f.agent.tool(f.session,'plan',second.id,data);
+  const review=f.agent.reviews(f.session);
+  assert.equal(review.item.kind,'step');
+  assert.equal(review.item.stepId,f.agent.steps(f.turn.id)[0].id);
+  assert.equal(review.total,2);
+  assert.equal(f.agent.reviews(f.session,1).item.plan.id,second.id);
+  await f.agent.control({id:second.id,command:'approve-plan',scopeToken:f.agent.approvalToken(second.id)});
+  assert.equal(f.agent.reviews(f.session,1).page,0);
+  const {sessionId}=await f.agent.session(f.session);
+  const amendment=input(sessionId,'调整旧计划');
+  f.agent.tool(sessionId,'amend',amendment.id,{planId:f.turn.id,replaceFrom:1,steps:data.steps});
+  const change=f.agent.reviews(sessionId).item;
+  assert.equal(change.kind,'change');
+  assert.equal(change.plan.change.id,amendment.id);
+  assert.equal(f.agent.reviews(f.session).total,0);
+  await f.agent.control({id:f.turn.id,command:'reject-change',changeId:amendment.id});
+  assert.equal(f.agent.reviews(sessionId).total,0);
+  assert.equal(f.agent.reviews(f.session).item.kind,'step');
+});
+
 async function uploadRevision(f,taskId,number){
   const {outputCardId,cardVersionId}=f.service.cards.binding(taskId);
   const {node}=f.service.cards.describe({requirementId:f.b,cardId:outputCardId,versionId:cardVersionId});

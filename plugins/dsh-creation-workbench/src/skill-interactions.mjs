@@ -1,10 +1,12 @@
 const KINDS = new Set(['question', 'plan-review', 'approval']);
 const answerLocks = new Set();
 const submittedAnswers = new Set();
+export const IMAGE_REVIEW_INSTRUCTION = '需要确认图片、封面或四帧拼图时，先生成项目内可打开的 PNG／JPEG／WebP／GIF，再调用 ask_user_question。在 question 正文中每张单列一行：Markdown 图片文件链接（项目相对路径） — SHA-256: 实际文件的 64 位校验值。写明本次审阅的版本；候选图留在本任务工作目录即可，获批前不登记为正式成果。';
 export const SKILL_CONFIRMATION_INSTRUCTIONS = [
   'Skill 沟通契约：默认遵循所选 Skill 的全部人工确认门。只有本任务用户指令明确授权、且 Skill 本身支持的自动模式才可采用；其他任务或历史对话授权不继承，硬门和执行权限不能绕过。',
   '需要补信息、审阅大纲／设计方案／PPT 样章时，先形成可审阅正文或真实文件，再调用 DSH 原生 ask_user_question；不要只在聊天里写“请确认”后结束。',
   '每个问题使用稳定 id；在 question 正文完整写明当前步骤、问题／方案摘要、待审正文或具体文件路径与版本及实际 hash、确认后的下一步。普通提问接口不保留额外 detail/intent 字段，审阅内容必须放入 question。选项清楚区分确认继续与提出修改，用户可自填意见。',
+  IMAGE_REVIEW_INSTRUCTION,
   '返回 pending／超时／取消／无明确同意都不代表确认；立即结束当前轮次，停止所有依赖此决定的生成、保存或发送步骤。收到同一个原生问题的真实答案后才继续原任务。提出修改时先修改再重新请求审阅，不把修改意见当批准。',
   '文件尚未保存、预览不可用或内容有变化时如实说明。已保存产物可先登记以供准确版本预览，但登记、Skill 方案认可、客户确认、发送和收款是独立事实。',
 ];

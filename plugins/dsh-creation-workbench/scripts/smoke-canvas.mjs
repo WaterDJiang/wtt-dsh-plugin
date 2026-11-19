@@ -37,6 +37,15 @@ async function seed(workspace) {
     const { material } = await service.importMaterial({ requirementId: id, filename: '验收素材.md',
       bytes: Buffer.from('# 合成验收素材'), operationId: randomUUID() });
     const nodeId = `material:${material.id}`;
+    if (['all', 'delete'].includes(scenario)) {
+      const archive = service.store.createCanvas({ title: '回收站长列表', operationId: randomUUID() });
+      for (let i = 1; i <= 24; i++) {
+        const { material: item } = service.canvas.addMaterial({ requirementId: archive.id,
+          title: `清空验收记录 ${i}`, content: '合成回收记录', operationId: randomUUID() });
+        const plan = service.recycle.plan({ requirementId: archive.id, selections: [{ nodeId: `material:${item.id}` }] });
+        service.recycle.remove({ planId: plan.id });
+      }
+    }
     service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision,
       positions: { [nodeId]: { x: 80, y: 150 } }, viewport: { x: 0, y: 0, zoom: 0.8 } });
     const other = scenario==='agent' ? service.store.createCanvas({title:'项目助手目标画布',operationId:randomUUID()}).id : null;
@@ -380,12 +389,69 @@ async function checkDelete(page, canvas, card, apiPath) {
   await card.waitFor({ state: 'hidden' });
   assert.equal(await canvas.locator('.react-flow__viewport').getAttribute('data-delete-marker'), 'retained', '移除节点应复用画布视口');
   await page.getByRole('button', { name: /^打开文件栏/ }).click();
-  await page.getByRole('button', { name: '项目回收站', exact: true }).click();
+  await page.getByRole('button', { name: '文件栏操作', exact: true }).click();
+  await page.getByRole('menuitem', { name: '项目回收站', exact: true }).click();
   const recycle = page.getByRole('dialog', { name: '项目回收站', exact: true });
-  await recycle.getByRole('button', { name: '恢复', exact: true }).click();
+  await recycle.locator('article').filter({ hasNotText: '清空验收记录' }).getByRole('button', { name: '恢复', exact: true }).click();
   await card.waitFor();
+  await checkPurgeConfirmation(page, recycle);
   await recycle.getByRole('button', { name: '关闭项目回收站', exact: true }).click();
   await recycle.waitFor({ state: 'hidden' });
+}
+
+async function checkPurgeConfirmation(page, recycle) {
+  const desktop = page.viewportSize();
+  const clear = recycle.getByRole('button', { name: '清空回收站', exact: true });
+  const confirmation = page.getByRole('dialog', { name: '清空回收站', exact: true });
+  try {
+    for (const [viewport, colorScheme] of [[desktop, 'light'], [{ width: 320, height: 430 }, 'dark']]) {
+      await page.emulateMedia({ colorScheme });
+      await page.setViewportSize(viewport);
+      await clear.click();
+      const checkbox = confirmation.getByRole('checkbox', { name: '我确认永久删除，无法恢复' });
+      const submit = confirmation.getByRole('button', { name: '确认永久删除', exact: true });
+      const body = confirmation.locator('.wtt-recycle-body');
+      await checkbox.waitFor();
+      assert.equal(await confirmation.evaluate(el => getComputedStyle(el).colorScheme), colorScheme);
+      assert.equal(await checkbox.isChecked(), false);
+      assert(await submit.isDisabled());
+      assert(await confirmation.evaluate(dialog => {
+        const body = dialog.querySelector('.wtt-recycle-body');
+        const footer = dialog.querySelector('footer');
+        const box = footer.getBoundingClientRect();
+        return footer.contains(dialog.querySelector('[type=checkbox]')) &&
+          body.scrollHeight > body.clientHeight && body.scrollTop === 0 &&
+          box.top >= body.getBoundingClientRect().bottom - 1 &&
+          box.y >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth &&
+          footer.scrollWidth <= footer.clientWidth;
+      }), '长清单首屏必须完整显示底部勾选和操作按钮');
+      await checkbox.check();
+      assert(await submit.isEnabled());
+      assert.equal(await body.evaluate(el => el.scrollTop), 0);
+      if (process.env.WTT_SMOKE_ARTIFACTS) {
+        await mkdir(process.env.WTT_SMOKE_ARTIFACTS, { recursive: true });
+        await confirmation.screenshot({ path: path.join(process.env.WTT_SMOKE_ARTIFACTS, `purge-confirm-${viewport.width}.png`) });
+      }
+      await body.evaluate(el => { el.scrollTop = el.scrollHeight; });
+      await checkbox.uncheck();
+      assert(await submit.isDisabled());
+      assert(await body.evaluate(el => el.scrollTop > 0));
+      await checkbox.check();
+      await confirmation.getByRole('button', { name: '取消', exact: true }).click();
+      await clear.waitFor();
+    }
+    await recycle.getByRole('button', { name: /^永久删除：清空验收记录/ }).first().click();
+    const single = page.getByRole('dialog', { name: '永久删除', exact: true });
+    const checkbox = single.getByRole('checkbox');
+    await checkbox.waitFor();
+    assert.equal(await checkbox.isChecked(), false);
+    assert(await single.getByRole('button', { name: '确认永久删除', exact: true }).isDisabled());
+    await page.keyboard.press('Escape');
+    assert.equal(await recycle.locator('article').count(), 24, '取消后应保留全部回收记录');
+  } finally {
+    await page.emulateMedia({ colorScheme: null });
+    await page.setViewportSize(desktop);
+  }
 }
 
 async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
@@ -696,10 +762,10 @@ try {
         }
       }
       await input.click();await input.press('End');await page.keyboard.insertText('从采访写脚本和分镜');await input.press('Enter');
-      if(mode==='plan')await panel.getByRole('button',{name:'查看待授权计划'}).click({timeout:26000});
-      else await plansTab.click();
+      const review=panel.getByRole('region',{name:'对话授权',exact:true});
+      if(mode==='auto')await plansTab.click();
+      else await review.waitFor({timeout:26000});
       if(mode==='plan'&&fixture.referenceId){
-        await chatTab.click();
         await panel.getByText('已核对工作台回执。',{exact:true}).last().waitFor();
         await input.click();await input.press('End');await page.keyboard.insertText('保留这段草稿 ');
         await skillsButton.click();
@@ -712,26 +778,33 @@ try {
         await pickSkill();
         assert.match(await input.innerText(),/wtt-qa-layout/,'有对话历史时仍能选择技能');
         assert.match(await input.innerText(),/保留这段草稿/,'选择技能应保留已有草稿');
-        await plansTab.click();
       }
       if(mode==='auto')await panel.getByText('浏览器跨画布委托',{exact:false}).first().waitFor({timeout:26000});
       else {
-        const approve=panel.getByRole('button',{name:mode==='plan'?'授权并执行':'执行此项',exact:true});
+        const approve=review.getByRole('button',{name:mode==='plan'?'授权并执行':'执行此项',exact:true});
         await approve.waitFor({timeout:26000}).catch(async e=>{throw Error(e.message+' · '+JSON.stringify(agentModel.calls)+' · '+await panel.innerText());});
+        assert.equal(await chatTab.getAttribute('aria-pressed'),'true','同一对话页内完成授权');
         if(mode==='plan'){
           assert.equal((await state()).plans[0].steps.filter(s=>s.taskId).length,0);
-          await panel.getByText('完成 0/2',{exact:true}).waitFor();
+          await review.getByText(/脚本 · /).click();
+          await review.getByText(/写验收脚本/).waitFor();
+          const viewport=page.viewportSize();
+          await page.setViewportSize({width:440,height:680});
+          await approve.scrollIntoViewIfNeeded();
+          assert(await input.isVisible());
           if(fixture.referenceId&&process.env.WTT_SMOKE_ARTIFACTS)
             await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-plan.png')});
+          await page.setViewportSize(viewport);
         }
         await approve.click();
+        assert.equal(await chatTab.getAttribute('aria-pressed'),'true');
       }
       await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       const checkHandoff=process.env.WTT_AGENT_SMOKE_HANDOFF==='1';
       assert(!checkHandoff||(mode==='plan'&&process.env.WTT_AGENT_SMOKE_QUESTION==='1'),'交接冒烟需要计划授权与原生提问');
       let adoptedVersion;
       if(process.env.WTT_AGENT_SMOKE_QUESTION==='1'){
-        await launcher.click();await plansTab.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({calls:agentModel.calls,state:await state()}));});
+        await launcher.click();await plansTab.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({panel:await panel.innerText(),calls:agentModel.calls,state:await state()}));});
         assert.equal(agentModel.calls.filter(c=>c.name==='course_save_outline').length,0);
         if(checkHandoff)await panel.getByRole('button',{name:'暂停',exact:true}).click();
         await panel.getByRole('button',{name:'打开卡片对话',exact:true}).first().click();
@@ -778,8 +851,8 @@ try {
       }
       if(mode==='step'){
         await launcher.click();
-        await plansTab.click();
-        await panel.getByRole('button',{name:'执行此项',exact:true}).click({timeout:25000});
+        await review.getByText(/分镜 · /).waitFor({timeout:25000});
+        await review.getByRole('button',{name:'执行此项',exact:true}).click();
         await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       }
       const deadline=Date.now()+40000;
@@ -813,15 +886,24 @@ try {
       await panel.getByLabel('查项目日志').fill('横屏');await panel.getByText(/画幅/).first().waitFor();
       const select=page.getByRole('combobox',{name:'当前画布',exact:true});
       if(await select.inputValue()===fixture.other)await select.selectOption(fixture.id);else await select.selectOption(fixture.other);
+      const currentCanvas=await select.inputValue();
       await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor();assert.equal((await state()).sessionId,bound);
+      await panel.getByText('从采访写脚本和分镜',{exact:false}).first().waitFor();
       await panel.getByRole('button',{name:'执行方式 · '+modeLabel}).click();await page.getByRole('menuitemradio',{name:mode==='step'?'先规划后执行':'逐项确认'}).click();
-      await panel.getByRole('button',{name:'项目记忆',exact:true}).click();
-      await panel.getByRole('button',{name:'用项目记忆开新对话'}).click();
+      await panel.getByRole('button',{name:'新建对话',exact:true}).click();
+      await panel.getByText('从采访写脚本和分镜',{exact:false}).first().waitFor({state:'hidden'});
       await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor();
       assert.notEqual((await state()).sessionId,bound);
+      assert.equal(await panel.getByText(/已选 \d+ 张/).count(),0,'新对话不带入旧引用');
+      assert.equal((await state()).plans[0].state,'done','新建对话保留项目委托');
+      assert.doesNotMatch(await panel.locator('[contenteditable=true]').last().innerText(),/保留这段草稿/);
       const nextInput=panel.locator('[contenteditable=true]').last();await nextInput.click();await nextInput.press('End');await page.keyboard.insertText('回忆验收，查画幅和脚本');await nextInput.press('Enter');
       const until=Date.now()+18000;while(!agentModel.evidence.length&&Date.now()<until)await new Promise(r=>setTimeout(r,250));
       assert.ok(agentModel.evidence.some(r=>r.includes('横屏 16:9')&&r.includes(receipts[1].versionId)),'新会话应检索设定及上次委托的真实版本');
+      const routed=agentModel.newContexts[0];
+      assert.equal(routed?.snapshot.canvas.id,currentCanvas);
+      assert.deepEqual(routed?.snapshot.sources,[]);
+      assert.equal(routed?.oldMessages,false);
       await page.setViewportSize({width:440,height:680});
       await page.waitForFunction(()=>{
         const box=document.querySelector('.wtt-agent-float.is-open')?.getBoundingClientRect();
@@ -870,7 +952,7 @@ try {
     }
     if (['all', 'delete'].includes(scenario)) {
       await checkDelete(page, canvas, card, api.pathname);
-      console.log('PASS 删除核对、取消、移除后视口复用和回收站恢复');
+      console.log('PASS 删除核对、移除后视口复用、回收站恢复及长清单确认底栏');
     }
     if (['all', 'refresh'].includes(scenario)) {
       await checkRefresh(page, canvas, card, api, fixture);

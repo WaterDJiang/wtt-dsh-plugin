@@ -5,7 +5,7 @@ import { once } from 'node:events';
 // Isolated Messages transport. DSH still admits the prompt, executes each tool,
 // publishes the session events and persists the exact primary output.
 export async function projectAgentModel(fixture){
-  const calls=[], evidence=[], skillInvocations=[], followups=[];
+  const calls=[], evidence=[], skillInvocations=[], followups=[], newContexts=[];
   const server=createServer(async(req,res)=>{
     try{
       let raw='';for await(const chunk of req)raw+=chunk;
@@ -13,6 +13,10 @@ export async function projectAgentModel(fixture){
       const ended=messages.at(-1)?.content?.some?.(b=>b.type==='tool_result');
       if(text.includes('回忆验收')&&ended)evidence.push(JSON.stringify(messages.at(-1).content));
       const turn=text.match(/"turnId":"([\da-f-]+)"/),task=text.match(/taskId=([\da-f-]{36})/),canvas=text.match(/requirementId=([\da-f-]{36})/);
+      if(!ended&&turn&&text.includes('回忆验收')){
+        const snapshot=text.match(/\[工作台发送现场\] (\{[^\n]+\})/u);
+        if(snapshot)newContexts.push({snapshot:JSON.parse(snapshot[1]),oldMessages:text.includes('从采访写脚本和分镜')});
+      }
       const skill=text.includes('WTT-SKILL-CONTENT-VERIFIED');
       if(skill)skillInvocations.push(task?'task':'supervisor');
       let name,input;
@@ -44,5 +48,5 @@ export async function projectAgentModel(fixture){
     }catch(e){console.error('合成模型请求',e.message);res.writeHead(500);res.end();}
   });
   server.listen(0,'127.0.0.1');await once(server,'listening');
-  return {calls,evidence,skillInvocations,followups,env:{DEEPSEEK_API_KEY:'sk-'+'0'.repeat(32),DEEPSEEK_BASE_URL:'http://127.0.0.1:'+server.address().port},close:()=>server.close()};
+  return {calls,evidence,skillInvocations,followups,newContexts,env:{DEEPSEEK_API_KEY:'sk-'+'0'.repeat(32),DEEPSEEK_BASE_URL:'http://127.0.0.1:'+server.address().port},close:()=>server.close()};
 }

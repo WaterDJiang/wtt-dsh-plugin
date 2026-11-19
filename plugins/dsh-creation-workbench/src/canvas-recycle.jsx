@@ -134,9 +134,17 @@ export function ProjectRecycleDialog({request,endpoint,onClose,onChanged}){
      {!entry.files.length&&!entry.links?.length&&<small>{entry.directoryCount?'清理空目录与关联节点的恢复信息':'仅清理节点恢复记录，原文件保留'}</small>}
     </li>)}</ul>
     <p>只处理以上回收内容；未回收的源文件和其他版本保留。</p>
-    <label className="wtt-purge-confirm"><input type="checkbox" checked={confirmed} disabled={!!busy} onChange={e=>setConfirmed(e.target.checked)}/><span>我确认永久删除，无法恢复</span></label>
    </div>
-   <DialogFooter><UiButton data-purge-cancel disabled={!!busy} onClick={close}>取消</UiButton><UiButton variant="danger" type="submit" disabled={!confirmed||!!busy}>{busy==='purge'?'正在删除…':'确认永久删除'}</UiButton></DialogFooter>
+   <DialogFooter className="wtt-purge-footer">
+    <label className="wtt-purge-confirm">
+     <input type="checkbox" checked={confirmed} disabled={!!busy} onChange={e=>setConfirmed(e.target.checked)}/>
+     <span>我确认永久删除，无法恢复</span>
+    </label>
+    <div className="wtt-purge-actions">
+     <UiButton data-purge-cancel disabled={!!busy} onClick={close}>取消</UiButton>
+     <UiButton variant="danger" type="submit" disabled={!confirmed||!!busy}>{busy==='purge'?'正在删除…':'确认永久删除'}</UiButton>
+    </div>
+   </DialogFooter>
   </form>:<>
    <div className="wtt-recycle-body">
     {error&&<UserError error={error}/>}{notice&&<p role="status">{notice}</p>}

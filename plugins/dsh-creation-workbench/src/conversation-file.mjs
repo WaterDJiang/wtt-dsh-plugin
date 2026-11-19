@@ -77,3 +77,17 @@ export function reviewImagesFromInteraction(root, interaction) {
   }
   return [...images.values()]
 }
+
+export function reviewImagesForActiveQuestion(root, active, interaction) {
+  if (!active?.questionId) return []
+  // Use the live request only when it matches the native question currently shown.
+  if (active.callKey && active.callKey === interaction?.key) {
+    const prefix = `question-${active.callKey}-`
+    if (active.questionId.startsWith(prefix)) {
+      const index = active.questionId.slice(prefix.length)
+      const question = /^\d+$/.test(index) && interaction.questions?.[Number(index)]
+      if (question?.question === active.text) return reviewImagesFromInteraction(root, { questions: [question] })
+    }
+  }
+  return reviewImagesFromQuestion(root, active.text)
+}

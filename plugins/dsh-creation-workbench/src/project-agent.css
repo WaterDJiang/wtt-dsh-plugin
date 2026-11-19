@@ -35,7 +35,7 @@
   padding:var(--wtt-space-1) var(--wtt-space-3);
   border-bottom:1px solid var(--wtt-ui-line);
 }
-.wtt-agent-mode-anchor { margin-inline-start:auto; }
+.wtt-agent-mode-anchor { display:flex; align-items:center; flex-wrap:wrap; gap:var(--wtt-space-1); margin-inline-start:auto; }
 .wtt-agent-tab-count {
   min-width:1.5em;
   padding-inline:4px;
@@ -46,7 +46,7 @@
   font-variant-numeric:tabular-nums;
 }
 .wtt-agent-mode { display:grid; min-width:130px; padding:var(--wtt-space-1,4px); }
-.wtt-agent-chat:not([hidden]) { display:flex; flex:1; min-height:0; min-width:0; }
+.wtt-agent-chat:not([hidden]) { display:flex; flex-direction:column; flex:1; min-height:0; min-width:0; }
 .wtt-agent-chat { isolation:isolate; }
 .wtt-agent-chat [data-composer-overlay] [data-trigger-menu] {
   bottom:calc(var(--wtt-agent-trigger-offset,0px) + var(--wtt-space-2));
@@ -72,7 +72,20 @@
 .wtt-agent-memory input,.wtt-agent-memory textarea { width:100%; }
 .wtt-agent-footer,.wtt-agent-feedback { padding:var(--wtt-space-2) var(--wtt-space-3); }
 .wtt-agent-footer { border-top:1px solid var(--wtt-ui-line); }
-.wtt-agent-review { padding:var(--wtt-space-1) var(--wtt-space-3); }
+.wtt-agent-review {
+  display:flex; flex-direction:column; flex:0 0 auto; gap:var(--wtt-space-1);
+  padding:var(--wtt-space-2) var(--wtt-space-3); border-bottom:1px solid var(--wtt-ui-line);
+  background:var(--wtt-ui-subtle);
+}
+.wtt-agent-review-heading { display:flex; align-items:baseline; gap:var(--wtt-space-2); min-width:0; }
+.wtt-agent-review-heading strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wtt-agent-review-heading small { color:var(--wtt-ui-muted); }
+.wtt-agent-review-steps {
+  max-height:min(80px, 14dvh); overflow:auto; overscroll-behavior:contain;
+  overflow-wrap:anywhere; font-size:var(--wtt-text-sm);
+}
+.wtt-agent-review-steps p { margin:var(--wtt-space-1) var(--wtt-space-3); white-space:pre-wrap; }
+.wtt-agent-review-pager { display:flex; align-items:center; gap:var(--wtt-space-1); margin-inline-start:auto; }
 .wtt-agent-feedback { display:flex; align-items:center; gap:var(--wtt-space-2); }
 .wtt-agent-feedback span { flex:1; min-width:0; overflow-wrap:anywhere; }
 .wtt-agent-empty { margin:var(--wtt-space-3); color:var(--wtt-ui-muted); }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewImagesFromQuestion, reviewImagesFromInteraction } from '../src/conversation-file.mjs'
+import { conversationFileSelection, nativeConversationFilePath, reviewDraftFromQuestion, reviewImagesFromQuestion, reviewImagesFromInteraction, reviewImagesForActiveQuestion } from '../src/conversation-file.mjs'
 
 test('card chat opens project-relative and same-project absolute file links', () => {
   const root = '/tmp/项目'
@@ -77,4 +77,20 @@ test('task reviews include candidates in detail and option descriptions without 
   ] })
   assert.deepEqual(images.map(image => image.path), ['courses/base.png', 'courses/candidate.png', 'courses/option.jpg'])
   assert.deepEqual(reviewImagesFromInteraction(root, null), [])
+})
+
+test('card chat uses the open native question and rejects sources from a previous call or another question', () => {
+  const root = '/tmp/项目', hash = 'ab'.repeat(32), key = 'question:session-a:call-1'
+  const text = '确认四帧拼图？'
+  const request = { key, questions: [
+    { question: text, options: [{ description: `[四帧拼图](working/grid.png) — SHA-256: ${hash}` }] },
+    { question: text, detail: `[另一个问题](working/other.png) — ${hash}` },
+  ] }
+  const active = { callKey: key, questionId: `question-${key}-0`, text }
+  assert.deepEqual(reviewImagesForActiveQuestion(root, active, request).map(img => img.name), ['grid.png'])
+  assert.deepEqual(reviewImagesForActiveQuestion(root, { ...active, questionId: `question-${key}-1` }, request).map(img => img.name), ['other.png'])
+  assert.deepEqual(reviewImagesForActiveQuestion(root, active, { ...request, key: 'question:session-a:old-call' }), [])
+  assert.deepEqual(reviewImagesForActiveQuestion(root, { ...active, text: '先定风格' }, request), [])
+  const legacy = { questionId: 'legacy-heading', text: `[待审图](working/legacy.png) — ${hash}` }
+  assert.deepEqual(reviewImagesForActiveQuestion(root, legacy).map(img => img.name), ['legacy.png'])
 })

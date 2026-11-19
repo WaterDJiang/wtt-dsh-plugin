@@ -13,7 +13,7 @@ import { TaskInputSummary } from './task-input-summary.jsx'
 import { pendingContinueAllowed, pendingLabel, pendingRetryAllowed } from './pending-card-state.mjs'
 import { ReferencePromptInput } from './reference-prompt-input.jsx'
 import { cardDisplayTitle } from './card-capabilities.mjs'
-import { reviewDraftFromQuestion, reviewImagesFromQuestion } from './conversation-file.mjs'
+import { reviewDraftFromQuestion, reviewImagesForActiveQuestion } from './conversation-file.mjs'
 import { ReviewImageGallery } from './review-image-gallery.jsx'
 import { StepHandoff } from './project-agent-handoff.jsx'
 import './card-creation.css'
@@ -272,7 +272,7 @@ export function NodeCreateMenu({ caption, position = { x: 0, y: 0 }, trigger, it
 export function CardComposer({
   visible = true, suspended = false, position = { x: 0, y: 0 }, context, references: referenceItems = [], availableReferences = [], creationTypes = [],
   instruction = '', onInstructionChange, onReferencesChange, onPickCanvasReferences, onImportFiles, acceptedFileTypes = DEFAULT_ACCEPTED_FILES, getReferenceFileHref, onLocateReference, onClose, onSend, onAction,
-  searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewImageHref,
+  searchProjectReferences, onReferenceProjectFile, projectRoot, onOpenReviewDraft, getReviewImageHref, pendingInteraction,
   busy = false, error, sendLabel, canSend = true, sendDisabledReason, conversation, conversationVisible = true, onOpenConversation, onPrepareContinuation, onOpenNativeConversation, onTaskControl, actionContent, hideSubmit = false,
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
   mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onMediaOptionsChange, onGenerationMethodChange, onMediaProviderChange, onGenerateMedia, onResumeMedia, onNewMedia,
@@ -331,7 +331,8 @@ export function CardComposer({
   const hasExecution = !isMedia && (hasConversation || Boolean(context?.sessionId))
   const executionExpanded = hasConversation && conversationOpen && !collapsed
   const reviewDraft = reviewQuestion?.scope === conversationScope && reviewDraftFromQuestion(projectRoot, reviewQuestion.text)
-  const reviewImages = reviewQuestion?.scope === conversationScope ? reviewImagesFromQuestion(projectRoot, reviewQuestion.text) : []
+  const activeReviewQuestion = executionExpanded && reviewQuestion?.scope === conversationScope ? reviewQuestion : null
+  const reviewImages = useMemo(() => reviewImagesForActiveQuestion(projectRoot, activeReviewQuestion, pendingInteraction), [projectRoot, activeReviewQuestion, pendingInteraction])
   const frameTop = executionExpanded && Number.isFinite(position.canvasHeight)
     ? Math.max(12, Math.min(position.y, position.canvasHeight - Math.min(560, position.canvasHeight - 24))) : position.y
   const references = useMemo(() => uniqueCards(referenceItems), [referenceItems])
@@ -452,9 +453,9 @@ export function CardComposer({
   function canOpenReviewImage(image) {
     const question = conversationPanel.current?.querySelector(ACTIVE_NATIVE_QUESTION)
     if (question?.getAttribute('aria-labelledby') !== reviewQuestion?.questionId
+      || question?.parentElement?.dataset.questionKey !== reviewQuestion?.callKey
       || question?.querySelector('h2')?.textContent !== reviewQuestion?.text) return false
-    return reviewImagesFromQuestion(projectRoot, question?.querySelector('h2')?.textContent)
-      .some(current => current.path === image.path && current.hash === image.hash)
+    return reviewImages.some(current => current.path === image.path && current.hash === image.hash)
   }
 
   useEffect(() => {
@@ -480,17 +481,18 @@ export function CardComposer({
         }
         const activeQuestion = seat?.querySelector(ACTIVE_NATIVE_QUESTION) || null
         const activeId = activeQuestion?.getAttribute('aria-labelledby') || null
+        const callKey = activeQuestion?.parentElement?.dataset.questionKey
         if (activeQuestion && (activeQuestion !== question || activeId !== questionId)) scrollToQuestion(activeQuestion)
         const text = activeQuestion?.querySelector('h2')?.textContent
-        setReviewQuestion(previous => previous?.scope === conversationScope && previous.text === text && previous.questionId === activeId
-          ? previous : { scope: conversationScope, text, questionId: activeId })
+        setReviewQuestion(previous => previous?.scope === conversationScope && previous.text === text && previous.questionId === activeId && previous.callKey === callKey
+          ? previous : { scope: conversationScope, text, questionId: activeId, callKey })
         question = activeQuestion
         questionId = activeId
         const height = Math.ceil(seat?.getBoundingClientRect().height || 0)
         setNativeComposerHeight(previous => previous === height ? previous : height)
       })
     }
-    mutation.observe(panel, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['aria-labelledby'] })
+    mutation.observe(panel, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['aria-labelledby', 'data-question-key'] })
     measure()
     return () => {
       resize.disconnect()
@@ -715,7 +717,7 @@ export function CardComposer({
     {!collapsed && conversationError?.scope === conversationScope && <UserError className="wcc-creation-error wcc-creation-task-error" error={conversationError.message} />}
     {!collapsed && conversationOpen && !hasConversation && <p className="wcc-creation-execution-note" role="status">此版本的执行会话尚未恢复，请重新展开或从任务中核对。</p>}
     {executionExpanded && visible && !suspended && reviewImages.length > 0 && getReviewImageHref && <ReviewImageGallery
-      key={`${conversationScope}:${reviewQuestion.questionId}:${reviewQuestion.text}`} images={reviewImages} getHref={getReviewImageHref} onOpen={canOpenReviewImage} />}
+      key={`${conversationScope}:${reviewQuestion.questionId}:${reviewImages.map(({path,hash})=>path+':'+hash).join('|')}`} images={reviewImages} getHref={getReviewImageHref} onOpen={canOpenReviewImage} />}
     <div ref={conversationPanel} id={`${id}-conversation`} className="wcc-creation-conversation" hidden={!visible || collapsed || !conversationOpen || !hasConversation}>{conversation}</div>
     </div>
     <SkillSettings open={visible && skillSettingsOpen} catalog={skillCatalog} loading={skillCatalogLoading} error={skillCatalogError} onRefresh={onRefreshSkills} onSave={onSaveSkillSettings} onPreference={onUpdateSkillPreference} onClose={() => setSkillSettingsOpen(false)} />

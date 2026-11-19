@@ -38,6 +38,7 @@ test('HTTP actions and existing Agent tool share exact task, excerpt and version
   const { task, prepared } = await call('create-task', { requirementId: requirement.id, selectedCardIds: [`material:${excerpt.material.id}`],
     instruction: '生成课程大纲', operationId: randomUUID() });
   assert.equal(prepared.requestId, task.requestId);
+  assert.match(prepared.prompt, /四帧拼图.*项目相对路径.*SHA-256/);
   const controlRequest = (projectId, data) => endpoint.fetch(new Request(`http://localhost/api/wtt-creation-workbench${projectId ? `?projectId=${projectId}` : ''}`, {
     method: 'POST', body: JSON.stringify({ action: 'inspect-task-control', data }),
   }));

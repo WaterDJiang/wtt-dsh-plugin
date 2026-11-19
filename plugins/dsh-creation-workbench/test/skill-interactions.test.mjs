@@ -103,6 +103,7 @@ test('后台恢复跳过缺失的历史会话，仍展示同项目的有效待�
 test('任务沟通契约保留硬门、超时停止及任务授权边界', () => {
   const prompt = SKILL_CONFIRMATION_INSTRUCTIONS.join('\n');
   assert.match(prompt, /ask_user_question/); assert.match(prompt, /立即结束当前轮次/); assert.match(prompt, /其他任务或历史对话授权不继承/);
+  assert.match(prompt, /四帧拼图.*项目相对路径.*SHA-256/);
 });
 
 test('同一 callId 的 Native 和恢复载体共享提交锁与已答标记', async () => {

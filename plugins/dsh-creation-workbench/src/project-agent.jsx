@@ -22,6 +22,50 @@ function ModeMenu({value,onChange,label='执行方式'}){
     {open&&<CanvasPopover className="wtt-agent-mode" anchorRef={anchor} onDismiss={()=>setOpen(false)} onKeyDown={e=>{if(e.key==='Escape'){setOpen(false);anchor.current?.focus();}}} role="menu">
       {Object.entries(labels).map(([id,name])=><UiButton key={id} role="menuitemradio" aria-checked={value===id} onClick={()=>{setOpen(false);onChange(id);}}>{name}{value===id?' ✓':''}</UiButton>)}</CanvasPopover>}</>;
 }
+function PlanStepDetails({step,locate}){
+  return <>
+    <details><summary>{step.title} · {step.target}</summary><p>{step.instruction}</p>
+      {!!step.deps.length&&<small>依赖步骤 {step.deps.join('、')}</small>}
+    </details>
+    {!!step.refs?.length&&<details><summary>{step.refs.length} 份引用</summary>{step.refs.map(ref=><div key={ref.cardId}>
+      {ref.title}{ref.versionId&&<UiButton size="compact" onClick={()=>locate({...ref,cardId:ref.outputCardId})}>查看引用版本</UiButton>}
+    </div>)}</details>}
+  </>;
+}
+function ReviewActions({kind,plan,stepId,act,busy}){
+  if(kind==='change')return <>
+    <UiButton variant="primary" size="compact" disabled={busy} onClick={()=>act(plan,'accept-change',{changeId:plan.change.id})}>批准变更</UiButton>
+    <UiButton size="compact" disabled={busy} onClick={()=>act(plan,'reject-change',{changeId:plan.change.id})}>保留原计划</UiButton>
+  </>;
+  return <UiButton variant="primary" size="compact" disabled={busy} onClick={()=>act(plan,kind==='plan'?'approve-plan':'approve-step',kind==='step'?{stepId}:undefined)}>
+    {kind==='plan'?reviewLabel:'执行此项'}
+  </UiButton>;
+}
+function ChatReview({review,act,locate,busy,onPage}){
+  if(!review?.item)return null;
+  const {plan,kind,stepId}=review.item;
+  const steps=kind==='change'?plan.change.steps:kind==='plan'?plan.steps:plan.steps.filter(step=>step.id===stepId);
+  return <section className="wtt-agent-review" aria-label="对话授权">
+    <div className="wtt-agent-review-heading">
+      <strong title={plan.title}>{plan.title}</strong>
+      <small role="status">{kind==='change'?('范围变更 · 从第 '+plan.change.start+' 项起'):kind==='step'?'待确认步骤':'待授权'}</small>
+    </div>
+    <div className="wtt-agent-review-steps" key={plan.id+':'+kind+':'+(stepId||'')}>
+      {steps.map((step,index)=><div key={step.id||index}>
+        <PlanStepDetails step={step} locate={locate}/>
+        {kind==='step'&&step.error&&<small>{step.error}</small>}
+      </div>)}
+    </div>
+    <div className="wtt-agent-actions">
+      <ReviewActions kind={kind} plan={plan} stepId={stepId} act={act} busy={busy}/>
+      {review.total>1&&<div className="wtt-agent-review-pager" aria-label="对话待授权分页">
+        <UiButton size="compact" disabled={busy||review.page===0} onClick={()=>onPage(review.page-1)}>上一项</UiButton>
+        <small>{review.page+1} / {review.total}</small>
+        <UiButton size="compact" disabled={busy||review.page+1===review.total} onClick={()=>onPage(review.page+1)}>下一项</UiButton>
+      </div>}
+    </div>
+  </section>;
+}
 function Plans({plans,act,locate,busy}){
   if(!plans?.length)return null;
   return <div className="wtt-agent-plans">{plans.map((p,index)=>{
@@ -36,15 +80,14 @@ function Plans({plans,act,locate,busy}){
       <summary><span>{p.title}</span><small>{status}</small>
         <span className="wtt-agent-plan-progress"><progress value={completed} max={p.steps.length||1} aria-label={p.title+'进度'}/><span>完成 {completed}/{p.steps.length}</span></span>
       </summary>
-      {p.steps.map(s=><div key={s.id} className="wtt-agent-step"><details><summary>{s.title} · {s.target}</summary><p>{s.instruction}</p>{!!s.deps.length&&<small>依赖步骤 {s.deps.join('、')}</small>}</details>{s.receipt?<UiButton size="compact" onClick={()=>locate(s.receipt)}>定位 V{s.receipt.number}</UiButton>:<small>{s.error||statuses[s.state]}</small>}
-        {!!s.refs?.length&&<details><summary>{s.refs.length} 份引用</summary>{s.refs.map(r=><div key={r.cardId}>{r.title}{r.versionId&&<UiButton size="compact" onClick={()=>locate({...r,cardId:r.outputCardId})}>查看引用版本</UiButton>}</div>)}</details>}
+      {p.steps.map(s=><div key={s.id} className="wtt-agent-step"><PlanStepDetails step={s} locate={locate}/>{s.receipt?<UiButton size="compact" onClick={()=>locate(s.receipt)}>定位 V{s.receipt.number}</UiButton>:<small>{s.error||statuses[s.state]}</small>}
         {s.state==='blocked'&&!s.taskId&&<UiButton size="compact" onClick={()=>act(p,'recheck',{stepId:s.id})}>重新核对来源</UiButton>}
         {s.taskId&&s.outputCardId&&(!s.receipt||s.handoff||s.choice)&&<UiButton size="compact" onClick={()=>locate({requirementId:s.requirementId,taskId:s.taskId,cardId:s.outputCardId})}>打开卡片对话</UiButton>}
         {!ended&&p.state!=='stopping'&&<StepHandoff step={s} busy={busy} act={command=>act(p,command,{stepId:s.id,cardId:s.outputCardId,requirementId:s.requirementId,versionId:s.choice?.versionId})}/>}
         {s.id===next?.id&&p.state==='running'&&!s.authorized&&!s.handoff&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'approve-step',{stepId:s.id})}>执行此项</UiButton>}</div>)}
-      {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>{p.change.steps.map((s,i)=><details key={i}><summary>{s.title} · {s.target}</summary><p>{s.instruction}</p>{s.refs.map(r=><small key={r.cardId}>{r.title} </small>)}</details>)}
-        <UiButton disabled={busy} onClick={()=>act(p,'accept-change',{changeId:p.change.id})}>批准变更</UiButton><UiButton disabled={busy} onClick={()=>act(p,'reject-change',{changeId:p.change.id})}>保留原计划</UiButton></div>}
-      {!ended&&<div className="wtt-agent-actions">{p.state==='approval'&&<UiButton variant="primary" size="compact" disabled={busy} onClick={()=>act(p,'approve-plan')}>{reviewLabel}</UiButton>}
+      {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>{p.change.steps.map((s,i)=><PlanStepDetails key={i} step={s} locate={locate}/>)}
+        <ReviewActions kind="change" plan={p} act={act} busy={busy}/></div>}
+      {!ended&&<div className="wtt-agent-actions">{p.state==='approval'&&<ReviewActions kind="plan" plan={p} act={act} busy={busy}/>}
         {['running','paused'].includes(p.state)&&<UiButton disabled={busy} onClick={()=>act(p,p.state==='paused'?'resume':'pause')}>{p.state==='paused'?'继续剩余步骤':'暂停'}</UiButton>}
         {p.state!=='stopping'&&<ModeMenu label="委托执行方式" value={p.mode} onChange={mode=>act(p,'mode',{mode})}/>}<UiButton disabled={busy} onClick={()=>act(p,'stop')}>{p.state==='stopping'?'重试停止':'停止委托'}</UiButton></div>}</details>;
   })}</div>;
@@ -62,14 +105,23 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
   const panelId=useId();
   const [canvas,setCanvas]=useState(null);
   const call=useCallback((action,data={})=>request('project-agent-'+action,data),[request]);
-  const [page,setPage]=useState(0),[waiting,setWaiting]=useState(0);
+  const [page,setPage]=useState(0),[reviewPage,setReviewPage]=useState(0),[waiting,setWaiting]=useState(0);
+  const [starting,setStarting]=useState(false),startPending=useRef(false);
   const readEpoch=useRef(0),sendEpoch=useRef(0),sending=useRef(0);
+  const view=useRef({tab,page,reviewPage});
+  view.current={tab,page,reviewPage};
   const refresh=useCallback(async(full=true)=>{
     const epoch=++readEpoch.current, sent=sendEpoch.current;
+    const {tab,page,reviewPage}=view.current;
     const cardRead=cardId?canvasActions.current.cardRead():null;
-    const v=await call(full?'state':'progress',{...(full?{page}:{}),...(cardId?{cardId,requirementId:requirement.id}:{})});
+    const v=await call(full?'state':'progress',{...(full?{page,view:tab,reviewPage}:{}),...(cardId?{cardId,requirementId:requirement.id}:{})});
     if(!alive.current||epoch!==readEpoch.current)return;
-    if(full){setState(v);if(v.page!==page)setPage(v.page);}
+    if(full&&(view.current.tab!==tab||view.current.page!==page||view.current.reviewPage!==reviewPage))return;
+    if(full){
+      setState({...v,view:tab});if(v.page!==page)setPage(v.page);
+      if(v.review&&v.review.page!==reviewPage)setReviewPage(v.review.page);
+      if(v.sessionId&&!startPending.current)setSession(v.sessionId);
+    }
     if(cardId)canvasActions.current.showCardStep(cardId,v.card,cardRead);
     setWaiting(v.waiting);
     if(lastProgress.current&&v.signature!==lastProgress.current)canvasActions.current.refresh();
@@ -78,7 +130,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
       const follow=Boolean(v.active||v.running);
       setTracking(follow);persist(sessionStorage,key+':tracking',follow);
     }
-  },[call,page,key,cardId,requirement.id,canvasActions]);
+  },[call,key,cardId,requirement.id,canvasActions]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
   useEffect(()=>{
     if(!open)return;
@@ -103,7 +155,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
       if(live&&(open||tracking))timer=setTimeout(poll,2200);
     }
     void poll();return ()=>{live=false;readEpoch.current++;clearTimeout(timer);};
-  },[open,tracking,cardId,refresh,call,requirement.id,canvasActions,key]);
+  },[open,tracking,cardId,refresh,call,requirement.id,canvasActions,key,tab,page,reviewPage]);
   useLayoutEffect(()=>{
     if(!open)return;
     const el=launcher.current?.closest('.wtt-course-canvas');
@@ -155,28 +207,44 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
   const grip={onPointerDown:e=>{if(e.button!==0||e.target.closest('button'))return;drag.current={x:e.clientX,y:e.clientY,left:position.x*dx,top:position.y*dy};e.currentTarget.setPointerCapture(e.pointerId);},onPointerMove:move,
     onPointerUp:()=>{if(drag.current?.last)persist(localStorage,key+':pos',drag.current.last);drag.current=null;},onPointerCancel:()=>{drag.current=null;}};
   const toggle=v=>{setOpen(v);persist(sessionStorage,key+':open',v);};
-  const act=async(p,command,extra)=>{if(busy)return;setBusy(true);try{await call('control',{id:p.id,scopeToken:p.scopeToken,command,...extra});await refresh();setError('');}catch(e){setError(e.message);}finally{setBusy(false);}};
+  const act=async(p,command,extra)=>{if(busy)return;setBusy(true);try{await call('control',{id:p.id,scopeToken:p.scopeToken,command,...extra});await refresh();setError('');}catch(e){setError(e.message);await refresh().catch(()=>{});}finally{setBusy(false);}};
+  async function newConversation(){
+    if(!session||startPending.current||sending.current||busy||state?.running)return;
+    startPending.current=true;setStarting(true);setError('');
+    try{
+      const result=await call('session',{replace:session});
+      readEpoch.current++;
+      if(Array.isArray(pinned))persist(sessionStorage,key+':references',null);
+      if(alive.current){setPinned(null);setSession(result.sessionId);setReviewPage(0);setTab('chat');}
+    }catch(e){if(alive.current)setError(e.message);}
+    finally{startPending.current=false;if(alive.current)setStarting(false);}
+  }
   const toReference=card=>({
     cardId:card.outputCard?.id||card.nodeId||card.id,
     sourceId:creationSource(card).id,
     versionId:card.outputCard?.versionId,hash:card.sourceHash,title:card.title,
     requirementId:requirement.id,canvasTitle:requirement.title,
   });
-  const references=pinned??(open?selected.filter(usableCreationSource).map(toReference):[]);
+  const pinnedReferences=Array.isArray(pinned)?pinned:pinned?.sessionId===session?pinned?.refs:null;
+  const references=pinnedReferences??(open?selected.filter(usableCreationSource).map(toReference):[]);
   function updateReferences(next){
-    setPinned(next);
-    persist(sessionStorage,key+':references',next);
+    const value={sessionId:session,refs:next};
+    setPinned(value);
+    persist(sessionStorage,key+':references',value);
   }
   const owner={
-    references,requirementId:requirement.id,showError:setError,chatActive:tab==='chat'&&!picking,
+    references,requirementId:requirement.id,showError:setError,chatActive:tab==='chat'&&!picking&&!starting,switching:starting,
     addReferences(cards){
       const next=[...new Map([...references,...cards.map(toReference)].map(ref=>[ref.requirementId+':'+ref.sourceId,ref])).values()];
       if(next.length>24)throw Error('一次最多引用 24 张卡片，请先移除部分引用。');
       updateReferences(next);
     },
     removeReference(ref){updateReferences(references.filter(item=>item!==ref));},
-    freeze:async(id,text)=>({...await call('turn',{sessionId:id,requirementId:requirement.id,
-      refs:references.map(({cardId,requirementId,versionId,hash})=>({cardId,requirementId,versionId,hash})),mode,text}),text}),
+    freeze:async(id,text)=>{
+      if(startPending.current)throw Error('正在新建对话，请稍后发送');
+      return {...await call('turn',{sessionId:id,requirementId:requirement.id,
+        refs:references.map(({cardId,requirementId,versionId,hash})=>({cardId,requirementId,versionId,hash})),mode,text}),text};
+    },
     submitting:()=>{
       sendEpoch.current++;sending.current++;
       setTracking(true);persist(sessionStorage,key+':tracking',true);
@@ -198,18 +266,19 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='chat'} onClick={()=>setTab('chat')}>对话</UiButton>
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='plans'} aria-label="委托" onClick={()=>setTab('plans')}>委托{waiting>0&&<span className="wtt-agent-tab-count" title={waiting+' 项待确认'}>{waiting}</span>}</UiButton>
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='memory'} onClick={()=>setTab('memory')}>项目记忆{state?.suggestions.length>0&&<span className="wtt-agent-tab-count">{state.suggestions.length}</span>}</UiButton>
-      {tab==='chat'&&<div className="wtt-agent-mode-anchor"><ModeMenu value={mode} onChange={v=>{setMode(v);persist(localStorage,key+':mode',v);}}/></div>}
+      <div className="wtt-agent-mode-anchor">
+        <UiButton variant="ghost" size="compact" disabled={!session||starting||busy||state?.running} onClick={newConversation}>{starting?'正在新建…':'新建对话'}</UiButton>
+        {tab==='chat'&&<ModeMenu value={mode} onChange={v=>{setMode(v);persist(localStorage,key+':mode',v);}}/>}
+      </div>
     </nav>
     {error&&<div className="wtt-agent-feedback" role="alert"><span>{error}</span><UiButton size="compact" onClick={()=>setError('')}>关闭提示</UiButton></div>}
-    {tab==='chat'&&state?.approvals>0&&<div className="wtt-agent-review">
-      <UiButton variant="quiet" size="compact" onClick={()=>{setPage(0);setTab('plans');}}>查看待授权计划</UiButton>
-    </div>}
     <section className="wtt-agent-chat" aria-label={assistantName+'对话'} hidden={tab!=='chat'}>
-      {session?<ProjectInputContext.Provider value={owner}>{renderConversation({identity:'project-agent:'+session,sessionId:session,label:assistantName,editing:false,onSettled:()=>refresh().catch(e=>setError(e.message))})}</ProjectInputContext.Provider>
+      {tab==='chat'&&state?.sessionId===session&&<ChatReview review={state?.review} act={act} locate={locate} busy={busy||starting} onPage={setReviewPage}/>}
+      {session?<ProjectInputContext.Provider key={session} value={owner}>{renderConversation({identity:'project-agent:'+session,sessionId:session,label:assistantName,editing:false,onSettled:()=>refresh().catch(e=>setError(e.message))})}</ProjectInputContext.Provider>
         :!error&&<p className="wtt-agent-empty" role="status">正在打开对话…</p>}
     </section>
     {tab==='plans'&&<section className="wtt-agent-queue" aria-label="项目委托">
-      {!state?.plans?.length&&<p className="wtt-agent-empty">{state?'暂无委托':'正在读取委托…'}</p>}
+      {!state?.plans?.length&&<p className="wtt-agent-empty">{state?.view==='plans'?'暂无委托':'正在读取委托…'}</p>}
       <Plans plans={state?.plans} act={act} locate={locate} busy={busy}/>
       {state?.total>20&&<div className="wtt-agent-actions" aria-label="委托分页">
         <UiButton size="compact" disabled={page===0} onClick={()=>setPage(page-1)}>上一页</UiButton>
@@ -217,7 +286,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
         <UiButton size="compact" disabled={(page+1)*20>=state.total} onClick={()=>setPage(page+1)}>下一页</UiButton></div>}
     </section>}
     {tab==='memory'&&<><ProjectMemoryPanel call={call} onChanged={()=>refresh().catch(e=>setError(e.message))} suggestions={state?.suggestions} onLocate={locate}/>
-      {session&&<div className="wtt-agent-footer"><UiButton size="compact" onClick={async()=>{try{const v=await call('session',{replace:session});setSession(v.sessionId);setTab('chat');}catch(e){setError(e.message);}}}>用项目记忆开新对话</UiButton></div>}</>}
+      {session&&<div className="wtt-agent-footer"><UiButton size="compact" disabled={starting||busy||state?.running} onClick={newConversation}>用项目记忆开新对话</UiButton></div>}</>}
     <UiButton variant="custom" className="wtt-agent-resize" aria-label="调整浮窗大小" title="拖动调整浮窗大小" {...resizeGrip}/>
   </div></div>,canvas)}
   </>;

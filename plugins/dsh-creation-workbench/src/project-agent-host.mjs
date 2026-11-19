@@ -37,14 +37,17 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
   }));
   const host={
     bound(service,sessionId){owners.set(sessionId,projects.idOf(service));},
+    sessionRunning(sessionId){
+      const native=sessionId&&getService('agents')?.get(sessionId);
+      return Boolean(native?.status==='running'||native?.inbox?.nextTurn?.length||native?.inbox?.nextStep?.length);
+    },
     async createSession(service,agentPreset){
       const {workspace}=await controller('workspaceController').create({path:service.workspaceRoot});
       const {sessionId}=await controller('sessionController').create({workspaceId:workspace.workspaceId,...(agentPreset?{agentPreset}:{})});
       if(!sessionId)throw Error('DSH 未返回会话编号');return sessionId;
     },
-    async createTask(service,input,sources,settings,authorized,title){
+    async createTask(service,input,sources,settings,authorized,title,sessionId){
       const names=extractSkillNames(input.instruction);
-      const sessionId=runners.get(service)?.sessionId();
       const scope=names.length&&sessionId?await skillScope(sessionId):undefined;
       const skillRefs=names.length?await (await catalogReady).resolve(service.workspaceRoot,names,scope):[];
       if(!authorized())return null;
@@ -140,12 +143,14 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
         case 'turn':return agent.turn(data);
         case 'progress':
         case 'state':{
-          const sessionId=agent.sessionId(), native=sessionId&&getService('agents')?.get(sessionId);
-          const info={...agent.progress(),running:Boolean(native?.status==='running'||native?.inbox?.nextTurn?.length||native?.inbox?.nextStep?.length),
+          const sessionId=agent.sessionId();
+          const info={...agent.progress(),running:host.sessionRunning(sessionId),
             ...(data.cardId?{card:agent.cardHandoff(data)}:{})};
           if(action==='progress')return info;
           const page=Math.min(data.page??0,Math.max(0,Math.ceil(info.total/20)-1));
-          return {sessionId,...info,page,plans:agent.plans(page),suggestions:agent.db.prepare('SELECT * FROM pa_suggestions ORDER BY rowid DESC LIMIT 12').all().map(r=>({id:r.id,...JSON.parse(r.data)}))};
+          return {sessionId,...info,page,plans:!data.view||data.view==='plans'?agent.plans(page):[],
+            ...(data.view==='chat'?{review:agent.reviews(sessionId,data.reviewPage)}:{}),
+            suggestions:agent.db.prepare('SELECT * FROM pa_suggestions ORDER BY rowid DESC LIMIT 12').all().map(r=>({id:r.id,...JSON.parse(r.data)}))};
         }
         case 'control':{
           const result=await agent.control(data);
