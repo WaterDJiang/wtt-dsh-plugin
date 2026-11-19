@@ -454,6 +454,7 @@ export class WorkbenchService {
         ...(content.length > allowed ? { noteTruncated: '正文超过本次上下文上限，以下仅为节选；未包含的内容需按路径进一步读取' } : {}) };
     });
     if (projectInputs) sources.push(...projectInputs.sources);
+    this.projectFiles.organizer.assertAvailableForTask(sources);
     const modelSelection = normalizeModelSelection(input.modelSelection);
     const executionSkills = route ? route.skills : exactSkills && (selectedSkills.length || pptEngine !== 'baoyu')
       ? [...selectedSkills] : [...new Set([...creation.skills, ...selectedSkills])];
@@ -746,5 +747,5 @@ export class WorkbenchService {
 
   artifactPreview() { return this.previewRenderer ??= createArtifactPreview(this); }
 
-  close() { this.previewRenderer?.close(); this.svgDecks.close(); this.slides.close(); this.deck.close(); this.media.close(); this.store.close(); }
+  close() { this.projectFiles.clearFileIndex(); this.previewRenderer?.close(); this.svgDecks.close(); this.slides.close(); this.deck.close(); this.media.close(); this.store.close(); }
 }

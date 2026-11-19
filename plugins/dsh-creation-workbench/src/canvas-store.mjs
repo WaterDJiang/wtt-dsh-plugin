@@ -541,7 +541,7 @@ export class CanvasStore {
     return { bytes, name: row.original_name, mime: row.mime };
   }
 
-  async importMaterial(input, { python = 'python3', ffprobe = 'ffprobe', signal, projectReference } = {}) {
+  async importMaterial(input, { python = 'python3', ffprobe = 'ffprobe', signal, projectReference, includeBoard = true } = {}) {
     const requirement = this.#requirement(input?.requirementId);
     if (!uuid(input.operationId)) throw new Error('导入操作标识无效');
     const metadata = inspectMaterialImport({ filename: input.filename, bytes: input.bytes });
@@ -552,7 +552,7 @@ export class CanvasStore {
     const replayed = this.db.prepare('SELECT * FROM operations WHERE id=?').get(operationId);
     if (replayed) {
       if (replayed.kind !== 'import-material' || replayed.input_hash !== fingerprint) throw new Error('导入操作标识已用于不同文件或内容');
-      return { material: this.#materialResult(this.db.prepare('SELECT * FROM canvas_materials WHERE id=?').get(replayed.result_id)), board: this.getBoard(requirement.id) };
+      return { material: this.#materialResult(this.db.prepare('SELECT * FROM canvas_materials WHERE id=?').get(replayed.result_id)), ...(includeBoard ? { board: this.getBoard(requirement.id) } : {}) };
     }
     const bytes = Buffer.from(input.bytes);
     const extracted = await extractMaterialImport(bytes, metadata, { python, ffprobe, signal });
@@ -564,7 +564,7 @@ export class CanvasStore {
     const materialInput = { requirementId: requirement.id, title: metadata.name, content, sourcePath: relative, operationId,
       ...(input.position ? { position: input.position } : {}) };
     const verifiedAssociation = {};
-    return this.#addMaterial(materialInput, undefined, fingerprint, { operationKind: 'import-material', importedFile, rawBytes: bytes,
+    return this.#addMaterial(materialInput, undefined, fingerprint, { operationKind: 'import-material', importedFile, rawBytes: bytes, includeBoard,
       ...(projectReference ? { projectReference, beforeCreate: () => this.db.prepare('SELECT material_id FROM canvas_project_references WHERE requirement_id=? AND source_path=? AND source_hash=?').get(requirement.id,projectReference.path,projectReference.hash)?.material_id } : {}),
       ...(association ? { association: verifiedAssociation, beforeCreate: () => {
         Object.assign(verifiedAssociation, this.validateSourceRefs(requirement.id, [association])[0]);
@@ -855,7 +855,7 @@ export class CanvasStore {
     const replayed = this.db.prepare('SELECT * FROM operations WHERE id=?').get(operationId);
     if (replayed) {
       if (replayed.kind !== operationKind || replayed.input_hash !== fingerprint) throw new Error('素材操作标识已用于不同内容');
-      return { material: this.#materialResult(this.db.prepare('SELECT * FROM canvas_materials WHERE id=?').get(replayed.result_id)), board: this.getBoard(requirement.id) };
+      return { material: this.#materialResult(this.db.prepare('SELECT * FROM canvas_materials WHERE id=?').get(replayed.result_id)), ...(internal.includeBoard !== false ? { board: this.getBoard(requirement.id) } : {}) };
     }
     if (normalizedSource && !internal.importedFile) {
       const file = path.resolve(this.workspaceRoot, normalizedSource);
@@ -952,7 +952,7 @@ export class CanvasStore {
       });
       committed = true;
       const material = this.#materialResult(this.db.prepare('SELECT * FROM canvas_materials WHERE id=?').get(id));
-      return { material, board: this.getBoard(requirement.id) };
+      return { material, ...(internal.includeBoard !== false ? { board: this.getBoard(requirement.id) } : {}) };
     } finally {
       if (!committed && createdFile) unlinkSync(createdFile);
       if (!committed && createdOriginal) unlinkSync(createdOriginal);

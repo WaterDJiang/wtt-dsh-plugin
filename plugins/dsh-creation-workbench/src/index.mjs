@@ -102,6 +102,28 @@ export function apply(ctx, config = {}) {
     return Promise.resolve({kind:'deny',reason:'请通过 workbench_project 提交项目计划，原任务会话在用户授权后执行创作。'});
   });
   ctx.effect(() => ctx.connection.fetch.register({
+    path: '/api/wtt-creation-workbench-upload',
+    methods: ['POST'],
+    requestBody: 'streaming',
+    fetch: async request => {
+      const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
+      try {
+        const params=new URL(request.url).searchParams;
+        const fields=['projectId','projectFileUpload','name','size','offset','length'];
+        if(fields.some(key=>params.getAll(key).length!==1||!params.get(key)))throw new Error('文件上传必须指定当前项目和分片参数');
+        const length=Number(params.get('length')),advertised=request.headers.get('content-length');
+        if(advertised!==null&&Number(advertised)!==length)throw new Error('上传分片大小与声明不符。');
+        const organizer=projects.get(params.get('projectId')).projectFiles.organizer;
+        return Response.json(await organizer.uploadStream({
+          id:params.get('projectFileUpload'),name:params.get('name'),size:Number(params.get('size')),
+          offset:Number(params.get('offset')),length,chunks:request.body||[],signal:request.signal,
+        }),{headers});
+      }catch(error){
+        return Response.json({error:error.message||'文件上传失败，请重试。'},{status:400,headers});
+      }
+    },
+  }));
+  ctx.effect(() => ctx.connection.fetch.register({
     path: '/api/wtt-creation-workbench',
     methods: ['GET', 'HEAD', 'POST'],
     requestBody: 'buffered',
@@ -136,6 +158,26 @@ export function apply(ctx, config = {}) {
           if(url.searchParams.has('projectFilePage')){if(!projectId)throw new Error('文件预览必须指定项目');const file=await service.projectFiles.documentPreview.page(url.searchParams.get('projectFilePage'),url.searchParams.get('hash'),Number(url.searchParams.get('page')));return new Response(request.method==='HEAD'?null:file.bytes,{headers:{...headers,'Content-Type':file.mime}})}
           if(url.searchParams.has('recycleEntries')){if(!projectId)throw new Error('回收站必须指定项目');return Response.json({entries:service.recycle.list()},{headers})}
           if(url.searchParams.has('projectFiles')){if(!projectId)throw new Error('文件树必须指定项目');return Response.json(service.projectFiles.list(url.searchParams.get('projectFiles')),{headers})}
+          if(url.searchParams.has('projectFilesPage')){
+            if(!projectId)throw new Error('文件树必须指定项目');
+            try {
+              const page=await service.projectFiles.listPage(url.searchParams.get('projectFilesPage'),{
+                offset:url.searchParams.get('offset'),around:url.searchParams.get('around')??undefined,
+              });
+              return Response.json(page,{headers});
+            } catch (cause) {
+              if(cause.code==='ENOENT'||cause.code==='ENOTDIR')return Response.json({error:'文件夹已移动或删除'},{status:404,headers});
+              throw cause;
+            }
+          }
+          if(url.searchParams.has('projectFileSearch')){
+            if(!projectId)throw new Error('搜索文件必须指定项目');
+            return Response.json(await service.projectFiles.searchFiles(url.searchParams.get('projectFileSearch'),{refresh:url.searchParams.get('refresh')==='1'}),{headers});
+          }
+          if(url.searchParams.has('projectFileOrganization')){
+            if(!projectId)throw new Error('文件操作必须指定项目');
+            return Response.json(await service.projectFiles.organizer.status(),{headers});
+          }
           if(url.searchParams.has('projectReferenceSearch')){if(!projectId)throw new Error('搜索文件必须指定项目');return Response.json(service.projectFiles.searchReferences(url.searchParams.get('projectReferenceSearch')),{headers})}
           if(url.searchParams.has('reviewImage')){
             if(!projectId)throw new Error('候选图片预览必须指定项目');
@@ -289,6 +331,18 @@ export function apply(ctx, config = {}) {
           if (url.searchParams.has('canvasWorkspace') && !projectId) throw new Error('打开画布必须指定当前项目');
           return Response.json(projects.snapshot(service, await service.snapshot({ openCanvas: url.searchParams.get('canvasWorkspace') === '1' })), { headers });
         }
+        if(url.searchParams.has('projectFileUpload')){
+          const fields=['projectFileUpload','name','size','offset'];
+          if(!projectId||fields.some(key=>url.searchParams.getAll(key).length!==1))throw new Error('文件上传必须指定当前项目和分片参数');
+          const chunkLimit=4*1024*1024;
+          if(Number(request.headers.get('content-length'))>chunkLimit)throw Object.assign(new Error('上传分片不能超过 4 MiB'),{status:413});
+          const bytes=Buffer.from(await request.arrayBuffer());
+          if(bytes.length>chunkLimit)throw Object.assign(new Error('上传分片不能超过 4 MiB'),{status:413});
+          return Response.json(await projects.get(projectId).projectFiles.organizer.upload({
+            id:url.searchParams.get('projectFileUpload'),name:url.searchParams.get('name'),size:Number(url.searchParams.get('size')),
+            offset:Number(url.searchParams.get('offset')),bytes,
+          }),{headers});
+        }
         if (url.searchParams.has('saveWordDraft')) {
           if (!projectId || ['saveWordDraft','revision'].some(key=>url.searchParams.getAll(key).length!==1)) throw new Error('Word草稿必须指定当前项目和唯一修订号');
           if (Number(request.headers.get('content-length')) > IMPORT_MAX_BYTES) throw Object.assign(new Error('Word草稿不能超过20MiB'),{status:413});
@@ -373,8 +427,13 @@ export function apply(ctx, config = {}) {
         else if(action==='canvas-recycle-purge')result=service.recycle.purge(data||{});
         else if(action==='project-file-delete-plan')result=service.recycle.fileEntries.plan(data||{});
         else if(action==='project-file-delete')result=service.recycle.fileEntries.remove(data||{});
+        else if(action==='project-file-organize-plan')result=await service.projectFiles.organizer.organize(data||{},{preview:true});
+        else if(action==='project-file-organize')result=await service.projectFiles.organizer.organize(data||{});
+        else if(action==='project-file-undo')result=await service.projectFiles.organizer.undo(data||{});
+        else if(action==='project-file-recover')result=await service.projectFiles.organizer.retryRecovery(data||{});
         else if (action === 'project-file-create') result = service.projectFiles.create(data || {});
         else if (action === 'project-file-reference') result = await service.projectFiles.reference(data || {});
+        else if (action === 'project-file-reference-batch') result = await service.projectFiles.referenceBatch(data || {},{signal:request.signal});
         else if (action === 'project-file-reveal') result = await service.projectFiles.reveal(data || {});
         else if (action === 'project-file-open') result = await service.projectFiles.openExternal(data || {});
         else if (action === 'card-open-applications') result = await service.openCardApplications(data || {});

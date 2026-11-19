@@ -2701,6 +2701,45 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   min-height: 0;
   overflow: auto;
   padding: 4px 0;
+  overflow-anchor: none;
+}
+.wtt-file-tree[hidden] {
+  display: none;
+}
+.wtt-file-tree-space {
+  position: relative;
+}
+.wtt-file-tree-slot {
+  position: absolute;
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+}
+.wtt-file-tree-slot .wtt-file-row {
+  height: 100%;
+}
+.wtt-file-tree-control {
+  align-items: center;
+}
+.wtt-file-tree-control > .wtt-file-inline-create {
+  width: 100%;
+}
+.wtt-file-tree-control .wtt-file-branch-status {
+  box-sizing: border-box;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+.wtt-file-tree-control .wtt-file-branch-status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wtt-file-root-drop-label {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 1;
 }
 .wtt-file-row {
   box-sizing: border-box;
@@ -2717,7 +2756,7 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   text-overflow: ellipsis;
 }
 .wtt-file-row.is-selected {
-  background: var(--wtt-ui-selected, #4965a522);
+  background: var(--wtt-ui-selection);
 }
 .wtt-file-chevron {
   width: 10px;
@@ -2995,6 +3034,169 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
 @media (max-width: 700px) {
   .wtt-project-explorer footer button.wtt-ui-button.wtt-file-mobile-preview {
     display: inline-flex;
+  }
+}
+.wtt-project-explorer .wtt-file-header {
+  flex-shrink: 0;
+  gap: 2px;
+  padding: var(--wtt-space-2);
+}
+.wtt-project-explorer .wtt-file-header .wtt-file-root {
+  width: auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-start;
+  gap: 4px;
+}
+.wtt-file-root > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wtt-file-chevron {
+  width: 19px;
+}
+.wtt-file-type {
+  flex-shrink: 0;
+  color: var(--wtt-ui-muted);
+}
+.wtt-file-type:is(.is-directory, .is-image, .is-video, .is-slides) {
+  color: var(--wtt-ui-accent);
+}
+.wtt-project-explorer .wtt-file-name[aria-current] {
+  box-shadow: inset 2px 0 var(--wtt-ui-accent);
+}
+.wtt-file-search {
+  flex-shrink: 0;
+  padding: var(--wtt-space-2);
+  border-bottom: 1px solid var(--wtt-ui-line);
+}
+.wtt-file-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--wtt-control-h);
+  padding: 4px var(--wtt-space-2);
+  border: 1px solid var(--wtt-ui-line);
+  border-radius: var(--wtt-radius-control);
+  background: var(--wtt-ui-canvas);
+  color: var(--wtt-ui-text);
+  font: inherit;
+}
+.wtt-file-search input:focus-visible {
+  outline: 1px solid var(--wtt-ui-accent);
+  outline-offset: 0;
+}
+.wtt-file-results {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.wtt-project-explorer .wtt-file-results [role=option] {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  gap: var(--wtt-space-2);
+  text-align: left;
+  justify-content: flex-start;
+  padding: 6px 10px;
+}
+.wtt-file-results [role=option][aria-selected=true] {
+  background: var(--wtt-ui-accent-paper);
+  color: var(--wtt-ui-accent);
+}
+.wtt-file-results [role=option] > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.wtt-file-results [role=option] :is(strong, small) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+}
+.wtt-file-results [role=option] small {
+  color: var(--wtt-ui-muted);
+  font-size: var(--wtt-text-xs);
+}
+.wtt-file-page {
+  margin-left: var(--wtt-space-2);
+}
+.wtt-file-branch-status,
+.wtt-file-batch-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--wtt-space-2);
+  padding: 4px var(--wtt-space-2);
+  color: var(--wtt-ui-muted);
+}
+.wtt-file-batch-status {
+  border-top: 1px solid var(--wtt-ui-line);
+}
+.wtt-file-batch-status > span {
+  flex: 1;
+}
+.wtt-file-batch-errors {
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+.wtt-file-batch-errors ul {
+  max-height: 120px;
+  overflow: auto;
+  margin: 4px 0;
+  padding: 0 0 0 18px;
+}
+.wtt-file-batch-errors li span {
+  display: block;
+}
+.wtt-file-row.is-cut .wtt-file-name {
+  opacity: .55;
+}
+.wtt-file-row.is-file-drop-target,
+.wtt-file-tree.is-file-drop-target {
+  box-shadow: inset 0 0 0 1px var(--wtt-ui-accent);
+  background: var(--wtt-ui-accent-paper);
+}
+.wtt-file-drop-label {
+  flex-shrink: 0;
+  margin: 0 var(--wtt-space-2);
+  color: var(--wtt-ui-accent);
+  white-space: nowrap;
+}
+.wtt-file-row > .wtt-file-inline-create {
+  flex: 1;
+  min-width: 0;
+}
+.wtt-file-conflict-list {
+  max-height: 10rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.wtt-file-organize-feedback code {
+  font-size: var(--wtt-text-xs);
+  overflow-wrap: anywhere;
+}
+.wtt-project-explorer footer {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: var(--wtt-space-2);
+}
+.wtt-project-explorer .wtt-file-context {
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  min-width: 0;
+  margin: 0;
+  box-sizing: border-box;
+  color: var(--wtt-ui-text);
+}
+@media (max-width: 700px) {
+  .wtt-file-search input {
+    min-height: 40px;
+    font-size: var(--wtt-text-lg);
+  }
+  .wtt-file-results [role=option] {
+    min-height: 44px;
   }
 }
 .wtt-project-file-preview .wtt-file-preview-body {

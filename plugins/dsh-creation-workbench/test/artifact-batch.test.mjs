@@ -147,6 +147,20 @@ test('a misregistered video can publish the original file to the original card o
 
   const mainPath = path.join(root, main.path);
   const preview = options => service.tasks.files.videoPreviewResponse(original.id, options);
+  const detail=options=>service.outcomes.preview({requirementId:requirement.id,sourceRef:'artifact:'+original.id,hash:original.hash,...options});
+  const originalRead=service.tasks.files.read,originalWrite=service.documents.write;
+  try{
+    service.tasks.files.read=()=>{throw new Error('video detail must not read all bytes')};
+    service.documents.write=()=>{throw new Error('video detail must not write a full snapshot')};
+    assert.equal(detail().path,original.path);
+    assert.equal(detail().originalPath,original.path);
+    assert.equal(detail().mime,'video/mp4');
+    assert.throws(()=>detail({requirementId:randomUUID()}),/不属于当前画布/);
+    assert.throws(()=>detail({hash:'0'.repeat(64)}),/版本已变化/);
+  }finally{
+    service.tasks.files.read=originalRead;
+    service.documents.write=originalWrite;
+  }
   const response = await preview({ range: 'bytes=32-79' });
   assert.equal(response.status, 206);
   assert.equal(response.headers.get('content-range'), `bytes 32-79/${video.stdout.length}`);
@@ -165,6 +179,7 @@ test('a misregistered video can publish the original file to the original card o
   modified[32] ^= 0xff;
   writeFileSync(mainPath, modified);
   utimesSync(mainPath, old.atime, old.mtime);
+  assert.throws(()=>detail(),/外改/);
   await assert.rejects(preview({ range: 'bytes=32-79' }), /已被外部修改/);
   writeFileSync(mainPath, video.stdout);
   const pending = await preview({ range: 'bytes=32-79' });

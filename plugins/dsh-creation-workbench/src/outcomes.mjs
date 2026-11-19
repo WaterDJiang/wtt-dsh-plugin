@@ -44,7 +44,8 @@ export class Outcomes {
     const taskId = version?.taskId || task?.id;
     const files = this.files(taskId, version?.primaryRef, card.id);
     if (version && !files.some(file => file.sourceRef === version.primaryRef)) {
-      const raw = this.read({ requirementId, sourceRef: version.primaryRef });
+      const input={requirementId,sourceRef:version.primaryRef};
+      const raw = this.registeredVideo(input)||this.read(input);
       files.unshift({ ...raw, bytes: undefined, role: 'result' });
     }
     if (sourceRef && !files.some(file => file.sourceRef === sourceRef)) throw new Error('所选文件不属于当前卡片版本或任务。');
@@ -88,7 +89,19 @@ export class Outcomes {
     return { bytes, path: relative, name: path.basename(relative), title, hash: fileHash, format: outcomeFormat(relative),
       mime, sourceRef, status: 'ready', sessionId, cardId, versionId };
   }
+  registeredVideo({requirementId,sourceRef,hash,projectPath}){
+    if(projectPath!==undefined||!refPattern.test(sourceRef||'')||!sourceRef.startsWith('artifact:'))return null;
+    const video=this.service.tasks.files.videoPreviewMetadata(sourceRef.slice(9),{requirementId,hash});
+    if(!video)return null;
+    const {path:relative,title,mime,hash:fileHash,taskId}=video;
+    const owner=this.db.prepare('SELECT card_id,version_id FROM output_card_outputs WHERE source_ref=?').get(sourceRef);
+    const task=this.db.prepare('SELECT session_id FROM course_tasks WHERE id=?').get(taskId);
+    return {path:relative,originalPath:relative,title,name:path.basename(relative),mime,hash:fileHash,format:outcomeFormat(relative),sourceRef,status:'ready',
+      sessionId:task?.session_id,cardId:owner?.card_id,versionId:owner?.version_id};
+  }
   preview(input) {
+    const video=this.registeredVideo(input);
+    if(video)return video;
     const source = this.read(input);
     // Office/PDF/image snapshots are immutable inputs for the host's live file reader.
     // HTML/Markdown keep their source directory for relative styles and images.

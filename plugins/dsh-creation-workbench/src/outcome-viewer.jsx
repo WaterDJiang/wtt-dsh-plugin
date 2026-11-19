@@ -7,7 +7,7 @@ import { VideoPreview } from './video-preview.jsx'
 
 const externalFormats = ['pptx', 'docx', 'pdf', 'csv']
 export function OutcomeViewer({ target, endpoint, request, renderNativePreview, onOpenSlides, onEditPpt, onSaved, onClose, onAdd,
-  onToggleWidth, widthExpanded, active = true }) {
+  onToggleWidth, widthExpanded, active = true, projectFilePinned, onPinProjectFile, onLocateProjectFile }) {
   const [manifest, setManifest] = useState(null), [selected, setSelected] = useState(''), [sourceBinding, setSource] = useState(null)
   const [error, setError] = useState('')
   const [svgBinding,setSvgBinding]=useState(null),[svgChoice,setSvgChoice]=useState('')
@@ -98,6 +98,8 @@ export function OutcomeViewer({ target, endpoint, request, renderNativePreview, 
     <PanelHeader title={target.displayTitle || manifest?.displayTitle || file?.name || target.title || '成果文件'} format={source?.format?.toUpperCase()} downloadHref={downloadHref}
       expanded={widthExpanded} onToggleWidth={onToggleWidth} onClose={onClose} closeLabel="关闭成果预览" />
     <PanelToolbar>{choices(false)}
+      {onPinProjectFile&&<UiButton variant="quiet" aria-pressed={Boolean(projectFilePinned)} onClick={onPinProjectFile}>{projectFilePinned?'取消固定':'固定预览'}</UiButton>}
+      {onLocateProjectFile&&<UiButton variant="quiet" onClick={onLocateProjectFile}>在项目文件中定位</UiButton>}
       {onAdd && source && <UiButton variant="quiet" onClick={() => onAdd({ path: target.projectPath, name: source.name, hash: source.hash, directory: false })}>添加到画布</UiButton>}
     </PanelToolbar>
     {file?.role === 'attachment' && <div className="wtt-outcome-status" role="status">附件 · 未作为正式版本归档</div>}

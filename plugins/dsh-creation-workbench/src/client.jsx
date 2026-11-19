@@ -18,6 +18,7 @@ import { NATIVE_PREVIEW_CHILDREN, registerNativePreview, HostFilePreview } from 
 import { CourseCanvas } from './canvas.jsx'
 import { ProjectRecycleDialog } from './canvas-recycle.jsx'
 import { ProjectExplorer, ProjectFilePreview } from './project-explorer.jsx'
+import {remapProjectFilePath} from './project-file-paths.mjs'
 import { ProjectPicker } from './project-picker.jsx'
 import { normalizeModelCatalog, openNativeModelSettings } from './model-selection.mjs'
 import { createNativeModelSeat } from './model-selection.jsx'
@@ -235,13 +236,32 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   const [projectFileSelection,setProjectFileSelection]=useState(null)
   const [conversationFileError,setConversationFileError]=useState(null)
   const [fileAddRequest,setFileAddRequest]=useState(null)
+  const [fileRevealRequest,setFileRevealRequest]=useState(null)
+  const fileRequestPending=useRef(null)
   const [recycleRequest,setRecycleRequest]=useState(null)
   const [fileRefresh,setFileRefresh]=useState(0)
   const [fileRecycleSignal,setFileRecycleSignal]=useState(null)
+  const [fileClipboard,setFileClipboard]=useState(null)
+  const [fileOrganizationSignal,setFileOrganizationSignal]=useState(null)
   const [backgroundEdit,setBackgroundEdit]=useState(null)
   const [backgroundError,setBackgroundError]=useState('')
   const backgroundAttempt=useRef(null)
-  const previewProjectFile=entry=>{setProjectFileSelection({...entry,token:crypto.randomUUID()});if(window.innerWidth<=700)setFilesOpen(false)}
+  function previewProjectFile(entry,{temporary=false,pinned=false}={}){
+    setProjectFileSelection(previous=>{
+      if(temporary&&previous?.pinned)return previous
+      if(previous?.path===entry.path&&pinned)return {...previous,pinned:true}
+      return {...entry,pinned,token:crypto.randomUUID()}
+    })
+    if(window.innerWidth<=700)setFilesOpen(false)
+  }
+  function pinProjectFile(){
+    setProjectFileSelection(current=>current?{...current,pinned:!current.pinned}:current)
+  }
+  function locateProjectFile(path){
+    if(!path)return
+    setFileRevealRequest({path,token:crypto.randomUUID()})
+    setFilesOpen(true)
+  }
   function openConversationFile(event, sessionId = reference?.sessionId) {
     const file = nativeConversationFilePath(event.target.closest?.('button'))
     if (!file) return
@@ -257,7 +277,30 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
       setConversationFileError({ sessionId, message: messageOf(cause) })
     }
   }
-  const addProjectFile=entry=>{setFileAddRequest({...entry,projectId:project.id,requirementId:selectedId,token:crypto.randomUUID()});setProjectFileSelection(null);if(window.innerWidth<=700)setFilesOpen(false)}
+  function addProjectFile(input,{references=false,onResult}={}){
+    const entries=Array.isArray(input)?input:[input]
+    function unavailable(error){
+      if(onResult)onResult({done:0,failed:entries.map(entry=>({...entry,error}))})
+      else setError(error)
+    }
+    if(!active||!selectedId||view!=='canvas')return unavailable('请先打开一张画布。')
+    if(fileRequestPending.current)return unavailable('正在处理上一批文件，请稍后重试。')
+    const token=crypto.randomUUID()
+    fileRequestPending.current=token
+    setFileAddRequest({entries,references,projectId:project.id,requirementId:selectedId,token,onResult:result=>{
+      if(fileRequestPending.current!==token)return
+      fileRequestPending.current=null
+      onResult?.(result)
+      if(!onResult&&result.failed.length)setError(result.failed[0].error)
+      if(result.done&&!Array.isArray(input))setProjectFileSelection(current=>current?.path===input.path&&!current.pinned?null:current)
+      if(result.done&&!result.failed.length&&window.innerWidth<=700)setFilesOpen(false)
+    }})
+  }
+  useEffect(()=>{
+    if(fileRequestPending.current===fileAddRequest?.token&&(!active||view!=='canvas'||selectedId!==fileAddRequest.requirementId)){
+      fileAddRequest.onResult({done:0,failed:fileAddRequest.entries.map(entry=>({...entry,error:'画布已切换，请在目标画布重试。'}))})
+    }
+  },[active,view,selectedId,fileAddRequest])
   const [sessionGeneration, setSessionGeneration] = useState(0)
   const [sessionErrors, setSessionErrors] = useState({})
   const [canvasSignals, setCanvasSignals] = useState({})
@@ -593,6 +636,21 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     </div>}
   </> : null
 
+  function fileOrganizationChanged(changes){
+    setProjectFileSelection(previous=>{
+      if(!previous||previous.fromConversation||previous.reviewDraft)return previous
+      const path=remapProjectFilePath(previous.path,changes)
+      return !path?null:path===previous.path?previous:{...previous,path,name:path.split('/').at(-1),token:crypto.randomUUID()}
+    })
+    setFileClipboard(current=>{
+      if(!current)return current
+      const paths=current.paths.map(path=>remapProjectFilePath(path,changes)).filter(Boolean)
+      return paths.length?{...current,paths}:null
+    })
+    const requirements=[...new Set(changes.flatMap(item=>item.requirements||[]))]
+    if(requirements.length)setFileOrganizationSignal({token:crypto.randomUUID(),requirements,changes})
+  }
+
   async function fileTreeChanged(plan){
     setProjectFileSelection(previous=>previous&&(previous.path===plan.target.path||previous.path.startsWith(plan.target.path+'/'))?null:previous)
     setFileRefresh(value=>value+1)
@@ -601,7 +659,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
   }
   const projectBar = <CanvasProjectBar workspace={workspace} project={project} onToggleFiles={()=>setFilesOpen(true)} filesOpen={filesOpen} selectedId={selectedId} busy={busy} loading={loading} onSelect={selectRequirement} onNew={() => { setFormError(''); setShowNew(true) }} onList={showList} onRefresh={() => load()} onRename={showRename} onBackground={showBackground} onSyncDeliverables={syncDeliverables} onModelSettings={onOpenModelSettings} notificationChannel={desktopTaskNotices?.channel} />
 
-  return <div className="wtt-project-layout">{filesOpen&&<ProjectExplorer onChanged={fileTreeChanged} refreshSignal={fileRefresh} onRecycle={()=>setRecycleRequest(crypto.randomUUID())} project={project} request={request} active={active} onClose={()=>setFilesOpen(false)} onChooseProject={onChooseProject} onOpenProject={onOpenProject} onPreview={previewProjectFile} onAdd={addProjectFile} canAdd={Boolean(selected)}/>}<div className="wtt-project-main"><div className={`wtt-course-workbench ${view === 'canvas' ? 'wtt-canvas-mode' : ''}`}>
+  return <div className="wtt-project-layout">{filesOpen&&<ProjectExplorer onChanged={fileTreeChanged} clipboard={fileClipboard} setClipboard={setFileClipboard} onOrganized={fileOrganizationChanged} refreshSignal={fileRefresh} onRecycle={()=>setRecycleRequest(crypto.randomUUID())} project={project} request={request} active={active} onClose={()=>setFilesOpen(false)} onChooseProject={onChooseProject} onOpenProject={onOpenProject} onPreview={previewProjectFile} previewPath={projectFileSelection?.path} revealRequest={fileRevealRequest} onAdd={addProjectFile} canAdd={view==='canvas'&&Boolean(selected)}/>}<div className="wtt-project-main"><div className={`wtt-course-workbench ${view === 'canvas' ? 'wtt-canvas-mode' : ''}`}>
     {view === 'canvas' && !selected && projectBar}
     {view !== 'canvas' && <>
       <header className="wtt-page-heading">
@@ -627,8 +685,8 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {loadError && <div className="wtt-feedback wtt-feedback-error" role="alert"><UserError error={loadError} announce={false} /><UiButton variant="quiet" className="wtt-button" onClick={() => load(!workspace)} disabled={loading}>重新读取</UiButton></div>}
     {modelError && <div className="wtt-feedback wtt-feedback-error wtt-model-feedback" role="alert"><UserError error={modelError} announce={false} /><UiButton variant="quiet" className="wtt-button" onClick={onRefreshModels} disabled={modelLoading}>刷新模型</UiButton></div>}
 
-    {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
-      onPreviewProjectFile={previewProjectFile}
+    {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} fileOrganizationSignal={fileOrganizationSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
+      onPreviewProjectFile={previewProjectFile} onLocateProjectFile={locateProjectFile} onPinProjectFile={pinProjectFile}
       onAssetNavigate={(requirementId, cardId, versionId,taskId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId,taskId }; selectRequirement(target) }}
       nativeModelSeat={nativeModelSeat} desktopTaskNotices={desktopTaskNotices} onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation}
       onOpenNativeConversation={onOpenNativeConversation && (sessionId => {
@@ -636,7 +694,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
         onOpenNativeConversation(sessionId)
       })} />}
     {!selected&&recycleRequest&&<ProjectRecycleDialog request={request} endpoint={q=>endpoint(q,project.id)} onClose={()=>setRecycleRequest(null)} onChanged={()=>setFileRefresh(v=>v+1)}/>}
-    {view==='canvas'&&!selected&&projectFileSelection&&<div className="wtt-empty-file-preview"><ProjectFilePreview selection={projectFileSelection} endpoint={q=>endpoint(q,project.id)} onClose={()=>setProjectFileSelection(null)}/></div>}
+    {view==='canvas'&&!selected&&projectFileSelection&&<div className="wtt-empty-file-preview"><ProjectFilePreview selection={projectFileSelection} endpoint={q=>endpoint(q,project.id)} onClose={()=>setProjectFileSelection(null)} onPin={pinProjectFile} onLocate={()=>locateProjectFile(projectFileSelection.path)}/></div>}
     {view === 'canvas' && workspace && !selected && <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>拖入文件，继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div>}
     {loading && !workspace ? <div className="wtt-page-empty" role="status"><p>正在读取画布和已保存版本…</p></div> : workspace && view === 'list' && <div className="wtt-workspace-layout">
       <aside className="wtt-requirements" aria-label="项目画布">

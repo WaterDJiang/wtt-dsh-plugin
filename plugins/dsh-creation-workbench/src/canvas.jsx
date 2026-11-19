@@ -9,6 +9,7 @@ import {DeleteNodesDialog,ProjectRecycleDialog} from './canvas-recycle.jsx'
 import { TaskControlDialog } from './task-control.jsx'
 import { CardNameDialog } from './card-name-dialog.jsx'
 import {PROJECT_FILE_DRAG, ProjectFilePreview} from './project-explorer.jsx'
+import {remapProjectFilePath} from './project-file-paths.mjs'
 import { SvgSourceView } from './svg-source-view.jsx'
 import {SavedPptPreview} from './saved-ppt-preview.jsx'
 import { VideoPreview } from './video-preview.jsx'
@@ -31,7 +32,7 @@ import { CourseTasks } from './course-tasks.jsx'
 import { normalizeLineEndings } from './text-diff.mjs'
 import { NodeCreateMenu, CardComposer } from './card-creation.jsx'
 import { mediaJobPending, mediaOptionsFor, mediaSizeLabel } from './media-creation.jsx'
-import { CARD_WIDTH, CARD_HEIGHT, OUTPUT_CARD_SIZE, createCardContext, createCompositionContext, createRevisionContext, creationSource, updateCreationReferences, creationTaskInput, adjacentCreationPosition, visibleCreationPosition, usableCreationSource } from './creation-context.mjs'
+import { CARD_WIDTH, CARD_HEIGHT, OUTPUT_CARD_SIZE, createCardContext, createCompositionContext, createRevisionContext, creationSource, updateCreationReferences, creationTaskInput, adjacentCreationPosition, creationPositionFree, visibleCreationPosition, usableCreationSource } from './creation-context.mjs'
 import { OutputPreview, DeckPreview } from './output-preview.jsx'
 import { SlideDraftCover } from './slide-draft-cover.jsx'
 import { AssetBoard } from './asset-board.jsx'
@@ -166,6 +167,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
           className="wcc-card-open-menu nodrag nopan nowheel" role="group" aria-label="卡片操作" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
           {data.onUploadContent && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onUploadContent() }}>上传文件</UiButton>}
           {data.onRename && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRename() }}>重命名</UiButton>}
+          {data.onLocateProjectFile && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onLocateProjectFile() }}><UiIcon name="directory" size={14}/>在项目文件中定位</UiButton>}
           {openTarget && <>
           <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onOpenInspect?.() }}><UiIcon name="file" size={14} />在侧栏查看</UiButton>
           {data.projectFile?.status === 'missing' && <UiButton variant="ghost" size="compact" onClick={() => { setOpenMenu(false); data.onRestoreFile?.() }}><UiIcon name="refresh" size={14} />恢复源文件</UiButton>}
@@ -382,8 +384,8 @@ function GroupDialog({ busy, onClose, onSubmit }) {
   </dialog>
 }
 
-function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, onOpenNativeConversation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
-  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile, desktopTaskNotices }) {
+function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileSelection, onCloseProjectFile, onAddProjectFile, fileAddRequest, recycleRequest, onCloseRecycle, onFilesChanged, projectBar, project, projectId, dependencies, active = true, requirement, request, onChanged, onStart, conversation, conversationSessionId, onSessionRestore, onPrepareContinuation, onOpenNativeConversation, refreshSignal, draftCache, creationCache, onAssetNavigate, renderNativePreview,renderEditorConversation,
+  nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, onWatchTaskSessions, onPreviewProjectFile, onLocateProjectFile, onPinProjectFile, desktopTaskNotices }) {
   const panelId = useId()
   const endpoint = query => apiEndpoint(query, projectId)
   const flow = useReactFlow()
@@ -1145,6 +1147,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       if (blank && outputType === 'text') { openTextEditor(result.node); return }
       openComposition(result);
       if(seed)updateCreation(creationRef.current.key,{instruction:seed.instruction,generationMethod:seed.generationMethod==='api'?'api':'skill',providerId:seed.providerId,mediaOptions:seed.mediaOptions,selectedSkills:seed.selectedSkills||[]});
+      return true
     }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}
     finally{if(mounted.current&&epoch===epochRef.current)setBusy('')}
   }
@@ -1770,6 +1773,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
       onOpenInspect: () => { selectCard(node.id); closeCreation(); setSidebar(true); setTab('inspect') },
       onOpenDetails: () => openCardDetails(node.data),
       onRevealFile: entry => void openProjectFileAction('project-file-reveal', entry),
+      onLocateProjectFile: (node.data.projectFile?.path||node.data.delivery?.status==='ready'&&node.data.delivery?.path)?() => onLocateProjectFile?.(node.data.projectFile?.path||node.data.delivery.path):undefined,
       onOpenExternal: entry => void openProjectFileAction('project-file-open', entry),
       onLoadOpenApps: entry => request('card-open-applications', { ...entry, requirementId: requirement.id }),
       onOpenWithApp: (entry, application, draftId) => request(draftId ? 'document-open-application' : 'card-open-application',
@@ -1908,6 +1912,34 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }catch(cause){if(mounted.current&&epoch===epochRef.current&&deleteRequest.current===token){setDeletePlan(null);setError(messageOf(cause))}}
     finally { if (deleteRequest.current === token) deleteRequest.current = null }
   }
+  const lastFileOrganization=useRef(null)
+  useEffect(()=>{
+    const signal=fileOrganizationSignal
+    if(!active||!signal||lastFileOrganization.current===signal.token||!signal.requirements.includes(requirement.id))return
+    lastFileOrganization.current=signal.token
+    function remap(card){
+      if(!card)return card
+      const sourcePath=remapProjectFilePath(card.sourcePath,signal.changes)
+      const projectPath=remapProjectFilePath(card.projectFile?.path,signal.changes)
+      if(sourcePath===card.sourcePath&&projectPath===card.projectFile?.path)return card
+      return {...card,sourcePath,...(card.projectFile?{projectFile:{...card.projectFile,path:projectPath}}:{})}
+    }
+    const latest=boardRef.current
+    if(latest){
+      const next={...latest,nodes:latest.nodes.map(remap)}
+      boardRef.current=next
+      setBoard(next)
+      replaceNodes(decorate(nodesRef.current.map(node=>{
+        const data=remap(node.data)
+        return data===node.data?node:{...node,data}
+      })))
+    }
+    for(const [key,frame] of cache.current.drafts){
+      if(frame.pendingTaskId||frame.taskId)continue
+      const references=frame.references.map(remap),anchor=remap(frame.anchor)
+      if(anchor!==frame.anchor||references.some((source,index)=>source!==frame.references[index]))updateCreation(key,{references,anchor})
+    }
+  },[fileOrganizationSignal,active])
   const lastFileRecycle=useRef(null)
   useEffect(()=>{
     if(!active||!fileRecycleSignal||lastFileRecycle.current===fileRecycleSignal.token||!fileRecycleSignal.requirements.includes(requirement.id))return
@@ -2983,34 +3015,122 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
 
   const handledFileAdd=useRef(null)
   useEffect(()=>{
-    if (!projectFileSelection) return
-    if (!projectFileSelection.fromConversation) closeCreation()
+    if(!projectFileSelection)return
+    if(documentViewRef.current||deckPreview||textEditorOpen){
+      onCloseProjectFile?.()
+      setNotice('请先完成右栏编辑，再打开项目文件。')
+      return
+    }
     setSidebar(false)
-    setDeckPreview(null)
     setOutcomeView(null)
-    setDocumentView(null)
     setFocusOpen(false)
     setAssetsOpen(false)
   },[projectFileSelection?.token])
   useEffect(()=>{
     if(!active||!board||!fileAddRequest||fileAddRequest.projectId!==projectId||fileAddRequest.requirementId!==requirement.id||handledFileAdd.current===fileAddRequest.token)return
     handledFileAdd.current=fileAddRequest.token
-    void addProjectReference(fileAddRequest,viewCenter())
+    void addProjectReferences(fileAddRequest,viewCenter())
   },[active,Boolean(board),fileAddRequest?.token])
-  async function addProjectReference(entry,position){
-    if(entry.projectId!==projectId) {setError('请在同一个项目内拖入文件。');return}
-    if(busy||operationLock.current){setError('当前操作尚未结束，请稍后再添加文件。');return}
-    const epoch=epochRef.current
-    setBusy('file-reference');setError('')
-    try{
-      let hash=entry.hash
-      if(!hash){const response=await fetch(endpoint({projectFilePreview:entry.path}),{credentials:'same-origin'}),data=await response.json();if(!response.ok)throw new Error(data.error||'文件读取失败');hash=data.hash}
-      const result=await request('project-file-reference',{requirementId:requirement.id,path:entry.path,hash,position,operationId:crypto.randomUUID()})
-      if(!mounted.current||epoch!==epochRef.current)return
-      await loadBoard({selectIds:[`material:${result.material.id}`],preserveViewport:true})
-      onFilesChanged?.()
-      onCloseProjectFile?.()
-    }catch(cause){if(mounted.current&&epoch===epochRef.current)setError(messageOf(cause))}finally{if(mounted.current&&epoch===epochRef.current)setBusy('')}
+  async function addProjectReferences(batch,position){
+    const entries=batch.entries||[batch]
+    const references=batch.references===true
+    let done=0
+    let failed=[]
+    const fail=(items,error)=>items.map(item=>({...item,error}))
+    function finish(){
+      if(batch.onResult)batch.onResult({done,failed})
+      else if(mounted.current&&activeRef.current){
+        if(done)setNotice('已添加 '+done+' 项')
+        if(failed.length)setError(failed[0].error+(failed.length>1?'，另有 '+(failed.length-1)+' 项未添加。':''))
+      }
+    }
+    if(batch.projectId!==projectId){
+      failed=fail(entries,'请在同一个项目内拖入文件。')
+      finish()
+      return
+    }
+    if(!entries.length||entries.length>100){
+      failed=fail(entries,'每批请选择 1 到 100 个文件。')
+      finish()
+      return
+    }
+    const context=references&&cache.current.visible?creationRef.current:null
+    if(context?.pendingTaskId||context?.mediaJob?.taskId||referencePickRef.current){
+      failed=fail(entries,'当前创作正在执行或选择引用，请稍后重试。')
+      finish()
+      return
+    }
+    if(references&&entries.length>24){
+      failed=fail(entries,'一次创作最多引用 24 份资料。')
+      finish()
+      return
+    }
+    const intent=creationIntent.current
+    const files=entries.map(entry=>({...entry,operationId:entry.operationId||crypto.randomUUID()}))
+    let openDraft=null
+    const outcome=await perform('file-reference',async epoch=>{
+      const current=()=>mounted.current&&activeRef.current&&epoch===epochRef.current
+      if(!current())throw new Error('画布已切换，请在目标画布重试。')
+      const occupied=nodesRef.current.filter(isObject).map(node=>({
+        position:absolutePosition(node,nodesRef.current),...nodeSize(node),
+      }))
+      const positions=files.map((file,index)=>{
+        const point=index===0&&creationPositionFree(position,occupied,CARD_WIDTH,CARD_HEIGHT)
+          ?position:adjacentCreationPosition({position,width:CARD_WIDTH},occupied,CARD_WIDTH,CARD_HEIGHT)
+        occupied.push({position:point,width:CARD_WIDTH,height:CARD_HEIGHT})
+        return {...file,position:point}
+      })
+      const result=await request('project-file-reference-batch',{requirementId:requirement.id,files:positions})
+      const byPath=new Map(files.map(file=>[file.path,file]))
+      failed=result.failed.map(item=>({...byPath.get(item.path),...item}))
+      if(!result.added.length)return
+      if(!current())throw new Error('画布已切换，请在目标画布核对已保存素材。')
+      const selectedIds=result.added.map(item=>item.cardId)
+      const updated=await loadBoard({selectIds:references?undefined:selectedIds,keepVisible:true,preserveViewport:true,selectionIntent:intent})
+      if(!current())throw new Error('画布已切换，请在目标画布核对已保存素材。')
+      if(!references){
+        done=result.added.length
+        return
+      }
+      if(creationIntent.current!==intent) {
+        failed=failed.concat(fail(result.added.map(item=>byPath.get(item.path)),'创作目标已切换，文件已保存为素材，可重试加入引用。'))
+        return
+      }
+      const cards=new Map(updated?.nodes?.map(card=>[card.id,card]))
+      const sources=[]
+      const currentDraft=context?cache.current.drafts.get(context.key):null
+      const existing=new Set(currentDraft?.references.map(card=>card.id))
+      for(const item of result.added){
+        const card=cards.get(item.cardId)
+        if(!usableCreationSource(card)){
+          failed.push(...fail([byPath.get(item.path)],'素材已导入，请刷新画布后重试添加引用。'))
+        }else if(existing.has(card.id)){
+          done++
+        }else if(existing.size>=24){
+          failed.push(...fail([byPath.get(item.path)],'此草稿已达到 24 份引用上限。'))
+        }else{
+          existing.add(card.id)
+          sources.push({card,file:byPath.get(item.path)})
+        }
+      }
+      if(!sources.length)return
+      if(currentDraft&&!currentDraft.pendingTaskId){
+        updateCreation(currentDraft.key,current=>({...updateCreationReferences(current,[...current.references,...sources.map(item=>item.card)]),
+          referencesEdited:true,error:''}))
+        done+=sources.length
+      }else if(!context){
+        openDraft=sources
+      }else{
+        failed=failed.concat(fail(sources.map(item=>item.file),'此草稿正在发送，请在可编辑草稿中重试。'))
+      }
+    })
+    if(!outcome.ok)failed=fail(files,messageOf(outcome.error))
+    if(openDraft){
+      const cards=openDraft.map(item=>item.card)
+      if(mounted.current&&activeRef.current&&creationIntent.current===intent&&await beginComposition(cards[0],'text',{referenceCards:cards}))done+=cards.length
+      else failed=failed.concat(fail(openDraft.map(item=>item.file),'素材已导入，创作草稿未打开，可重试添加引用。'))
+    }
+    finish()
   }
   function clickPane(event) {
     if (referencePickRef.current) return
@@ -3051,7 +3171,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   async function dropFiles(event) {
     if (referencePickRef.current) { event.preventDefault(); setDraggingFile(false); return }
     const projectPayload=event.dataTransfer.getData(PROJECT_FILE_DRAG)
-    if(projectPayload){event.preventDefault();setDraggingFile(false);try{const entry=JSON.parse(projectPayload);await addProjectReference(entry,flow.screenToFlowPosition({x:event.clientX,y:event.clientY}))}catch(cause){setError(messageOf(cause))}return}
+    if(projectPayload){event.preventDefault();setDraggingFile(false);try{const entry=JSON.parse(projectPayload);await addProjectReferences(entry,flow.screenToFlowPosition({x:event.clientX,y:event.clientY}))}catch(cause){setError(messageOf(cause))}return}
 
     if (!event.dataTransfer.files.length) return
     event.preventDefault()
@@ -3384,6 +3504,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
         endpoint={endpoint} request={request} renderNativePreview={renderNativePreview} active={active}
         onClose={() => {setOutcomeView(null);onCloseProjectFile?.()}}
         onAdd={projectFileSelection && !projectFileSelection.reviewDraft ? onAddProjectFile : undefined} onToggleWidth={dock.toggleExpanded} widthExpanded={dock.expanded}
+        projectFilePinned={projectFileSelection?.pinned} onPinProjectFile={projectFileSelection&&!projectFileSelection.fromConversation&&!projectFileSelection.reviewDraft?onPinProjectFile:undefined}
+        onLocateProjectFile={projectFileSelection&&!projectFileSelection.fromConversation&&!projectFileSelection.reviewDraft?()=>onLocateProjectFile?.(projectFileSelection.path):undefined}
         onSaved={async result => { cache.current.versionViews.delete(result.cardId);setOutcomeView(null);await onChanged?.();await loadBoard({preserveViewport:true}) }}
         onEditPpt={scope => setDeckPreview({...scope,viewIntent:++creationIntent.current,viewEpoch:epochRef.current})}
         onOpenSlides={manifest => setDeckPreview({slideProject:manifest.slideProject,artifactId:manifest.slideProject.artifactId,hash:manifest.slideProject.artifactHash,title:manifest.title,cardId:manifest.cardId,

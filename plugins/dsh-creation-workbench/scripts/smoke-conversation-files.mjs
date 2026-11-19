@@ -1,5 +1,5 @@
 import { seedConversationReferences, checkConversationReferences, seedConversationReferenceStress, checkConversationReferenceStress } from './conversation-reference-smoke.mjs';
-import { seedProjectImages, checkProjectImages } from './project-image-smoke.mjs';
+import { seedProjectImages, checkProjectImages, checkProjectFileNavigation, checkProjectFileOrganization } from './project-image-smoke.mjs';
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -14,9 +14,11 @@ import { WorkbenchService } from '../src/service.mjs';
 
 const stressMode = process.argv[2] === 'stress';
 const fileMode = process.argv[2] === 'files';
+const navigationMode = process.argv[2] === 'navigation';
+const organizeMode = process.argv[2] === 'organize';
 const mediaMode = process.argv[2] === 'media';
 const referenceMode = process.argv[2] === 'references' || stressMode;
-assert(!process.argv[2] || referenceMode || fileMode || mediaMode, '用法：node scripts/smoke-conversation-files.mjs [references|stress|files|media]');
+assert(!process.argv[2] || referenceMode || fileMode || mediaMode || navigationMode || organizeMode, '用法：node scripts/smoke-conversation-files.mjs [references|stress|files|media|navigation|organize]');
 const run = promisify(execFile), repo = fileURLToPath(new URL('../', import.meta.url));
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir => path.join(repo, dir, 'node_modules/playwright-core/index.mjs')).find(existsSync);
@@ -340,6 +342,16 @@ try {
   await run('python3', ['-c', 'from PIL import Image;import sys;Image.new("RGB",(41,27),"blue").save(sys.argv[1])', path.join(workspace, 'working/image.png')]);
   await run('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', mediaMode ? 'testsrc2=s=320x180:d=8' : 'color=c=blue:s=32x24:d=0.3', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(workspace, 'working/video.mp4')]);
   const projectImages = fileMode ? await seedProjectImages(workspace, run) : null;
+  if(navigationMode||organizeMode)for(const folder of ['分镜 A','分镜 B']){
+    await mkdir(path.join(workspace,folder));
+    await writeFile(path.join(workspace,folder,'镜头说明.md'),'# '+folder);
+    await writeFile(path.join(workspace,folder,'提示词.md'),'# '+folder+' 合成提示词');
+    await writeFile(path.join(workspace,folder,'分镜预览.png'),await readFile(path.join(workspace,'working','image.png')));
+  }
+  if(navigationMode){
+    await writeFile(path.join(workspace,'拖入 1.txt'),'第一份合成资料');
+    await writeFile(path.join(workspace,'拖入 2.txt'),'第二份合成资料');
+  }
   const service = new WorkbenchService({ workspaceRoot: workspace });
   let f;
   try {
@@ -383,6 +395,10 @@ try {
       await checkMediaAttachment(page, canvas, f.requirementId, f.media.attachment);
       await checkMedia(page, canvas, f.media);
       assert.deepEqual(errors, []); assert.deepEqual(logs, []);
+    } else if (navigationMode||organizeMode) {
+      await (organizeMode?checkProjectFileOrganization:checkProjectFileNavigation)(page,canvas,workspace,artifacts);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(logs.filter(message => !message.includes('[React Flow]: The parent container needs a width and a height')), []);
     } else if (fileMode) {
       await checkProjectImages(page, canvas, projectImages, workspace, artifacts);
       assert.deepEqual(errors, []);

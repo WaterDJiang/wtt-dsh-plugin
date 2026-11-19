@@ -41,6 +41,64 @@ test('mention search distinguishes nested files and snapshots only a selected vi
   await assert.rejects(f.files.reference({...input,path,useCurrentFile:true,operationId:randomUUID()}));
  }
 });
+
+test('explorer search and pagination locate files beyond the old 1,000-entry limit without traversing hidden directories or links', async t => {
+ const f=fixture(t);
+ for(const dir of ['素材','分镜','node_modules','.hidden','courses']){
+  mkdirSync(path.join(f.root,dir),{recursive:true});
+  writeFileSync(path.join(f.root,dir,'镜头.md'),dir);
+ }
+ symlinkSync(path.join(f.root,'分镜'),path.join(f.root,'目录链接'));
+ for(let n=1;n<=1001;n++)writeFileSync(path.join(f.root,'素材',`片段 ${n}.txt`),'素材');
+ const page=await f.files.listPage('素材',{around:'素材/片段 1001.txt'});
+ assert.equal(page.total,1002);
+ assert.equal(page.offset,1000);
+ assert(page.entries.some(entry=>entry.path==='素材/片段 1001.txt'));
+ assert.equal(page.previousOffset,800);
+ assert.equal(page.nextOffset,null);
+ assert.deepEqual((await f.files.searchFiles('镜头.md')).entries.map(entry=>entry.path).sort(),['分镜/镜头.md','素材/镜头.md'].sort());
+ assert.equal((await f.files.searchFiles('素材/片段 1001.txt')).entries[0].path,'素材/片段 1001.txt');
+ await assert.rejects(f.files.listPage('目录链接'));
+ f.files.create({parent:'素材',name:'新文件.txt'});
+ assert.equal((await f.files.searchFiles('新文件')).entries[0].path,'素材/新文件.txt');
+});
+
+test('bounded file search preserves natural top matches and releases competing and expired project indexes', async t => {
+ const a=fixture(t),b=fixture(t);
+ for(let i=230;i>0;i--)writeFileSync(path.join(a.root,`镜头 ${i}.txt`),'样例');
+ writeFileSync(path.join(a.root,'镜头'),'完全匹配');
+ writeFileSync(path.join(b.root,'另一项目.md'),'隔离');
+ t.mock.timers.enable({apis:['setTimeout']});
+ const result=await a.files.searchFiles('镜头');
+ assert.equal(result.entries.length,100);
+ assert.equal(result.truncated,true);
+ assert.deepEqual(result.entries.slice(0,4).map(entry=>entry.name),['镜头','镜头 1.txt','镜头 2.txt','镜头 3.txt']);
+ assert.equal(result.entries.at(-1).name,'镜头 99.txt');
+ assert(a.files.fileIndex);
+ assert.equal((await b.files.searchFiles('另一项目')).entries[0].name,'另一项目.md');
+ assert.equal(a.files.fileIndex,null);
+ assert(b.files.fileIndex);
+ t.mock.timers.tick(5000);
+ assert.equal(b.files.fileIndex,null);
+});
+
+test('project file import batches isolate failures, reuse frozen snapshots and do not reload the board for each file', async t => {
+ const f=fixture(t);
+ writeFileSync(path.join(f.root,'A.txt'),'A');
+ writeFileSync(path.join(f.root,'B.txt'),'B');
+ const files=['A.txt','缺失.txt','B.txt'].map(file=>({path:file,operationId:randomUUID()}));
+ const getBoard=f.service.canvas.getBoard.bind(f.service.canvas);
+ let reads=0;
+ f.service.canvas.getBoard=(...args)=>{reads++;return getBoard(...args)};
+ const first=await f.files.referenceBatch({requirementId:f.req.id,files});
+ const retry=await f.files.referenceBatch({requirementId:f.req.id,files});
+ assert.deepEqual(retry,first);
+ assert.deepEqual(first.added.map(entry=>entry.path),['A.txt','B.txt']);
+ assert.deepEqual(first.failed.map(entry=>entry.path),['缺失.txt']);
+ assert.equal(reads,0);
+ assert.equal(getBoard(f.req.id).nodes.filter(node=>node.projectFile).length,2);
+ await assert.rejects(f.files.referenceBatch({requirementId:f.req.id,files:[files[0],files[0]]}),/重复/);
+});
 test('file references reuse document working-copy versions and persist across restart',async t=>{
  const f=fixture(t);writeFileSync(path.join(f.root,'练习.csv'),'A,B\n1,2\n');const file=await f.files.preview('练习.csv'),r=await f.files.reference({requirementId:f.req.id,path:file.path,hash:file.hash,operationId:randomUUID()});const n=r.board.nodes.find(n=>n.refId===r.material.id),scope={requirementId:f.req.id,cardId:n.outputCard.id,versionId:n.outputCard.versionId,sourceRef:n.id,hash:n.importedFile.hash};let d=await f.service.documents.open(scope);d=await f.service.documents.saveDraft({draftId:d.id,revision:0,patch:{rows:[['A','B'],['修改','2']]}});const v=await f.service.externalDocuments.saveVersion({draftId:d.id,revision:d.revision,hash:(await f.service.documents.snapshot(d.id,d.revision)).hash,operationId:randomUUID()});assert.ok(v.artifactId);assert.equal(readFileSync(path.join(f.root,'练习.csv'),'utf8'),'A,B\n1,2\n');
  const second=new WorkbenchService({workspaceRoot:f.root});t.after(()=>second.close());assert.equal(second.canvas.getRawBoard(f.req.id).nodes.find(x=>x.refId===r.material.id).projectFile.path,'练习.csv');

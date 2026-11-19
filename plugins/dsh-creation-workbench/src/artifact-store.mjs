@@ -112,6 +112,15 @@ export class ArtifactStore {
     return { bytes, name: path.basename(artifact.path), mime: artifact.mime };
   }
 
+  videoPreviewMetadata(artifactId,{requirementId,hash}={}){
+    const row=this.#row(artifactId);
+    if(!/^video\/(mp4|webm)$/.test(row.mime))return null;
+    if(row.requirement_id!==requirementId)throw new Error('成果文件不属于当前画布。');
+    if(hash&&hash!==row.hash)throw new Error('成果文件版本已变化，请重新选择。');
+    if(this.#state(row)!=='ready')throw new Error('产物文件缺失、外改或路径不可用，请核对后重新生产');
+    return {path:row.path,title:row.title,mime:row.mime,hash:row.hash,taskId:row.task_id};
+  }
+
   async videoPreviewResponse(artifactId, { signal, ...options } = {}) {
     const row = this.#row(artifactId);
     if (!/^video\/(mp4|webm)$/.test(row.mime)) return null;

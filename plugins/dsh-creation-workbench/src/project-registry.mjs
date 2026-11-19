@@ -151,6 +151,7 @@ export class ProjectRegistry {
       throw new Error(`保存项目列表失败，当前项目未切换：${error.message}`, { cause: error });
     }
     this.records = next;
+    if(this.activeProjectId!==record.id)this.services.get(this.activeProjectId)?.projectFiles.clearFileIndex();
     this.activeProjectId = record.id;
     this.registryError = undefined;
     if (created) this.#retain(record.id, candidate);
