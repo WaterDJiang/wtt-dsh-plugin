@@ -69,9 +69,9 @@ export function CanvasSearch({ width, panelOpen, hidden, query, onQuery, nodes, 
   </div>
 }
 
-function ToolButton({ icon, label, shortcut, active, menuOpen, descriptionId, hint, onClick, disabled, children, className = '', buttonRef }) {
+export function ToolButton({ icon, label, shortcut, active, menuOpen, expanded = menuOpen, controlsId, description, descriptionId, hint, onClick, disabled, children, className = '', buttonRef }) {
   const title = [label, shortcut, hint].filter(Boolean).join(' · ')
-  return <UiButton ref={buttonRef} variant="custom" type="button" className={`wcc-studio-button ${active ? 'is-active' : ''} ${className}`} title={title} aria-label={label} aria-describedby={descriptionId} aria-pressed={active} aria-haspopup={menuOpen === undefined ? undefined : 'menu'} aria-expanded={menuOpen} disabled={disabled || !onClick} onClick={onClick}>
+  return <UiButton ref={buttonRef} variant="custom" type="button" className={`wcc-studio-button ${active ? 'is-active' : ''} ${className}`} title={title} aria-label={label} aria-description={description} aria-describedby={descriptionId} aria-pressed={active} aria-haspopup={menuOpen === undefined ? undefined : 'menu'} aria-expanded={expanded} aria-controls={controlsId} disabled={disabled || !onClick} onClick={onClick}>
     {icon && <CanvasIcon name={icon} />}
     {children}
     <span className="wcc-studio-tooltip" aria-hidden="true">{hint ? `${label} · ${hint}` : label}{shortcut && <kbd>{shortcut}</kbd>}</span>
@@ -96,7 +96,7 @@ export function CanvasChrome({
   tool = 'select', onTool, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected, onArrange, canArrange,
   onToggleMap, showMap = false, onAddMaterial, onAddElement, onUndo, onRedo, canUndo, canRedo,
   onInspect, onAI, onTasks, onAssets, pendingCount = 0, completedCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
-  hasSelection = selectedCount > 0, busy = false, pickingReferences = false,
+  hasSelection = selectedCount > 0, busy = false, pickingReferences = false, projectAssistant,
 }) {
   const status = {
     saved: ['已保存', 'check'], saving: ['保存中', 'loading'],
@@ -118,6 +118,7 @@ export function CanvasChrome({
       </React.Fragment>)}
       <span className="wcc-studio-divider is-horizontal" aria-hidden="true" />
       <ToolButton icon="material" label="添加素材" onClick={onAddMaterial} disabled={controlsDisabled} />
+      {projectAssistant}
     </div>
 
     <div className="wcc-studio-status-dock wcc-studio-surface" role="toolbar" aria-label="画布操作">

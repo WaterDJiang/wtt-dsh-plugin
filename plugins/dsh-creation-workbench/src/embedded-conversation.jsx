@@ -54,8 +54,12 @@ export function registerCanvasConversation(ctx) {
 export function registerConversationFilePreview(ctx) {
   ctx.effect(() => registerConversationPreviewScope(ctx, (Component, slot) => function FileConversation(props) {
     const { openFile } = useContext(FilePreviewContext)
-    const renderSlot = useMemo(() => props.renderSlot && ((name, ...args) => props.renderSlot(conversationPreviewSlot(name), ...args)), [props.renderSlot])
-    return <Component {...props} {...(renderSlot ? { renderSlot } : {})}
+    const { renderSlot, renderSlotChain } = props
+    const renderLocal = useMemo(() => ({
+      ...(renderSlot && { renderSlot: (name, ...args) => renderSlot(conversationPreviewSlot(name), ...args) }),
+      ...(renderSlotChain && { renderSlotChain: (name, ...args) => renderSlotChain(conversationPreviewSlot(name), ...args) }),
+    }), [renderSlot, renderSlotChain])
+    return <Component {...props} {...renderLocal}
       {...(slot === 'conversation.view' && openFile ? { openFile } : {})}/>
   }))
 }

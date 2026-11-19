@@ -132,6 +132,7 @@ test('accepted is not completion, unknown cannot be blindly resubmitted and sess
   const { task } = service.createTask(input);
   assert.throws(() => service.tasks.setDispatch({ taskId: task.id, status: 'accepted' }), /尚未绑定会话/);
   service.tasks.setDispatch({ taskId: task.id, status: 'submitting' });
+  assert.throws(() => service.tasks.setDispatch({ taskId: task.id, status: 'submitting' }), /不能直接重发/);
   service.tasks.bindSession({ taskId: task.id, sessionId: 'native-session' });
   const accepted = service.tasks.setDispatch({ taskId: task.id, status: 'accepted' });
   assert.equal(accepted.status, 'accepted');

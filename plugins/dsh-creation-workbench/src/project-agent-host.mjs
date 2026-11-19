@@ -18,15 +18,23 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
   }
   // Standard questions and approvals live in the host waterfall while the user decides.
   const interactions=new Map();
+  function forNativeSession(session){
+    const cwd=session?.header?.cwd;
+    if(cwd)for(const [service,runner] of runners)if(!service.store.closed&&service.workspaceRoot===cwd)return runner;
+  }
   const observeInteraction=async(req,next)=>{
     const session=req.agent?.session;
-    const runner=session&&[...runners.entries()].find(([service])=>!service.store.closed&&service.workspaceRoot===session.header?.cwd)?.[1];
+    const runner=forNativeSession(session);
     if(!runner?.db.prepare('SELECT 1 FROM course_tasks t JOIN pa_steps s ON s.task_id=t.id WHERE t.session_id=? LIMIT 1').get(session.id))return next();
     const callId=String(req.callId||req.id||randomUUID());
     const active=interactions.get(session.id)||new Set();active.add(callId);interactions.set(session.id,active);
     try{return await next();}finally{active.delete(callId);if(!active.size)interactions.delete(session.id);}
   };
   const disposers=['user-questions/request','approval/request'].map(event=>ctx.on?.(event,observeInteraction,{prepend:true,global:true}));
+  disposers.push(ctx.on?.('session/event',(session,event)=>{
+    if(event.type==='turn/end'&&event.data?.reason?.kind==='aborted'&&event.data.reason.reason?.kind==='user')
+      forNativeSession(session)?.nativeInput(session.id);
+  }));
   const host={
     bound(service,sessionId){owners.set(sessionId,projects.idOf(service));},
     async createSession(service,agentPreset){
@@ -108,7 +116,7 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
         const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE name IN ('pa_session','pa_owned_sessions','pa_plans')").all().map(r=>r.name));
         if(tables.has('pa_owned_sessions'))for(const r of db.prepare('SELECT id FROM pa_owned_sessions').all())owners.set(r.id,record.id);
         else if(tables.has('pa_session')){const r=db.prepare('SELECT session_id FROM pa_session').get();if(r?.session_id)owners.set(r.session_id,record.id);}
-        if(db.prepare("SELECT 1 FROM sqlite_master WHERE name='pa_plans'").get()&&db.prepare("SELECT 1 FROM pa_plans WHERE state IN ('running','stopping') LIMIT 1").get())get(projects.get(record.id));
+        if(tables.has('pa_plans')&&db.prepare("SELECT 1 FROM pa_plans WHERE state IN ('running','paused','stopping') LIMIT 1").get())get(projects.get(record.id));
       }catch(e){if(e.code!=='ENOENT')warn(e);}finally{db?.close();}
     }
     if(!closed)tick();
@@ -121,8 +129,10 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
     if(id && projects.records.get(id)?.path===agent.session?.header?.cwd)return get(projects.get(id));
     return false;
   }
-  return {get,bySession,close(){closed=true;clearTimeout(start);clearInterval(timer);for(const dispose of disposers)dispose?.();interactions.clear();runners.clear();owners.clear();},
+  return {get,bySession,existing:service=>runners.get(service),nativeInput(session,ids){forNativeSession(session)?.nativeInput(session.id,ids);},
+    close(){closed=true;clearTimeout(start);clearInterval(timer);for(const dispose of disposers)dispose?.();interactions.clear();runners.clear();owners.clear();},
     async api(service,action,data={}){
+      if(action==='card')return {card:runners.get(service)?.cardHandoff(data)??null};
       const agent=get(service);
       switch(action){
         case 'attention':return agent.attention();
@@ -131,12 +141,16 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
         case 'progress':
         case 'state':{
           const sessionId=agent.sessionId(), native=sessionId&&getService('agents')?.get(sessionId);
-          const info={...agent.progress(),running:Boolean(native?.status==='running'||native?.inbox?.nextTurn?.length||native?.inbox?.nextStep?.length)};
+          const info={...agent.progress(),running:Boolean(native?.status==='running'||native?.inbox?.nextTurn?.length||native?.inbox?.nextStep?.length),
+            ...(data.cardId?{card:agent.cardHandoff(data)}:{})};
           if(action==='progress')return info;
           const page=Math.min(data.page??0,Math.max(0,Math.ceil(info.total/20)-1));
           return {sessionId,...info,page,plans:agent.plans(page),suggestions:agent.db.prepare('SELECT * FROM pa_suggestions ORDER BY rowid DESC LIMIT 12').all().map(r=>({id:r.id,...JSON.parse(r.data)}))};
         }
-        case 'control':return agent.control(data);
+        case 'control':{
+          const result=await agent.control(data);
+          return ['take-over','use-version','keep-version'].includes(data.command)?{card:result}:result;
+        }
         case 'memory':{const settings=agent.memory.settings();agent.memory.project({rebuild:data.rebuild===true});return {settings:settings.filter(s=>!s.missing||s.document),hits:agent.memory.search(data.query)};}
         case 'bind-document':return agent.memory.bind(data);
         case 'save':{const result=agent.memory.save(data);if(!result.conflict && data.suggestionId)agent.db.prepare('DELETE FROM pa_suggestions WHERE id=?').run(data.suggestionId);return result;}

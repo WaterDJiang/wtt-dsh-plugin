@@ -24,7 +24,7 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本为 **0.58.2**。修复 Windows 字体目录配置导致的插件激活失败。PPT 预览遇到字体或渲染环境问题时会显示原因，画布和原件下载仍可使用。[使用说明](plugins/dsh-creation-workbench/README.md#0582-的主要改进) · [更新日志](CHANGELOG.md)
+当前版本为 **0.58.3**。项目助手的 W 入口固定在画布左侧工具栏，卡片任务支持单步接管和版本交回，对话中的技能选择增加兼容处理。[使用说明](plugins/dsh-creation-workbench/README.md#0583-的主要改进) · [更新日志](CHANGELOG.md)
 
 使用社区市场 `dshmarket` 时，打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」就点 **立即更新**。如果旧版的「代码来源」写的是 `path:plugins/...`，在原 DSH 配置用上面的安装串覆盖安装一次，以后可以直接从市场更新。
 

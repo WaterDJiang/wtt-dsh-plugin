@@ -15,6 +15,7 @@ import { ReferencePromptInput } from './reference-prompt-input.jsx'
 import { cardDisplayTitle } from './card-capabilities.mjs'
 import { reviewDraftFromQuestion, reviewImagesFromQuestion } from './conversation-file.mjs'
 import { ReviewImageGallery } from './review-image-gallery.jsx'
+import { StepHandoff } from './project-agent-handoff.jsx'
 import './card-creation.css'
 import './task-stage.css'
 
@@ -276,6 +277,7 @@ export function CardComposer({
   skillCatalog, skillCatalogLoading = false, skillCatalogError, onRefreshSkills, onSaveSkillSettings, onUpdateSkillPreference,
   mediaCapabilities, mediaLoading = false, mediaError, onRefreshMedia, onMediaOptionsChange, onGenerationMethodChange, onMediaProviderChange, onGenerateMedia, onResumeMedia, onNewMedia,
   nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, modelLoading, modelError,
+  handoff, onHandoff, handoffBusy, handoffError,
 }) {
   const id = useId()
   const composer = useRef(null)
@@ -633,6 +635,8 @@ export function CardComposer({
       <div className="wcc-creation-window-actions">{onTaskControl && (context?.pendingTaskId || context?.pendingGeneration?.taskId || context?.mediaJob?.taskId) && <UiButton variant="quiet" size="compact" onClick={onTaskControl}>任务控制</UiButton>}{collapsed && headingCard?.kind === 'outline' && onAction && <UiButton variant="custom" className="wcc-creation-edit" aria-label="专注编辑当前大纲" disabled={busy} onClick={() => onAction('edit')}>编辑</UiButton>}<UiButton variant="custom" aria-label={collapsed ? '展开卡片创作框' : '收起卡片创作框'} aria-expanded={!collapsed} aria-controls={`${id}-body`} onClick={() => { setCollapsed(value => !value); setReferencesOpen(false) }}><CreationIcon type={collapsed ? 'expand' : 'collapse'} size={15} /></UiButton><UiButton variant="custom" aria-label="关闭卡片创作框" onClick={onClose}><CreationIcon type="close" size={15} /></UiButton></div>
     </header>
     <div ref={scrollBody} id={`${id}-body`} className="wcc-creation-scroll-body" hidden={collapsed}>
+    {handoff&&<StepHandoff step={handoff} act={onHandoff} busy={busy||handoffBusy} offerTakeover/>}
+    {handoffError&&<UserError className="wcc-creation-error" error={handoffError}/>}
     {(taskMode || reviewingResult) && <>
       <TaskInputSummary instruction={instruction} references={references} skills={(context?.selectedSkills || chosenSkills).map(name => skillLabel(skillCatalog?.skills?.find(skill => skill.name === name) || { name }))} model={context?.modelSelection || (taskMode ? modelSelection : undefined)} engine={engineSummary}
         renderFile={reference=><>{reference.requirementId&&onLocateReference&&<UiButton size="compact" onClick={()=>onLocateReference(reference)}>定位来源</UiButton>}{getReferenceFileHref&&(reference.importedFile||reference.generatedFile)&&<ImportedReferenceFile card={reference} getHref={getReferenceFileHref}/>}</>} />

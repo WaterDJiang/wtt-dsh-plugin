@@ -1,8 +1,11 @@
-import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {PanelHeader,UiButton} from './ui/controls.jsx';
+import {ToolButton} from './canvas-chrome.jsx';
 import {CanvasPopover} from './ui/canvas-popover.jsx';
 import {ProjectInputContext} from './conversation-references.jsx';
 import {ProjectMemoryPanel} from './project-agent-memory.jsx';
+import {StepHandoff} from './project-agent-handoff.jsx';
 import {creationSource, usableCreationSource} from './creation-context.mjs';
 import wattterAgentLogo from './assets/wattter-agent.png';
 import './project-agent.css';
@@ -21,9 +24,12 @@ function ModeMenu({value,onChange,label='执行方式'}){
 function Plans({plans,act,locate,busy}){
   if(!plans?.length)return null;
   return <div className="wtt-agent-plans">{plans.map((p,index)=>{
-    const next=p.steps.find(s=>s.state!=='done'),ended=['done','stopped'].includes(p.state);
-    const completed=p.steps.filter(step=>step.state==='done').length;
-    const status=p.state==='running'&&next?.error==='原任务待确认'?'待确认'
+    const next=p.steps.find(s=>s.state!=='done'||s.handoff),ended=['done','stopped'].includes(p.state);
+    const completed=p.steps.filter(step=>step.state==='done'&&!step.handoff).length;
+    const waitingVersion=p.steps.some(s=>s.choice&&!s.handoff);
+    const status=p.state==='running'&&next?.interaction?'待确认'
+      :p.state==='running'&&next?.handoff?'你正在处理'
+      :p.state==='running'&&waitingVersion?'待选择版本'
       :p.state==='running'&&next?.state==='blocked'?'待核对':statuses[p.state];
     return <details className="wtt-agent-plan" key={p.id} open={!ended&&index===0||undefined}>
       <summary><span>{p.title}</span><small>{status}</small>
@@ -32,16 +38,17 @@ function Plans({plans,act,locate,busy}){
       {p.steps.map(s=><div key={s.id} className="wtt-agent-step"><details><summary>{s.title} · {s.target}</summary><p>{s.instruction}</p>{!!s.deps.length&&<small>依赖步骤 {s.deps.join('、')}</small>}</details>{s.receipt?<UiButton size="compact" onClick={()=>locate(s.receipt)}>定位 V{s.receipt.number}</UiButton>:<small>{s.error||statuses[s.state]}</small>}
         {!!s.refs?.length&&<details><summary>{s.refs.length} 份引用</summary>{s.refs.map(r=><div key={r.cardId}>{r.title}{r.versionId&&<UiButton size="compact" onClick={()=>locate({...r,cardId:r.outputCardId})}>查看引用版本</UiButton>}</div>)}</details>}
         {s.state==='blocked'&&!s.taskId&&<UiButton size="compact" onClick={()=>act(p,'recheck',{stepId:s.id})}>重新核对来源</UiButton>}
-        {s.taskId&&!s.receipt&&<UiButton size="compact" onClick={()=>locate({requirementId:s.requirementId,taskId:s.taskId,cardId:s.outputCardId})}>查看原任务</UiButton>}
-        {s.id===next?.id&&p.state==='running'&&!s.authorized&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'approve-step',{stepId:s.id})}>执行此项</UiButton>}</div>)}
+        {s.taskId&&s.outputCardId&&(!s.receipt||s.handoff||s.choice)&&<UiButton size="compact" onClick={()=>locate({requirementId:s.requirementId,taskId:s.taskId,cardId:s.outputCardId})}>打开卡片对话</UiButton>}
+        {!ended&&p.state!=='stopping'&&<StepHandoff step={s} busy={busy} act={command=>act(p,command,{stepId:s.id,cardId:s.outputCardId,requirementId:s.requirementId,versionId:s.choice?.versionId})}/>}
+        {s.id===next?.id&&p.state==='running'&&!s.authorized&&!s.handoff&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'approve-step',{stepId:s.id})}>执行此项</UiButton>}</div>)}
       {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>{p.change.steps.map((s,i)=><details key={i}><summary>{s.title} · {s.target}</summary><p>{s.instruction}</p>{s.refs.map(r=><small key={r.cardId}>{r.title} </small>)}</details>)}
         <UiButton disabled={busy} onClick={()=>act(p,'accept-change',{changeId:p.change.id})}>批准变更</UiButton><UiButton disabled={busy} onClick={()=>act(p,'reject-change',{changeId:p.change.id})}>保留原计划</UiButton></div>}
       {!ended&&<div className="wtt-agent-actions">{p.state==='approval'&&<UiButton variant="primary" size="compact" disabled={busy} onClick={()=>act(p,'approve-plan')}>{reviewLabel}</UiButton>}
-        {['running','paused'].includes(p.state)&&<UiButton disabled={busy} onClick={()=>act(p,p.state==='paused'?'resume':'pause')}>{p.state==='paused'?'继续执行':'暂停'}</UiButton>}
+        {['running','paused'].includes(p.state)&&<UiButton disabled={busy} onClick={()=>act(p,p.state==='paused'?'resume':'pause')}>{p.state==='paused'?'继续剩余步骤':'暂停'}</UiButton>}
         {p.state!=='stopping'&&<ModeMenu label="委托执行方式" value={p.mode} onChange={mode=>act(p,'mode',{mode})}/>}<UiButton disabled={busy} onClick={()=>act(p,'stop')}>{p.state==='stopping'?'重试停止':'停止委托'}</UiButton></div>}</details>;
   })}</div>;
 }
-export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,project,requirement,selected,request,renderConversation,canvasActions,picking}){
+export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,project,requirement,selected,request,renderConversation,canvasActions,picking,cardId}){
   const key='wtt-project-agent:'+project.id;
   const [tracking,setTracking]=useState(()=>stored(sessionStorage,key+':tracking',false));
   const [open,setOpen]=useState(()=>stored(sessionStorage,key+':open',false)),[tab,setTab]=useState('chat');
@@ -50,15 +57,19 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
   const [position,setPosition]=useState(()=>stored(localStorage,key+':pos',{x:.98,y:.66}));
   const [windowSize,setWindowSize]=useState(()=>stored(localStorage,key+':size',{w:540,h:680}));
   const [size,setSize]=useState({w:0,h:0}),[session,setSession]=useState(null),[state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  const layer=useRef(null),drag=useRef(null),resizeStart=useRef(null),didDrag=useRef(false),lastProgress=useRef(''),alive=useRef(true);
+  const launcher=useRef(null),drag=useRef(null),resizeStart=useRef(null),lastProgress=useRef(''),alive=useRef(true);
+  const panelId=useId();
+  const [canvas,setCanvas]=useState(null);
   const call=useCallback((action,data={})=>request('project-agent-'+action,data),[request]);
   const [page,setPage]=useState(0),[waiting,setWaiting]=useState(0);
   const readEpoch=useRef(0),sendEpoch=useRef(0),sending=useRef(0);
   const refresh=useCallback(async(full=true)=>{
     const epoch=++readEpoch.current, sent=sendEpoch.current;
-    const v=await call(full?'state':'progress',full?{page}:{});
+    const cardRead=cardId?canvasActions.current.cardRead():null;
+    const v=await call(full?'state':'progress',{...(full?{page}:{}),...(cardId?{cardId,requirementId:requirement.id}:{})});
     if(!alive.current||epoch!==readEpoch.current)return;
     if(full){setState(v);if(v.page!==page)setPage(v.page);}
+    if(cardId)canvasActions.current.showCardStep(cardId,v.card,cardRead);
     setWaiting(v.waiting);
     if(lastProgress.current&&v.signature!==lastProgress.current)canvasActions.current.refresh();
     lastProgress.current=v.signature;
@@ -66,7 +77,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
       const follow=Boolean(v.active||v.running);
       setTracking(follow);persist(sessionStorage,key+':tracking',follow);
     }
-  },[call,page,key]);
+  },[call,page,key,cardId,requirement.id,canvasActions]);
   useEffect(()=>{alive.current=true;return ()=>{alive.current=false;};},[]);
   useEffect(()=>{
     if(!open)return;
@@ -75,17 +86,33 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     return ()=>{live=false;};
   },[open,call]);
   useEffect(()=>{
-    if(!open&&!tracking)return;
+    if(!open&&!tracking&&!cardId)return;
     let live=true,timer;
+    if(!open&&!tracking){
+      const cardRead=canvasActions.current.cardRead();
+      call('card',{cardId,requirementId:requirement.id}).then(({card:value})=>{
+        if(!live)return;
+        canvasActions.current.showCardStep(cardId,value,cardRead);
+        if(value){setTracking(true);persist(sessionStorage,key+':tracking',true);}
+      }).catch(e=>{if(live)setError(e.message);});
+      return ()=>{live=false;};
+    }
     async function poll(){
       try {await refresh(open);}catch(e){if(live)setError(e.message);}
-      if(live)timer=setTimeout(poll,2200);
+      if(live&&(open||tracking))timer=setTimeout(poll,2200);
     }
     void poll();return ()=>{live=false;readEpoch.current++;clearTimeout(timer);};
-  },[open,tracking,refresh]);
-  useLayoutEffect(()=>{const el=layer.current?.parentElement;if(!el)return;const resize=()=>setSize({w:Math.max(0,el.clientWidth-16),h:Math.max(0,el.clientHeight-16)});resize();const ob=new ResizeObserver(resize);ob.observe(el);return ()=>ob.disconnect();},[]);
-  const launcherSize=Math.min(40,size.w,size.h);
-  const width=open?Math.min(windowSize.w,size.w):launcherSize,height=open?Math.min(windowSize.h,size.h):launcherSize;
+  },[open,tracking,cardId,refresh,call,requirement.id,canvasActions,key]);
+  useLayoutEffect(()=>{
+    if(!open)return;
+    const el=launcher.current?.closest('.wtt-course-canvas');
+    if(!el)return;
+    const resize=()=>setSize({w:Math.max(0,el.clientWidth-16),h:Math.max(0,el.clientHeight-16)});
+    setCanvas(el);resize();
+    const observer=new ResizeObserver(resize);observer.observe(el);
+    return ()=>observer.disconnect();
+  },[open]);
+  const width=Math.min(windowSize.w,size.w),height=Math.min(windowSize.h,size.h);
   const dx=Math.max(0,size.w-width),dy=Math.max(0,size.h-height);
   const clamp=n=>Math.min(1,Math.max(0,n));
   const resolveSize=(w,h)=>({w:Math.min(size.w,Math.max(340,w)),h:Math.min(size.h,Math.max(350,h))});
@@ -121,9 +148,9 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     },
   };
   const move=e=>{if(!drag.current)return;const d=drag.current,mx=e.clientX-d.x,my=e.clientY-d.y;
-    if(!didDrag.current&&Math.hypot(mx,my)<4)return;
-    didDrag.current=true;const next={x:dx?clamp((d.left+mx)/dx):0,y:dy?clamp((d.top+my)/dy):0};setPosition(next);d.last=next;};
-  const grip={onPointerDown:e=>{if(e.button!==0||open&&e.target.closest('button'))return;didDrag.current=false;drag.current={x:e.clientX,y:e.clientY,left:position.x*dx,top:position.y*dy};e.currentTarget.setPointerCapture(e.pointerId);},onPointerMove:move,
+    if(!d.last&&Math.hypot(mx,my)<4)return;
+    const next={x:dx?clamp((d.left+mx)/dx):0,y:dy?clamp((d.top+my)/dy):0};setPosition(next);d.last=next;};
+  const grip={onPointerDown:e=>{if(e.button!==0||e.target.closest('button'))return;drag.current={x:e.clientX,y:e.clientY,left:position.x*dx,top:position.y*dy};e.currentTarget.setPointerCapture(e.pointerId);},onPointerMove:move,
     onPointerUp:()=>{if(drag.current?.last)persist(localStorage,key+':pos',drag.current.last);drag.current=null;},onPointerCancel:()=>{drag.current=null;}};
   const toggle=v=>{setOpen(v);persist(sessionStorage,key+':open',v);};
   const act=async(p,command,extra)=>{if(busy)return;setBusy(true);try{await call('control',{id:p.id,scopeToken:p.scopeToken,command,...extra});await refresh();setError('');}catch(e){setError(e.message);}finally{setBusy(false);}};
@@ -155,15 +182,16 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     }
   };
   const locate=ref=>{toggle(false);canvasActions.current.locate(ref);};
-  return <div className="wtt-agent-layer" ref={layer}><div className={'wtt-agent-float '+(open?'is-open':'is-closed')} data-picking={picking||undefined} style={{width,height,left:Math.round(clamp(position.x)*dx),top:Math.round(clamp(position.y)*dy)}}
-    onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()} onWheel={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}>
-    {!open?<UiButton variant="custom" className="wtt-agent-launch" aria-label="打开项目助手" title="打开项目助手"
-      aria-description={waiting>0?waiting+' 项待确认':undefined}
-      {...grip} onClick={()=>{if(!didDrag.current)toggle(true);didDrag.current=false;}}>
+  return <>
+    <ToolButton label="打开项目助手" buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
+      expanded={open} controlsId={open?panelId:undefined} description={waiting>0?waiting+' 项待确认':undefined}
+      onClick={()=>toggle(!open)}>
       <img src={wattterAgentLogo} alt="" draggable={false}/>
       {waiting>0&&<span className="wtt-agent-badge" aria-hidden="true">{waiting}</span>}
-    </UiButton>:<>
-    <div className="wtt-agent-grip" {...grip}><PanelHeader title="项目助手" subtitle={requirement.title} onClose={()=>toggle(false)} closeLabel="收起项目助手"/></div>
+    </ToolButton>
+    {open&&canvas&&createPortal(<div className="wtt-agent-layer"><div id={panelId} className="wtt-agent-float is-open" data-picking={picking||undefined} style={{width,height,left:Math.round(clamp(position.x)*dx),top:Math.round(clamp(position.y)*dy)}}
+      onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()} onWheel={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}>
+    <div className="wtt-agent-grip" {...grip}><PanelHeader title="项目助手" subtitle={requirement.title} onClose={()=>{toggle(false);launcher.current?.focus({preventScroll:true});}} closeLabel="收起项目助手"/></div>
     <nav className="wtt-agent-nav" aria-label="项目助手视图">
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='chat'} onClick={()=>setTab('chat')}>对话</UiButton>
       <UiButton variant="ghost" size="compact" aria-pressed={tab==='plans'} aria-label="委托" onClick={()=>setTab('plans')}>委托{waiting>0&&<span className="wtt-agent-tab-count" title={waiting+' 项待确认'}>{waiting}</span>}</UiButton>
@@ -189,6 +217,6 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     {tab==='memory'&&<><ProjectMemoryPanel call={call} onChanged={()=>refresh().catch(e=>setError(e.message))} suggestions={state?.suggestions} onLocate={locate}/>
       {session&&<div className="wtt-agent-footer"><UiButton size="compact" onClick={async()=>{try{const v=await call('session',{replace:session});setSession(v.sessionId);setTab('chat');}catch(e){setError(e.message);}}}>用项目记忆开新对话</UiButton></div>}</>}
     {size.w>600&&<UiButton variant="custom" className="wtt-agent-resize" aria-label="调整浮窗大小" title="拖动调整浮窗大小" {...resizeGrip}/>}
-    </>}
-  </div></div>;
+  </div></div>,canvas)}
+  </>;
 });

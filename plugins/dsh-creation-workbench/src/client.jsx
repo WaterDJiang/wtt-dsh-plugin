@@ -363,6 +363,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     const generation = Symbol()
     sessionNavigation.current.set(prepared.requirementId, generation)
     let identifiedSession
+    let dispatchClaimed = false
     let reference
     try {
       reference = await onStartCanvas(prepared, prepared.sessionId || (prepared.taskId ? undefined : previous?.sessionId), {
@@ -370,6 +371,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
           identifiedSession = sessionId
           if (prepared.taskId) {
             await request('set-task-dispatch', { taskId: prepared.taskId, status: 'submitting' })
+            dispatchClaimed = true
             await request('bind-task-session', { taskId: prepared.taskId, sessionId })
           }
           await request('bind-canvas-session', { requirementId: prepared.requirementId, sessionId })
@@ -377,7 +379,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
       })
     } catch (cause) {
       let stateError = ''
-      if (prepared.taskId) {
+      if (dispatchClaimed) {
         try {
           await request('set-task-dispatch', { taskId: prepared.taskId,
             status: cause.submissionState === 'unknown' ? 'unknown' : 'failed', error: messageOf(cause) })
@@ -627,7 +629,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
 
     {view === 'canvas' && selected && <CourseCanvas renderEditorConversation={renderEditorConversation} renderNativePreview={renderNativePreview} fileRecycleSignal={fileRecycleSignal} key={selected.id} onCloseRecycle={()=>setRecycleRequest(null)} recycleRequest={recycleRequest} onFilesChanged={()=>setFileRefresh(v=>v+1)} projectFileSelection={projectFileSelection} onCloseProjectFile={()=>setProjectFileSelection(null)} onAddProjectFile={addProjectFile} fileAddRequest={fileAddRequest} projectBar={projectBar} project={project} projectId={project.id} dependencies={workspace.dependencies} active={active} requirement={selected} request={request} draftCache={draftCache} creationCache={creationCache} onChanged={() => load()} onStart={startCanvas} conversation={conversation} conversationSessionId={reference?.sessionId} refreshSignal={canvasSignals[selected.id] || 0} onSessionRestore={(sessionId, options) => restoreCanvasSession(sessionId, selected.id, options)}
       onPreviewProjectFile={previewProjectFile}
-      onAssetNavigate={(requirementId, cardId, versionId,openConversation=false) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId,openConversation }; selectRequirement(target) }}
+      onAssetNavigate={(requirementId, cardId, versionId,taskId) => { const target = workspace.requirements.find(item => item.id === requirementId); if (!target) return; if (!creationDrafts.current.has(requirementId)) creationDrafts.current.set(requirementId, { drafts: new Map(), attempts: new Map(), activeKey: null, visible: false }); creationDrafts.current.get(requirementId).pendingAsset = { cardId, versionId,taskId }; selectRequirement(target) }}
       nativeModelSeat={nativeModelSeat} desktopTaskNotices={desktopTaskNotices} onOpenMediaSettings={onOpenMediaSettings} onWatchMediaSettings={onWatchMediaSettings} modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={onModelChange} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} onWatchTaskSessions={onWatchTaskSessions} onPrepareContinuation={onPrepareContinuation}
       onOpenNativeConversation={onOpenNativeConversation && (sessionId => {
         if (!active || canvasSessions.current.get(selectedId)?.sessionId !== sessionId) throw new Error('请重新打开此版本的原对话。')

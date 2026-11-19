@@ -52,6 +52,75 @@ test('暂停、回执未知、重开和更换总会话均不会重新派发',asy
   assert.equal(f.sent.length,1);assert.match(f.agent.steps(f.turn.id)[0].error,/通信中断/);
   await f.agent.session(f.session);assert.throws(()=>f.propose(),/已绑定/);await f.agent.control({id:f.turn.id,command:'stop'});await f.agent.tick();assert.equal(f.sent.length,1);
 });
+
+async function uploadRevision(f,taskId,number){
+  const {outputCardId,cardVersionId}=f.service.cards.binding(taskId);
+  const {node}=f.service.cards.describe({requirementId:f.b,cardId:outputCardId,versionId:cardVersionId});
+  const {versionId}=await f.service.cardFiles.upload({requirementId:f.b,nodeId:node.id,versionId:cardVersionId,
+    headVersionId:cardVersionId,sourceHash:node.sourceHash,filename:`revision-${number}.md`,
+    bytes:Buffer.from(`# 人工修订 V${number}`),operationId:randomUUID()});
+  return f.service.cards.describe({requirementId:f.b,cardId:outputCardId,versionId});
+}
+
+test('暂停仍同步成果，接管和交回保留版本与单次派发，原任务可准确打开',async t=>{
+  const f=await fixture(t,'auto');f.propose();await f.agent.tick();
+  const {taskId}=f.sent[0].prepared,id=f.turn.id;
+  const cardId=f.service.cards.binding(taskId).outputCardId;
+  const selection={requirementId:f.b,cardId,id,stepId:f.agent.steps(id)[0].id};
+  await f.agent.control({id,command:'pause'});
+  await f.publish(0,{primary:true});await f.agent.tick();
+  const first=f.agent.cardHandoff(selection);
+  assert.equal(first.receipt.number,1);
+  assert.equal(f.agent.plans()[0].state,'paused');
+  assert.equal(f.sent.length,1);
+
+  const {sessionId,requestId}=f.service.tasks.get(taskId);
+  f.agent.nativeInput(sessionId,[requestId]);
+  assert.equal(f.agent.cardHandoff(selection).handoff,false);
+  f.agent.nativeInput(sessionId,[randomUUID()]);
+  assert.equal(f.agent.cardHandoff(selection).handoff,true);
+  const revision=await uploadRevision(f,taskId,2);
+  const original=f.service.cards.describePending({requirementId:f.b,cardId,taskId});
+  assert.equal(original.task.sessionId,sessionId);
+  assert.equal(original.node.outputCard.versionId,first.receipt.versionId);
+  assert.throws(()=>f.service.cards.describePending({requirementId:f.a,cardId,taskId}),/不属于/);
+
+  f.restart();await f.agent.control({id,command:'resume'});await f.agent.tick();
+  assert.equal(f.sent.length,1);
+  const choose={...selection,command:'use-version',versionId:revision.version.id};
+  await assert.rejects(f.agent.control({...choose,versionId:randomUUID()}),/版本已变化/);
+  await Promise.all([f.agent.control(choose),f.agent.control(choose)]);
+  f.restart();await f.agent.tick();await f.agent.tick();
+  assert.equal(f.sent.length,2);
+  const source=f.service.tasks.get(f.sent[1].prepared.taskId).input.sources[0];
+  assert.equal(source.versionId,revision.version.id);
+  assert.equal(source.hash,revision.node.sourceHash);
+  assert.equal(f.agent.cardHandoff(selection),null);
+});
+
+test('下游领取前出现同卡新版会暂停，保留旧版后只派发一次',async t=>{
+  const f=await fixture(t,'auto');f.propose();await f.agent.tick();
+  const {taskId}=f.sent[0].prepared,id=f.turn.id;
+  await f.publish(0,{primary:true});await f.agent.tick();
+  const {outputCardId,cardVersionId}=f.service.cards.binding(taskId);
+  const input={requirementId:f.b,cardId:outputCardId,id,stepId:f.agent.steps(id)[0].id};
+  const create=f.host.createTask;
+  let release,started;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const preparing=new Promise(resolve=>{started=resolve;});
+  f.host.createTask=async(...args)=>{started();await gate;return create(...args);};
+  const inFlight=f.agent.tick();
+  await preparing;
+  const revision=await uploadRevision(f,taskId,2);
+  release();await inFlight;await f.agent.tick();
+  assert.equal(f.sent.length,1);
+  assert.equal(f.agent.cardHandoff(input).choice.versionId,revision.version.id);
+  assert.equal(f.agent.plans()[0].steps[1].error,'请在上游步骤选择成果版本');
+  await f.agent.control({...input,command:'keep-version',versionId:revision.version.id});
+  f.restart();await f.agent.tick();await f.agent.tick();
+  assert.equal(f.sent.length,2);
+  assert.equal(f.service.tasks.get(f.sent[1].prepared.taskId).input.sources[0].versionId,cardVersionId);
+});
 test('设定读取外部原文、并发保护、局部覆盖、撤销和跨月检索',async t=>{
   const f=await fixture(t);const m=f.agent.memory;
   const general=m.save({name:'画幅',body:'竖屏'}).setting;

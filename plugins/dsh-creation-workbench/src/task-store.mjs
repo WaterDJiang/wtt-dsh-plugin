@@ -244,10 +244,10 @@ export class TaskStore {
     return this.#transaction(() => {
       const row = this.#row(taskId), task = this.get(row.id);
       if (row.status === 'cancelled') throw new Error('任务已取消，不能重新提交');
+      if (status === 'submitting' && (['submitting','accepted','unknown','output'].includes(row.status)||task.status==='output')) throw new Error('任务正在提交、已受理或状态待核对，请打开原生会话核对，不能直接重发');
       if (task.artifacts.length || task.files.length || row.status === 'output') return task;
       if (task.input.workflow === 'ppt-edit' && ['proposed', 'discarded', 'applied'].includes(row.status)) return task;
       if (row.kind !== 'ai') throw new Error('人工修订任务不提交模型请求');
-      if (status === 'submitting' && ['accepted', 'unknown'].includes(row.status)) throw new Error('任务已受理或状态待核对，请打开原生会话核对，不能直接重发');
       if (status === 'accepted' && !row.session_id) throw new Error('任务尚未绑定会话，不能标记受理');
       this.db.prepare('UPDATE course_tasks SET status=?,error=?,updated_at=? WHERE id=?')
         .run(status, error || null, new Date().toISOString(), row.id);

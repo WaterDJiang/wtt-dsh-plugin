@@ -8,6 +8,8 @@ const checkText = (v,n) => typeof v === 'string' && !!v.trim() && v.length <= n;
 const json = JSON.stringify;
 const parse = JSON.parse;
 const summary = ({cardId,requirementId,title,hash,versionId,outputCardId})=>({cardId,requirementId,title,hash,versionId,outputCardId});
+const openPlans = "('approval','running','paused')";
+const activePhases = ['awaiting-input','awaiting-approval','generating','unknown','failed'];
 
 function limitSourceContent(sources) {
   let remaining=60000;
@@ -33,7 +35,11 @@ export class ProjectAgent {
       CREATE INDEX IF NOT EXISTS pa_step_status ON pa_steps(state,task_id);
       CREATE UNIQUE INDEX IF NOT EXISTS pa_open_change ON pa_changes(plan_id) WHERE state='pending';
       CREATE TABLE IF NOT EXISTS pa_suggestions(id TEXT PRIMARY KEY,data TEXT NOT NULL);`);
-    if(!this.db.prepare('PRAGMA table_info(pa_steps)').all().some(c=>c.name==='interaction'))this.db.exec('ALTER TABLE pa_steps ADD COLUMN interaction TEXT');
+    const columns=new Set(this.db.prepare('PRAGMA table_info(pa_steps)').all().map(c=>c.name));
+    if(!columns.has('interaction'))this.db.exec('ALTER TABLE pa_steps ADD COLUMN interaction TEXT');
+    if(!columns.has('handoff'))this.db.exec('ALTER TABLE pa_steps ADD COLUMN handoff INTEGER NOT NULL DEFAULT 0');
+    if(!columns.has('kept_version'))this.db.exec('ALTER TABLE pa_steps ADD COLUMN kept_version TEXT');
+    this.db.exec('CREATE INDEX IF NOT EXISTS pa_step_task ON pa_steps(task_id); CREATE INDEX IF NOT EXISTS pa_task_session ON course_tasks(session_id) WHERE session_id IS NOT NULL');
     // Older versions marked a plan stopped before the host acknowledged cancellation.
     this.db.exec(`UPDATE pa_plans SET state='stopping' WHERE state='stopped' AND EXISTS
       (SELECT 1 FROM pa_steps s WHERE s.plan_id=pa_plans.id AND s.task_id IS NOT NULL AND s.state NOT IN ('done','stopped'))`);
@@ -109,14 +115,96 @@ export class ProjectAgent {
     return '[工作台发送现场] '+json(context)+'\n你是这个项目的画布助手。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。发送现场的 skills 是用户为本轮调用的技能。委托步骤需要其中的技能时，在该步骤 instruction 中用独立的 /技能名 标明，使原任务也加载该技能。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
   }
   steps(id){return this.db.prepare('SELECT * FROM pa_steps WHERE plan_id=? ORDER BY seq').all(id).map(r=>({...r,data:parse(r.data),receipt:r.receipt?parse(r.receipt):null}));}
+  waitingConsumers(step){
+    return this.db.prepare(`SELECT json_extract(s.data,'$.title') AS title FROM pa_steps s
+      JOIN json_each(s.data,'$.deps') d ON d.value=? LEFT JOIN operations o ON o.id=s.id AND o.kind='create-task'
+      WHERE s.plan_id=? AND s.seq>? AND s.state IN ('ready','blocked') AND s.task_id IS NULL AND o.id IS NULL
+      ORDER BY s.seq`).all(step.seq,step.plan_id,step.seq).map(row=>row.title);
+  }
+  linkedCard({requirementId,cardId,taskId,stepId}={}){
+    if(typeof requirementId!=='string'||(!cardId&&!taskId))return null;
+    // The card is assigned by the original task. Another version's task can locate that same card.
+    const card=cardId||this.service.cards.binding(taskId)?.outputCardId;
+    if(!card)return null;
+    return this.db.prepare(`SELECT s.*,c.id AS card_id,c.requirement_id
+      FROM output_cards c JOIN output_card_tasks b ON b.card_id=c.id JOIN pa_steps s ON s.task_id=b.task_id
+      JOIN pa_plans p ON p.id=s.plan_id WHERE c.id=? AND c.requirement_id=? AND p.state IN ${openPlans}
+      AND (? IS NULL OR s.id=?) ORDER BY s.rowid DESC LIMIT 1`).get(card,requirementId,stepId??null,stepId??null)||null;
+  }
+  versionChoice(step){
+    const receipt=typeof step.receipt==='string'?parse(step.receipt):step.receipt;
+    const cardId=step.card_id||receipt?.cardId;
+    if(!cardId||(!step.handoff&&!receipt))return null;
+    const head=this.db.prepare(`SELECT v.id AS versionId,v.number,v.task_id AS taskId,c.requirement_id AS requirementId
+      FROM output_cards c JOIN output_card_versions v ON v.id=c.head_version_id
+      WHERE c.id=? AND v.card_id=c.id AND v.legacy=0`).get(cardId);
+    if(!head||(!step.handoff && [receipt.versionId,step.kept_version].includes(head.versionId)))return null;
+    if(receipt && head.versionId!==receipt.versionId && !this.db.prepare(`WITH RECURSIVE ancestors(id) AS (
+        SELECT ? UNION SELECT v.base_version_id FROM output_card_versions v JOIN ancestors a ON a.id=v.id
+        WHERE v.card_id=? AND v.base_version_id IS NOT NULL) SELECT 1 FROM ancestors WHERE id=?`).get(head.versionId,cardId,receipt.versionId))return null;
+    return {...head,cardId};
+  }
+  cardHandoff(input){
+    const s=this.linkedCard(input);
+    if(!s)return null;
+    const consumers=this.waitingConsumers(s);
+    if(s.state==='done'&&!consumers.length&&!s.handoff)return null;
+    return {planId:s.plan_id,stepId:s.id,taskId:s.task_id,cardId:s.card_id,requirementId:s.requirement_id,
+      handoff:Boolean(s.handoff),title:parse(s.data).title,receipt:s.receipt?parse(s.receipt):null,choice:this.versionChoice(s),consumers};
+  }
+  takeOver(input){
+    const s=this.linkedCard(input);
+    if(!s||(s.state==='done'&&!this.waitingConsumers(s).length))return null;
+    if(input.id&&input.id!==s.plan_id)throw Error('委托已变化，请重新打开卡片');
+    if(this.db.prepare('UPDATE pa_steps SET handoff=1 WHERE id=? AND handoff=0').run(s.id).changes){
+      this.memory.event(randomUUID(),'任务交接',parse(s.data).title,'用户接管此步骤',{planId:s.plan_id,taskId:s.task_id,cardId:s.card_id});
+    }
+    return this.cardHandoff({...input,cardId:s.card_id});
+  }
+  nativeInput(sessionId,requestIds){
+    const rows=this.db.prepare(`SELECT t.requirement_id AS requirementId,t.id AS taskId,t.request_id AS requestId
+      FROM course_tasks t JOIN pa_steps s ON s.task_id=t.id JOIN pa_plans p ON p.id=s.plan_id
+      WHERE t.session_id=? AND p.state IN ${openPlans}`).all(sessionId);
+    for(const row of rows)if(!requestIds||requestIds.some(id=>id!==row.requestId))this.takeOver(row);
+  }
+  async chooseVersion(input){
+    const read=()=>this.cardHandoff(input);
+    const current=read();
+    if(!current||current.planId!==input.id||current.stepId!==input.stepId)throw Error('步骤已变化，请重新打开卡片');
+    if(!current.handoff&&current.receipt?.versionId===input.versionId&&input.command!=='keep-version')return current;
+    if(!current.choice||current.choice.versionId!==input.versionId)throw Error('卡片版本已变化，请核对当前成果');
+    const keep=input.command==='keep-version';
+    if(keep){
+      if(current.handoff||!current.receipt)throw Error('请先选择此步骤的交付版本');
+      this.db.prepare('UPDATE pa_steps SET kept_version=? WHERE id=?').run(input.versionId,input.stepId);
+      return read();
+    }
+    for(const taskId of new Set([current.taskId,current.choice.taskId])){
+      const task=this.service.tasks.get(taskId);
+      if(task.kind==='ai' && (task.dispatchStatus==='submitting'||await this.host.pending?.(this.service,task)||
+        (task.sessionId&&this.host.settled&&!await this.host.settled(this.service,task))))throw Error('卡片任务仍在运行或待确认，请先在原对话处理');
+    }
+    const latest=read();
+    if(!latest||json(latest)!==json(current)){
+      if(latest&&!latest.handoff&&latest.receipt?.versionId===input.versionId)return latest;
+      throw Error('任务状态已变化，请重新核对版本');
+    }
+    const {number,cardId,requirementId,versionId,taskId}=current.choice;
+    const {node}=this.service.cards.describe({requirementId,cardId,versionId});
+    if(!node.sourceHash||['missing','changed','modified','unavailable'].includes(node.status))throw Error('正式成果文件不可用，请重新核对版本');
+    this.db.prepare("UPDATE pa_steps SET state='done',handoff=0,receipt=?,kept_version=NULL,interaction=NULL,error=NULL WHERE id=?")
+      .run(json({number,cardId,requirementId,versionId,hash:node.sourceHash}),input.stepId);
+    this.memory.event(randomUUID(),'任务交接',current.title,`已采用 V${number}`,{planId:current.planId,taskId,cardId,versionId});
+    return read();
+  }
   approvalToken(id){
     const ids=this.db.prepare('SELECT id FROM pa_steps WHERE plan_id=? ORDER BY seq').all(id);
     return createHash('sha256').update(json(ids)).digest('hex');
   }
   pendingEvents(){
-    const rows=this.db.prepare(`SELECT p.id AS planId,p.state AS planState,s.id,s.state,s.authorized,s.interaction,s.task_id AS taskId,s.error
-      FROM pa_plans p JOIN pa_steps s ON s.id=(SELECT t.id FROM pa_steps t WHERE t.plan_id=p.id AND t.state!='done' ORDER BY seq LIMIT 1)
-      WHERE p.state IN ('approval','running','stopping')`).all();
+    const rows=this.db.prepare(`SELECT p.id AS planId,p.state AS planState,s.id,s.state,s.authorized,s.interaction,s.task_id AS taskId,s.error,s.handoff
+      FROM pa_plans p JOIN pa_steps s ON s.id=(SELECT t.id FROM pa_steps t WHERE t.plan_id=p.id AND (t.state!='done' OR t.handoff=1) ORDER BY seq LIMIT 1)
+      WHERE p.state IN ('approval','running','paused','stopping')`).all();
     const changes=this.db.prepare("SELECT c.id,c.plan_id AS planId FROM pa_changes c JOIN pa_plans p ON p.id=c.plan_id WHERE c.state='pending' AND p.state NOT IN ('stopping','stopped','done')").all();
     const pending=changes.map(c=>({planId:c.planId,key:'change:'+c.id}));
     for(const row of rows){
@@ -124,7 +212,8 @@ export class ProjectAgent {
       if(row.planState==='stopping')key='stop:'+row.planId;
       else if(row.planState==='approval')key='plan:'+row.planId;
       else if(row.interaction)key=json([row.taskId,row.interaction]);
-      else if(row.state==='blocked'||!row.authorized||row.error)key=row.state+':'+row.id;
+      else if(row.handoff)key='handoff:'+row.id;
+      else if(row.planState==='running'&&(row.state==='blocked'||!row.authorized||row.error))key=row.state+':'+row.id;
       if(key)pending.push({planId:row.planId,key});
     }
     return pending;
@@ -145,8 +234,15 @@ export class ProjectAgent {
       const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps});
       const change=this.change(plan.id);
       return {...plan,scopeToken:this.approvalToken(plan.id),change:change&&{id:change.id,start:change.start,steps:change.data.map(describe)},
-        steps:this.steps(plan.id).map(s=>({id:s.id,...describe(s.data),state:s.state,authorized:!!s.authorized,error:s.error,
-          taskId:s.task_id,outputCardId:s.task_id?this.service.cards.binding(s.task_id)?.outputCardId:null,receipt:s.receipt}))};
+        steps:this.steps(plan.id).map(s=>{
+          const binding=s.task_id?this.service.cards.binding(s.task_id):null;
+          const cardId=binding?.outputCardId;
+          const active=!['done','stopped','stopping'].includes(plan.state);
+          const consumers=cardId&&active&&(s.handoff||s.receipt)?this.waitingConsumers(s):[];
+          const choice=cardId&&active&&(s.handoff||consumers.length)?this.versionChoice({...s,card_id:cardId}):null;
+          return {id:s.id,...describe(s.data),state:s.state,authorized:!!s.authorized,error:s.error,interaction:s.interaction,
+            taskId:s.task_id,outputCardId:cardId,receipt:s.receipt,handoff:active&&Boolean(s.handoff),choice,consumers};
+        })};
     });
   }
   normalizeSteps(data,turn,offset=0) {
@@ -229,9 +325,9 @@ export class ProjectAgent {
     const turn=parse(row.data);
     if(action==='details'){
       const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(data.planId||'');
-      if(!plan)throw Error('委托不存在');return {...plan,steps:this.steps(plan.id).map(s=>({title:s.data.title,instruction:s.data.instruction,refs:s.data.sources.map(summary),state:s.state,taskId:s.task_id,receipt:s.receipt}))};
+      if(!plan)throw Error('委托不存在');return {...plan,steps:this.steps(plan.id).map(s=>({title:s.data.title,instruction:s.data.instruction,refs:s.data.sources.map(summary),state:s.state,handoff:Boolean(s.handoff),taskId:s.task_id,receipt:s.receipt}))};
     }
-    if(action==='context') return {current:{canvas:turn.requirementId,sources:turn.sources.map(summary)},canvases:this.db.prepare('SELECT id,title FROM requirements ORDER BY updated_at DESC,id').all(),settings:this.memory.effective([turn.requirementId,data.scope].filter(Boolean)),scopes:this.db.prepare('SELECT DISTINCT scope FROM pa_settings WHERE rev IS NOT NULL ORDER BY scope LIMIT 60').all().map(s=>s.scope),plans:this.plans().slice(0,8).map(p=>({id:p.id,title:p.title,state:p.state,next:p.steps.find(s=>s.state!=='done')?.title,lastResult:p.steps.filter(s=>s.receipt).at(-1)?.receipt})),history:this.memory.search(data.query||turn.text).slice(0,2)};
+    if(action==='context') return {current:{canvas:turn.requirementId,sources:turn.sources.map(summary)},canvases:this.db.prepare('SELECT id,title FROM requirements ORDER BY updated_at DESC,id').all(),settings:this.memory.effective([turn.requirementId,data.scope].filter(Boolean)),scopes:this.db.prepare('SELECT DISTINCT scope FROM pa_settings WHERE rev IS NOT NULL ORDER BY scope LIMIT 60').all().map(s=>s.scope),plans:this.plans().slice(0,8).map(p=>({id:p.id,title:p.title,state:p.state,next:p.steps.find(s=>s.state!=='done'||s.handoff)?.title,handoff:p.steps.find(s=>s.handoff)?.title,lastResult:p.steps.filter(s=>s.receipt).at(-1)?.receipt})),history:this.memory.search(data.query||turn.text).slice(0,2)};
     if(action==='pause'||action==='stop')return this.control({id:data.planId,command:action});
     if(action==='amend')return this.amend(turnId,data,turn);
     if(action==='plan')return this.proposal(turnId,data,turn);
@@ -254,7 +350,7 @@ export class ProjectAgent {
     const operation=(async()=>{
       const pending=this.db.prepare(`SELECT s.id,coalesce(s.task_id,o.result_id) AS taskId,json_extract(s.data,'$.requirementId') AS canvas
         FROM pa_steps s LEFT JOIN operations o ON o.id=s.id AND o.kind='create-task'
-        WHERE s.plan_id=? AND s.state NOT IN ('done','stopped') AND coalesce(s.task_id,o.result_id) IS NOT NULL`).all(id);
+        WHERE s.plan_id=? AND s.handoff=0 AND s.state NOT IN ('done','stopped') AND coalesce(s.task_id,o.result_id) IS NOT NULL`).all(id);
       for(const step of pending){
         this.db.prepare('UPDATE pa_steps SET task_id=? WHERE id=? AND task_id IS NULL').run(step.taskId,step.id);
         try{
@@ -268,14 +364,22 @@ export class ProjectAgent {
           return;
         }
       }
+      this.db.prepare("UPDATE pa_steps SET state=CASE WHEN state='done' THEN state ELSE 'stopped' END,handoff=0,interaction=NULL,error=NULL WHERE plan_id=? AND handoff=1").run(id);
       if(this.db.prepare("UPDATE pa_plans SET state='stopped' WHERE id=? AND state='stopping'").run(id).changes){
-        this.memory.event('stopped-'+id,'授权与控制','停止委托','已结束在途步骤',{planId:id});
+        this.memory.event('stopped-'+id,'授权与控制','停止委托','已停止派发并核对助手负责的步骤',{planId:id});
       }
     })();
     this.stops.set(id,operation);
     try{await operation;}finally{this.stops.delete(id);}
   }
-  async control({id,command,stepId,changeId,mode,scopeToken}) {
+  async control(input) {
+    const {id,command,stepId,changeId,mode,scopeToken}=input;
+    if(command==='take-over'){
+      const current=this.takeOver(input);
+      if(!current)throw Error('此卡没有可接管的委托步骤');
+      return current;
+    }
+    if(['use-version','keep-version'].includes(command))return this.chooseVersion(input);
     const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(id);
     if(!plan||['done','stopped'].includes(plan.state))throw Error('委托已结束或不存在');
     if(plan.state==='stopping'&&command!=='stop')throw Error('正在核对原任务停止状态');
@@ -291,7 +395,7 @@ export class ProjectAgent {
     if(command==='approve-plan' && plan.state==='approval' && plan.mode==='plan'){
       this.db.prepare("UPDATE pa_steps SET authorized=1 WHERE plan_id=? AND state='ready' AND json_extract(data,'$.review')=0").run(id);setState('running');
     } else if(command==='approve-step' && plan.state==='running'){
-      const next=steps.find(s=>s.state!=='done');
+      const next=steps.find(s=>s.state!=='done'||s.handoff);
       if(next?.state!=='ready'||next.id!==stepId||next.authorized)throw Error('当前步骤已变化');
       this.db.prepare('UPDATE pa_steps SET authorized=1 WHERE id=?').run(stepId);
     } else if(command==='pause' && plan.state==='running')setState('paused');
@@ -314,29 +418,46 @@ export class ProjectAgent {
     this.busy=true;
     try {
       if(this.host.stopConfirmed)for(const {id} of this.db.prepare("SELECT id FROM pa_plans WHERE state='stopping'").all())await this.finishStop(id,true);
-      for(const {id} of this.db.prepare("SELECT id FROM pa_plans WHERE state='running' ORDER BY rowid").all()){
-        const pending=this.db.prepare("SELECT * FROM pa_steps WHERE plan_id=? AND state<>'done' ORDER BY seq LIMIT 1").get(id);
+      for(const {id,state} of this.db.prepare(`SELECT id,state FROM pa_plans p WHERE state IN ('running','paused') OR
+        (state='approval' AND EXISTS (SELECT 1 FROM pa_steps s WHERE s.plan_id=p.id AND s.task_id IS NOT NULL AND s.state<>'done'))
+        ORDER BY rowid`).all()){
+        const pending=this.db.prepare(`SELECT s.*,o.result_id AS recovered_task FROM pa_steps s
+          LEFT JOIN operations o ON s.task_id IS NULL AND o.id=s.id AND o.kind='create-task'
+          WHERE s.plan_id=? AND (s.state<>'done' OR s.handoff=1) ORDER BY s.seq LIMIT 1`).get(id);
         const s=pending&&{...pending,data:parse(pending.data)};
         const change=this.change(id);
-        if(change&&(!s||s.seq>=change.start))continue;
-        if(!s){this.db.prepare("UPDATE pa_plans SET state='done' WHERE id=?").run(id);this.memory.event('done-'+id,'委托',this.db.prepare('SELECT title FROM pa_plans WHERE id=?').get(id).title,'已完成全部交付',{planId:id});continue;}
-        if(!s.authorized||(s.state==='blocked'&&!s.task_id))continue;
-        try {await this.advance(id,s);}
-        catch(e){if(!this.service.store.closed){this.db.prepare("UPDATE pa_steps SET state='blocked',error=? WHERE id=?").run(String(e.message).slice(0,1200),s.id);
+        if(!s){if(state==='running'&&!change){this.db.prepare("UPDATE pa_plans SET state='done' WHERE id=?").run(id);this.memory.event('done-'+id,'委托',this.db.prepare('SELECT title FROM pa_plans WHERE id=?').get(id).title,'已完成全部交付',{planId:id});}continue;}
+        const dispatch=state==='running'&&s.authorized&&!s.handoff&&(!change||s.seq<change.start);
+        if(!s.task_id&&!s.recovered_task&&(!dispatch||s.state==='blocked'))continue;
+        try {await this.advance(id,s,dispatch);}
+        catch(e){if(!this.service.store.closed){this.db.prepare("UPDATE pa_steps SET state='blocked',error=? WHERE id=? AND state<>'done'").run(String(e.message).slice(0,1200),s.id);
           this.memory.event('blocked-'+s.id,'步骤待核对',s.data.title,String(e.message).slice(0,1200),{planId:id,taskId:s.task_id});}}
       }
       this.memory.project();
     } finally {this.busy=false;}
   }
-  async advance(id,s) {
-    const allowed=()=>this.live(id)&&this.db.prepare("SELECT authorized FROM pa_steps WHERE id=? AND NOT EXISTS (SELECT 1 FROM pa_changes WHERE plan_id=? AND state='pending' AND start<=?)").get(s.id,id,s.seq)?.authorized;
-    const existingId=s.task_id||this.db.prepare("SELECT result_id FROM operations WHERE id=? AND kind='create-task'").get(s.id)?.result_id;
+  dependencyReceipts(id,deps){
+    if(!deps.length)return [];
+    const read=this.db.prepare("SELECT * FROM pa_steps WHERE plan_id=? AND seq=? AND state='done' AND handoff=0");
+    return deps.map(seq=>{
+      const step=read.get(id,seq);
+      return step?.receipt&&!this.versionChoice(step)?parse(step.receipt):null;
+    });
+  }
+  async advance(id,s,dispatch) {
+    const d=s.data;
+    let receipts;
+    const allowed=()=>dispatch&&this.live(id)&&this.db.prepare("SELECT authorized FROM pa_steps WHERE id=? AND handoff=0 AND state<>'done' AND NOT EXISTS (SELECT 1 FROM pa_changes WHERE plan_id=? AND state='pending' AND start<=?)").get(s.id,id,s.seq)?.authorized
+      &&(!receipts||json(receipts)===json(this.dependencyReceipts(id,d.deps)));
+    const stillObserving=()=>!this.service.store.closed&&this.db.prepare(`SELECT 1 FROM pa_steps s JOIN pa_plans p ON p.id=s.plan_id
+      WHERE s.id=? AND s.task_id=? AND (s.state<>'done' OR s.handoff=1) AND p.state IN ${openPlans}`).get(s.id,task.id);
+    const existingId=s.task_id||s.recovered_task;
     let task=existingId&&this.service.tasks.get(existingId);
     if(task&&!s.task_id)this.db.prepare("UPDATE pa_steps SET task_id=?,state='working' WHERE id=?").run(task.id,s.id);
-    const d=s.data;
     if(task){
       const saved=this.db.prepare('SELECT v.id AS versionId,v.card_id AS cardId,c.requirement_id AS requirementId,v.number FROM output_card_versions v JOIN output_card_tasks b ON b.card_id=v.card_id AND b.task_id=v.task_id JOIN output_cards c ON c.id=v.card_id WHERE v.task_id=? ORDER BY v.number LIMIT 1').get(task.id);
       const pending=await this.host.pending?.(this.service,task);
+      if(!stillObserving())return;
       if(pending){
         if(s.interaction!==pending.callId)this.db.prepare("UPDATE pa_steps SET interaction=?,error='原任务待确认' WHERE id=?").run(pending.callId,s.id);
         return;
@@ -345,9 +466,11 @@ export class ProjectAgent {
       const phase=task.runtimeState?.phase;
       const budget=this.service.production.usage(task.id)?.budgetStop;
       if(budget)throw Error(budget);
-      if(saved && !['awaiting-input','awaiting-approval','generating','unknown','failed'].includes(phase) && (!this.host.settled || await this.host.settled(this.service,task))){
-        this.db.prepare("UPDATE pa_steps SET state='done',receipt=?,error=NULL WHERE id=?").run(json(saved),s.id);return;
+      if(saved && !s.handoff && !activePhases.includes(phase) && (!this.host.settled || await this.host.settled(this.service,task))){
+        if(stillObserving())this.db.prepare("UPDATE pa_steps SET state='done',receipt=?,error=NULL WHERE id=? AND handoff=0").run(json(saved),s.id);
+        return;
       }
+      if(!stillObserving())return;
       if(s.state==='blocked')return;
       if(task.dispatchStatus==='submitting')return;
       if(['failed','unknown','cancelled'].includes(task.dispatchStatus))throw Error(task.error||'发送回执待核对，请打开原任务');
@@ -357,11 +480,11 @@ export class ProjectAgent {
         return;
       }
     } else {
-      const receipts=d.deps.map(n=>{
-        const row=this.db.prepare("SELECT receipt FROM pa_steps WHERE plan_id=? AND seq=? AND state='done'").get(id,n);
-        return row?.receipt&&parse(row.receipt);
-      });
-      if(receipts.some(r=>!r))return;
+      receipts=this.dependencyReceipts(id,d.deps);
+      if(receipts.some(r=>!r)){
+        if(!s.error)this.db.prepare("UPDATE pa_steps SET error='请在上游步骤选择成果版本' WHERE id=?").run(s.id);
+        return;
+      }
       const files=d.sources.filter(src=>src.path||src.importedFile||src.generatedFile);
       const verified=this.freezeByCanvas([...files.map(src=>({...src,cardId:src.outputCardId||src.cardId})),...receipts],d.requirementId);
       const sources=[...d.sources,...verified.slice(files.length)];
@@ -375,7 +498,9 @@ export class ProjectAgent {
       const created=await this.host.createTask(this.service,{requirementId:d.requirementId,operationId:s.id,selectedCardIds:[],generation:{mode:'new'},outputType:d.type,instruction:d.instruction},limitSourceContent([...new Map(sources.map(r=>[r.cardId,r])).values()]),settings,allowed,d.title);
       if(!created)return;
       task=created.task;
-      this.db.prepare("UPDATE pa_steps SET task_id=?,state='working' WHERE id=?").run(task.id,s.id);
+      this.db.prepare("UPDATE pa_steps SET task_id=?,state='working',error=NULL WHERE id=?").run(task.id,s.id);
+      // The creation transaction froze these dependencies. Later edits affect future steps only.
+      receipts=undefined;
     }
     if(!allowed())return;
     const prepared=this.service.prepareTask({taskId:task.id}).prepared;

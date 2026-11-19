@@ -5,7 +5,7 @@ import { once } from 'node:events';
 // Isolated Messages transport. DSH still admits the prompt, executes each tool,
 // publishes the session events and persists the exact primary output.
 export async function projectAgentModel(fixture){
-  const calls=[], evidence=[], skillInvocations=[];
+  const calls=[], evidence=[], skillInvocations=[], followups=[];
   const server=createServer(async(req,res)=>{
     try{
       let raw='';for await(const chunk of req)raw+=chunk;
@@ -25,6 +25,9 @@ export async function projectAgentModel(fixture){
       } else if(gate&&ended&&calls.some(c=>c.name==='ask_user_question'&&c.id===task[1])&&!calls.some(c=>c.name==='course_save_outline'&&c.id===task[1])){
         name='course_save_outline';input={requirementId:canvas[1],taskId:task[1],primary:true,markdown:'# 验收脚本',operationId:randomUUID()};
       }
+      if(process.env.WTT_AGENT_SMOKE_NATIVE_FOLLOWUP==='1'&&task&&text.includes('验收手动补充')){
+        followups.push(task[1]);name=null;
+      }
       const available=(body.tools||[]).map(t=>t.name);
       if(!available.includes(name)&&!available.includes('run_code'))name=null;
       if(name){calls.push({name,id:input.taskId||input.turnId||task?.[1]});if(!available.includes(name)&&available.includes('run_code')){input={description:'工作台验收',code:'return await tools.'+name+'('+JSON.stringify(input)+')'};name='run_code';}}
@@ -41,5 +44,5 @@ export async function projectAgentModel(fixture){
     }catch(e){console.error('合成模型请求',e.message);res.writeHead(500);res.end();}
   });
   server.listen(0,'127.0.0.1');await once(server,'listening');
-  return {calls,evidence,skillInvocations,env:{DEEPSEEK_API_KEY:'sk-'+'0'.repeat(32),DEEPSEEK_BASE_URL:'http://127.0.0.1:'+server.address().port},close:()=>server.close()};
+  return {calls,evidence,skillInvocations,followups,env:{DEEPSEEK_API_KEY:'sk-'+'0'.repeat(32),DEEPSEEK_BASE_URL:'http://127.0.0.1:'+server.address().port},close:()=>server.close()};
 }

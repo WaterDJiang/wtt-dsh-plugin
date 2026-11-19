@@ -83,7 +83,8 @@ export async function checkProjectAgentPages(canvas){
   await badge.waitFor();
   assert.equal(await launcher.getAttribute('aria-description'),'100 项待确认');
   const box=await launcher.boundingBox(), count=await badge.boundingBox();
-  assert.equal(box.width,40);
-  assert(count.x>box.x&&count.x+count.width>box.x+box.width&&count.y<box.y);
-  console.log('PASS 分页定位并处理第 101 份待办，浮标显示其余 100 份');
+  const tools=await canvas.getByRole('toolbar',{name:'白板工具'}).boundingBox();
+  assert(box.x>tools.x&&box.x+box.width<tools.x+tools.width&&box.y+box.height<=tools.y+tools.height);
+  assert(count.x>box.x&&count.x+count.width>=box.x+box.width&&count.y<box.y);
+  console.log('PASS 分页定位并处理第 101 份待办，工具栏 W 按钮显示其余 100 份');
 }

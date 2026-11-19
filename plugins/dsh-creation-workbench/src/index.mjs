@@ -85,9 +85,12 @@ export function apply(ctx, config = {}) {
   const coordinators = projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskControl});
   ctx.effect(() => () => coordinators.close());
   ctx.on?.('agent/pre-step',async({agent,messages},next)=>{
-    const decision=await next(),runner=coordinators.bySession(agent);
-    if(!runner||runner.sessionId()!==agent.id||decision.kind!=='enter')return decision;
+    const decision=await next();
+    if(decision.kind!=='enter')return decision;
     const incoming=messages.filter(m=>m.source?.kind==='user'&&m.source.rpcId);
+    if(incoming.length)coordinators.nativeInput(agent.session,incoming.map(m=>m.source.rpcId));
+    const runner=coordinators.bySession(agent);
+    if(!runner||runner.sessionId()!==agent.id)return decision;
     if(incoming.length)runner.activeTurns.clear();
     const contexts=incoming.map(m=>runner.promptContext(agent.id,m.source.rpcId)).filter(Boolean);
     if(!contexts.length)return decision;
@@ -220,6 +223,7 @@ export function apply(ctx, config = {}) {
           }
           if (url.searchParams.has('outputPending')) return Response.json(service.cards.describePending({
             requirementId: url.searchParams.get('requirementId'), cardId: url.searchParams.get('outputPending'),
+            ...(url.searchParams.has('cardTask')?{taskId:url.searchParams.get('cardTask')}:{}),
           }), { headers });
           if (url.searchParams.has('outputCard')) return Response.json(await service.cards.describe({
             requirementId: url.searchParams.get('requirementId'), cardId: url.searchParams.get('outputCard'),
@@ -384,6 +388,7 @@ export function apply(ctx, config = {}) {
         else if (action === 'save-media-settings') result = await service.media.updateSettings(data);
         else if (action === 'generate-media-api') {
           if (data?.generationMethod !== 'api') throw new Error('API 生成方式无效');
+          if(data.generation?.mode==='revise')coordinators.existing(service)?.takeOver({requirementId:data.requirementId,cardId:data.generation.cardId});
           result = await service.media.create(data);
         }
         else if (action === 'generate-media') result = await service.media.create(data);
@@ -463,12 +468,14 @@ export function apply(ctx, config = {}) {
           if (data?.selectedSkills !== undefined && JSON.stringify(data.selectedSkills) !== JSON.stringify(names)) throw new Error('Skill 选择与创作指令不一致，请重新选择');
           const skillRefs = names.length ? await (await catalogReady).resolve(service.workspaceRoot, names) : [];
           const created = service.createTask({ ...data, selectedSkills: names }, { skillRefs });
+          if(data.generation?.mode==='revise')coordinators.existing(service)?.takeOver({requirementId:data.requirementId,cardId:created.task.outputCardId});
           result = { ...created, prepared: projects.prepared(service, created.prepared) };
         }
         else if (action === 'prepare-task') {
           if (!projectId) throw new Error('任务重试必须指定当前项目');
           await verifyTaskSkills(service, data.taskId);
           const prepared = service.prepareTask(data);
+          if(['draft','failed'].includes(prepared.task.dispatchStatus))coordinators.existing(service)?.takeOver({requirementId:prepared.task.requirementId,taskId:data.taskId});
           result = { ...prepared, prepared: projects.prepared(service, prepared.prepared) };
         }
         else if (action === 'bind-task-session') { await verifyTaskSkills(service, data.taskId); result = service.tasks.bindSession(data); }

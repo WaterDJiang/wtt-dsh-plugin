@@ -917,15 +917,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     }
   }
 
-  async function openPendingCard(card, { showDeck = true, openConversation = false } = {}) {
+  async function openPendingCard(card, { showDeck = true, openConversation = false, taskId } = {}) {
     cancelCardOpen()
     if (card.composition) return openComposition({card:card.outputCard,node:card,composition:card.composition})
-    if (!card.outputCard?.id || !card.pendingGeneration) return
+    if (!card.outputCard?.id || (!card.pendingGeneration&&!taskId)) return
     selectCard(card.id)
     const intent = ++creationIntent.current, epoch = epochRef.current
     const selectedAtOpen = nodesRef.current.filter(node => node.selected).map(node => node.id).sort().join('|')
     try {
-      const response = await fetch(endpoint({ outputPending: card.outputCard.id, requirementId: requirement.id }), { credentials: 'same-origin' })
+      const response = await fetch(endpoint({ outputPending: card.outputCard.id, requirementId: requirement.id, ...(taskId?{cardTask:taskId}:{}) }), { credentials: 'same-origin' })
       const descriptor = await response.json()
       if (!response.ok) throw new Error(descriptor?.error || '原任务读取失败')
       if (!mounted.current || !activeRef.current || epoch !== epochRef.current || intent !== creationIntent.current
@@ -1038,8 +1038,9 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const card = board.nodes.find(node => node.outputCard?.id === target.cardId || node.id === target.cardId)
     if (!card) return
     delete cache.current.pendingAsset
-    if(card.outputCard)void openOutputCard(card, target.versionId,{openConversation:!!target.openConversation}); else openCardDetails(card)
-  }, [loading, board?.nodes?.length])
+    if(target.taskId)void openPendingCard(card,{showDeck:false,openConversation:true,taskId:target.taskId})
+    else if(card.outputCard)void openOutputCard(card, target.versionId); else openCardDetails(card)
+  }, [loading, board])
 
   function openCardDetails(card) {
     cancelCardOpen()
@@ -3153,6 +3154,26 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   referenceOptionsRef.current = referenceOptions
   const referencePicker = pickingReferences ? { options: referenceOptions, onToggle: toggleReferencePick, busy: referencePick.busy } : null
   const composerVisible = creationVisible && !editingNodeId && !deskVisible && !deckPreview && !assetsOpen && !documentView
+  const assistantCardId=active&&composerVisible?creation?.targetCard?.outputCard?.id:null
+  const [assistantStep,setAssistantStep]=useState(null)
+  const assistantStepRead=useRef(0)
+  const handoffWrite=useRef(false)
+  const [handoffBusy,setHandoffBusy]=useState(false)
+  const [handoffError,setHandoffError]=useState(null)
+  const handoff=assistantStep?.cardId===assistantCardId?assistantStep:null
+  const handoffScope=useRef(assistantCardId)
+  handoffScope.current=assistantCardId
+  async function operateHandoff(command){
+    if(!handoff||handoffWrite.current)return
+    const cardId=handoff.cardId,read=++assistantStepRead.current
+    handoffWrite.current=true
+    setHandoffBusy(true);setHandoffError(null)
+    try{
+      const {card}=await request('project-agent-control',{id:handoff.planId,stepId:handoff.stepId,requirementId:requirement.id,cardId,command,versionId:handoff.choice?.versionId})
+      if(mounted.current&&handoffScope.current===cardId&&read===assistantStepRead.current)setAssistantStep(card)
+    }catch(error){if(mounted.current&&handoffScope.current===cardId)setHandoffError({cardId,message:messageOf(error)})}
+    finally{handoffWrite.current=false;if(mounted.current)setHandoffBusy(false)}
+  }
   const showSelectionActions = !pickingReferences && selectedNodes.length > 0 && !(creationVisible && selectedNodes.length === 1)
     && !deckPreview && !assetsOpen && !deskVisible && tool === 'select' && !busy && !contextMenu
   const bounds = showSelectionActions ? selectedNodes.map(node => ({ ...absolutePosition(node, nodes), ...nodeSize(node) })) : []
@@ -3210,19 +3231,22 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
   const agentActions=useRef(null);
   agentActions.current={refresh:()=>{void refreshTasks();void loadBoard({preserveViewport:true,keepVisible:true});},
+    cardRead:()=>assistantStepRead.current,
+    showCardStep:(cardId,value,read)=>{
+      if(handoffScope.current!==cardId||handoffWrite.current||read!==assistantStepRead.current)return
+      setAssistantStep(previous=>JSON.stringify(previous)===JSON.stringify(value)?previous:value)
+    },
     locate:async({requirementId,cardId,versionId,taskId})=>{
-        if(requirementId!==requirement.id){onAssetNavigate?.(requirementId,cardId,versionId,!!taskId);return}
+        if(requirementId!==requirement.id){onAssetNavigate?.(requirementId,cardId,versionId,taskId);return}
         try { const current=boardRef.current?.nodes.find(n=>n.outputCard?.id===cardId)
-          if(current){await openOutputCard(current,versionId,{openConversation:!!taskId});return}
-          cache.current.pendingAsset={cardId,versionId,openConversation:!!taskId};await loadBoard({preserveViewport:true,keepVisible:true})
+          if(current){if(taskId)await openPendingCard(current,{showDeck:false,openConversation:true,taskId});else await openOutputCard(current,versionId);return}
+          cache.current.pendingAsset={cardId,versionId,taskId};await loadBoard({preserveViewport:true,keepVisible:true})
         } catch(e){setError(messageOf(e))}
       }
   };
   return <CanvasConversationReferenceContext.Provider value={{ start: startConversationReferencePick, busy: Boolean(busy) || loading || pickingReferences }}><div ref={rootRef} tabIndex={-1} onKeyDown={keyboard} onClickCapture={dismissOtherCardCreation} onPointerDownCapture={cancelPaneInsert} onMouseDownCapture={event => {
     if (!event.target.closest('input,textarea,button,select,summary,[popover],[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-large-canvas={nodes.length >= LARGE_CANVAS_THRESHOLD || undefined} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
-    {active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current}
-      request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/>}
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
       onRemove={() => void removeElements()} />}
@@ -3272,6 +3296,8 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           {referencePick.error && <UserError error={referencePick.error} />}
         </div>}
         <CanvasChrome pickingReferences={pickingReferences} tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
+          projectAssistant={active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current} cardId={assistantCardId}
+            request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/>}
           onZoom100={zoom100} onFitAll={fitAllCards} onFitSelected={fitSelection}
           showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => { setMaterialError(''); setMaterialDialog(EMPTY_MATERIAL) }}
           onUndo={() => undo()} onRedo={() => undo(true)} canUndo={historyRef.current.canUndo} canRedo={historyRef.current.canRedo}
@@ -3301,6 +3327,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     <CardComposer onPickCanvasReferences={startReferencePick} suspended={draggingCard} visible={composerVisible && !pickingReferences} position={composerPosition(view)} context={creation ? { ...creation,
       pendingGeneration: publishedExecution || nativePendingState(creation.pendingGeneration, effectiveStatuses.get(creation.pendingGeneration?.sessionId || creation.sessionId)) } : creation}
       references={creationReferences} availableReferences={availableReferences}
+      handoff={handoff} onHandoff={operateHandoff} handoffBusy={handoffBusy} handoffError={handoffError?.cardId===assistantCardId?handoffError.message:null}
       creationTypes={creation ? [...creationMenuItems(creation.anchor).map(item => ({ id: item.id, label: item.label, available: !item.disabled, message: item.disabled ? item.reason : item.description })), ...['outline', 'exercise', 'script'].map(id => ({ id, label: '文本', available: true })), ...['word', 'excerpt', 'material'].map(id => ({ id, label: OUTPUT_LABELS[id], available: true }))] : productionTypes}
       skillCatalog={skillCatalog} skillCatalogLoading={skillCatalogLoading} skillCatalogError={skillCatalogError}
       onRefreshSkills={refreshSkillCatalog} onSaveSkillSettings={saveSkillSettings} onUpdateSkillPreference={updateSkillPreference}

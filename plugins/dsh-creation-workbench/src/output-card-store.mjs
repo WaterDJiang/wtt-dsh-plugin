@@ -320,14 +320,16 @@ export class OutputCardStore {
       pendingGeneration:{phase:'composing',message:'填写创作要求后开始生成',outputType:card.type}};
   }
 
-  describePending({ requirementId, cardId } = {}) {
+  describePending({ requirementId, cardId, taskId } = {}) {
     const raw = this.#raw(requirementId);
     if (typeof cardId !== 'string') throw new Error('产物卡标识无效');
     const row = this.db.prepare('SELECT * FROM output_cards WHERE id=? AND requirement_id=?').get(cardId, requirementId);
     if (!row) throw new Error('产物卡不存在或不属于当前需求');
-    const card = this.#card(row), task = this.#pendingTask(card);
+    const card = this.#card(row);
+    if(taskId&&this.binding(taskId)?.outputCardId!==cardId)throw new Error('原任务不属于当前卡片');
+    const task = taskId?this.store.tasks.get(taskId):this.#pendingTask(card);
     if (!task) throw new Error('此卡没有未完成的生成任务，请刷新画布');
-    const version = card.versions.find(value => value.id === card.latestVersionId);
+    const version = card.versions.find(value => value.id === task.cardVersionId) || card.versions.find(value => value.id === card.latestVersionId);
     const node = version ? this.#node(card, version, raw, task) : this.#pendingNode(card, task, raw);
     return this.#named({ card, node, task, pendingGeneration: node.pendingGeneration });
   }
