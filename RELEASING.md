@@ -17,5 +17,5 @@
 ## 发布后
 
 - [ ] 打开 GitHub、README 和市场入口，复核实际文案、版本和安装链接。
-- [ ] 有插件版本更新时，在独立配置验证从上一版安装或升级，并核对实际安装文件。
+- [ ] 有插件版本更新时，在隔离 DSH 配置装上一公开版，保持 Host 运行，从「插件 → 发现」更新到新版本。记录 DSH 版本、插件版本和宿主提示。热更新成功后复核 Host 未重启、原画布和卡片可打开。宿主要求重启时记录原因，并验证重启后可用。
 - [ ] 社区目录分别记录 PR 已提交、已合并和各镜像已同步的状态。 [国际区目录](https://awesome-dsh-plugin.com/plugins.json) · [中国区目录包](https://registry.npmmirror.com/dsh-plugin-catalog/latest)

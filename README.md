@@ -24,9 +24,11 @@ github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-creation-workbench
 
 ## 已安装？如何检查更新
 
-当前版本为 **0.58.3**。项目助手的 W 入口固定在画布左侧工具栏，卡片任务支持单步接管和版本交回，对话中的技能选择增加兼容处理。[使用说明](plugins/dsh-creation-workbench/README.md#0583-的主要改进) · [更新日志](CHANGELOG.md)
+当前版本为 **0.58.4**。[更新日志](CHANGELOG.md)
 
-使用社区市场 `dshmarket` 时，打开 **插件 → 插件市场 → 已安装**，找到 WTT 创作工作台。看到「有新版本」就点 **立即更新**。如果旧版的「代码来源」写的是 `path:plugins/...`，在原 DSH 配置用上面的安装串覆盖安装一次，以后可以直接从市场更新。
+保存编辑并等任务结束后，打开 **插件 → 发现 → WTT 创作工作台 → 更新**。看到「新版本已经开始运行」即可回到画布。DSH 明确提示「需要重启」时，再按提示操作。
+
+从社区市场安装的用户可打开 **插件 → 插件市场 → 已安装**，在工作台条目点 **立即更新**。旧安装串迁移和回退方法见下方。
 
 WTT 创作工作台已加入社区公共目录。各镜像的同步进度可能不同。[查看收录记录](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13878)
 
