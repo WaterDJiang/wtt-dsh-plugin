@@ -73,6 +73,7 @@ export class WorkbenchService {
     this.scriptSkillDir = config.scriptSkillDir || localSkillDirectory('wtt-course-scriptwriter');
     this.ffprobe = config.ffprobeExecutable || 'ffprobe';
     this.python = config.pythonExecutable || 'python3';
+    this.previewFontDirectoryOverride = config.fontDirectories;
     this.exporting = new Map();
     this.productionChecks = new Map();
     this.production = new ProductionControl(this, config);
@@ -116,8 +117,6 @@ export class WorkbenchService {
       if (this[key] !== directory) { this[key] = directory; changed = true; }
     }
     if (changed) { this.productionChecks.clear(); this.pythonCheck = null; }
-    if (this.deck?.previewRenderer) this.deck.previewRenderer.script = path.resolve(this.pptSkillDir, 'scripts/render_course_pptx.py');
-    if (this.previewRenderer) this.previewRenderer.script = path.resolve(this.pptSkillDir, 'scripts/render_course_pptx.py');
   }
   selectCapabilitySource({ source }) {
     if (source !== 'local') throw new Error('已停止提供插件内置课程技能，请在技能设置中选择本机技能文件夹。');

@@ -18,7 +18,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent','preview'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent|preview]');
 const cli = path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const playwright = ['.runtime/canvas-smoke', '.runtime/jimeng-backend'].map(dir =>
@@ -102,6 +102,67 @@ async function seedSend(workspace) {
       return { id, nodeId: node.id, type };
     });
   } finally { service.close(); }
+}
+
+async function seedPptPreview(workspace, requirementId) {
+  const service = new WorkbenchService({ workspaceRoot: workspace });
+  try {
+    const requirement = service.store.getRequirement(requirementId);
+    const instruction = '中文分页预览夹具';
+    const node = service.canvas.getBoard(requirementId).nodes[0];
+    const sourceRefs = [{ cardId: node.id, hash: node.sourceHash }];
+    const input = { requirementId, instruction, outputType: 'pptx', selectedCardIds: [node.id], sourceRefs, operationId: randomUUID() };
+    const task = service.tasks.create(input, { requirement, instruction, outputType: 'pptx', sourceRefs,
+      sources: [{ cardId: node.id, title: node.title, kind: node.kind, hash: node.sourceHash, content: node.content }] });
+    const sessionId = 'ppt-preview-smoke';
+    service.tasks.bindSession({ taskId: task.id, sessionId });
+    const directory = path.join(service.workspaceRoot, 'courses', requirementId, 'tasks', task.id, 'delivery');
+    await mkdir(directory, { recursive: true });
+    const file = path.join(directory, '中文预览.pptx');
+    await run(service.python, ['-c', `from pptx import Presentation
+from pptx.util import Inches, Pt
+import sys
+r=Presentation()
+for page in range(1,3):
+ s=r.slides.add_slide(r.slide_layouts[6])
+ p=s.shapes.add_textbox(Inches(1), Inches(1), Inches(7), Inches(1)).text_frame.paragraphs[0]
+ a=p.add_run()
+ a.text='中文课件预览验收，第 '+str(page)+' 页'
+ a.font.name='Microsoft YaHei'
+ a.font.size=Pt(28)
+r.save(sys.argv[1])`, file]);
+    return await service.tasks.files.register({ taskId: task.id, kind: 'pptx', title: instruction, path: file, operationId: randomUUID() }, { sessionId });
+  } finally { service.close(); }
+}
+
+async function checkPptPreview(page, canvas, api, artifact, invalidFonts) {
+  await canvas.getByRole('button', { name: '内容详情', exact: true }).click();
+  await canvas.getByRole('button', { name: '关闭画布侧栏', exact: true }).waitFor();
+  const get = async fields => {
+    const url = new URL(api);
+    for (const [key,value] of Object.entries(fields)) url.searchParams.set(key, value);
+    const reply = await page.request.get(url.href);
+    assert(reply.ok(), `HTTP ${reply.status()}: ${await reply.text()}`);
+    return reply;
+  };
+  const catalog = await (await get({ skills: '' })).json();
+  assert(Array.isArray(catalog.skills));
+  console.log('PASS 插件激活，画布、内容侧栏和技能目录可用');
+  const manifest = await (await get({ artifactPreview: artifact.id, hash: artifact.hash })).json();
+  if (invalidFonts) {
+    assert.equal(manifest.status, 'failed');
+    assert.match(manifest.error, /预览字体目录无效/);
+    assert.deepEqual(manifest.pages, []);
+  } else {
+    assert.equal(manifest.status, 'ready', manifest.error);
+    assert.equal(manifest.chineseGlyphCheck, 'passed');
+    assert.equal(manifest.pageCount, 2);
+    const png = await (await get({ artifactPreviewPage: artifact.id, page: '2', hash: artifact.hash })).body();
+    assert.equal(createHash('sha256').update(png).digest('hex'), manifest.pages[1].hash);
+  }
+  const download = await (await get({ downloadArtifact: artifact.id })).body();
+  assert.equal(createHash('sha256').update(download).digest('hex'), artifact.hash);
+  console.log(invalidFonts ? 'PASS 字体配置故障仅影响 PPT 预览，下载原件匹配' : 'PASS 两页中文 PPT 渲染、中文字形和原件 hash 验证');
 }
 
 async function checkSend(page, canvas, cases, api) {
@@ -418,6 +479,8 @@ try {
   const workspace = path.join(temporary, 'workspace');
   await mkdir(workspace);
   const fixture = await seed(workspace);
+  const pptPreview = scenario==='preview' ? await seedPptPreview(workspace, fixture.id) : null;
+  const invalidPreviewFonts = Boolean(pptPreview && process.env.WTT_SMOKE_INVALID_PREVIEW_FONTS==='1');
   if(fixture.referenceId){
     const skillDir=path.join(workspace,'.agents','skills','wtt-qa-layout');
     await mkdir(skillDir,{recursive:true});
@@ -438,7 +501,9 @@ try {
   await run(process.execPath, [cli, 'plugin', '--profile', 'web', 'add', candidate], { cwd: workspace, env, timeout: 30_000 });
   for (const file of ['src/canvas.jsx', 'src/canvas.css', 'dist/client.js']) assert.deepEqual(
     await readFile(path.join(candidate, file)), await readFile(path.join(env.DSH_HOME, 'profiles/web/node_modules/@wtt/dsh-creation-workbench', file)), `安装文件不一致：${file}`);
-  host = spawn(process.execPath, [cli, 'web', '--port', '0', '--no-open'], { cwd: workspace, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const overlay = path.join(temporary, 'preview-fonts.json');
+  if (invalidPreviewFonts) await writeFile(overlay, JSON.stringify([{ id: 'wtt-creation-workbench', config: { fontDirectories: [] } }]));
+  host = spawn(process.execPath, [cli, 'web', ...(invalidPreviewFonts ? ['--patch', overlay] : []), '--port', '0', '--no-open'], { cwd: workspace, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const login = await loginUrl(host);
   browser = await chromium.launch({ executablePath, headless: true });
   const page = await browser.newPage({ viewport: { width: 1320, height: 940 } });
@@ -459,6 +524,7 @@ try {
   const api = new URL('/api/wtt-creation-workbench', login);
   api.searchParams.set('projectId', createHash('sha256').update(await realpath(workspace)).digest('hex'));
   try {
+    if (pptPreview) await checkPptPreview(page, canvas, api, pptPreview, invalidPreviewFonts);
     if(scenario==='agent' && process.env.WTT_AGENT_AUDIT_STOP==='1'){
       const {checkProjectAgentStop}=await import('./project-agent-idle-audit.mjs');
       await checkProjectAgentStop(page,canvas,api,agentModel);

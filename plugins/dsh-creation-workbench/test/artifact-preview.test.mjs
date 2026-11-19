@@ -6,12 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { WorkbenchService, runProcess } from '../src/service.mjs';
 import { createArtifactPreview } from '../src/artifact-preview.mjs';
+import { defaultPreviewFontCandidates, windowsOfficeExecutable } from '../src/preview-environment.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
-async function fixture(t, label = 'A', fontFamily = '') {
+async function fixture(t, label = 'A', fontFamily = '', config = {}) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'wtt-ppt-preview-')));
-  const service = new WorkbenchService({ workspaceRoot: root });
+  const service = new WorkbenchService({ workspaceRoot: root, ...config });
   const preview = createArtifactPreview(service);
   t.after(() => { preview.close(); service.close(); rmSync(root, { recursive: true, force: true }); });
   const requirement = service.store.createRequirement({ title: '人工技术夹具（不是 AI 生成）', operationId: randomUUID() });
@@ -52,6 +53,35 @@ deck.save(sys.argv[1])
   const bytes = readFileSync(file);
   return { root, service, preview, artifact, file, bytes, task, requirement, directory };
 }
+
+test('Windows default fonts use the Windows drive and per-user font directory', () => {
+  assert.deepEqual(defaultPreviewFontCandidates('win32', {
+    SystemRoot: 'D:\\WINDOWS', LOCALAPPDATA: 'E:\\Profile\\Local',
+  }), ['D:\\WINDOWS\\Fonts', 'E:\\Profile\\Local\\Microsoft\\Windows\\Fonts']);
+  assert.deepEqual(defaultPreviewFontCandidates('win32', {
+    SystemRoot: '\\Windows', WINDIR: 'F:\\Win', LOCALAPPDATA: 'relative',
+  }), ['F:\\Win\\Fonts']);
+  assert.deepEqual(defaultPreviewFontCandidates('win32', {}), ['C:\\Windows\\Fonts']);
+  const console = 'D:\\Program Files\\LibreOffice\\program\\soffice.com';
+  assert.equal(windowsOfficeExecutable('win32', { ProgramFiles: 'D:\\Program Files' },
+    candidate => [console, console.replace(/\.com$/, '.exe')].includes(candidate)), console);
+});
+
+test('an invalid font override leaves the project and original PPTX readable while preview fails', async t => {
+  const f = await fixture(t, '字体故障', '', { fontDirectories: [] });
+  assert.ok(f.service.canvas.getBoard(f.requirement.id).nodes.length);
+  const fontCheck = f.service.environment().checks.find(item => item.name === '系统字体目录');
+  assert.equal(fontCheck.available, false);
+  assert.match(fontCheck.message, /预览字体目录无效/);
+  const preview = await f.service.artifactPreview().get(f.artifact.id, { hash: f.artifact.hash });
+  assert.equal(preview.status, 'failed');
+  assert.equal(preview.hash, f.artifact.hash);
+  assert.match(preview.error, /预览字体目录无效/);
+  assert.equal(preview.pages.length, 0);
+  await assert.rejects(f.service.deck.previewRenderer.prepareBytes({ id: randomUUID(), bytes: f.bytes, hash: f.artifact.hash }),
+    /预览字体目录无效/);
+  assert.deepEqual((await f.service.tasks.files.download(f.artifact.id)).bytes, f.bytes);
+});
 
 function cacheDirectory(preview, artifact) {
   const parent = path.join(preview.cacheRoot, artifact.id);

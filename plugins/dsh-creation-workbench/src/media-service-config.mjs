@@ -1,6 +1,8 @@
 import z from '@deepseek-ai/schemastery';
 
 export const Config = z.object({
+  // Optional preview-only config is validated on use, keeping host activation independent.
+  fontDirectories: z.any(),
   mediaServices: z.dict(z.object({
     displayName: z.string().required(),
     baseURL: z.string().required(),

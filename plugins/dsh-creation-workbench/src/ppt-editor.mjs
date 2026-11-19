@@ -25,7 +25,6 @@ export class DeckEditor {
     this.db = this.store.db;
     this.root = realpathSync(service.workspaceRoot);
     this.helper = fileURLToPath(new URL('./ppt-editor.py', import.meta.url));
-    this.previewRenderer = createArtifactPreview(service);
     this.children = new Set();
     this.inflight = new Map();
     this.closed = false;
@@ -44,6 +43,8 @@ export class DeckEditor {
       status TEXT NOT NULL,artifact_id TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL
     )`);
   }
+
+  get previewRenderer() { return this._previewRenderer ??= createArtifactPreview(this.service); }
 
   #check() { if (this.closed || this.store.closed) throw new Error('PPT 编辑服务已关闭'); }
   #transaction(action) {
@@ -496,6 +497,6 @@ export class DeckEditor {
     if (this.closed) return;
     this.closed = true;
     for (const child of this.children) child.kill('SIGTERM');
-    this.children.clear(); this.previewRenderer.close();
+    this.children.clear(); this._previewRenderer?.close();
   }
 }

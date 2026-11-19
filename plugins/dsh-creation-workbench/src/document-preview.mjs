@@ -58,8 +58,12 @@ export class DocumentPreview {
         if (existsSync(converted) && lstatSync(converted).isSymbolicLink()) throw new Error('文档转换目标不能是链接');
         // Never render into an attacker-replaced page path.
         for (let page = 1; page <= 200; page++) { const file = path.join(directory, `page-${page}.png`); if (existsSync(file) && lstatSync(file).isSymbolicLink()) throw new Error('文档预览页不能是链接'); }
-        const fonts = this.service.deck.previewRenderer.documentFontConfiguration();
-        await runProcess(this.service.python, [fileURLToPath(new URL('./document-preview.py', import.meta.url)), snapshot, directory, path.join(this.service.pptSkillDir, 'scripts'), fonts.fontconfigPath], { timeout: 150000 });
+        const args = [fileURLToPath(new URL('./document-preview.py', import.meta.url)), snapshot, directory];
+        if (source.extension === '.docx') {
+          const fonts = this.service.deck.previewRenderer.documentFontConfiguration();
+          args.push(path.join(this.service.pptSkillDir, 'scripts'), fonts.fontconfigPath, fonts.office || '');
+        }
+        await runProcess(this.service.python, args, { timeout: 150000 });
         await this.source(ref, hash); return this.cached(directory, source);
       })();
       this.inflight.set(key, job); job.finally(() => this.inflight.delete(key)).catch(() => {});

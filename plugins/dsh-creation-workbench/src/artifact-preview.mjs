@@ -5,6 +5,7 @@ import {
   realpathSync, renameSync, rmSync, writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { resolvePreviewFontDirectories, windowsOfficeExecutable } from './preview-environment.mjs';
 
 const VERSION = 'cw10-ppt-preview-2';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -15,10 +16,10 @@ const xml = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt
 // The existing Builder does the actual LibreOffice → PDF → PNG conversion. This
 // preflight bounds that renderer's fixed 1280px page width before rasterization.
 const PREFLIGHT_AND_RENDER = String.raw`
-import collections,hashlib,json,math,posixpath,resource,runpy,sys,zipfile
+import collections,hashlib,json,math,os,posixpath,runpy,sys,zipfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
-source,script,out,script_hash,max_pages,max_pixels,max_total,max_expanded,max_bytes,timeout,fontconfig,fontconfig_hash=sys.argv[1:]
+source,script,out,script_hash,max_pages,max_pixels,max_total,max_expanded,max_bytes,timeout,fontconfig,fontconfig_hash,office=sys.argv[1:]
 script=Path(script)
 if hashlib.sha256(script.read_bytes()).hexdigest()!=script_hash: raise ValueError('渲染脚本已变更，请重试预览')
 with zipfile.ZipFile(source) as package:
@@ -59,8 +60,17 @@ with zipfile.ZipFile(source) as package:
      raise ValueError('课件含外部资源，当前预览不加载外部文件或网络素材')
 # Bound intermediate PDF/file writes as well as the final cache. These limits
 # are process-local and inherited by this isolated LibreOffice invocation.
-resource.setrlimit(resource.RLIMIT_FSIZE,(int(max_bytes),int(max_bytes)))
+if os.name!='nt':
+ import resource
+ resource.setrlimit(resource.RLIMIT_FSIZE,(int(max_bytes),int(max_bytes)))
 import fitz
+if os.name=='nt':
+ original_open=fitz.open
+ def bounded_open(filename=None,*args,**kwargs):
+  if isinstance(filename,(str,os.PathLike)) and Path(filename).suffix.lower()=='.pdf' and Path(filename).stat().st_size>int(max_bytes):
+   raise ValueError('实际 PDF 文件超过预览大小限制')
+  return original_open(filename,*args,**kwargs)
+ fitz.open=bounded_open
 original_pixmap=fitz.Page.get_pixmap
 original_save=fitz.Pixmap.save
 rendered_pixels=0;rendered_bytes=0
@@ -80,6 +90,7 @@ def bounded_save(image,filename,*args,**kwargs):
 fitz.Page.get_pixmap=bounded_pixmap
 fitz.Pixmap.save=bounded_save
 sys.argv=[str(script),source,'--out',out,'--timeout',timeout,'--fontconfig',fontconfig]
+if office: sys.argv+=['--soffice',office]
 try:
  runpy.run_path(str(script),run_name='__main__')
 except SystemExit as error:
@@ -126,15 +137,8 @@ export class ArtifactPreview {
     if (service.tasks?.files?.store !== service.store || service.store.workspaceRoot !== this.root) throw new Error('预览必须绑定当前项目的文件产物服务');
     this.files = service.tasks.files;
     this.cacheRoot = path.join(this.root, '.wtt-workbench', 'previews', 'pptx');
-    this.script = path.resolve(service.pptSkillDir, 'scripts/render_course_pptx.py');
     this.python = service.python || 'python3';
-    const directories = options.fontDirectories ?? ['/System/Library/Fonts', '/System/Library/Fonts/Supplemental', '/Library/Fonts',
-      '/System/Library/AssetsV2/com_apple_MobileAsset_Font8', '/usr/share/fonts', '/usr/local/share/fonts'].filter(existsSync);
-    if (!Array.isArray(directories) || !directories.length || directories.length > 20) throw new Error('预览字体目录无效');
-    this.fontDirectories = [...new Set(directories.map(directory => {
-      if (typeof directory !== 'string' || !path.isAbsolute(directory) || !lstatSync(directory).isDirectory()) throw new Error('预览字体目录必须是本机实际目录');
-      return realpathSync(directory);
-    }))];
+    this.fontDirectoryOverride = options.fontDirectories ?? service.previewFontDirectoryOverride;
     this.maxPages = positive(options.maxPages, 200, 200, '预览页数上限');
     this.maxPagePixels = positive(options.maxPagePixels, 4_000_000, 8_000_000, '单页像素上限');
     this.maxTotalPixels = positive(options.maxTotalPixels, 200_000_000, 400_000_000, '总像素上限');
@@ -146,6 +150,10 @@ export class ArtifactPreview {
     this.children = new Set();
     this.closed = false;
   }
+
+  get script() { return this.scriptOverride ?? path.resolve(this.service.pptSkillDir, 'scripts/render_course_pptx.py'); }
+  set script(value) { this.scriptOverride = value; }
+  get fontDirectories() { return resolvePreviewFontDirectories(this.fontDirectoryOverride); }
 
   #directory(directory, create = false) {
     const relative = path.relative(this.root, directory);
@@ -189,6 +197,8 @@ export class ArtifactPreview {
   documentFontConfiguration() { return this.#renderer(); }
 
   #renderer() {
+    const directories = this.fontDirectories;
+    const office = windowsOfficeExecutable();
     const bytes = readFileSync(this.script);
     if (!bytes.length || bytes.length > 1_048_576) throw new Error('PPT 渲染脚本大小无效');
     const scriptHash = sha(bytes);
@@ -198,15 +208,25 @@ export class ArtifactPreview {
       Consolas: ['Menlo', 'Liberation Mono'], monospace: ['Menlo', 'Liberation Mono'],
       'Segoe UI': ['Arial', 'Heiti SC'], 'sans-serif': ['Arial', 'Heiti SC'],
       'Microsoft YaHei': ['Heiti SC'], '微软雅黑': ['Heiti SC'], SimSun: ['Heiti SC'], '宋体': ['Heiti SC'], SimHei: ['Heiti SC'], '黑体': ['Heiti SC'] };
-    const fontconfig = `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig>${this.fontDirectories.map(directory => `<dir>${xml(directory)}</dir>`).join('')}<cachedir>${xml(fontCache)}</cachedir>${Object.entries(aliases).map(([family, prefer]) => `<alias><family>${xml(family)}</family><prefer>${prefer.map(value => `<family>${xml(value)}</family>`).join('')}</prefer></alias>`).join('')}</fontconfig>`;
+    if (process.platform === 'win32') Object.assign(aliases, {
+      'PingFang SC': ['Microsoft YaHei', 'SimHei', 'SimSun'], '楷体': ['KaiTi', 'SimSun'],
+      KaiTi: ['SimSun', 'Microsoft YaHei'], '微软雅黑': ['Microsoft YaHei', 'SimHei'],
+      '宋体': ['SimSun', 'Microsoft YaHei'], '黑体': ['SimHei', 'Microsoft YaHei'],
+      'Microsoft YaHei': ['SimHei', 'SimSun'], SimSun: ['Microsoft YaHei'], SimHei: ['Microsoft YaHei'],
+      'Segoe UI': ['Arial', 'Microsoft YaHei'], 'sans-serif': ['Segoe UI', 'Microsoft YaHei'],
+      Consolas: ['Courier New'], monospace: ['Consolas', 'Courier New'],
+    });
+    const fontconfig = `<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig>${directories.map(directory => `<dir>${xml(directory)}</dir>`).join('')}<cachedir>${xml(fontCache)}</cachedir>${Object.entries(aliases).map(([family, prefer]) => `<alias><family>${xml(family)}</family><prefer>${prefer.map(value => `<family>${xml(value)}</family>`).join('')}</prefer></alias>`).join('')}</fontconfig>`;
     const fontconfigHash = sha(fontconfig), fontconfigPath = path.join(fontRoot, `${fontconfigHash}.conf`);
     if (!existsSync(fontconfigPath)) writeFileSync(fontconfigPath, fontconfig, { flag: 'wx', mode: 0o600 });
     if (sha(this.#read(fontconfigPath, 65_536)) !== fontconfigHash) throw new Error('PPT 预览字体配置已被外改');
-    const fontSignatures = this.fontDirectories.map(directory => {
+    const fontSignatures = directories.map(directory => {
       const info = lstatSync(directory); return [directory, info.dev, info.ino, info.mtimeMs, info.ctimeMs];
     });
-    const rendererVersion = `${VERSION}-${sha(JSON.stringify([scriptHash, this.python, fontconfigHash, fontSignatures, this.maxPages, this.maxPagePixels, this.maxTotalPixels, this.maxCacheBytes])).slice(0, 20)}`;
-    return { scriptHash, rendererVersion, fontconfigPath, fontconfigHash };
+    const rendererIdentity = [scriptHash, this.python, fontconfigHash, fontSignatures, this.maxPages, this.maxPagePixels, this.maxTotalPixels, this.maxCacheBytes];
+    if (process.platform === 'win32') rendererIdentity.push('win32', office || 'PATH');
+    const rendererVersion = `${VERSION}-${sha(JSON.stringify(rendererIdentity)).slice(0, 20)}`;
+    return { scriptHash, rendererVersion, fontconfigPath, fontconfigHash, office };
   }
 
   #png(bytes) {
@@ -286,7 +306,7 @@ export class ArtifactPreview {
     try {
       await this.#run(['-c', PREFLIGHT_AND_RENDER, source, this.script, output, renderer.scriptHash,
         String(this.maxPages), String(this.maxPagePixels), String(this.maxTotalPixels), String(512 * 1024 * 1024),
-        String(this.maxCacheBytes), String(Math.max(1, (this.timeoutMs - 20_000) / 1000)), renderer.fontconfigPath, renderer.fontconfigHash]);
+        String(this.maxCacheBytes), String(Math.max(1, (this.timeoutMs - 20_000) / 1000)), renderer.fontconfigPath, renderer.fontconfigHash, renderer.office || '']);
       const rendered = JSON.parse(this.#read(path.join(output, 'manifest.json'), 1_048_576));
       if (rendered.pptx_sha256 !== artifact.hash || rendered.fontconfig_sha256 !== renderer.fontconfigHash || rendered.chinese_glyph_check !== 'passed'
         || rendered.status !== 'rendered_requires_review' || !Array.isArray(rendered.pages)

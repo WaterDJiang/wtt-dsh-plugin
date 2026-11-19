@@ -15,7 +15,7 @@ pdf = source
 if source.suffix in ('.docx', '.pptx'):
     sys.path.insert(0, sys.argv[3])
     import render_course_pptx
-    office = render_course_pptx.resolve_soffice(None)
+    office = render_course_pptx.resolve_soffice((sys.argv[5] if len(sys.argv) > 5 else '') or None)
     if not office:
         raise ValueError('本机未发现可用 LibreOffice，原 Word 可下载')
     with tempfile.TemporaryDirectory(prefix='wtt-doc-office-') as profile:

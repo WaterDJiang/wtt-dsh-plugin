@@ -117,6 +117,7 @@ test('actual PDF and Word page previews use verified source hash, keep original 
   await runProcess('python3', ['-c', 'from pathlib import Path; import fitz,sys; from docx import Document; p=Path(sys.argv[1]); d=fitz.open(); d.new_page().insert_text((70,70),"Verified PDF"); d.save(p/"preview.pdf"); w=Document(); w.add_paragraph("Verified Word preview"); w.save(p/"preview.docx")', dir]);
   const preview = new DocumentPreview(service);
   for (const name of ['preview.pdf', 'preview.docx']) {
+    service.previewFontDirectoryOverride = name.endsWith('.pdf') ? [] : undefined;
     const artifact = await service.tasks.files.register({ taskId: created.task.id, kind: 'text', title: name, path: `${created.prepared.deliveryDirectory}/${name}`, operationId: randomUUID() }, { sessionId });
     const ref = `artifact:${artifact.id}`, manifest = await preview.get(ref, artifact.hash);
     assert.equal(manifest.pageCount, 1);
