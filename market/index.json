@@ -17,7 +17,26 @@
         }
       }
     },
-    "labels": {},
+    "labels": {
+      "presentations": {
+        "title": {
+          "zh": "PPT 制作",
+          "en": "Presentations"
+        }
+      },
+      "image-video": {
+        "title": {
+          "zh": "图片与视频",
+          "en": "Image & Video"
+        }
+      },
+      "project-assistant": {
+        "title": {
+          "zh": "项目助手",
+          "en": "Project Assistant"
+        }
+      }
+    },
     "sortKeys": {}
   },
   "plugins": [
@@ -28,8 +47,8 @@
         "en": "WTT Creation Workbench"
       },
       "description": {
-        "zh": "DeepSeek Harness 的 AI 创作画布。在同一个项目里整理资料、引用卡片与文件、调用本机 Skill，并管理文本、演示文稿、图片和视频的成果版本。",
-        "en": "An AI creation canvas for DeepSeek Harness. Organize project materials, reference cards and files, run local Skills, and manage versions of text, presentations, images, and video."
+        "zh": "在无限画布上做 PPT、图片或视频，想改哪一步就回到那张卡接着做，也能让 Agent 安排 Sub-agent 用你库里的 Skill 接力。",
+        "en": "Create presentations, images, or videos on an infinite canvas, return to a card to revise that step, and let the Agent delegate work to sub-agents using Skills from your library."
       },
       "author": "Wattter (WTT)",
       "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin",
@@ -50,12 +69,44 @@
           "创作画布",
           "AI 创作",
           "项目资料",
-          "工作台"
+          "工作台",
+          "创作工作台",
+          "可视化工作流",
+          "PPT 制作",
+          "演示文稿",
+          "图片生成",
+          "视频制作",
+          "项目助手",
+          "presentations",
+          "image generation",
+          "video production",
+          "project assistant",
+          "文件导航",
+          "批量整理",
+          "file explorer",
+          "file organization"
         ],
-        "labels": [],
+        "labels": [
+          "presentations",
+          "image-video",
+          "project-assistant"
+        ],
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.58.6",
+          "publishTimestamp": 1795078317,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+            "commit": "fc183d2c6a0ef7cbd0019bf14c3b94eda9590a4a",
+            "path": "plugins/dsh-creation-workbench"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
+          }
+        },
         {
           "version": "0.58.5",
           "publishTimestamp": 1795072996,
@@ -433,7 +484,8 @@
             "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
           }
         }
-      ]
+      ],
+      "icon": "https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/36fc1bcaf2f16635a8b354378335ce44f89c6b31/plugins/dsh-creation-workbench/src/assets/wattter-agent.png"
     }
   ]
 }
