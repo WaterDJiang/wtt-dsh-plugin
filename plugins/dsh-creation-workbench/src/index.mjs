@@ -75,10 +75,10 @@ export function apply(ctx, config = {}) {
     return result;
   };
   const documentsFor = service => { if (!documentPreviews.has(service)) documentPreviews.set(service, new DocumentPreview(service)); return documentPreviews.get(service); };
-  async function verifyTaskSkills(service, taskId) {
+  async function verifyTaskSkills(service, taskId, scope) {
     const refs = service.tasks.get(taskId).input.skillRefs || [];
     if (!refs.length) return;
-    const current = await (await catalogReady).resolve(service.workspaceRoot, refs.map(ref => ref.name));
+    const current = await (await catalogReady).resolve(service.workspaceRoot, refs.map(ref => ref.name), scope);
     const identity = async values => JSON.stringify(await Promise.all(values.map(async ref => [ref.name, ref.path ? await realpath(ref.path).catch(() => ref.path) : null, ref.hash])));
     if (await identity(current) !== await identity(refs)) throw new Error('Skill 已变化，旧任务输入已保留；请核对后新建任务。');
   }
@@ -339,7 +339,7 @@ export function apply(ctx, config = {}) {
         if (action === 'open-project') return Response.json({ project: projects.open(data?.path) }, { headers });
         const service = projects.get(projectId);
         if (typeof action==='string' && action.startsWith('project-agent-')) {
-          if (!projectId) throw Error('总 Agent 必须指定项目');
+          if (!projectId) throw Error('项目助手 必须指定项目');
           return Response.json(await coordinators.api(service,action.slice(14),data),{headers});
         }
         if (['inspect-task-control', 'stop-task-control'].includes(action)) {
@@ -489,7 +489,7 @@ export function apply(ctx, config = {}) {
   const projectParameter = { type: 'string', description: '准备输入返回的 projectId；必须属于当前会话的原始项目目录' };
   ctx.effect(() => ctx.tools.register(defineTool({
     name:'workbench_project',
-    description:'项目总 Agent 专用。context 读取项目画布、计划、有效设定（可传 scope 查局部设定）。cards 按画布查询卡，search 查日志。plan 提交同一发送现场的一份计划，数据为 {title,steps:[{title,type:text|pptx|image|video,instruction,requirementId?,useSelection?,refs?:[{requirementId,cardId,versionId?}],dependsOn?:[前序步骤序号，从1开始],scope?,review?}]}。amend 使用 planId、steps 和可选 replaceFrom（从该序号起替换未派发部分，省略则追加）。suggest 提议长期设定 {name,scope,body}，log 保存事实 {title,body,taskId?,requirementId?,cardId?,versionId?}，details/pause/stop 传 {planId}。所有审批由用户在浮窗操作。',
+    description:'项目助手 专用。context 读取项目画布、计划、有效设定（可传 scope 查局部设定）。cards 按画布查询卡，search 查日志。plan 提交同一发送现场的一份计划，数据为 {title,steps:[{title,type:text|pptx|image|video,instruction,requirementId?,useSelection?,refs?:[{requirementId,cardId,versionId?}],dependsOn?:[前序步骤序号，从1开始],scope?,review?}]}。amend 使用 planId、steps 和可选 replaceFrom（从该序号起替换未派发部分，省略则追加）。suggest 提议长期设定 {name,scope,body}，log 保存事实 {title,body,taskId?,requirementId?,cardId?,versionId?}，details/pause/stop 传 {planId}。所有审批由用户在浮窗操作。',
     parameters:{action:{type:'string',required:true,enum:['context','cards','read-card','search','evidence','plan','suggest','log','pause','stop','details','amend']},turnId:{type:'string',description:'当前用户消息的 turnId'},data:{type:'string',description:'JSON 对象字符串，cards 使用 requirementId 和可选 query，检索用 query，可带 requirementId、cardId 或 versionId。evidence 用 eventId；read-card 用 requirementId、cardId 和可选 versionId'}},
     output:textOutput,execute:async(args,execution)=>{
       execution.signal.throwIfAborted();

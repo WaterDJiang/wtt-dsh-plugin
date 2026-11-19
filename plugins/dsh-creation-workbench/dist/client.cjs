@@ -212,19 +212,215 @@ __export(client_exports, {
 module.exports = __toCommonJS(client_exports);
 
 // src/project-agent-input.jsx
+var import_react3 = __toESM(require("react"), 1);
+
+// src/conversation-references.jsx
+var import_react2 = __toESM(require("react"), 1);
+
+// src/ui/controls.jsx
 var import_react = __toESM(require("react"), 1);
+var LazyDetails = (0, import_react.forwardRef)(function LazyDetails2({ summary, children: children2, active = true, onToggle, ...props }, ref) {
+  const [expanded, setExpanded] = (0, import_react.useState)(Boolean(props.open));
+  return /* @__PURE__ */ import_react.default.createElement("details", { ...props, ref, onToggle: (event) => {
+    if (event.target !== event.currentTarget) return;
+    setExpanded(event.currentTarget.open);
+    onToggle?.(event);
+  } }, summary, active && expanded ? children2 : null);
+});
+function UiIcon({ name: name2, size: size3 = 16, ...props }) {
+  const paths = { file: /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("path", { d: "M13 3H5v18h14V9l-6-6Z" }), /* @__PURE__ */ import_react.default.createElement("path", { d: "M13 3v6h6M8 15h8M12 11v8" })), folder: /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("path", { d: "M3 7V4h6l2 3h10v13H3V7Z" }), /* @__PURE__ */ import_react.default.createElement("path", { d: "M8 13h8M12 9v8" })), check: /* @__PURE__ */ import_react.default.createElement("path", { d: "m4 12 5 5L20 6" }), close: /* @__PURE__ */ import_react.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" }), download: /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("path", { d: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" })), expand: /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("path", { d: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" })), restore: /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("path", { d: "M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6" })), back: /* @__PURE__ */ import_react.default.createElement("path", { d: "m14 5-7 7 7 7" }), refresh: /* @__PURE__ */ import_react.default.createElement("path", { d: "M20 10a8 8 0 1 0-2 8M20 4v6h-6" }), more: /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("circle", { cx: "5", cy: "12", r: "1" }), /* @__PURE__ */ import_react.default.createElement("circle", { cx: "12", cy: "12", r: "1" }), /* @__PURE__ */ import_react.default.createElement("circle", { cx: "19", cy: "12", r: "1" })) };
+  return /* @__PURE__ */ import_react.default.createElement("svg", { width: size3, height: size3, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", ...props }, paths[name2]);
+}
+var UiButton = (0, import_react.forwardRef)(function UiButton2({ variant = "quiet", size: size3 = "normal", iconOnly = false, className = "", type = "button", children: children2, ...props }, ref) {
+  return /* @__PURE__ */ import_react.default.createElement("button", { ref, type, "data-ui-variant": variant, "data-ui-size": size3, className: `wtt-ui-button${iconOnly ? " is-icon-only" : ""}${className ? " " + className : ""}`, ...props }, children2);
+});
+function UiLink({ variant = "ghost", size: size3 = "normal", iconOnly = false, className = "", children: children2, ...props }) {
+  return /* @__PURE__ */ import_react.default.createElement("a", { "data-ui-variant": variant, "data-ui-size": size3, className: `wtt-ui-button${iconOnly ? " is-icon-only" : ""}${className ? " " + className : ""}`, ...props }, children2);
+}
+function PanelHeader({ title, titleId, subtitle, subtitleId, format, downloadHref, downloadLabel = "\u4E0B\u8F7D\u5F53\u524D\u6587\u4EF6", expanded = false, onToggleWidth, expandLabel = "\u5C55\u5F00\u4FA7\u680F", restoreLabel = "\u8FD8\u539F\u4FA7\u680F\u5BBD\u5EA6", onClose, closeLabel = "\u5173\u95ED\u9884\u89C8", closeDisabled = false, className = "" }) {
+  return /* @__PURE__ */ import_react.default.createElement("header", { className: `wtt-ui-panel-header${className ? " " + className : ""}` }, /* @__PURE__ */ import_react.default.createElement("div", { className: "wtt-ui-panel-heading" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", { id: titleId, title }, title), format && /* @__PURE__ */ import_react.default.createElement("span", { className: "wtt-ui-format" }, format)), subtitle && /* @__PURE__ */ import_react.default.createElement("p", { id: subtitleId, title: typeof subtitle === "string" ? subtitle : void 0 }, subtitle)), /* @__PURE__ */ import_react.default.createElement("div", { className: "wtt-ui-panel-actions", role: "toolbar", "aria-label": "\u7A97\u53E3\u64CD\u4F5C" }, downloadHref && /* @__PURE__ */ import_react.default.createElement(UiLink, { iconOnly: true, href: downloadHref, download: true, "aria-label": downloadLabel, title: downloadLabel, "data-panel-action": "download" }, /* @__PURE__ */ import_react.default.createElement(UiIcon, { name: "download" })), onToggleWidth && /* @__PURE__ */ import_react.default.createElement(UiButton, { variant: "ghost", iconOnly: true, "aria-label": expanded ? restoreLabel : expandLabel, title: expanded ? restoreLabel : expandLabel, "aria-pressed": expanded, onClick: onToggleWidth, "data-panel-action": "expand" }, /* @__PURE__ */ import_react.default.createElement(UiIcon, { name: expanded ? "restore" : "expand" })), onClose && /* @__PURE__ */ import_react.default.createElement(UiButton, { variant: "ghost", iconOnly: true, disabled: closeDisabled, "aria-label": closeLabel, title: closeLabel, onClick: onClose, "data-panel-action": "close" }, /* @__PURE__ */ import_react.default.createElement(UiIcon, { name: "close" }))));
+}
+function PanelToolbar({ children: children2, className = "", ...props }) {
+  return /* @__PURE__ */ import_react.default.createElement("div", { className: `wtt-ui-panel-toolbar${className ? " " + className : ""}`, ...props }, children2);
+}
+function DialogHeader({ title, titleId, description, descriptionId, onClose, closeLabel = "\u5173\u95ED\u7A97\u53E3", busy = false }) {
+  return /* @__PURE__ */ import_react.default.createElement(PanelHeader, { title, titleId, subtitle: description, subtitleId: descriptionId, onClose, closeLabel, closeDisabled: busy });
+}
+function DialogFooter({ children: children2, className = "", ...props }) {
+  return /* @__PURE__ */ import_react.default.createElement("footer", { className: `wtt-ui-dialog-footer${className ? " " + className : ""}`, ...props }, children2);
+}
+function DialogBody({ children: children2, className = "", ...props }) {
+  return /* @__PURE__ */ import_react.default.createElement("div", { className: `wtt-ui-dialog-body${className ? " " + className : ""}`, ...props }, children2);
+}
+
+// src/conversation-references.mjs
+var MAX_CONVERSATION_FILES = 24;
+var MAX_CONVERSATION_FILE_BYTES = 20 * 1024 * 1024;
+var locked = (phase) => ["adjudicating", "submitting"].includes(phase);
+var conversationAttachmentsLocked = (input) => locked(input.phase) || Boolean(input.claim && input.claim.attachments !== true);
+function attachmentName(card, sourcePath) {
+  const extension = /\.[a-z0-9]{1,12}$/i.exec(sourcePath || "")?.[0] || ".md";
+  const title = Array.from(String(card.displayTitle || card.title || "\u753B\u5E03\u8D44\u6599").replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, "_")).slice(0, 48).join("").trim() || "\u753B\u5E03\u8D44\u6599";
+  return title.toLowerCase().endsWith(extension.toLowerCase()) ? title : title + extension;
+}
+async function loadConversationReferenceFiles(cards, { endpoint: endpoint2, isCurrent, currentCard, signal, fetchFile = fetch, FileType = File }) {
+  const files = new Array(cards.length), controller = new AbortController();
+  const cancelled = () => controller.abort(signal.reason);
+  if (signal?.aborted) cancelled();
+  signal?.addEventListener("abort", cancelled, { once: true });
+  const readSignal = controller.signal;
+  async function read(card) {
+    readSignal.throwIfAborted();
+    if (!isCurrent()) throw new Error("\u5BF9\u8BDD\u6216\u753B\u5E03\u5DF2\u5207\u6362\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
+    const current = currentCard(card);
+    if (["missing", "changed", "modified", "unavailable"].includes(current?.status) || ["missing", "changed", "modified", "unavailable"].includes(current?.sourceStatus)) throw new Error("\u539F\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
+    if (!current || current.id !== card.id || current.sourceHash !== card.sourceHash || card.kind === "whiteboard" && current.content !== card.content) throw new Error("\u5361\u7247\u5185\u5BB9\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
+    if (["whiteboard", "requirement"].includes(card.kind)) {
+      const text2 = String(card.requirementBackground ?? card.content ?? "");
+      if (!text2.trim()) throw new Error("\u6B64\u5361\u7247\u6CA1\u6709\u53EF\u6DFB\u52A0\u7684\u5185\u5BB9\u3002");
+      const file = new FileType([text2], attachmentName(card, ".md"), { type: "text/markdown" });
+      if (file.size > MAX_CONVERSATION_FILE_BYTES) throw new Error("\u5355\u4E2A\u9644\u4EF6\u4E0D\u80FD\u8D85\u8FC720MiB\u3002");
+      return file;
+    }
+    const source = card.importedFile || card.generatedFile || card.defaultOutcome;
+    const sourcePath = source?.path || card.path;
+    if (!sourcePath) throw new Error("\u6B64\u5361\u7247\u5C1A\u65E0\u53EF\u6DFB\u52A0\u7684\u5DF2\u4FDD\u5B58\u6587\u4EF6\u3002");
+    let hash = source?.hash || source?.sha256 || (card.kind === "word" ? void 0 : card.sourceHash);
+    if (!hash) {
+      const result = await fetchFile(endpoint2({ projectFilePreview: sourcePath }), { signal: readSignal });
+      if (!result.ok) throw new Error("\u6587\u4EF6\u4FE1\u606F\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+      hash = (await result.json()).hash;
+    }
+    if (!/^[a-f0-9]{64}$/i.test(hash || "")) throw new Error("\u6587\u4EF6\u7F3A\u5C11\u51C6\u786E\u7248\u672C\u4FE1\u606F\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002");
+    const response = await fetchFile(endpoint2({ projectFileDownload: sourcePath, hash }), { signal: readSignal });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null);
+      throw new Error(detail?.error?.message || detail?.error || "\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u65B0\u9009\u62E9\u3002");
+    }
+    if (Number(response.headers.get("content-length") || 0) > MAX_CONVERSATION_FILE_BYTES) throw new Error("\u5355\u4E2A\u9644\u4EF6\u4E0D\u80FD\u8D85\u8FC720MiB\u3002");
+    const blob = await response.blob();
+    if (blob.size > MAX_CONVERSATION_FILE_BYTES) throw new Error("\u5355\u4E2A\u9644\u4EF6\u4E0D\u80FD\u8D85\u8FC720MiB\u3002");
+    const actual = [...new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    if (actual !== hash) throw new Error("\u6587\u4EF6\u5185\u5BB9\u4E0E\u6240\u9009\u7248\u672C\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002");
+    return new FileType([blob], attachmentName(card, sourcePath), { type: source?.mime || blob.type || "application/octet-stream" });
+  }
+  let next = 0, failure;
+  async function worker() {
+    while (next < cards.length && !readSignal.aborted) {
+      const index2 = next++;
+      try {
+        files[index2] = await read(cards[index2]);
+      } catch (error) {
+        if (!failure) {
+          failure = error;
+          controller.abort(error);
+        }
+        throw error;
+      }
+    }
+  }
+  try {
+    const results = await Promise.allSettled(Array.from({ length: Math.min(3, cards.length) }, worker));
+    if (failure) throw failure;
+    const rejected = results.find((result) => result.status === "rejected");
+    if (rejected) throw rejected.reason;
+    readSignal.throwIfAborted();
+    if (!isCurrent()) throw new Error("\u5BF9\u8BDD\u6216\u753B\u5E03\u5DF2\u5207\u6362\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
+    return files;
+  } finally {
+    signal?.removeEventListener("abort", cancelled);
+  }
+}
+function stageConversationReferenceFiles({ service, inputActions, sessionId, files, readInput, isCurrent }) {
+  if (!service?.createDrafts || !service?.releaseDraftAttachments || !inputActions?.addAttachments) throw new Error("\u5F53\u524DDSH\u6CA1\u6709\u63D0\u4F9B\u5BF9\u8BDD\u9644\u4EF6\u63A5\u53E3\uFF0C\u8BF7\u66F4\u65B0\u5BBF\u4E3B\u540E\u91CD\u8BD5\u3002");
+  const input = readInput();
+  if (!isCurrent() || conversationAttachmentsLocked(input)) throw new Error("\u5BF9\u8BDD\u6B63\u5728\u63D0\u4EA4\uFF0C\u8BF7\u7A0D\u540E\u91CD\u65B0\u6DFB\u52A0\u3002");
+  if ((input.attachmentIds?.length || 0) + files.length > MAX_CONVERSATION_FILES) throw new Error("\u4E00\u6761\u6D88\u606F\u6700\u591A\u6DFB\u52A024\u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9644\u4EF6\u3002");
+  const drafts = service.createDrafts(sessionId, files);
+  try {
+    if (!isCurrent() || !inputActions.addAttachments(drafts.map((draft) => draft.id))) throw new Error("\u5BF9\u8BDD\u6B63\u5728\u63D0\u4EA4\u6216\u5DF2\u5207\u6362\uFF0C\u539F\u8F93\u5165\u548C\u9644\u4EF6\u5DF2\u4FDD\u7559\u3002");
+  } catch (error) {
+    service.releaseDraftAttachments(drafts);
+    throw error;
+  }
+}
+
+// src/conversation-references.jsx
+var CanvasConversationReferenceContext = (0, import_react2.createContext)(null);
+var ProjectInputContext = (0, import_react2.createContext)(null);
+function CanvasConversationReferenceButton({ sessionId, useInput, inputActions, getAttachmentService }) {
+  const picker = (0, import_react2.useContext)(CanvasConversationReferenceContext);
+  const projectAssistant = (0, import_react2.useContext)(ProjectInputContext);
+  const phase = useInput((value) => value.phase);
+  const claim = useInput((value) => value.claim);
+  const attachmentIds = useInput((value) => value.attachmentIds);
+  const input = { phase, claim, attachmentIds };
+  const current = (0, import_react2.useRef)({ sessionId, input });
+  const live = (0, import_react2.useRef)(false), cancel = (0, import_react2.useRef)(null), button = (0, import_react2.useRef)(null);
+  const [error, setError] = (0, import_react2.useState)("");
+  current.current = { sessionId, input };
+  (0, import_react2.useEffect)(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      cancel.current?.();
+    };
+  }, [sessionId]);
+  if (!picker || projectAssistant) return null;
+  const supported = Boolean(getAttachmentService()?.createDrafts && getAttachmentService()?.releaseDraftAttachments && inputActions?.addAttachments);
+  const remaining = Math.max(0, MAX_CONVERSATION_FILES - input.attachmentIds.length);
+  const disabled = !remaining || picker.busy || conversationAttachmentsLocked(input) || !supported;
+  function select() {
+    setError("");
+    const isCurrent = () => live.current && current.current.sessionId === sessionId;
+    try {
+      cancel.current = picker.start({
+        sessionId,
+        isCurrent,
+        maxReferences: remaining,
+        restoreFocus: () => button.current?.focus({ preventScroll: true }),
+        stage: (files) => stageConversationReferenceFiles({
+          service: getAttachmentService(),
+          sessionId,
+          inputActions,
+          files,
+          readInput: () => current.current.input,
+          isCurrent
+        })
+      });
+    } catch (cause) {
+      setError(cause.message);
+    }
+  }
+  return /* @__PURE__ */ import_react2.default.createElement("span", { className: "wtt-conversation-canvas-reference" }, /* @__PURE__ */ import_react2.default.createElement(
+    UiButton,
+    {
+      ref: button,
+      variant: "quiet",
+      size: "compact",
+      type: "button",
+      "aria-label": "\u4ECE\u753B\u5E03\u6DFB\u52A0\u8D44\u4EA7",
+      disabled,
+      title: !supported ? "\u5F53\u524DDSH\u6CA1\u6709\u63D0\u4F9B\u5BF9\u8BDD\u9644\u4EF6\u63A5\u53E3" : !remaining ? "\u4E00\u6761\u6D88\u606F\u6700\u591A\u6DFB\u52A024\u4EFD\u9644\u4EF6" : error || "\u4ECE\u753B\u5E03\u6DFB\u52A0\u8D44\u4EA7",
+      onClick: select
+    },
+    /* @__PURE__ */ import_react2.default.createElement(UiIcon, { name: "folder", size: 14 }),
+    "\u753B\u5E03\u8D44\u4EA7"
+  ), error && /* @__PURE__ */ import_react2.default.createElement("span", { role: "alert" }, error));
+}
+
+// src/project-agent-input.jsx
 var TOKEN = "/\u9879\u76EE";
-var ProjectInputContext = (0, import_react.createContext)(null);
 function projectInputBridge(ctx) {
   const owners = /* @__PURE__ */ new Map();
   const claim = (id2, frozen) => ({
     name: "\u9879\u76EE",
     token: TOKEN + " ",
-    hint: "\u4EA4\u7ED9\u9879\u76EE\u603B Agent",
+    hint: "\u4EA4\u4EE3\u4EFB\u52A1\u6216\u8BE2\u95EE\u9879\u76EE\u8FDB\u5C55",
     attachments: true,
     async submit(text2, _actx, attachments) {
       const owner = owners.get(id2);
-      if (!owner && !frozen) throw Error("\u8BF7\u91CD\u65B0\u6253\u5F00\u9879\u76EE\u603B Agent \u540E\u53D1\u9001");
+      if (!owner && !frozen) throw Error("\u8BF7\u91CD\u65B0\u6253\u5F00\u9879\u76EE\u52A9\u624B\u540E\u53D1\u9001");
       const turn = frozen || await owner.current.freeze(id2, text2);
       const done = owner?.current.submitting?.();
       try {
@@ -245,13 +441,23 @@ function projectInputBridge(ctx) {
   return { owners, claim, begin(id2, span) {
     const scope = ctx.sessions.binding(id2)?.ctx;
     return scope?.bail(scope, "slash/input-begin-command", { claim: claim(id2), span });
+  }, openSkills(id2, span, draft) {
+    const scope = ctx.sessions.binding(id2)?.ctx;
+    if (!scope) throw Error("\u8BF7\u7B49\u5F85\u5BF9\u8BDD\u52A0\u8F7D\u540E\u518D\u9009\u62E9\u6280\u80FD\u3002");
+    ctx.inputTriggers.sessionOf(scope).toggleSource("skill", {
+      trigger: "/",
+      query: "",
+      quoted: false,
+      position: draft.slice(0, span.start).trim() ? "inline" : "leading",
+      span
+    });
   }, source: {
     trigger: "/",
     name: "wtt-project-agent",
     order: 3,
     showGroupTitle: false,
     async candidates({ sessionId }, { query }) {
-      return owners.has(sessionId) && "\u9879\u76EE".includes(query) ? [{ name: "\u9879\u76EE", label: "\u9879\u76EE\u603B Agent" }] : [];
+      return owners.has(sessionId) && "\u9879\u76EE".includes(query) ? [{ name: "\u9879\u76EE", label: "\u9879\u76EE\u52A9\u624B" }] : [];
     },
     onPick() {
       return { text: TOKEN + " ", continue: true };
@@ -272,27 +478,84 @@ function projectInputBridge(ctx) {
   } };
 }
 function ProjectInputDock({ sessionId, useInput, inputActions, bridge }) {
-  const owner = (0, import_react.useContext)(ProjectInputContext), latest = (0, import_react.useRef)(owner);
+  const owner = (0, import_react3.useContext)(ProjectInputContext), latest = (0, import_react3.useRef)(owner);
+  const picker = (0, import_react3.useContext)(CanvasConversationReferenceContext), pickButton = (0, import_react3.useRef)(null), cancelPick = (0, import_react3.useRef)(null), live = (0, import_react3.useRef)(false);
   latest.current = owner;
   const draft = useInput((v2) => v2.draft), phase = useInput((v2) => v2.phase), draftRev = useInput((v2) => v2.draftRev);
-  (0, import_react.useLayoutEffect)(() => {
+  (0, import_react3.useLayoutEffect)(() => {
     if (!owner) return;
+    live.current = true;
     bridge.owners.set(sessionId, latest);
     return () => {
+      live.current = false;
+      cancelPick.current?.();
       if (bridge.owners.get(sessionId) === latest) bridge.owners.delete(sessionId);
     };
   }, [sessionId, !!owner]);
-  (0, import_react.useLayoutEffect)(() => {
+  (0, import_react3.useLayoutEffect)(() => {
     if (!owner || phase !== "plain") return;
     const hasToken = /^\/项目(?:\s|$)/u.test(draft);
     if (!bridge.begin(sessionId, { start: 0, end: hasToken ? TOKEN.length : 0, draftRev }) && !hasToken)
       inputActions.setDraft(TOKEN + " " + draft);
   }, [!!owner, phase, draft, draftRev, inputActions, bridge, sessionId]);
-  return null;
+  if (!owner) return null;
+  const locked2 = ["adjudicating", "submitting"].includes(phase);
+  function selectCards() {
+    try {
+      cancelPick.current = picker.start({
+        sessionId,
+        projectAssistant: true,
+        maxReferences: Math.max(0, 24 - owner.references.length),
+        excludedReferenceIds: owner.references.map((ref) => ref.sourceId),
+        isCurrent: () => live.current,
+        restoreFocus: () => pickButton.current?.focus({ preventScroll: true }),
+        stageCards: (cards) => latest.current.addReferences(cards)
+      });
+    } catch (error) {
+      owner.showError(error.message);
+    }
+  }
+  return /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-agent-input-tools", "aria-label": "\u9879\u76EE\u52A9\u624B\u8F93\u5165\u5DE5\u5177" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-agent-input-actions" }, /* @__PURE__ */ import_react3.default.createElement(
+    UiButton,
+    {
+      size: "compact",
+      variant: "ghost",
+      disabled: locked2,
+      onClick: () => {
+        try {
+          bridge.openSkills(sessionId, inputActions.captureInsertion(), draft);
+        } catch (error) {
+          owner.showError(error.message);
+        }
+      }
+    },
+    "\u6280\u80FD"
+  ), /* @__PURE__ */ import_react3.default.createElement(
+    UiButton,
+    {
+      ref: pickButton,
+      size: "compact",
+      variant: "ghost",
+      disabled: !picker || picker.busy || locked2 || owner.references.length >= 24,
+      onClick: selectCards
+    },
+    /* @__PURE__ */ import_react3.default.createElement(UiIcon, { name: "folder", size: 14 }),
+    "\u753B\u5E03\u5F15\u7528"
+  )), !!owner.references.length && /* @__PURE__ */ import_react3.default.createElement("details", { className: "wtt-agent-selected" }, /* @__PURE__ */ import_react3.default.createElement("summary", null, "\u5DF2\u9009 ", owner.references.length, " \u5F20"), /* @__PURE__ */ import_react3.default.createElement("ul", null, owner.references.map((ref) => /* @__PURE__ */ import_react3.default.createElement("li", { key: ref.requirementId + ":" + ref.sourceId }, /* @__PURE__ */ import_react3.default.createElement("span", { title: ref.canvasTitle + " \xB7 " + ref.title }, ref.title, ref.requirementId !== owner.requirementId && /* @__PURE__ */ import_react3.default.createElement("small", null, " \xB7 ", ref.canvasTitle)), /* @__PURE__ */ import_react3.default.createElement(
+    UiButton,
+    {
+      size: "compact",
+      variant: "ghost",
+      disabled: locked2,
+      "aria-label": "\u79FB\u9664\u5F15\u7528 " + ref.title,
+      onClick: () => owner.removeReference(ref)
+    },
+    /* @__PURE__ */ import_react3.default.createElement(UiIcon, { name: "close", size: 14 })
+  ))))));
 }
 
 // src/canvas-task-notices.mjs
-var import_react2 = require("react");
+var import_react4 = require("react");
 
 // src/pending-card-state.mjs
 var LABELS = {
@@ -443,14 +706,14 @@ function seenTasks(key) {
 }
 function useCanvasTaskNotices({ projectId, canvasId, ready, tasks, statuses: statuses2, pendingIds }) {
   const key = `wtt-canvas-task-seen:${projectId}:${canvasId}`;
-  const [seen, setSeen] = (0, import_react2.useState)(() => seenTasks(key));
+  const [seen, setSeen] = (0, import_react4.useState)(() => seenTasks(key));
   const completed = completedCanvasTasks(tasks, statuses2, pendingIds);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     if (!ready || seen !== null) return;
     const existing = tasks.filter((task) => task.status === "output" && task.kind !== "manual" && !pendingIds.has(task.id) && task.runtimeState?.phase !== "generating" && statuses2.get(task.sessionId)?.running !== true);
     setSeen(new Set(existing.map((task) => task.id)));
   }, [ready, seen, tasks, pendingIds, statuses2]);
-  (0, import_react2.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     if (seen === null) return;
     try {
       localStorage.setItem(key, JSON.stringify([.../* @__PURE__ */ new Set([...seenTasks(key) || [], ...seen])]));
@@ -667,199 +930,6 @@ function createDesktopTaskNotices({ channel, readTasks, readStatuses, watchSessi
     projectWatches.clear();
     delivered.clear();
   } };
-}
-
-// src/conversation-references.jsx
-var import_react4 = __toESM(require("react"), 1);
-
-// src/ui/controls.jsx
-var import_react3 = __toESM(require("react"), 1);
-var LazyDetails = (0, import_react3.forwardRef)(function LazyDetails2({ summary, children: children2, active = true, onToggle, ...props }, ref) {
-  const [expanded, setExpanded] = (0, import_react3.useState)(Boolean(props.open));
-  return /* @__PURE__ */ import_react3.default.createElement("details", { ...props, ref, onToggle: (event) => {
-    if (event.target !== event.currentTarget) return;
-    setExpanded(event.currentTarget.open);
-    onToggle?.(event);
-  } }, summary, active && expanded ? children2 : null);
-});
-function UiIcon({ name: name2, size: size3 = 16, ...props }) {
-  const paths = { file: /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M13 3H5v18h14V9l-6-6Z" }), /* @__PURE__ */ import_react3.default.createElement("path", { d: "M13 3v6h6M8 15h8M12 11v8" })), folder: /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M3 7V4h6l2 3h10v13H3V7Z" }), /* @__PURE__ */ import_react3.default.createElement("path", { d: "M8 13h8M12 9v8" })), check: /* @__PURE__ */ import_react3.default.createElement("path", { d: "m4 12 5 5L20 6" }), close: /* @__PURE__ */ import_react3.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" }), download: /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" })), expand: /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" })), restore: /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6" })), back: /* @__PURE__ */ import_react3.default.createElement("path", { d: "m14 5-7 7 7 7" }), refresh: /* @__PURE__ */ import_react3.default.createElement("path", { d: "M20 10a8 8 0 1 0-2 8M20 4v6h-6" }), more: /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("circle", { cx: "5", cy: "12", r: "1" }), /* @__PURE__ */ import_react3.default.createElement("circle", { cx: "12", cy: "12", r: "1" }), /* @__PURE__ */ import_react3.default.createElement("circle", { cx: "19", cy: "12", r: "1" })) };
-  return /* @__PURE__ */ import_react3.default.createElement("svg", { width: size3, height: size3, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", ...props }, paths[name2]);
-}
-var UiButton = (0, import_react3.forwardRef)(function UiButton2({ variant = "quiet", size: size3 = "normal", iconOnly = false, className = "", type = "button", children: children2, ...props }, ref) {
-  return /* @__PURE__ */ import_react3.default.createElement("button", { ref, type, "data-ui-variant": variant, "data-ui-size": size3, className: `wtt-ui-button${iconOnly ? " is-icon-only" : ""}${className ? " " + className : ""}`, ...props }, children2);
-});
-function UiLink({ variant = "ghost", size: size3 = "normal", iconOnly = false, className = "", children: children2, ...props }) {
-  return /* @__PURE__ */ import_react3.default.createElement("a", { "data-ui-variant": variant, "data-ui-size": size3, className: `wtt-ui-button${iconOnly ? " is-icon-only" : ""}${className ? " " + className : ""}`, ...props }, children2);
-}
-function PanelHeader({ title, titleId, subtitle, subtitleId, format, downloadHref, downloadLabel = "\u4E0B\u8F7D\u5F53\u524D\u6587\u4EF6", expanded = false, onToggleWidth, expandLabel = "\u5C55\u5F00\u4FA7\u680F", restoreLabel = "\u8FD8\u539F\u4FA7\u680F\u5BBD\u5EA6", onClose, closeLabel = "\u5173\u95ED\u9884\u89C8", closeDisabled = false, className = "" }) {
-  return /* @__PURE__ */ import_react3.default.createElement("header", { className: `wtt-ui-panel-header${className ? " " + className : ""}` }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-ui-panel-heading" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("h2", { id: titleId, title }, title), format && /* @__PURE__ */ import_react3.default.createElement("span", { className: "wtt-ui-format" }, format)), subtitle && /* @__PURE__ */ import_react3.default.createElement("p", { id: subtitleId, title: typeof subtitle === "string" ? subtitle : void 0 }, subtitle)), /* @__PURE__ */ import_react3.default.createElement("div", { className: "wtt-ui-panel-actions", role: "toolbar", "aria-label": "\u7A97\u53E3\u64CD\u4F5C" }, downloadHref && /* @__PURE__ */ import_react3.default.createElement(UiLink, { iconOnly: true, href: downloadHref, download: true, "aria-label": downloadLabel, title: downloadLabel, "data-panel-action": "download" }, /* @__PURE__ */ import_react3.default.createElement(UiIcon, { name: "download" })), onToggleWidth && /* @__PURE__ */ import_react3.default.createElement(UiButton, { variant: "ghost", iconOnly: true, "aria-label": expanded ? restoreLabel : expandLabel, title: expanded ? restoreLabel : expandLabel, "aria-pressed": expanded, onClick: onToggleWidth, "data-panel-action": "expand" }, /* @__PURE__ */ import_react3.default.createElement(UiIcon, { name: expanded ? "restore" : "expand" })), onClose && /* @__PURE__ */ import_react3.default.createElement(UiButton, { variant: "ghost", iconOnly: true, disabled: closeDisabled, "aria-label": closeLabel, title: closeLabel, onClick: onClose, "data-panel-action": "close" }, /* @__PURE__ */ import_react3.default.createElement(UiIcon, { name: "close" }))));
-}
-function PanelToolbar({ children: children2, className = "", ...props }) {
-  return /* @__PURE__ */ import_react3.default.createElement("div", { className: `wtt-ui-panel-toolbar${className ? " " + className : ""}`, ...props }, children2);
-}
-function DialogHeader({ title, titleId, description, descriptionId, onClose, closeLabel = "\u5173\u95ED\u7A97\u53E3", busy = false }) {
-  return /* @__PURE__ */ import_react3.default.createElement(PanelHeader, { title, titleId, subtitle: description, subtitleId: descriptionId, onClose, closeLabel, closeDisabled: busy });
-}
-function DialogFooter({ children: children2, className = "", ...props }) {
-  return /* @__PURE__ */ import_react3.default.createElement("footer", { className: `wtt-ui-dialog-footer${className ? " " + className : ""}`, ...props }, children2);
-}
-function DialogBody({ children: children2, className = "", ...props }) {
-  return /* @__PURE__ */ import_react3.default.createElement("div", { className: `wtt-ui-dialog-body${className ? " " + className : ""}`, ...props }, children2);
-}
-
-// src/conversation-references.mjs
-var MAX_CONVERSATION_FILES = 24;
-var MAX_CONVERSATION_FILE_BYTES = 20 * 1024 * 1024;
-var locked = (phase) => ["adjudicating", "submitting"].includes(phase);
-var conversationAttachmentsLocked = (input) => locked(input.phase) || Boolean(input.claim && input.claim.attachments !== true);
-function attachmentName(card, sourcePath) {
-  const extension = /\.[a-z0-9]{1,12}$/i.exec(sourcePath || "")?.[0] || ".md";
-  const title = Array.from(String(card.displayTitle || card.title || "\u753B\u5E03\u8D44\u6599").replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, "_")).slice(0, 48).join("").trim() || "\u753B\u5E03\u8D44\u6599";
-  return title.toLowerCase().endsWith(extension.toLowerCase()) ? title : title + extension;
-}
-async function loadConversationReferenceFiles(cards, { endpoint: endpoint2, isCurrent, currentCard, signal, fetchFile = fetch, FileType = File }) {
-  const files = new Array(cards.length), controller = new AbortController();
-  const cancelled = () => controller.abort(signal.reason);
-  if (signal?.aborted) cancelled();
-  signal?.addEventListener("abort", cancelled, { once: true });
-  const readSignal = controller.signal;
-  async function read(card) {
-    readSignal.throwIfAborted();
-    if (!isCurrent()) throw new Error("\u5BF9\u8BDD\u6216\u753B\u5E03\u5DF2\u5207\u6362\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
-    const current = currentCard(card);
-    if (["missing", "changed", "modified", "unavailable"].includes(current?.status) || ["missing", "changed", "modified", "unavailable"].includes(current?.sourceStatus)) throw new Error("\u539F\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
-    if (!current || current.id !== card.id || current.sourceHash !== card.sourceHash || card.kind === "whiteboard" && current.content !== card.content) throw new Error("\u5361\u7247\u5185\u5BB9\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
-    if (["whiteboard", "requirement"].includes(card.kind)) {
-      const text2 = String(card.requirementBackground ?? card.content ?? "");
-      if (!text2.trim()) throw new Error("\u6B64\u5361\u7247\u6CA1\u6709\u53EF\u6DFB\u52A0\u7684\u5185\u5BB9\u3002");
-      const file = new FileType([text2], attachmentName(card, ".md"), { type: "text/markdown" });
-      if (file.size > MAX_CONVERSATION_FILE_BYTES) throw new Error("\u5355\u4E2A\u9644\u4EF6\u4E0D\u80FD\u8D85\u8FC720MiB\u3002");
-      return file;
-    }
-    const source = card.importedFile || card.generatedFile || card.defaultOutcome;
-    const sourcePath = source?.path || card.path;
-    if (!sourcePath) throw new Error("\u6B64\u5361\u7247\u5C1A\u65E0\u53EF\u6DFB\u52A0\u7684\u5DF2\u4FDD\u5B58\u6587\u4EF6\u3002");
-    let hash = source?.hash || source?.sha256 || (card.kind === "word" ? void 0 : card.sourceHash);
-    if (!hash) {
-      const result = await fetchFile(endpoint2({ projectFilePreview: sourcePath }), { signal: readSignal });
-      if (!result.ok) throw new Error("\u6587\u4EF6\u4FE1\u606F\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u8BD5\u3002");
-      hash = (await result.json()).hash;
-    }
-    if (!/^[a-f0-9]{64}$/i.test(hash || "")) throw new Error("\u6587\u4EF6\u7F3A\u5C11\u51C6\u786E\u7248\u672C\u4FE1\u606F\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002");
-    const response = await fetchFile(endpoint2({ projectFileDownload: sourcePath, hash }), { signal: readSignal });
-    if (!response.ok) {
-      const detail = await response.json().catch(() => null);
-      throw new Error(detail?.error?.message || detail?.error || "\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u65B0\u9009\u62E9\u3002");
-    }
-    if (Number(response.headers.get("content-length") || 0) > MAX_CONVERSATION_FILE_BYTES) throw new Error("\u5355\u4E2A\u9644\u4EF6\u4E0D\u80FD\u8D85\u8FC720MiB\u3002");
-    const blob = await response.blob();
-    if (blob.size > MAX_CONVERSATION_FILE_BYTES) throw new Error("\u5355\u4E2A\u9644\u4EF6\u4E0D\u80FD\u8D85\u8FC720MiB\u3002");
-    const actual = [...new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    if (actual !== hash) throw new Error("\u6587\u4EF6\u5185\u5BB9\u4E0E\u6240\u9009\u7248\u672C\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002");
-    return new FileType([blob], attachmentName(card, sourcePath), { type: source?.mime || blob.type || "application/octet-stream" });
-  }
-  let next = 0, failure;
-  async function worker() {
-    while (next < cards.length && !readSignal.aborted) {
-      const index2 = next++;
-      try {
-        files[index2] = await read(cards[index2]);
-      } catch (error) {
-        if (!failure) {
-          failure = error;
-          controller.abort(error);
-        }
-        throw error;
-      }
-    }
-  }
-  try {
-    const results = await Promise.allSettled(Array.from({ length: Math.min(3, cards.length) }, worker));
-    if (failure) throw failure;
-    const rejected = results.find((result) => result.status === "rejected");
-    if (rejected) throw rejected.reason;
-    readSignal.throwIfAborted();
-    if (!isCurrent()) throw new Error("\u5BF9\u8BDD\u6216\u753B\u5E03\u5DF2\u5207\u6362\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u8D44\u4EA7\u3002");
-    return files;
-  } finally {
-    signal?.removeEventListener("abort", cancelled);
-  }
-}
-function stageConversationReferenceFiles({ service, inputActions, sessionId, files, readInput, isCurrent }) {
-  if (!service?.createDrafts || !service?.releaseDraftAttachments || !inputActions?.addAttachments) throw new Error("\u5F53\u524DDSH\u6CA1\u6709\u63D0\u4F9B\u5BF9\u8BDD\u9644\u4EF6\u63A5\u53E3\uFF0C\u8BF7\u66F4\u65B0\u5BBF\u4E3B\u540E\u91CD\u8BD5\u3002");
-  const input = readInput();
-  if (!isCurrent() || conversationAttachmentsLocked(input)) throw new Error("\u5BF9\u8BDD\u6B63\u5728\u63D0\u4EA4\uFF0C\u8BF7\u7A0D\u540E\u91CD\u65B0\u6DFB\u52A0\u3002");
-  if ((input.attachmentIds?.length || 0) + files.length > MAX_CONVERSATION_FILES) throw new Error("\u4E00\u6761\u6D88\u606F\u6700\u591A\u6DFB\u52A024\u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9644\u4EF6\u3002");
-  const drafts = service.createDrafts(sessionId, files);
-  try {
-    if (!isCurrent() || !inputActions.addAttachments(drafts.map((draft) => draft.id))) throw new Error("\u5BF9\u8BDD\u6B63\u5728\u63D0\u4EA4\u6216\u5DF2\u5207\u6362\uFF0C\u539F\u8F93\u5165\u548C\u9644\u4EF6\u5DF2\u4FDD\u7559\u3002");
-  } catch (error) {
-    service.releaseDraftAttachments(drafts);
-    throw error;
-  }
-}
-
-// src/conversation-references.jsx
-var CanvasConversationReferenceContext = (0, import_react4.createContext)(null);
-function CanvasConversationReferenceButton({ sessionId, useInput, inputActions, getAttachmentService }) {
-  const picker = (0, import_react4.useContext)(CanvasConversationReferenceContext);
-  const phase = useInput((value) => value.phase);
-  const claim = useInput((value) => value.claim);
-  const attachmentIds = useInput((value) => value.attachmentIds);
-  const input = { phase, claim, attachmentIds };
-  const current = (0, import_react4.useRef)({ sessionId, input });
-  const live = (0, import_react4.useRef)(false), cancel = (0, import_react4.useRef)(null), button = (0, import_react4.useRef)(null);
-  const [error, setError] = (0, import_react4.useState)("");
-  current.current = { sessionId, input };
-  (0, import_react4.useEffect)(() => {
-    live.current = true;
-    return () => {
-      live.current = false;
-      cancel.current?.();
-    };
-  }, [sessionId]);
-  if (!picker) return null;
-  const supported = Boolean(getAttachmentService()?.createDrafts && getAttachmentService()?.releaseDraftAttachments && inputActions?.addAttachments);
-  const remaining = Math.max(0, MAX_CONVERSATION_FILES - input.attachmentIds.length);
-  const disabled = !remaining || picker.busy || conversationAttachmentsLocked(input) || !supported;
-  function select() {
-    setError("");
-    const isCurrent = () => live.current && current.current.sessionId === sessionId;
-    try {
-      cancel.current = picker.start({
-        sessionId,
-        isCurrent,
-        maxReferences: remaining,
-        restoreFocus: () => button.current?.focus({ preventScroll: true }),
-        stage: (files) => stageConversationReferenceFiles({
-          service: getAttachmentService(),
-          sessionId,
-          inputActions,
-          files,
-          readInput: () => current.current.input,
-          isCurrent
-        })
-      });
-    } catch (cause) {
-      setError(cause.message);
-    }
-  }
-  return /* @__PURE__ */ import_react4.default.createElement("span", { className: "wtt-conversation-canvas-reference" }, /* @__PURE__ */ import_react4.default.createElement(
-    UiButton,
-    {
-      ref: button,
-      variant: "quiet",
-      size: "compact",
-      type: "button",
-      "aria-label": "\u4ECE\u753B\u5E03\u6DFB\u52A0\u8D44\u4EA7",
-      disabled,
-      title: !supported ? "\u5F53\u524DDSH\u6CA1\u6709\u63D0\u4F9B\u5BF9\u8BDD\u9644\u4EF6\u63A5\u53E3" : !remaining ? "\u4E00\u6761\u6D88\u606F\u6700\u591A\u6DFB\u52A024\u4EFD\u9644\u4EF6" : error || "\u4ECE\u753B\u5E03\u6DFB\u52A0\u8D44\u4EA7",
-      onClick: select
-    },
-    /* @__PURE__ */ import_react4.default.createElement(UiIcon, { name: "folder", size: 14 }),
-    "\u753B\u5E03\u8D44\u4EA7"
-  ), error && /* @__PURE__ */ import_react4.default.createElement("span", { role: "alert" }, error));
 }
 
 // src/media-service-settings.jsx
@@ -3562,7 +3632,7 @@ function NativeEditorInputDock({ sessionId, useInput, inputActions, bridge }) {
   };
   return /* @__PURE__ */ import_react10.default.createElement("div", { className: "wtt-native-edit-reference", "aria-label": "\u8BFE\u4EF6\u4FEE\u6539\u5F15\u7528" }, /* @__PURE__ */ import_react10.default.createElement("div", null, /* @__PURE__ */ import_react10.default.createElement("span", { title: owner.label }, entry.mode ? owner.label : "\u666E\u901A\u5BF9\u8BDD"), /* @__PURE__ */ import_react10.default.createElement(UiButton, { size: "compact", disabled: ["adjudicating", "submitting"].includes(input.phase) || !owner.ready, onClick: switchMode }, entry.mode ? "\u666E\u901A\u5BF9\u8BDD" : "\u5F15\u7528\u5F53\u524D\u5185\u5BB9")), owner.controls);
 }
-function NativeEditorConversation({ identity: identity4, project, sessionId, acquire, onSession, owner, bridge, SessionProvider, renderSlot, onSettled, label: label2 = "\u8BFE\u4EF6", onFileClick, onOpenFile, fileError }) {
+function NativeEditorConversation({ identity: identity4, project, sessionId, acquire, onSession, owner, bridge, SessionProvider, renderSlot, onSettled, label: label2 = "\u8BFE\u4EF6", editing = true, onFileClick, onOpenFile, fileError }) {
   const [binding, setBinding] = (0, import_react10.useState)(null), [error, setError] = (0, import_react10.useState)(""), ownerRef = (0, import_react10.useRef)(owner), sessionCallback = (0, import_react10.useRef)(onSession);
   ownerRef.current = owner;
   sessionCallback.current = onSession;
@@ -3600,7 +3670,7 @@ function NativeEditorConversation({ identity: identity4, project, sessionId, acq
   }, [binding, identity4, owner?.ready, owner?.label, owner?.autoCommand, owner?.uiKey]);
   if (error) return /* @__PURE__ */ import_react10.default.createElement(UserError, { error: `${label2}\u5BF9\u8BDD\u672A\u80FD\u6253\u5F00\uFF1A${error}` });
   if (binding?.identity !== identity4) return /* @__PURE__ */ import_react10.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6253\u5F00", label2, "\u5BF9\u8BDD\u2026");
-  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "wtt-native-editor-conversation", onClickCapture: (event) => onFileClick?.(event, binding.reference.sessionId) }, fileError?.sessionId === binding.reference.sessionId && /* @__PURE__ */ import_react10.default.createElement(UserError, { error: fileError.message }), /* @__PURE__ */ import_react10.default.createElement(SessionProvider, { session: binding.reference }, renderSlot(CANVAS_CONVERSATION_SLOT, { onSettled, editing: true, onOpenFile: (file) => onOpenFile?.(file, binding.reference.sessionId) })));
+  return /* @__PURE__ */ import_react10.default.createElement("div", { className: "wtt-native-editor-conversation", onClickCapture: (event) => onFileClick?.(event, binding.reference.sessionId) }, fileError?.sessionId === binding.reference.sessionId && /* @__PURE__ */ import_react10.default.createElement(UserError, { error: fileError.message }), /* @__PURE__ */ import_react10.default.createElement(SessionProvider, { session: binding.reference }, renderSlot(CANVAS_CONVERSATION_SLOT, { onSettled, editing, onOpenFile: (file) => onOpenFile?.(file, binding.reference.sessionId) })));
 }
 
 // src/native-preview.jsx
@@ -3780,9 +3850,223 @@ function ProjectMemoryPanel({ call, suggestions, onChanged, onLocate }) {
   return /* @__PURE__ */ import_react12.default.createElement("div", { className: "wtt-agent-memory" }, error && /* @__PURE__ */ import_react12.default.createElement("p", { role: "alert" }, error), /* @__PURE__ */ import_react12.default.createElement("div", { className: "wtt-agent-section" }, /* @__PURE__ */ import_react12.default.createElement("strong", null, "\u73B0\u884C\u8BBE\u5B9A"), /* @__PURE__ */ import_react12.default.createElement(UiButton, { size: "compact", onClick: () => edit(blank) }, "\u65B0\u589E\u8BBE\u5B9A"), /* @__PURE__ */ import_react12.default.createElement(UiButton, { size: "compact", onClick: () => edit({ ...blank, binding: true }) }, "\u7ED1\u5B9A\u539F\u6587")), data?.settings.map((item) => /* @__PURE__ */ import_react12.default.createElement(UiButton, { key: item.id, onClick: () => edit(item) }, item.name, " \xB7 ", item.scope)), suggestions?.map((s) => /* @__PURE__ */ import_react12.default.createElement("div", { key: s.id }, /* @__PURE__ */ import_react12.default.createElement("strong", null, s.name), /* @__PURE__ */ import_react12.default.createElement("pre", null, s.body), /* @__PURE__ */ import_react12.default.createElement(UiButton, { onClick: () => edit({ ...data?.settings.find((x2) => x2.name === s.name && x2.scope === s.scope), ...s, id: data?.settings.find((x2) => x2.name === s.name && x2.scope === s.scope)?.id, suggestionId: s.id }) }, "\u5BA1\u9605\u8BBE\u5B9A"), /* @__PURE__ */ import_react12.default.createElement(UiButton, { onClick: () => call("dismiss", { id: s.id }).then(onChanged).catch((e) => setError(e.message)) }, "\u5FFD\u7565"))), /* @__PURE__ */ import_react12.default.createElement("label", null, "\u67E5\u9879\u76EE\u65E5\u5FD7", /* @__PURE__ */ import_react12.default.createElement("input", { type: "search", value: query, placeholder: "\u5173\u952E\u8BCD\u3001\u5361\u7247\u6216\u7248\u672C", onChange: (e) => setQuery(e.target.value) })), data && !data.hits.length && /* @__PURE__ */ import_react12.default.createElement("p", null, "\u6682\u65E0\u5339\u914D\u65E5\u5FD7"), data?.hits.map((h2) => /* @__PURE__ */ import_react12.default.createElement("details", { key: h2.id }, /* @__PURE__ */ import_react12.default.createElement("summary", null, h2.day, " \xB7 ", h2.title), /* @__PURE__ */ import_react12.default.createElement("pre", null, h2.body), /* @__PURE__ */ import_react12.default.createElement("small", null, h2.relative), h2.evidence.cardId && h2.evidence.versionId && /* @__PURE__ */ import_react12.default.createElement(UiButton, { onClick: () => onLocate(h2.evidence) }, "\u5B9A\u4F4D\u6210\u679C"))), /* @__PURE__ */ import_react12.default.createElement(UiButton, { size: "compact", onClick: () => call("memory", { query, rebuild: true }).then(setData).catch((e) => setError(e.message)) }, "\u91CD\u5EFA\u8BB0\u5FC6\u7D22\u5F15"));
 }
 
+// src/skill-commands.mjs
+var SKILL_TOKEN = /(^|\s)\/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)/g;
+function extractSkillNames(text2) {
+  if (typeof text2 !== "string") return [];
+  return [...new Set([...text2.matchAll(SKILL_TOKEN)].map((match) => match[2]))];
+}
+function pptEngineForSelection({ pptEngine, selectedSkills = [] }) {
+  const names = selectedSkills.map((name2) => name2.replace(/-builtin$/, ""));
+  if (names.includes("claude-slides")) {
+    if (names.includes("wtt-course-pptx-builder")) throw new Error("PPT Builder \u4E0E\u5B9D\u7389\u5236\u4F5C\u662F\u4E24\u79CD\u5236\u4F5C\u65B9\u5F0F\uFF0C\u8BF7\u53EA\u9009\u62E9\u4E00\u79CD\u3002");
+    return "baoyu";
+  }
+  if (names.length) return "native";
+  return pptEngine || "native";
+}
+function skillQueryAtCursor(text2, cursor) {
+  if (typeof text2 !== "string" || !Number.isInteger(cursor) || cursor < 0 || cursor > text2.length) return null;
+  const match = text2.slice(0, cursor).match(/(?:^|\s)\/([a-z0-9-]*)$/i);
+  if (!match) return null;
+  const start2 = cursor - match[1].length - 1;
+  let end = cursor;
+  while (end < text2.length && !/\s/.test(text2[end])) end += 1;
+  if (!/^\/[a-z0-9-]*$/i.test(text2.slice(start2, end))) return null;
+  return { query: match[1], start: start2, end };
+}
+
+// src/creation-context.mjs
+var CARD_WIDTH = 320;
+var CARD_HEIGHT = 256;
+var OUTPUT_CARD_SIZE = Object.freeze({ width: CARD_WIDTH * 2, height: CARD_HEIGHT * 2 });
+var BLOCKED = /^(missing|modified|changed|unavailable)$/;
+var FIELDS2 = ["id", "nodeId", "kind", "artifactKind", "title", "number", "refId", "content", "excerpt", "path", "sourcePath", "sourceHash", "status", "sourceStatus", "extracted", "excerptInfo", "importedFile", "generatedFile", "whiteboardSource", "referenceNote", "unavailable"];
+function creationSource(card) {
+  return card?.sourceId ? { ...card, id: card.sourceId, nodeId: card.nodeId || card.id } : card;
+}
+function usableCreationSource(card) {
+  return Boolean(card && card.kind !== "whiteboard" && /^[a-f0-9]{64}$/i.test(card.sourceHash || "") && !BLOCKED.test(card.status || ""));
+}
+function freezeCreationSource(card) {
+  card = creationSource(card);
+  if (!usableCreationSource(card)) throw new Error("\u6B64\u5361\u7247\u5C1A\u65E0\u53EF\u7528\u7684\u5DF2\u4FDD\u5B58\u6765\u6E90\uFF0C\u8BF7\u5148\u4FDD\u5B58\u7D20\u6750\u6216\u6838\u5BF9\u6587\u4EF6\u72B6\u6001\u3002");
+  const value = Object.fromEntries(FIELDS2.filter((key) => card[key] !== void 0).map((key) => [key, card[key]]));
+  return JSON.parse(JSON.stringify(value));
+}
+function createCardContext({ projectId, projectName: projectName2, projectPath, requirement, anchor, outputType = "outline", outputPosition, selection: selection2, generation, blank: blank2 = false }) {
+  if (!projectId || !requirement?.id) throw new Error("\u9879\u76EE\u6216\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\u3002");
+  if (blank2 && anchor?.kind !== "canvas") throw new Error("\u7A7A\u767D\u521B\u4F5C\u53EA\u80FD\u4ECE\u753B\u5E03\u5165\u53E3\u53D1\u8D77");
+  const frozen = blank2 ? { id: `canvas:${requirement.id}`, kind: "canvas", title: "\u65B0\u5EFA\u5185\u5BB9" } : freezeCreationSource(anchor);
+  const references = blank2 ? [] : [frozen];
+  return {
+    key: `${projectId}:${requirement.id}:${frozen.id}:${outputType}${selection2 ? `:range:${selection2.start}-${selection2.end}` : ""}`,
+    projectId,
+    projectName: projectName2,
+    projectPath,
+    requirementId: requirement.id,
+    requirementTitle: requirement.title,
+    requirement: Object.fromEntries(["id", "title", "customer", "audience", "background", "objectives"].map((key) => [key, requirement[key] || ""])),
+    anchor: frozen,
+    blank: blank2,
+    intent: "new",
+    outputType,
+    ...outputType === "pptx" ? { pptEngine: "baoyu" } : {},
+    references,
+    instruction: "",
+    originalInput: { instruction: "", references: JSON.parse(JSON.stringify(references)), taskId: null, sessionId: null },
+    ...generation ? { generation: { ...generation } } : {},
+    outputPosition: { ...outputPosition },
+    ...selection2 ? { selection: JSON.parse(JSON.stringify(selection2)) } : {}
+  };
+}
+function createCompositionContext({ projectId, projectName: projectName2, projectPath, requirement, descriptor }) {
+  const { card, node, composition } = descriptor;
+  const references = JSON.parse(JSON.stringify(composition.references));
+  const anchor = references[0] || { id: `canvas:${requirement.id}`, kind: "canvas", title: "\u65B0\u5EFA\u5185\u5BB9" };
+  return {
+    key: `${projectId}:${requirement.id}:compose:${card.id}`,
+    projectId,
+    projectName: projectName2,
+    projectPath,
+    requirementId: requirement.id,
+    requirementTitle: requirement.title,
+    requirement,
+    anchor,
+    targetCard: JSON.parse(JSON.stringify(node)),
+    composerNodeId: node.id,
+    intent: "new",
+    blank: references.length === 0,
+    outputType: card.type,
+    ...card.type === "pptx" ? { pptEngine: "baoyu" } : {},
+    references,
+    instruction: composition.instruction,
+    draftRevision: composition.revision,
+    draftSaved: JSON.stringify([composition.instruction, references.map((r) => [r.id, r.sourceHash])]),
+    generation: { mode: "new", cardId: card.id },
+    outputPosition: { ...node.position },
+    originalInput: { instruction: composition.instruction, references: JSON.parse(JSON.stringify(references)), taskId: null, sessionId: null }
+  };
+}
+function createRevisionContext({ projectId, projectName: projectName2, projectPath, requirement, descriptor }) {
+  const { card, version: version2, node, editor } = descriptor || {};
+  if (!projectId || !requirement?.id || !card?.id || !version2?.id || !node) throw new Error("\u6B64\u4EA7\u7269\u7248\u672C\u8BB0\u5F55\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u5237\u65B0\u753B\u5E03\u3002");
+  const references = JSON.parse(JSON.stringify(editor?.references || []));
+  const originalInput = {
+    instruction: editor?.instruction || "",
+    references: JSON.parse(JSON.stringify(references)),
+    taskId: editor?.taskId || version2.taskId || null,
+    sessionId: editor?.sessionId || null,
+    generationMethod: editor?.generationMethod || "skill",
+    ...editor?.media ? { mediaOptions: { ...editor.media } } : {},
+    ...editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {}
+  };
+  return {
+    key: `${projectId}:${requirement.id}:revise:${card.id}:${version2.id}`,
+    projectId,
+    projectName: projectName2,
+    projectPath,
+    requirementId: requirement.id,
+    requirementTitle: requirement.title,
+    requirement: Object.fromEntries(["id", "title", "customer", "audience", "background", "objectives"].map((key) => [key, requirement[key] || ""])),
+    anchor: creationSource(node),
+    targetCard: JSON.parse(JSON.stringify(node)),
+    intent: "revise",
+    outputType: card.type,
+    ...card.type === "pptx" ? { pptEngine: editor?.pptEngine || "native" } : {},
+    references,
+    instruction: editor?.instruction || "",
+    ...editor?.modelSelection ? { modelSelection: { ...editor.modelSelection } } : {},
+    originalInput,
+    generation: { mode: "revise", cardId: card.id, baseVersionId: version2.id },
+    outputPosition: { ...node.position },
+    taskId: editor?.taskId || version2.taskId || null,
+    sessionId: editor?.sessionId || null,
+    generationMethod: "skill",
+    ...editor?.media ? { mediaOptions: { ...editor.media } } : {},
+    ...editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {},
+    recorded: editor?.recorded !== false,
+    referenceNotes: JSON.parse(JSON.stringify(editor?.referenceNotes || [])),
+    selectedSkills: [...editor?.selectedSkills || []],
+    baseVersion: { id: version2.id, number: version2.number }
+  };
+}
+function updateCreationReferences(context, cards) {
+  const pinned = context.intent !== "revise" && !context.blank;
+  const seen = new Set(pinned ? [context.anchor.id] : []);
+  const references = pinned ? [context.anchor] : [];
+  for (let card of cards) {
+    card = creationSource(card);
+    if (seen.has(card.id)) continue;
+    if (references.length >= 24) throw new Error("\u4E00\u6B21\u521B\u4F5C\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\u3002");
+    seen.add(card.id);
+    references.push(context.references.find((item) => item.id === card.id) || freezeCreationSource(card));
+  }
+  return { ...context, references };
+}
+function creationTaskInput(context) {
+  return {
+    requirementId: context.requirementId,
+    selectedCardIds: context.references.map((card) => card.id),
+    sourceRefs: context.references.map((card) => ({ cardId: card.id, hash: card.sourceHash })),
+    instruction: context.instruction.trim(),
+    outputType: context.outputType,
+    ...context.pptEngine ? { pptEngine: context.pptEngine } : {},
+    outputPosition: { ...context.outputPosition },
+    selectedSkills: extractSkillNames(context.instruction),
+    ...["image", "video"].includes(context.outputType) ? { generationMethod: context.generationMethod || "skill" } : {},
+    ...context.selection ? { selection: { ...context.selection } } : {},
+    ...context.generation ? { generation: { ...context.generation } } : {}
+  };
+}
+function creationPositionFree(position, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
+  return Number.isFinite(position?.x) && Number.isFinite(position?.y) && Math.abs(position.x) <= 999e3 && Math.abs(position.y) <= 999e3 && !cards.some((card) => position.x < card.position.x + (card.width || CARD_WIDTH) + 24 && position.x + width + 24 > card.position.x && position.y < card.position.y + (card.height || CARD_HEIGHT) + 24 && position.y + height + 24 > card.position.y);
+}
+function adjacentCreationPosition(anchor, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
+  const min2 = -999e3, maxX = 999e3 - width, maxY = 999e3 - height;
+  const clamp3 = (value, max2) => Math.max(min2, Math.min(max2, value));
+  const origin = { x: clamp3(anchor.position.x + (anchor.width || CARD_WIDTH) + 80, maxX), y: clamp3(anchor.position.y, maxY) };
+  const columns = /* @__PURE__ */ new Set([origin.x, clamp3(anchor.position.x - width - 80, maxX), min2, maxX]);
+  for (const card of cards) {
+    columns.add(clamp3(card.position.x + (card.width || CARD_WIDTH) + 24, maxX));
+    columns.add(clamp3(card.position.x - width - 24, maxX));
+  }
+  let best = null, score = Infinity;
+  for (const x2 of [...columns].sort((a, b2) => Math.abs(a - origin.x) - Math.abs(b2 - origin.x) || b2 - a)) {
+    const distance2 = (x2 - origin.x) ** 2;
+    if (distance2 > score) break;
+    const intervals = cards.filter((card) => x2 < card.position.x + (card.width || CARD_WIDTH) + 24 && x2 + width + 24 > card.position.x).map((card) => [card.position.y - height - 24, card.position.y + (card.height || CARD_HEIGHT) + 24]).sort((a, b2) => a[0] - b2[0]);
+    const merged = [];
+    for (const interval2 of intervals) {
+      const last = merged.at(-1);
+      if (last && interval2[0] < last[1]) last[1] = Math.max(last[1], interval2[1]);
+      else merged.push([...interval2]);
+    }
+    const blocked = merged.find(([top, bottom]) => origin.y > top && origin.y < bottom);
+    const rows = blocked ? [blocked[1], blocked[0]] : [origin.y];
+    for (const y2 of rows) {
+      if (y2 < min2 || y2 > maxY) continue;
+      const nextScore = distance2 + (y2 - origin.y) ** 2;
+      if (nextScore < score && creationPositionFree({ x: x2, y: y2 }, cards, width, height)) {
+        best = { x: x2, y: y2 };
+        score = nextScore;
+      }
+    }
+  }
+  if (!best) throw new Error("\u6765\u6E90\u9644\u8FD1\u6CA1\u6709\u53EF\u7528\u7684\u5361\u7247\u4F4D\u7F6E\uFF0C\u8BF7\u6574\u7406\u753B\u5E03\u540E\u91CD\u8BD5\u3002");
+  return best;
+}
+function visibleCreationPosition(anchor, cards, viewport, size3, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
+  return adjacentCreationPosition(anchor, cards, width, height);
+}
+
+// src/assets/wattter-agent.png
+var wattter_agent_default = "data:image/png;base64,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";
+
 // src/project-agent.jsx
-var labels = { auto: "\u5168\u81EA\u52A8", plan: "\u6309\u8BA1\u5212\u6388\u6743", step: "\u9010\u9879\u786E\u8BA4" };
-var statuses = { done: "\u5DF2\u5B8C\u6210", running: "\u6267\u884C\u4E2D", paused: "\u5DF2\u6682\u505C", approval: "\u5F85\u6388\u6743", stopped: "\u5DF2\u505C\u6B62", stopping: "\u505C\u6B62\u5F85\u6838\u5BF9", blocked: "\u5F85\u6838\u5BF9", working: "\u5DF2\u6D3E\u53D1", ready: "\u5F85\u6267\u884C" };
+var labels = { auto: "\u5168\u81EA\u52A8", plan: "\u5148\u89C4\u5212\u540E\u6267\u884C", step: "\u9010\u9879\u786E\u8BA4" };
+var statuses = { done: "\u5DF2\u5B8C\u6210", running: "\u6267\u884C\u4E2D", paused: "\u5DF2\u6682\u505C", approval: "\u5F85\u6388\u6743", stopped: "\u5DF2\u505C\u6B62", stopping: "\u505C\u6B62\u5F85\u6838\u5BF9", blocked: "\u5F85\u6838\u5BF9", working: "\u6267\u884C\u4E2D", ready: "\u5F85\u6267\u884C" };
+var reviewLabel = "\u6388\u6743\u5E76\u6267\u884C";
 function stored(storage, key, fallback) {
   try {
     return JSON.parse(storage.getItem(key)) ?? fallback;
@@ -3810,19 +4094,23 @@ function ModeMenu({ value, onChange, label: label2 = "\u6267\u884C\u65B9\u5F0F" 
 }
 function Plans({ plans, act, locate, busy }) {
   if (!plans?.length) return null;
-  return /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-plans" }, plans.map((p) => {
+  return /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-plans" }, plans.map((p, index2) => {
     const next = p.steps.find((s) => s.state !== "done"), ended = ["done", "stopped"].includes(p.state);
-    return /* @__PURE__ */ import_react13.default.createElement("details", { key: p.id, open: !ended || void 0 }, /* @__PURE__ */ import_react13.default.createElement("summary", null, p.title, " \xB7 ", statuses[p.state]), p.steps.map((s) => /* @__PURE__ */ import_react13.default.createElement("div", { key: s.id, className: "wtt-agent-step" }, /* @__PURE__ */ import_react13.default.createElement("details", null, /* @__PURE__ */ import_react13.default.createElement("summary", null, s.title, " \xB7 ", s.target), /* @__PURE__ */ import_react13.default.createElement("p", null, s.instruction), !!s.deps.length && /* @__PURE__ */ import_react13.default.createElement("small", null, "\u4F9D\u8D56\u6B65\u9AA4 ", s.deps.join("\u3001"))), s.receipt ? /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => locate(s.receipt) }, "\u5B9A\u4F4D V", s.receipt.number) : /* @__PURE__ */ import_react13.default.createElement("small", null, s.error || statuses[s.state]), !!s.refs?.length && /* @__PURE__ */ import_react13.default.createElement("details", null, /* @__PURE__ */ import_react13.default.createElement("summary", null, s.refs.length, " \u4EFD\u5F15\u7528"), s.refs.map((r) => /* @__PURE__ */ import_react13.default.createElement("div", { key: r.cardId }, r.title, r.versionId && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => locate({ ...r, cardId: r.outputCardId }) }, "\u67E5\u770B\u5F15\u7528\u7248\u672C")))), s.state === "blocked" && !s.taskId && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => act(p, "recheck", { stepId: s.id }) }, "\u91CD\u65B0\u6838\u5BF9\u6765\u6E90"), s.taskId && !s.receipt && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => locate({ requirementId: s.requirementId, taskId: s.taskId, cardId: s.outputCardId }) }, "\u67E5\u770B\u539F\u4EFB\u52A1"), s.id === next?.id && p.state === "running" && !s.authorized && /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "approve-step", { stepId: s.id }) }, "\u6267\u884C\u6B64\u9879"))), !ended && p.state !== "stopping" && p.change && /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("strong", null, "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C ", p.change.start, " \u9879\u8D77"), p.change.steps.map((s, i) => /* @__PURE__ */ import_react13.default.createElement("details", { key: i }, /* @__PURE__ */ import_react13.default.createElement("summary", null, s.title, " \xB7 ", s.target), /* @__PURE__ */ import_react13.default.createElement("p", null, s.instruction), s.refs.map((r) => /* @__PURE__ */ import_react13.default.createElement("small", { key: r.cardId }, r.title, " ")))), /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "accept-change", { changeId: p.change.id }) }, "\u6279\u51C6\u53D8\u66F4"), /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "reject-change", { changeId: p.change.id }) }, "\u4FDD\u7559\u539F\u8BA1\u5212")), !ended && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-actions" }, p.state === "approval" && /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "approve-plan") }, "\u6309\u8BA1\u5212\u6267\u884C"), ["running", "paused"].includes(p.state) && /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, p.state === "paused" ? "resume" : "pause") }, p.state === "paused" ? "\u7EE7\u7EED\u6267\u884C" : "\u6682\u505C"), p.state !== "stopping" && /* @__PURE__ */ import_react13.default.createElement(ModeMenu, { label: "\u59D4\u6258\u6267\u884C\u65B9\u5F0F", value: p.mode, onChange: (mode) => act(p, "mode", { mode }) }), /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "stop") }, p.state === "stopping" ? "\u91CD\u8BD5\u505C\u6B62" : "\u505C\u6B62\u59D4\u6258")));
+    const completed = p.steps.filter((step) => step.state === "done").length;
+    const status = p.state === "running" && next?.error === "\u539F\u4EFB\u52A1\u5F85\u786E\u8BA4" ? "\u5F85\u786E\u8BA4" : p.state === "running" && next?.state === "blocked" ? "\u5F85\u6838\u5BF9" : statuses[p.state];
+    return /* @__PURE__ */ import_react13.default.createElement("details", { className: "wtt-agent-plan", key: p.id, open: !ended && index2 === 0 || void 0 }, /* @__PURE__ */ import_react13.default.createElement("summary", null, /* @__PURE__ */ import_react13.default.createElement("span", null, p.title), /* @__PURE__ */ import_react13.default.createElement("small", null, status), /* @__PURE__ */ import_react13.default.createElement("span", { className: "wtt-agent-plan-progress" }, /* @__PURE__ */ import_react13.default.createElement("progress", { value: completed, max: p.steps.length || 1, "aria-label": p.title + "\u8FDB\u5EA6" }), /* @__PURE__ */ import_react13.default.createElement("span", null, "\u5B8C\u6210 ", completed, "/", p.steps.length))), p.steps.map((s) => /* @__PURE__ */ import_react13.default.createElement("div", { key: s.id, className: "wtt-agent-step" }, /* @__PURE__ */ import_react13.default.createElement("details", null, /* @__PURE__ */ import_react13.default.createElement("summary", null, s.title, " \xB7 ", s.target), /* @__PURE__ */ import_react13.default.createElement("p", null, s.instruction), !!s.deps.length && /* @__PURE__ */ import_react13.default.createElement("small", null, "\u4F9D\u8D56\u6B65\u9AA4 ", s.deps.join("\u3001"))), s.receipt ? /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => locate(s.receipt) }, "\u5B9A\u4F4D V", s.receipt.number) : /* @__PURE__ */ import_react13.default.createElement("small", null, s.error || statuses[s.state]), !!s.refs?.length && /* @__PURE__ */ import_react13.default.createElement("details", null, /* @__PURE__ */ import_react13.default.createElement("summary", null, s.refs.length, " \u4EFD\u5F15\u7528"), s.refs.map((r) => /* @__PURE__ */ import_react13.default.createElement("div", { key: r.cardId }, r.title, r.versionId && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => locate({ ...r, cardId: r.outputCardId }) }, "\u67E5\u770B\u5F15\u7528\u7248\u672C")))), s.state === "blocked" && !s.taskId && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => act(p, "recheck", { stepId: s.id }) }, "\u91CD\u65B0\u6838\u5BF9\u6765\u6E90"), s.taskId && !s.receipt && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => locate({ requirementId: s.requirementId, taskId: s.taskId, cardId: s.outputCardId }) }, "\u67E5\u770B\u539F\u4EFB\u52A1"), s.id === next?.id && p.state === "running" && !s.authorized && /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "approve-step", { stepId: s.id }) }, "\u6267\u884C\u6B64\u9879"))), !ended && p.state !== "stopping" && p.change && /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("strong", null, "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C ", p.change.start, " \u9879\u8D77"), p.change.steps.map((s, i) => /* @__PURE__ */ import_react13.default.createElement("details", { key: i }, /* @__PURE__ */ import_react13.default.createElement("summary", null, s.title, " \xB7 ", s.target), /* @__PURE__ */ import_react13.default.createElement("p", null, s.instruction), s.refs.map((r) => /* @__PURE__ */ import_react13.default.createElement("small", { key: r.cardId }, r.title, " ")))), /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "accept-change", { changeId: p.change.id }) }, "\u6279\u51C6\u53D8\u66F4"), /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "reject-change", { changeId: p.change.id }) }, "\u4FDD\u7559\u539F\u8BA1\u5212")), !ended && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-actions" }, p.state === "approval" && /* @__PURE__ */ import_react13.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(p, "approve-plan") }, reviewLabel), ["running", "paused"].includes(p.state) && /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, p.state === "paused" ? "resume" : "pause") }, p.state === "paused" ? "\u7EE7\u7EED\u6267\u884C" : "\u6682\u505C"), p.state !== "stopping" && /* @__PURE__ */ import_react13.default.createElement(ModeMenu, { label: "\u59D4\u6258\u6267\u884C\u65B9\u5F0F", value: p.mode, onChange: (mode) => act(p, "mode", { mode }) }), /* @__PURE__ */ import_react13.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "stop") }, p.state === "stopping" ? "\u91CD\u8BD5\u505C\u6B62" : "\u505C\u6B62\u59D4\u6258")));
   }));
 }
-var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2({ notices, project, requirement, selected: selected2, request, renderConversation, canvasActions }) {
+var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2({ notices, project, requirement, selected: selected2, request, renderConversation, canvasActions, picking }) {
   const key = "wtt-project-agent:" + project.id;
   const [tracking, setTracking] = (0, import_react13.useState)(() => stored(sessionStorage, key + ":tracking", false));
   const [open, setOpen] = (0, import_react13.useState)(() => stored(sessionStorage, key + ":open", false)), [tab, setTab] = (0, import_react13.useState)("chat");
+  const [pinned, setPinned] = (0, import_react13.useState)(() => stored(sessionStorage, key + ":references", null));
   const [mode, setMode] = (0, import_react13.useState)(() => stored(localStorage, key + ":mode", "plan"));
   const [position, setPosition] = (0, import_react13.useState)(() => stored(localStorage, key + ":pos", { x: 0.98, y: 0.66 }));
+  const [windowSize, setWindowSize] = (0, import_react13.useState)(() => stored(localStorage, key + ":size", { w: 540, h: 680 }));
   const [size3, setSize] = (0, import_react13.useState)({ w: 0, h: 0 }), [session, setSession] = (0, import_react13.useState)(null), [state, setState] = (0, import_react13.useState)(null), [error, setError] = (0, import_react13.useState)(""), [busy, setBusy] = (0, import_react13.useState)(false);
-  const layer = (0, import_react13.useRef)(null), drag = (0, import_react13.useRef)(null), didDrag = (0, import_react13.useRef)(false), lastProgress = (0, import_react13.useRef)(""), alive = (0, import_react13.useRef)(true);
+  const layer = (0, import_react13.useRef)(null), drag = (0, import_react13.useRef)(null), resizeStart = (0, import_react13.useRef)(null), didDrag = (0, import_react13.useRef)(false), lastProgress = (0, import_react13.useRef)(""), alive = (0, import_react13.useRef)(true);
   const call = (0, import_react13.useCallback)((action, data = {}) => request("project-agent-" + action, data), [request]);
   const [page, setPage] = (0, import_react13.useState)(0), [waiting2, setWaiting] = (0, import_react13.useState)(0);
   const readEpoch = (0, import_react13.useRef)(0), sendEpoch = (0, import_react13.useRef)(0), sending = (0, import_react13.useRef)(0);
@@ -3892,9 +4180,46 @@ var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2(
     ob.observe(el);
     return () => ob.disconnect();
   }, []);
-  const width = open ? Math.min(490, size3.w) : Math.min(88, size3.w), height = open ? Math.min(570, size3.h) : Math.min(38, size3.h);
+  const launcherSize = Math.min(40, size3.w, size3.h);
+  const width = open ? Math.min(windowSize.w, size3.w) : launcherSize, height = open ? Math.min(windowSize.h, size3.h) : launcherSize;
   const dx = Math.max(0, size3.w - width), dy = Math.max(0, size3.h - height);
   const clamp3 = (n) => Math.min(1, Math.max(0, n));
+  const resolveSize = (w2, h2) => ({ w: Math.min(size3.w, Math.max(340, w2)), h: Math.min(size3.h, Math.max(350, h2)) });
+  function resizeTo(w2, h2, right, top) {
+    const next = resolveSize(w2, h2);
+    const newDx = size3.w - next.w, newDy = size3.h - next.h;
+    const pos = { x: newDx ? clamp3((right - next.w) / newDx) : 0, y: newDy ? clamp3(top / newDy) : 0 };
+    setPosition(pos);
+    setWindowSize(next);
+    return { pos, next };
+  }
+  function saveResize({ pos, next }) {
+    persist(localStorage, key + ":pos", pos);
+    persist(localStorage, key + ":size", next);
+  }
+  const resizeGrip = {
+    onPointerDown(event) {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      resizeStart.current = { x: event.clientX, y: event.clientY, w: width, h: height, right: position.x * dx + width, top: position.y * dy };
+    },
+    onPointerMove(event) {
+      const start2 = resizeStart.current;
+      if (start2) start2.result = resizeTo(start2.w + start2.x - event.clientX, start2.h + event.clientY - start2.y, start2.right, start2.top);
+    },
+    onLostPointerCapture() {
+      if (resizeStart.current?.result) saveResize(resizeStart.current.result);
+      resizeStart.current = null;
+    },
+    onKeyDown(event) {
+      const delta = { ArrowLeft: [20, 0], ArrowRight: [-20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20] }[event.key];
+      if (!delta) return;
+      event.preventDefault();
+      event.stopPropagation();
+      saveResize(resizeTo(width + delta[0], height + delta[1], position.x * dx + width, position.y * dy));
+    }
+  };
   const move = (e) => {
     if (!drag.current) return;
     const d = drag.current, mx = e.clientX - d.x, my = e.clientY - d.y;
@@ -3937,8 +4262,39 @@ var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2(
       setBusy(false);
     }
   };
+  const toReference = (card) => ({
+    cardId: card.outputCard?.id || card.nodeId || card.id,
+    sourceId: creationSource(card).id,
+    versionId: card.outputCard?.versionId,
+    hash: card.sourceHash,
+    title: card.title,
+    requirementId: requirement.id,
+    canvasTitle: requirement.title
+  });
+  const references = pinned ?? (open ? selected2.filter(usableCreationSource).map(toReference) : []);
+  function updateReferences(next) {
+    setPinned(next);
+    persist(sessionStorage, key + ":references", next);
+  }
   const owner = {
-    freeze: async (id2, text2) => ({ ...await call("turn", { sessionId: id2, requirementId: requirement.id, refs: selected2.map((n) => ({ cardId: n.outputCard?.id || n.id, versionId: n.outputCard?.versionId, hash: n.sourceHash })), mode, text: text2 }), text: text2 }),
+    references,
+    requirementId: requirement.id,
+    showError: setError,
+    addReferences(cards) {
+      const next = [...new Map([...references, ...cards.map(toReference)].map((ref) => [ref.requirementId + ":" + ref.sourceId, ref])).values()];
+      if (next.length > 24) throw Error("\u4E00\u6B21\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u5F15\u7528\u3002");
+      updateReferences(next);
+    },
+    removeReference(ref) {
+      updateReferences(references.filter((item) => item !== ref));
+    },
+    freeze: async (id2, text2) => ({ ...await call("turn", {
+      sessionId: id2,
+      requirementId: requirement.id,
+      refs: references.map(({ cardId, requirementId, versionId, hash }) => ({ cardId, requirementId, versionId, hash })),
+      mode,
+      text: text2
+    }), text: text2 }),
     submitting: () => {
       sendEpoch.current++;
       sending.current++;
@@ -3958,6 +4314,7 @@ var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2(
     "div",
     {
       className: "wtt-agent-float " + (open ? "is-open" : "is-closed"),
+      "data-picking": picking || void 0,
       style: { width, height, left: Math.round(clamp3(position.x) * dx), top: Math.round(clamp3(position.y) * dy) },
       onPointerDown: (e) => e.stopPropagation(),
       onMouseDown: (e) => e.stopPropagation(),
@@ -3965,16 +4322,29 @@ var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2(
       onWheel: (e) => e.stopPropagation(),
       onKeyDown: (e) => e.stopPropagation()
     },
-    !open ? /* @__PURE__ */ import_react13.default.createElement(UiButton, { className: "wtt-agent-launch", "aria-label": "\u6253\u5F00\u9879\u76EE\u603B Agent", ...grip, onClick: () => {
-      if (!didDrag.current) toggle(true);
-      didDrag.current = false;
-    } }, "\u603B Agent", waiting2 > 0 && /* @__PURE__ */ import_react13.default.createElement("span", { "aria-label": waiting2 + " \u9879\u5F85\u786E\u8BA4" }, waiting2)) : /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-grip", ...grip }, /* @__PURE__ */ import_react13.default.createElement(PanelHeader, { title: "\u9879\u76EE\u603B Agent", onClose: () => toggle(false), closeLabel: "\u6536\u8D77\u9879\u76EE\u603B Agent" })), /* @__PURE__ */ import_react13.default.createElement("nav", { "aria-label": "\u603B Agent \u89C6\u56FE" }, /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", "aria-pressed": tab === "chat", onClick: () => setTab("chat") }, "\u5BF9\u8BDD"), /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", "aria-pressed": tab === "memory", onClick: () => setTab("memory") }, "\u9879\u76EE\u8BB0\u5FC6", state?.suggestions.length ? " \xB7 " + state.suggestions.length : ""), /* @__PURE__ */ import_react13.default.createElement(ModeMenu, { value: mode, onChange: (v2) => {
+    !open ? /* @__PURE__ */ import_react13.default.createElement(
+      UiButton,
+      {
+        variant: "custom",
+        className: "wtt-agent-launch",
+        "aria-label": "\u6253\u5F00\u9879\u76EE\u52A9\u624B",
+        title: "\u6253\u5F00\u9879\u76EE\u52A9\u624B",
+        "aria-description": waiting2 > 0 ? waiting2 + " \u9879\u5F85\u786E\u8BA4" : void 0,
+        ...grip,
+        onClick: () => {
+          if (!didDrag.current) toggle(true);
+          didDrag.current = false;
+        }
+      },
+      /* @__PURE__ */ import_react13.default.createElement("img", { src: wattter_agent_default, alt: "", draggable: false }),
+      waiting2 > 0 && /* @__PURE__ */ import_react13.default.createElement("span", { className: "wtt-agent-badge", "aria-hidden": "true" }, waiting2)
+    ) : /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-grip", ...grip }, /* @__PURE__ */ import_react13.default.createElement(PanelHeader, { title: "\u9879\u76EE\u52A9\u624B", subtitle: requirement.title, onClose: () => toggle(false), closeLabel: "\u6536\u8D77\u9879\u76EE\u52A9\u624B" })), /* @__PURE__ */ import_react13.default.createElement("nav", { className: "wtt-agent-nav", "aria-label": "\u9879\u76EE\u52A9\u624B\u89C6\u56FE" }, /* @__PURE__ */ import_react13.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "chat", onClick: () => setTab("chat") }, "\u5BF9\u8BDD"), /* @__PURE__ */ import_react13.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "plans", "aria-label": "\u59D4\u6258", onClick: () => setTab("plans") }, "\u59D4\u6258", waiting2 > 0 && /* @__PURE__ */ import_react13.default.createElement("span", { className: "wtt-agent-tab-count", title: waiting2 + " \u9879\u5F85\u786E\u8BA4" }, waiting2)), /* @__PURE__ */ import_react13.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "memory", onClick: () => setTab("memory") }, "\u9879\u76EE\u8BB0\u5FC6", state?.suggestions.length > 0 && /* @__PURE__ */ import_react13.default.createElement("span", { className: "wtt-agent-tab-count" }, state.suggestions.length)), tab === "chat" && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-mode-anchor" }, /* @__PURE__ */ import_react13.default.createElement(ModeMenu, { value: mode, onChange: (v2) => {
       setMode(v2);
       persist(localStorage, key + ":mode", v2);
-    } })), error && /* @__PURE__ */ import_react13.default.createElement("div", { role: "alert" }, error, " ", /* @__PURE__ */ import_react13.default.createElement(UiButton, { onClick: () => {
-      setError("");
-      toggle(false);
-    } }, "\u6536\u8D77")), tab === "chat" ? /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-context" }, /* @__PURE__ */ import_react13.default.createElement("span", { title: requirement.title }, requirement.title), !!selected2.length && /* @__PURE__ */ import_react13.default.createElement("details", null, /* @__PURE__ */ import_react13.default.createElement("summary", null, "\u5DF2\u9009 ", selected2.length, " \u5F20"), selected2.map((n) => /* @__PURE__ */ import_react13.default.createElement("div", { key: n.id }, n.title)))), /* @__PURE__ */ import_react13.default.createElement(Plans, { plans: state?.plans, act, locate, busy }), state?.total > 20 && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react13.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875")), session && /* @__PURE__ */ import_react13.default.createElement(ProjectInputContext.Provider, { value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: "\u9879\u76EE\u603B Agent", onSettled: () => refresh().catch((e) => setError(e.message)) }))) : /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement(ProjectMemoryPanel, { call, onChanged: () => refresh().catch((e) => setError(e.message)), suggestions: state?.suggestions, onLocate: locate }), session && /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: async () => {
+    } }))), error && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-feedback", role: "alert" }, /* @__PURE__ */ import_react13.default.createElement("span", null, error), /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: () => setError("") }, "\u5173\u95ED\u63D0\u793A")), tab === "chat" && state?.approvals > 0 && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-review" }, /* @__PURE__ */ import_react13.default.createElement(UiButton, { variant: "quiet", size: "compact", onClick: () => {
+      setPage(0);
+      setTab("plans");
+    } }, "\u67E5\u770B\u5F85\u6388\u6743\u8BA1\u5212")), /* @__PURE__ */ import_react13.default.createElement("section", { className: "wtt-agent-chat", "aria-label": "\u9879\u76EE\u52A9\u624B\u5BF9\u8BDD", hidden: tab !== "chat" }, session ? /* @__PURE__ */ import_react13.default.createElement(ProjectInputContext.Provider, { value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: "\u9879\u76EE\u52A9\u624B", editing: false, onSettled: () => refresh().catch((e) => setError(e.message)) })) : !error && /* @__PURE__ */ import_react13.default.createElement("p", { className: "wtt-agent-empty", role: "status" }, "\u6B63\u5728\u6253\u5F00\u5BF9\u8BDD\u2026")), tab === "plans" && /* @__PURE__ */ import_react13.default.createElement("section", { className: "wtt-agent-queue", "aria-label": "\u9879\u76EE\u59D4\u6258" }, !state?.plans?.length && /* @__PURE__ */ import_react13.default.createElement("p", { className: "wtt-agent-empty" }, state ? "\u6682\u65E0\u59D4\u6258" : "\u6B63\u5728\u8BFB\u53D6\u59D4\u6258\u2026"), /* @__PURE__ */ import_react13.default.createElement(Plans, { plans: state?.plans, act, locate, busy }), state?.total > 20 && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react13.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875"))), tab === "memory" && /* @__PURE__ */ import_react13.default.createElement(import_react13.default.Fragment, null, /* @__PURE__ */ import_react13.default.createElement(ProjectMemoryPanel, { call, onChanged: () => refresh().catch((e) => setError(e.message)), suggestions: state?.suggestions, onLocate: locate }), session && /* @__PURE__ */ import_react13.default.createElement("div", { className: "wtt-agent-footer" }, /* @__PURE__ */ import_react13.default.createElement(UiButton, { size: "compact", onClick: async () => {
       try {
         const v2 = await call("session", { replace: session });
         setSession(v2.sessionId);
@@ -3982,7 +4352,7 @@ var ProjectAgentFloat = import_react13.default.memo(function ProjectAgentFloat2(
       } catch (e) {
         setError(e.message);
       }
-    } }, "\u7528\u9879\u76EE\u8BB0\u5FC6\u5F00\u65B0\u5BF9\u8BDD")))
+    } }, "\u7528\u9879\u76EE\u8BB0\u5FC6\u5F00\u65B0\u5BF9\u8BDD"))), size3.w > 600 && /* @__PURE__ */ import_react13.default.createElement(UiButton, { variant: "custom", className: "wtt-agent-resize", "aria-label": "\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", title: "\u62D6\u52A8\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", ...resizeGrip }))
   ));
 });
 
@@ -4157,6 +4527,8 @@ function pinnedReference(card, context) {
   return Boolean(context?.pendingTaskId || context?.intent !== "revise" && !context?.blank && (card?.pinned || sameReference(card, context?.anchor)));
 }
 function referencePickReason(card, context) {
+  if (context?.projectAssistant && card?.kind === "whiteboard") return "\u8BF7\u5148\u5C06\u767D\u677F\u6587\u5B57\u4FDD\u5B58\u4E3A\u7D20\u6750";
+  if (context?.excludedReferenceIds?.has(card?.id)) return "\u5DF2\u5728\u9879\u76EE\u52A9\u624B\u7684\u5F15\u7528\u4E2D";
   const reason = unavailableReason(card);
   if (reason) return reason;
   if (context?.conversation && ["missing", "changed", "modified", "unavailable"].includes(card?.sourceStatus)) return "\u539F\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316";
@@ -4171,7 +4543,7 @@ function addPickedReferences(references, candidates, context) {
   for (const card of candidates) {
     if (!card || next.some((reference) => sameReference(reference, card)) || referencePickReason(card, context)) continue;
     if (next.length >= (context?.maxReferences ?? 24)) {
-      error = context?.maxReferences !== void 0 ? `\u672C\u6B21\u6700\u591A\u53EF\u518D\u6DFB\u52A0 ${context.maxReferences} \u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9009\u62E9\u3002` : "\u4E00\u6B21\u521B\u4F5C\u6700\u591A\u5F15\u7528 24 \u4EFD\u8D44\u6599\uFF0C\u8BF7\u5148\u53D6\u6D88\u90E8\u5206\u9009\u62E9\u3002";
+      error = context?.projectAssistant ? "\u9879\u76EE\u52A9\u624B\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u5F15\u7528\u3002" : context?.maxReferences !== void 0 ? `\u672C\u6B21\u6700\u591A\u53EF\u518D\u6DFB\u52A0 ${context.maxReferences} \u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9009\u62E9\u3002` : "\u4E00\u6B21\u521B\u4F5C\u6700\u591A\u5F15\u7528 24 \u4EFD\u8D44\u6599\uFF0C\u8BF7\u5148\u53D6\u6D88\u90E8\u5206\u9009\u62E9\u3002";
       break;
     }
     next.push(card);
@@ -45695,32 +46067,6 @@ var skillSearchText = (skill) => `${skillLabel(skill)} ${skill.name} ${skill.des
 // src/card-creation.jsx
 var import_react47 = __toESM(require("react"), 1);
 
-// src/skill-commands.mjs
-var SKILL_TOKEN = /(^|\s)\/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)/g;
-function extractSkillNames(text2) {
-  if (typeof text2 !== "string") return [];
-  return [...new Set([...text2.matchAll(SKILL_TOKEN)].map((match) => match[2]))];
-}
-function pptEngineForSelection({ pptEngine, selectedSkills = [] }) {
-  const names = selectedSkills.map((name2) => name2.replace(/-builtin$/, ""));
-  if (names.includes("claude-slides")) {
-    if (names.includes("wtt-course-pptx-builder")) throw new Error("PPT Builder \u4E0E\u5B9D\u7389\u5236\u4F5C\u662F\u4E24\u79CD\u5236\u4F5C\u65B9\u5F0F\uFF0C\u8BF7\u53EA\u9009\u62E9\u4E00\u79CD\u3002");
-    return "baoyu";
-  }
-  if (names.length) return "native";
-  return pptEngine || "native";
-}
-function skillQueryAtCursor(text2, cursor) {
-  if (typeof text2 !== "string" || !Number.isInteger(cursor) || cursor < 0 || cursor > text2.length) return null;
-  const match = text2.slice(0, cursor).match(/(?:^|\s)\/([a-z0-9-]*)$/i);
-  if (!match) return null;
-  const start2 = cursor - match[1].length - 1;
-  let end = cursor;
-  while (end < text2.length && !/\s/.test(text2[end])) end += 1;
-  if (!/^\/[a-z0-9-]*$/i.test(text2.slice(start2, end))) return null;
-  return { query: match[1], start: start2, end };
-}
-
 // src/skill-settings.jsx
 var import_react43 = __toESM(require("react"), 1);
 
@@ -47114,190 +47460,6 @@ function CardComposer({
     ), /* @__PURE__ */ import_react47.default.createElement("div", { ref: conversationPanel, id: `${id2}-conversation`, className: "wcc-creation-conversation", hidden: !visible || collapsed || !conversationOpen || !hasConversation }, conversation)),
     /* @__PURE__ */ import_react47.default.createElement(SkillSettings, { open: visible && skillSettingsOpen, catalog: skillCatalog, loading: skillCatalogLoading, error: skillCatalogError, onRefresh: onRefreshSkills, onSave: onSaveSkillSettings, onPreference: onUpdateSkillPreference, onClose: () => setSkillSettingsOpen(false) })
   );
-}
-
-// src/creation-context.mjs
-var CARD_WIDTH = 320;
-var CARD_HEIGHT = 256;
-var OUTPUT_CARD_SIZE = Object.freeze({ width: CARD_WIDTH * 2, height: CARD_HEIGHT * 2 });
-var BLOCKED = /^(missing|modified|changed|unavailable)$/;
-var FIELDS2 = ["id", "nodeId", "kind", "artifactKind", "title", "number", "refId", "content", "excerpt", "path", "sourcePath", "sourceHash", "status", "sourceStatus", "extracted", "excerptInfo", "importedFile", "generatedFile", "whiteboardSource", "referenceNote", "unavailable"];
-function creationSource(card) {
-  return card?.sourceId ? { ...card, id: card.sourceId, nodeId: card.nodeId || card.id } : card;
-}
-function usableCreationSource(card) {
-  return Boolean(card && card.kind !== "whiteboard" && /^[a-f0-9]{64}$/i.test(card.sourceHash || "") && !BLOCKED.test(card.status || ""));
-}
-function freezeCreationSource(card) {
-  card = creationSource(card);
-  if (!usableCreationSource(card)) throw new Error("\u6B64\u5361\u7247\u5C1A\u65E0\u53EF\u7528\u7684\u5DF2\u4FDD\u5B58\u6765\u6E90\uFF0C\u8BF7\u5148\u4FDD\u5B58\u7D20\u6750\u6216\u6838\u5BF9\u6587\u4EF6\u72B6\u6001\u3002");
-  const value = Object.fromEntries(FIELDS2.filter((key) => card[key] !== void 0).map((key) => [key, card[key]]));
-  return JSON.parse(JSON.stringify(value));
-}
-function createCardContext({ projectId, projectName: projectName2, projectPath, requirement, anchor, outputType = "outline", outputPosition, selection: selection2, generation, blank: blank2 = false }) {
-  if (!projectId || !requirement?.id) throw new Error("\u9879\u76EE\u6216\u753B\u5E03\u5C1A\u672A\u5C31\u7EEA\u3002");
-  if (blank2 && anchor?.kind !== "canvas") throw new Error("\u7A7A\u767D\u521B\u4F5C\u53EA\u80FD\u4ECE\u753B\u5E03\u5165\u53E3\u53D1\u8D77");
-  const frozen = blank2 ? { id: `canvas:${requirement.id}`, kind: "canvas", title: "\u65B0\u5EFA\u5185\u5BB9" } : freezeCreationSource(anchor);
-  const references = blank2 ? [] : [frozen];
-  return {
-    key: `${projectId}:${requirement.id}:${frozen.id}:${outputType}${selection2 ? `:range:${selection2.start}-${selection2.end}` : ""}`,
-    projectId,
-    projectName: projectName2,
-    projectPath,
-    requirementId: requirement.id,
-    requirementTitle: requirement.title,
-    requirement: Object.fromEntries(["id", "title", "customer", "audience", "background", "objectives"].map((key) => [key, requirement[key] || ""])),
-    anchor: frozen,
-    blank: blank2,
-    intent: "new",
-    outputType,
-    ...outputType === "pptx" ? { pptEngine: "baoyu" } : {},
-    references,
-    instruction: "",
-    originalInput: { instruction: "", references: JSON.parse(JSON.stringify(references)), taskId: null, sessionId: null },
-    ...generation ? { generation: { ...generation } } : {},
-    outputPosition: { ...outputPosition },
-    ...selection2 ? { selection: JSON.parse(JSON.stringify(selection2)) } : {}
-  };
-}
-function createCompositionContext({ projectId, projectName: projectName2, projectPath, requirement, descriptor }) {
-  const { card, node, composition } = descriptor;
-  const references = JSON.parse(JSON.stringify(composition.references));
-  const anchor = references[0] || { id: `canvas:${requirement.id}`, kind: "canvas", title: "\u65B0\u5EFA\u5185\u5BB9" };
-  return {
-    key: `${projectId}:${requirement.id}:compose:${card.id}`,
-    projectId,
-    projectName: projectName2,
-    projectPath,
-    requirementId: requirement.id,
-    requirementTitle: requirement.title,
-    requirement,
-    anchor,
-    targetCard: JSON.parse(JSON.stringify(node)),
-    composerNodeId: node.id,
-    intent: "new",
-    blank: references.length === 0,
-    outputType: card.type,
-    ...card.type === "pptx" ? { pptEngine: "baoyu" } : {},
-    references,
-    instruction: composition.instruction,
-    draftRevision: composition.revision,
-    draftSaved: JSON.stringify([composition.instruction, references.map((r) => [r.id, r.sourceHash])]),
-    generation: { mode: "new", cardId: card.id },
-    outputPosition: { ...node.position },
-    originalInput: { instruction: composition.instruction, references: JSON.parse(JSON.stringify(references)), taskId: null, sessionId: null }
-  };
-}
-function createRevisionContext({ projectId, projectName: projectName2, projectPath, requirement, descriptor }) {
-  const { card, version: version2, node, editor } = descriptor || {};
-  if (!projectId || !requirement?.id || !card?.id || !version2?.id || !node) throw new Error("\u6B64\u4EA7\u7269\u7248\u672C\u8BB0\u5F55\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u5237\u65B0\u753B\u5E03\u3002");
-  const references = JSON.parse(JSON.stringify(editor?.references || []));
-  const originalInput = {
-    instruction: editor?.instruction || "",
-    references: JSON.parse(JSON.stringify(references)),
-    taskId: editor?.taskId || version2.taskId || null,
-    sessionId: editor?.sessionId || null,
-    generationMethod: editor?.generationMethod || "skill",
-    ...editor?.media ? { mediaOptions: { ...editor.media } } : {},
-    ...editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {}
-  };
-  return {
-    key: `${projectId}:${requirement.id}:revise:${card.id}:${version2.id}`,
-    projectId,
-    projectName: projectName2,
-    projectPath,
-    requirementId: requirement.id,
-    requirementTitle: requirement.title,
-    requirement: Object.fromEntries(["id", "title", "customer", "audience", "background", "objectives"].map((key) => [key, requirement[key] || ""])),
-    anchor: creationSource(node),
-    targetCard: JSON.parse(JSON.stringify(node)),
-    intent: "revise",
-    outputType: card.type,
-    ...card.type === "pptx" ? { pptEngine: editor?.pptEngine || "native" } : {},
-    references,
-    instruction: editor?.instruction || "",
-    ...editor?.modelSelection ? { modelSelection: { ...editor.modelSelection } } : {},
-    originalInput,
-    generation: { mode: "revise", cardId: card.id, baseVersionId: version2.id },
-    outputPosition: { ...node.position },
-    taskId: editor?.taskId || version2.taskId || null,
-    sessionId: editor?.sessionId || null,
-    generationMethod: "skill",
-    ...editor?.media ? { mediaOptions: { ...editor.media } } : {},
-    ...editor?.mediaJob ? { mediaJob: { ...editor.mediaJob } } : {},
-    recorded: editor?.recorded !== false,
-    referenceNotes: JSON.parse(JSON.stringify(editor?.referenceNotes || [])),
-    selectedSkills: [...editor?.selectedSkills || []],
-    baseVersion: { id: version2.id, number: version2.number }
-  };
-}
-function updateCreationReferences(context, cards) {
-  const pinned = context.intent !== "revise" && !context.blank;
-  const seen = new Set(pinned ? [context.anchor.id] : []);
-  const references = pinned ? [context.anchor] : [];
-  for (let card of cards) {
-    card = creationSource(card);
-    if (seen.has(card.id)) continue;
-    if (references.length >= 24) throw new Error("\u4E00\u6B21\u521B\u4F5C\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\u3002");
-    seen.add(card.id);
-    references.push(context.references.find((item) => item.id === card.id) || freezeCreationSource(card));
-  }
-  return { ...context, references };
-}
-function creationTaskInput(context) {
-  return {
-    requirementId: context.requirementId,
-    selectedCardIds: context.references.map((card) => card.id),
-    sourceRefs: context.references.map((card) => ({ cardId: card.id, hash: card.sourceHash })),
-    instruction: context.instruction.trim(),
-    outputType: context.outputType,
-    ...context.pptEngine ? { pptEngine: context.pptEngine } : {},
-    outputPosition: { ...context.outputPosition },
-    selectedSkills: extractSkillNames(context.instruction),
-    ...["image", "video"].includes(context.outputType) ? { generationMethod: context.generationMethod || "skill" } : {},
-    ...context.selection ? { selection: { ...context.selection } } : {},
-    ...context.generation ? { generation: { ...context.generation } } : {}
-  };
-}
-function creationPositionFree(position, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
-  return Number.isFinite(position?.x) && Number.isFinite(position?.y) && Math.abs(position.x) <= 999e3 && Math.abs(position.y) <= 999e3 && !cards.some((card) => position.x < card.position.x + (card.width || CARD_WIDTH) + 24 && position.x + width + 24 > card.position.x && position.y < card.position.y + (card.height || CARD_HEIGHT) + 24 && position.y + height + 24 > card.position.y);
-}
-function adjacentCreationPosition(anchor, cards, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
-  const min2 = -999e3, maxX = 999e3 - width, maxY = 999e3 - height;
-  const clamp3 = (value, max2) => Math.max(min2, Math.min(max2, value));
-  const origin = { x: clamp3(anchor.position.x + (anchor.width || CARD_WIDTH) + 80, maxX), y: clamp3(anchor.position.y, maxY) };
-  const columns = /* @__PURE__ */ new Set([origin.x, clamp3(anchor.position.x - width - 80, maxX), min2, maxX]);
-  for (const card of cards) {
-    columns.add(clamp3(card.position.x + (card.width || CARD_WIDTH) + 24, maxX));
-    columns.add(clamp3(card.position.x - width - 24, maxX));
-  }
-  let best = null, score = Infinity;
-  for (const x2 of [...columns].sort((a, b2) => Math.abs(a - origin.x) - Math.abs(b2 - origin.x) || b2 - a)) {
-    const distance2 = (x2 - origin.x) ** 2;
-    if (distance2 > score) break;
-    const intervals = cards.filter((card) => x2 < card.position.x + (card.width || CARD_WIDTH) + 24 && x2 + width + 24 > card.position.x).map((card) => [card.position.y - height - 24, card.position.y + (card.height || CARD_HEIGHT) + 24]).sort((a, b2) => a[0] - b2[0]);
-    const merged = [];
-    for (const interval2 of intervals) {
-      const last = merged.at(-1);
-      if (last && interval2[0] < last[1]) last[1] = Math.max(last[1], interval2[1]);
-      else merged.push([...interval2]);
-    }
-    const blocked = merged.find(([top, bottom]) => origin.y > top && origin.y < bottom);
-    const rows = blocked ? [blocked[1], blocked[0]] : [origin.y];
-    for (const y2 of rows) {
-      if (y2 < min2 || y2 > maxY) continue;
-      const nextScore = distance2 + (y2 - origin.y) ** 2;
-      if (nextScore < score && creationPositionFree({ x: x2, y: y2 }, cards, width, height)) {
-        best = { x: x2, y: y2 };
-        score = nextScore;
-      }
-    }
-  }
-  if (!best) throw new Error("\u6765\u6E90\u9644\u8FD1\u6CA1\u6709\u53EF\u7528\u7684\u5361\u7247\u4F4D\u7F6E\uFF0C\u8BF7\u6574\u7406\u753B\u5E03\u540E\u91CD\u8BD5\u3002");
-  return best;
-}
-function visibleCreationPosition(anchor, cards, viewport, size3, width = OUTPUT_CARD_SIZE.width, height = OUTPUT_CARD_SIZE.height) {
-  return adjacentCreationPosition(anchor, cards, width, height);
 }
 
 // src/slide-draft-cover.jsx
@@ -52458,7 +52620,7 @@ function CanvasContent({
   }
   function startConversationReferencePick(owner) {
     if (busy || loading || referencePickRef.current) throw new Error("\u8BF7\u5148\u5B8C\u6210\u5F53\u524D\u64CD\u4F5C\uFF0C\u518D\u6DFB\u52A0\u753B\u5E03\u8D44\u4EA7\u3002");
-    if (!owner.maxReferences) throw new Error("\u4E00\u6761\u6D88\u606F\u6700\u591A\u6DFB\u52A024\u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9644\u4EF6\u3002");
+    if (!owner.maxReferences) throw new Error("\u4E00\u6761\u6D88\u606F\u6700\u591A\u6DFB\u52A0 24 \u4EFD\u5F15\u7528\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u5F15\u7528\u3002");
     cancelCardOpen();
     cancelPaneInsert();
     setContextMenu(null);
@@ -52471,7 +52633,15 @@ function CanvasContent({
       scope: `${projectId}:${requirement.id}`,
       epoch: epochRef.current,
       references: [],
-      context: { intent: "revise", blank: true, outputType: "text", conversation: true, maxReferences: owner.maxReferences },
+      context: {
+        intent: "revise",
+        blank: true,
+        outputType: "text",
+        conversation: true,
+        maxReferences: owner.maxReferences,
+        projectAssistant: owner.projectAssistant,
+        excludedReferenceIds: new Set(owner.excludedReferenceIds)
+      },
       controller: new AbortController(),
       previousTool: tool,
       busy: false,
@@ -52533,7 +52703,15 @@ function CanvasContent({
     const submitting = { ...pick, busy: true, error: "" };
     updateReferencePick(submitting);
     try {
-      if (pick.mode === "conversation") {
+      if (pick.projectAssistant) {
+        const current = [...referenceOptionsRef.current.values()].map((option) => option.card);
+        const cards = pick.references.map((ref) => {
+          const card = current.find((candidate) => candidate.id === ref.id && candidate.sourceHash === ref.sourceHash);
+          if (!card || referencePickReason(card, pick.context)) throw new Error("\u5F15\u7528\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002");
+          return card;
+        });
+        pick.stageCards(cards);
+      } else if (pick.mode === "conversation") {
         const files = await loadConversationReferenceFiles(pick.references, {
           endpoint: endpoint2,
           signal: pick.controller.signal,
@@ -53157,7 +53335,8 @@ function CanvasContent({
       selected: agentSelection.current,
       request,
       renderConversation: renderEditorConversation,
-      canvasActions: agentActions
+      canvasActions: agentActions,
+      picking: pickingReferences && Boolean(referencePick.projectAssistant)
     }
   ), taskControl && /* @__PURE__ */ import_react59.default.createElement(
     TaskControlDialog,
@@ -53235,7 +53414,7 @@ function CanvasContent({
     },
     /* @__PURE__ */ import_react59.default.createElement(Background, { gap: 24, size: 1, color: "var(--wtt-ui-grid, #d4d9e3)" }),
     showMap && /* @__PURE__ */ import_react59.default.createElement(MiniMap, { pannable: true, zoomable: true, position: "bottom-right", nodeColor: (node) => node.type === "whiteboard" ? "var(--wtt-ui-warning, #e6ce8d)" : "var(--wtt-ui-edge, #a6b6d5)" })
-  )), pickingReferences && /* @__PURE__ */ import_react59.default.createElement("div", { className: "wcc-reference-pick-bar", role: "region", "aria-label": "\u9009\u62E9\u753B\u5E03\u5F15\u7528" }, /* @__PURE__ */ import_react59.default.createElement("strong", { "aria-live": "polite" }, referencePick.mode === "conversation" ? "\u6DFB\u52A0\u5BF9\u8BDD\u9644\u4EF6" : "\u9009\u62E9\u5F15\u7528", " \xB7 ", referencePick.references.length, "/", referencePick.mode === "conversation" ? referencePick.context.maxReferences : 24), /* @__PURE__ */ import_react59.default.createElement(UiButton, { variant: "quiet", disabled: referencePick.busy, onClick: () => finishReferencePick() }, "\u53D6\u6D88"), /* @__PURE__ */ import_react59.default.createElement(UiButton, { ref: referenceDoneButton, variant: "primary", disabled: referencePick.busy, onClick: () => void confirmReferencePick() }, referencePick.busy ? "\u6B63\u5728\u6DFB\u52A0\u2026" : "\u5B8C\u6210"), referencePick.error && /* @__PURE__ */ import_react59.default.createElement(UserError, { error: referencePick.error })), /* @__PURE__ */ import_react59.default.createElement(
+  )), pickingReferences && /* @__PURE__ */ import_react59.default.createElement("div", { className: "wcc-reference-pick-bar", role: "region", "aria-label": "\u9009\u62E9\u753B\u5E03\u5F15\u7528" }, /* @__PURE__ */ import_react59.default.createElement("strong", { "aria-live": "polite" }, referencePick.mode === "conversation" && !referencePick.projectAssistant ? "\u6DFB\u52A0\u5BF9\u8BDD\u9644\u4EF6" : "\u9009\u62E9\u5F15\u7528", " \xB7 ", referencePick.references.length, "/", referencePick.context?.maxReferences ?? 24), /* @__PURE__ */ import_react59.default.createElement(UiButton, { variant: "quiet", disabled: referencePick.busy, onClick: () => finishReferencePick() }, "\u53D6\u6D88"), /* @__PURE__ */ import_react59.default.createElement(UiButton, { ref: referenceDoneButton, variant: "primary", disabled: referencePick.busy, onClick: () => void confirmReferencePick() }, referencePick.busy ? "\u6B63\u5728\u6DFB\u52A0\u2026" : "\u5B8C\u6210"), referencePick.error && /* @__PURE__ */ import_react59.default.createElement(UserError, { error: referencePick.error })), /* @__PURE__ */ import_react59.default.createElement(
     CanvasChrome,
     {
       pickingReferences,

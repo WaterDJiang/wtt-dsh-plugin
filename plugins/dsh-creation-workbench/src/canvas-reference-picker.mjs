@@ -28,6 +28,8 @@ export function pinnedReference(card, context) {
 }
 
 export function referencePickReason(card, context) {
+  if (context?.projectAssistant && card?.kind === 'whiteboard') return '请先将白板文字保存为素材';
+  if (context?.excludedReferenceIds?.has(card?.id)) return '已在项目助手的引用中';
   const reason = unavailableReason(card)
   if (reason) return reason
   if (context?.conversation && ['missing', 'changed', 'modified', 'unavailable'].includes(card?.sourceStatus)) return '原文件已缺失或变化'
@@ -42,7 +44,7 @@ export function addPickedReferences(references, candidates, context) {
   let error = ''
   for (const card of candidates) {
     if (!card || next.some(reference => sameReference(reference, card)) || referencePickReason(card, context)) continue
-    if (next.length >= (context?.maxReferences ?? 24)) { error = context?.maxReferences !== undefined ? `本次最多可再添加 ${context.maxReferences} 份附件，请先移除部分选择。` : '一次创作最多引用 24 份资料，请先取消部分选择。'; break }
+    if (next.length >= (context?.maxReferences ?? 24)) { error = context?.projectAssistant ? '项目助手最多引用 24 张卡片，请先移除部分引用。' : context?.maxReferences !== undefined ? `本次最多可再添加 ${context.maxReferences} 份附件，请先移除部分选择。` : '一次创作最多引用 24 份资料，请先取消部分选择。'; break }
     next.push(card)
   }
   return { references: next, error }

@@ -3,9 +3,11 @@ import { UiButton, UiIcon } from './ui/controls.jsx'
 import { conversationAttachmentsLocked, MAX_CONVERSATION_FILES, stageConversationReferenceFiles } from './conversation-references.mjs'
 
 export const CanvasConversationReferenceContext = createContext(null)
+export const ProjectInputContext = createContext(null)
 
 export function CanvasConversationReferenceButton({ sessionId, useInput, inputActions, getAttachmentService }) {
   const picker = useContext(CanvasConversationReferenceContext)
+  const projectAssistant = useContext(ProjectInputContext)
   const phase = useInput(value => value.phase)
   const claim = useInput(value => value.claim)
   const attachmentIds = useInput(value => value.attachmentIds)
@@ -15,7 +17,7 @@ export function CanvasConversationReferenceButton({ sessionId, useInput, inputAc
   const [error, setError] = useState('')
   current.current = { sessionId, input }
   useEffect(() => { live.current = true; return () => { live.current = false; cancel.current?.() } }, [sessionId])
-  if (!picker) return null
+  if (!picker || projectAssistant) return null
   const supported = Boolean(getAttachmentService()?.createDrafts && getAttachmentService()?.releaseDraftAttachments && inputActions?.addAttachments)
   const remaining = Math.max(0, MAX_CONVERSATION_FILES - input.attachmentIds.length)
   const disabled = !remaining || picker.busy || conversationAttachmentsLocked(input) || !supported

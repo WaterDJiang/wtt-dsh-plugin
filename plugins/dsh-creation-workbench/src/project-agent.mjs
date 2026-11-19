@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { ProjectMemory } from './project-memory.mjs';
+import { extractSkillNames } from './skill-commands.mjs';
 
 export const modes = ['plan','auto','step'];
 const supported = ['text','pptx','image','video'];
@@ -51,7 +52,7 @@ export class ProjectAgent {
     })().finally(()=>{this.opening=null});
     return this.opening;
   }
-  requireSession(id) {if (!id || id!==this.sessionId()) throw Error('只能由本项目已绑定的总 Agent 对话操作');}
+  requireSession(id) {if (!id || id!==this.sessionId()) throw Error('只能由本项目已绑定的助手对话操作');}
   canvas(id){const r=this.service.store.getRequirement(id);if(!r)throw Error('目标画布已失效或不属于当前项目');return r;}
   freeze(requirementId, refs, options) {
     if (!Array.isArray(refs)||refs.length>24)throw Error('一次最多引用 24 张卡片');
@@ -92,9 +93,10 @@ export class ProjectAgent {
   turn({sessionId,requirementId,refs=[],mode,text}) {
     this.requireSession(sessionId); if(!modes.includes(mode)||!checkText(text,8000))throw Error('执行档位或创作要求无效');
     this.canvas(requirementId);
-    const sources=this.freeze(requirementId,refs);
+    if(!Array.isArray(refs)||refs.length>24)throw Error('一次最多引用 24 张卡片');
+    const sources=limitSourceContent(this.freezeByCanvas(refs,requirementId));
     const id=randomUUID();
-    this.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(id,sessionId,json({requirementId,mode,sources,text}));
+    this.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(id,sessionId,json({requirementId,mode,sources,text,skills:extractSkillNames(text)}));
     return {id};
   }
   promptContext(sessionId,requestId){
@@ -103,7 +105,8 @@ export class ProjectAgent {
     this.activeTurns.add(requestId);
     const turn=parse(row.data);
     const context={turnId:requestId,mode:turn.mode,canvas:{id:turn.requirementId,title:this.canvas(turn.requirementId).title},sources:turn.sources.map(summary)};
-    return '[工作台发送现场] '+json(context)+'\n你是本项目的画布总 Agent。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
+    if(turn.skills?.length)context.skills=turn.skills;
+    return '[工作台发送现场] '+json(context)+'\n你是这个项目的画布助手。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。发送现场的 skills 是用户为本轮调用的技能。委托步骤需要其中的技能时，在该步骤 instruction 中用独立的 /技能名 标明，使原任务也加载该技能。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
   }
   steps(id){return this.db.prepare('SELECT * FROM pa_steps WHERE plan_id=? ORDER BY seq').all(id).map(r=>({...r,data:parse(r.data),receipt:r.receipt?parse(r.receipt):null}));}
   approvalToken(id){
@@ -131,14 +134,14 @@ export class ProjectAgent {
     return this.pendingEvents().map(({key})=>({key,type:'pending'})).concat(completed.map(r=>({key:'task:'+r.task_id,type:'completed'})));
   }
   progress(){
-    const counts=this.db.prepare("SELECT count(*) AS total,count(*) FILTER(WHERE state NOT IN ('done','stopped')) AS active FROM pa_plans").get();
+    const counts=this.db.prepare("SELECT count(*) AS total,count(*) FILTER(WHERE state NOT IN ('done','stopped')) AS active,count(*) FILTER(WHERE state='approval') AS approvals FROM pa_plans").get();
     const steps=this.db.prepare(`SELECT count(task_id) AS assigned,count(*) FILTER(WHERE state='done') AS completed,
       count(*) FILTER(WHERE state='blocked') AS blocked,count(*) FILTER(WHERE state='stopped') AS stopped FROM pa_steps`).get();
     return {...counts,waiting:new Set(this.pendingEvents().map(e=>e.planId)).size,signature:[steps.assigned,steps.completed,steps.blocked,steps.stopped].join('/')};
   }
   plans(page=0){
     if(!Number.isSafeInteger(page)||page<0||page>1000000)throw Error('委托页码无效');
-    return this.db.prepare("SELECT * FROM pa_plans ORDER BY CASE WHEN state IN ('done','stopped') THEN 1 ELSE 0 END,rowid DESC LIMIT 20 OFFSET ?").all(page*20).map(plan=>{
+    return this.db.prepare("SELECT * FROM pa_plans ORDER BY CASE WHEN state='approval' THEN 0 WHEN state IN ('done','stopped') THEN 2 ELSE 1 END,rowid DESC LIMIT 20 OFFSET ?").all(page*20).map(plan=>{
       const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps});
       const change=this.change(plan.id);
       return {...plan,scopeToken:this.approvalToken(plan.id),change:change&&{id:change.id,start:change.start,steps:change.data.map(describe)},

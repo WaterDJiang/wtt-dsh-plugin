@@ -2750,11 +2750,12 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
   }
   function startConversationReferencePick(owner) {
     if (busy || loading || referencePickRef.current) throw new Error('请先完成当前操作，再添加画布资产。')
-    if (!owner.maxReferences) throw new Error('一条消息最多添加24份附件，请先移除部分附件。')
+    if (!owner.maxReferences) throw new Error('一条消息最多添加 24 份引用，请先移除部分引用。')
     cancelCardOpen(); cancelPaneInsert(); setContextMenu(null); setCreationMenu(null)
     const key = `conversation:${owner.sessionId}:${crypto.randomUUID()}`
     updateReferencePick({ ...owner, key, mode: 'conversation', scope: `${projectId}:${requirement.id}`, epoch: epochRef.current,
-      references: [], context: { intent: 'revise', blank: true, outputType: 'text', conversation: true, maxReferences: owner.maxReferences },
+      references: [], context: { intent: 'revise', blank: true, outputType: 'text', conversation: true, maxReferences: owner.maxReferences,
+        projectAssistant: owner.projectAssistant, excludedReferenceIds: new Set(owner.excludedReferenceIds) },
       controller: new AbortController(), previousTool: tool, busy: false, error: '' })
     referenceBoxBase.current = null
     setTool('select')
@@ -2797,7 +2798,15 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     const submitting = { ...pick, busy: true, error: '' }
     updateReferencePick(submitting)
     try {
-      if (pick.mode === 'conversation') {
+      if (pick.projectAssistant) {
+        const current = [...referenceOptionsRef.current.values()].map(option => option.card)
+        const cards = pick.references.map(ref => {
+          const card = current.find(candidate => candidate.id === ref.id && candidate.sourceHash === ref.sourceHash);
+          if (!card || referencePickReason(card, pick.context)) throw new Error('引用已变化，请重新选择。')
+          return card
+        })
+        pick.stageCards(cards)
+      } else if (pick.mode === 'conversation') {
         const files = await loadConversationReferenceFiles(pick.references, { endpoint, signal: pick.controller.signal,
           isCurrent: () => referencePickRef.current === submitting && referencePickCurrent(submitting),
           currentCard: card => referenceOptionsRef.current.get(card.nodeId || card.id)?.card })
@@ -3213,7 +3222,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
     if (!event.target.closest('input,textarea,button,select,summary,[popover],[contenteditable="true"],[role="textbox"],[role="separator"]')) rootRef.current?.focus({ preventScroll: true })
   }} data-large-canvas={nodes.length >= LARGE_CANVAS_THRESHOLD || undefined} data-editor-fullscreen={!pickingReferences&&dockOpen&&editorFullscreen||undefined} data-dock-open={!pickingReferences&&dockOpen || undefined} data-dock-mobile={dock.mobile || undefined} data-dock-resizing={dock.dragging || undefined} style={{ '--wtt-dock-width': `${dock.width}px` }} className={`wtt-course-canvas wcc-studio${sidebar ? '' : ' is-sidebar-collapsed'}${deskVisible ? ' is-focus-open' : ''} is-tool-${tool}${pickingReferences ? ' is-picking-references' : ''}`}>
     {active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current}
-      request={request} renderConversation={renderEditorConversation} canvasActions={agentActions}/>}
+      request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/>}
     {taskControl && <TaskControlDialog key={requirement.id + ':' + taskControl.taskId} taskId={taskControl.taskId} requirementId={requirement.id}
       request={request} onClose={() => setTaskControl(null)} onChanged={async () => { await refreshTasks(); await loadBoard({preserveViewport:true,keepVisible:true}) }}
       onRemove={() => void removeElements()} />}
@@ -3257,7 +3266,7 @@ function CanvasContent({ fileRecycleSignal, projectFileSelection, onCloseProject
           {showMap && <MiniMap pannable zoomable position="bottom-right" nodeColor={node => node.type === 'whiteboard' ? 'var(--wtt-ui-warning, #e6ce8d)' : 'var(--wtt-ui-edge, #a6b6d5)'} />}
         </ReactFlow></CanvasReferencePickerContext.Provider>}
         {pickingReferences && <div className="wcc-reference-pick-bar" role="region" aria-label="选择画布引用">
-          <strong aria-live="polite">{referencePick.mode === 'conversation' ? '添加对话附件' : '选择引用'} · {referencePick.references.length}/{referencePick.mode === 'conversation' ? referencePick.context.maxReferences : 24}</strong>
+          <strong aria-live="polite">{referencePick.mode === 'conversation' && !referencePick.projectAssistant ? '添加对话附件' : '选择引用'} · {referencePick.references.length}/{referencePick.context?.maxReferences ?? 24}</strong>
           <UiButton variant="quiet" disabled={referencePick.busy} onClick={() => finishReferencePick()}>取消</UiButton>
           <UiButton ref={referenceDoneButton} variant="primary" disabled={referencePick.busy} onClick={() => void confirmReferencePick()}>{referencePick.busy ? '正在添加…' : '完成'}</UiButton>
           {referencePick.error && <UserError error={referencePick.error} />}

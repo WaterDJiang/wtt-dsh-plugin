@@ -6,6 +6,7 @@ await mkdir(new URL('../dist/', import.meta.url), { recursive: true });
 for(const file of ['word-editor.js','word-editor.css'])await rm(new URL(`../dist/${file}`,import.meta.url),{force:true});
 const clientBuild=await build({
   entryPoints: ['src/client.jsx'], bundle: true, format: 'cjs', target: 'es2022',
+  loader: { '.png': 'dataurl' },
   external: ['@deepseek-ai/dsh-client-ui-sidebar-documentpreview', 'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'], outfile: 'dist/client.cjs',
   minify: false, legalComments: 'inline', metafile:true,
 });

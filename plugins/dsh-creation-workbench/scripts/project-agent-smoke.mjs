@@ -5,7 +5,7 @@ import { once } from 'node:events';
 // Isolated Messages transport. DSH still admits the prompt, executes each tool,
 // publishes the session events and persists the exact primary output.
 export async function projectAgentModel(fixture){
-  const calls=[], evidence=[];
+  const calls=[], evidence=[], skillInvocations=[];
   const server=createServer(async(req,res)=>{
     try{
       let raw='';for await(const chunk of req)raw+=chunk;
@@ -13,8 +13,10 @@ export async function projectAgentModel(fixture){
       const ended=messages.at(-1)?.content?.some?.(b=>b.type==='tool_result');
       if(text.includes('回忆验收')&&ended)evidence.push(JSON.stringify(messages.at(-1).content));
       const turn=text.match(/"turnId":"([\da-f-]+)"/),task=text.match(/taskId=([\da-f-]{36})/),canvas=text.match(/requirementId=([\da-f-]{36})/);
+      const skill=text.includes('WTT-SKILL-CONTENT-VERIFIED');
+      if(skill)skillInvocations.push(task?'task':'supervisor');
       let name,input;
-      if(!ended&&turn){name='workbench_project';input={action:'plan',turnId:turn[1],data:JSON.stringify({title:'浏览器跨画布委托',steps:[{title:'脚本',type:'text',instruction:'写验收脚本',requirementId:fixture.other},{title:'分镜',type:'text',instruction:'从脚本写分镜',requirementId:fixture.other,useSelection:false,dependsOn:[1]}]})};}
+      if(!ended&&turn){name='workbench_project';input={action:'plan',turnId:turn[1],data:JSON.stringify({title:'浏览器跨画布委托',steps:[{title:'脚本',type:'text',instruction:skill&&text.includes('"skills":["wtt-qa-layout"]')?'/wtt-qa-layout 写验收脚本':'写验收脚本',requirementId:fixture.other},{title:'分镜',type:'text',instruction:'从脚本写分镜',requirementId:fixture.other,useSelection:false,dependsOn:[1]}]})};}
       if(!ended&&task&&canvas){name='course_save_outline';input={requirementId:canvas[1],taskId:task[1],primary:true,markdown:'# '+(text.includes('从脚本写分镜')?'验收分镜':'验收脚本'),operationId:randomUUID()};}
       if(!ended&&turn&&text.includes('回忆验收')){name='workbench_project';input={action:'context',turnId:turn[1],data:'{"query":"脚本"}'};}
       const gate=process.env.WTT_AGENT_SMOKE_QUESTION==='1'&&task&&canvas&&text.includes('写验收脚本');
@@ -39,5 +41,5 @@ export async function projectAgentModel(fixture){
     }catch(e){console.error('合成模型请求',e.message);res.writeHead(500);res.end();}
   });
   server.listen(0,'127.0.0.1');await once(server,'listening');
-  return {calls,evidence,env:{DEEPSEEK_API_KEY:'sk-'+'0'.repeat(32),DEEPSEEK_BASE_URL:'http://127.0.0.1:'+server.address().port},close:()=>server.close()};
+  return {calls,evidence,skillInvocations,env:{DEEPSEEK_API_KEY:'sk-'+'0'.repeat(32),DEEPSEEK_BASE_URL:'http://127.0.0.1:'+server.address().port},close:()=>server.close()};
 }

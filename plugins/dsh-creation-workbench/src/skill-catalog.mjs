@@ -206,12 +206,16 @@ export async function createWorkbenchSkillCatalog(ctx, config = {}) {
   }
   return {
     list(cwd) { return run(() => observe(cwd || initialCwd, active, settings, [...startupWarnings])); },
-    resolve(cwd, names) {
+    resolve(cwd, names, scope) {
       return run(async () => {
         const requested = skillNames(names, '调用的 Skill');
         const result = [];
+        const presets = scope && ctx.get?.('agentPresets');
+        const registry = presets?.serviceFor(scope, 'skills') || ctx.skills;
+        const workingDirectory = scope && ctx.get?.('workingDirectory');
+        const workspace = workingDirectory ? await workingDirectory.ensure(scope) : cwd;
         for (const name of requested) {
-          const skill = await ctx.skills.get(name, { cwd: cwd || initialCwd });
+          const skill = await registry.get(name, { cwd: workspace || cwd || initialCwd, ...(scope ? { scope } : {}) });
           if (!skill?.invocation.userInvocable) throw new Error(`技能「${name}」不存在或当前不可调用；原任务与文件保留，请重新选择本机技能创建任务。`);
           result.push({ name: skill.name, description: skill.description, path: skill.path ?? null, hash: hash(skill.content) });
         }

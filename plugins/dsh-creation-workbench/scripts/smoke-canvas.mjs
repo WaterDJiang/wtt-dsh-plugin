@@ -8,7 +8,7 @@ import { execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, realpath, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,8 +38,10 @@ async function seed(workspace) {
     const nodeId = `material:${material.id}`;
     service.canvas.saveBoard({ requirementId: id, expectedRevision: service.canvas.getBoard(id).revision,
       positions: { [nodeId]: { x: 80, y: 150 } }, viewport: { x: 0, y: 0, zoom: 0.8 } });
-    const other = scenario==='agent' ? service.store.createCanvas({title:'总 Agent 目标画布',operationId:randomUUID()}).id : null;
+    const other = scenario==='agent' ? service.store.createCanvas({title:'项目助手目标画布',operationId:randomUUID()}).id : null;
     if(other)service.canvas.addMaterial({requirementId:id,title:'采访乙',content:'验收第二份来源',operationId:randomUUID()});
+    const reference=other&&process.env.WTT_AGENT_UI_SMOKE==='1'
+      ?service.canvas.addMaterial({requirementId:other,title:'项目资料丙',content:'跨画布引用验收',operationId:randomUUID()}).material:null;
     if(scenario==='agent'&&process.env.WTT_AGENT_AUDIT_PAGES==='1'){
       const {ProjectAgent}=await import('../src/project-agent.mjs');
       const agent=new ProjectAgent(service,{});
@@ -49,7 +51,7 @@ async function seed(workspace) {
         agent.proposal(turnId,{title:'待办 '+i,steps:[{title:'脚本',instruction:'制作脚本',type:'text'}]},turn);
       }
     }
-    return { id, nodeId, other };
+    return { id, nodeId, other, referenceId:reference&&'material:'+reference.id };
   } finally { service.close(); }
 }
 
@@ -416,6 +418,11 @@ try {
   const workspace = path.join(temporary, 'workspace');
   await mkdir(workspace);
   const fixture = await seed(workspace);
+  if(fixture.referenceId){
+    const skillDir=path.join(workspace,'.agents','skills','wtt-qa-layout');
+    await mkdir(skillDir,{recursive:true});
+    await writeFile(path.join(skillDir,'SKILL.md'),'---\nname: wtt-qa-layout\ndescription: Isolated browser fixture\n---\n\nUse the QA marker WTT-SKILL-CONTENT-VERIFIED.\n');
+  }
   const selectionCases = ['all', 'selection'].includes(scenario) ? await seedSelection(workspace) : null;
   const sendCases = ['all', 'send'].includes(scenario) ? await seedSend(workspace) : null;
   const overviewCases = (scenario === 'overview' || scenario === 'all' && process.env.WTT_OVERVIEW_ALL === '1') ? await seedCanvasOverview(workspace, run) : null;
@@ -463,30 +470,90 @@ try {
       await checkProjectAgentIdle(page,canvas,api,agentModel);
     } else if(scenario==='agent'){
       await canvas.focus();await page.keyboard.press('Meta+a');
-      const launcher=canvas.getByRole('button',{name:'打开项目总 Agent'}),before=await launcher.boundingBox();
+      const launcher=canvas.getByRole('button',{name:'打开项目助手'}),before=await launcher.boundingBox();
+      assert.equal(before.width,40);
+      assert.equal(before.height,40);
+      assert.equal(await launcher.textContent(),'');
+      const logo=launcher.locator('img');
+      await logo.evaluate(img=>img.decode());
+      assert.equal(await logo.evaluate(img=>img.naturalWidth),128);
       await page.mouse.move(before.x+20,before.y+15);await page.mouse.down();await page.mouse.move(before.x-100,before.y-58,{steps:8});await page.mouse.up();
       assert((await launcher.boundingBox()).x<before.x-50);await launcher.click();
       const panel=canvas.locator('.wtt-agent-float.is-open');
+      await panel.getByRole('heading',{name:'项目助手',exact:true}).waitFor();
       const state=async()=>page.evaluate(async url=>{const r=await fetch(url,{method:'POST',body:JSON.stringify({action:'project-agent-state',data:{}})});return r.json()},api.href);
       await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor({timeout:20000}).catch(async e=>{throw Error(e.message+' · '+await panel.innerText());});
       await panel.getByText('已选 2 张').waitFor();
       const bound=(await state()).sessionId;assert(bound);
+      const plansTab=panel.getByRole('button',{name:'委托',exact:true});
+      const chatTab=panel.getByRole('button',{name:'对话',exact:true});
       const mode=process.env.WTT_AGENT_SMOKE_MODE||'plan';
-      const modeLabel={auto:'全自动',step:'逐项确认',plan:'按计划授权'}[mode];
+      const modeLabel={auto:'全自动',step:'逐项确认',plan:'先规划后执行'}[mode];
       if(mode!=='plan'){
-        await panel.getByRole('button',{name:'执行方式 · 按计划授权'}).click();await page.getByRole('menuitemradio',{name:modeLabel}).click();
+        await panel.getByRole('button',{name:'执行方式 · 先规划后执行'}).click();await page.getByRole('menuitemradio',{name:modeLabel}).click();
       }
       const input=panel.locator('[contenteditable=true]').last();
+      const routingLabel=input.locator('[data-composer-command="项目"]');
+      await routingLabel.waitFor({state:'attached'});
+      assert(await routingLabel.isHidden(),'自动加入的项目指令不应显示在输入框');
+      assert.doesNotMatch(await input.innerText(),/\/项目/u);
+      if(fixture.referenceId){
+        const oldSize=await panel.boundingBox();
+        const grip=panel.getByRole('button',{name:'调整浮窗大小'});
+        const handle=await grip.boundingBox();
+        assert(await grip.evaluate(el=>{
+          const r=el.getBoundingClientRect();
+          return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;
+        }),'浮窗缩放手柄须能接收指针');
+        await page.mouse.move(handle.x+10,handle.y+10);
+        await page.mouse.down();await page.mouse.move(handle.x+44,handle.y-26,{steps:6});await page.mouse.up();
+        await page.waitForFunction(({w,h})=>{
+          const rect=document.querySelector('.wtt-agent-float.is-open')?.getBoundingClientRect();
+          return rect?.width<w-25&&rect?.height<h-25;
+        },{w:oldSize.width,h:oldSize.height},{timeout:3000});
+        const resized=await panel.boundingBox();
+        assert(resized.width<oldSize.width-25&&resized.height<oldSize.height-25);
+        await panel.getByRole('button',{name:'收起项目助手'}).click();await launcher.click();
+        assert.equal((await panel.boundingBox()).width,resized.width);
+        await panel.getByText('已选 2 张',{exact:true}).click();
+        await panel.getByRole('button',{name:'移除引用 采访乙'}).click();
+        const selectCanvas=page.getByRole('combobox',{name:'当前画布',exact:true});
+        await selectCanvas.selectOption(fixture.other);
+        await panel.getByRole('button',{name:'画布引用',exact:true}).click();
+        await panel.waitFor({state:'hidden'});
+        await canvas.locator(`article[data-card-id="${fixture.referenceId}"] .wcc-reference-pick-card`).click();
+        await canvas.getByRole('region',{name:'选择画布引用'}).getByRole('button',{name:'完成',exact:true}).click();
+        await panel.getByText('已选 2 张',{exact:true}).waitFor();
+        await selectCanvas.selectOption(fixture.id);
+        await input.click();await input.press('End');
+        await panel.getByRole('button',{name:'技能',exact:true}).click();
+        await page.getByText('wtt-qa-layout',{exact:true}).click();
+        assert.match(await input.innerText(),/wtt-qa-layout/,'原生技能菜单须把调用插入草稿');
+        await plansTab.click();await chatTab.click();
+        assert.match(await input.innerText(),/wtt-qa-layout/,'切换页签须保留草稿');
+        if(process.env.WTT_SMOKE_ARTIFACTS){
+          await mkdir(process.env.WTT_SMOKE_ARTIFACTS,{recursive:true});
+          await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-chat.png')});
+        }
+      }
       await input.click();await input.press('End');await page.keyboard.insertText('从采访写脚本和分镜');await input.press('Enter');
+      if(mode==='plan')await panel.getByRole('button',{name:'查看待授权计划'}).click({timeout:26000});
+      else await plansTab.click();
       if(mode==='auto')await panel.getByText('浏览器跨画布委托',{exact:false}).first().waitFor({timeout:26000});
       else {
-        const approve=panel.getByRole('button',{name:mode==='plan'?'按计划执行':'执行此项',exact:true});
+        const approve=panel.getByRole('button',{name:mode==='plan'?'授权并执行':'执行此项',exact:true});
         await approve.waitFor({timeout:26000}).catch(async e=>{throw Error(e.message+' · '+JSON.stringify(agentModel.calls)+' · '+await panel.innerText());});
+        if(mode==='plan'){
+          assert.equal((await state()).plans[0].steps.filter(s=>s.taskId).length,0);
+          await panel.getByText('完成 0/2',{exact:true}).waitFor();
+          if(fixture.referenceId&&process.env.WTT_SMOKE_ARTIFACTS)
+            await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-plan.png')});
+        }
         await approve.click();
       }
-      await panel.getByRole('button',{name:'收起项目总 Agent'}).click();
+      await panel.getByRole('button',{name:'收起项目助手'}).click();
       if(process.env.WTT_AGENT_SMOKE_QUESTION==='1'){
-        await launcher.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({calls:agentModel.calls,state:await state()}));});
+        await launcher.click();await plansTab.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({calls:agentModel.calls,state:await state()}));});
         assert.equal(agentModel.calls.filter(c=>c.name==='course_save_outline').length,0);
         await panel.getByRole('button',{name:'查看原任务',exact:true}).first().click();
         const answer=page.getByRole('radio',{name:'采用采访原文',exact:true}).last();
@@ -494,8 +561,9 @@ try {
       }
       if(mode==='step'){
         await launcher.click();
+        await plansTab.click();
         await panel.getByRole('button',{name:'执行此项',exact:true}).click({timeout:25000});
-        await panel.getByRole('button',{name:'收起项目总 Agent'}).click();
+        await panel.getByRole('button',{name:'收起项目助手'}).click();
       }
       const deadline=Date.now()+40000;
       let live=await state();
@@ -504,9 +572,15 @@ try {
       }
       assert.equal(live.plans[0]?.state,'done',JSON.stringify({live,calls:agentModel.calls}));
       assert.equal(agentModel.calls.filter(c=>c.name==='course_save_outline').length,2,JSON.stringify(agentModel.calls));
-      const sources=live.plans[0].steps[0].refs;assert.equal(sources.length,2);assert.ok(sources.every(s=>s.requirementId===fixture.id));
+      const sources=live.plans[0].steps[0].refs;assert.equal(sources.length,2);
+      if(fixture.referenceId){
+        assert.deepEqual(sources.map(s=>s.requirementId),[fixture.id,fixture.other]);
+        assert.ok(sources.some(s=>s.cardId===fixture.referenceId&&s.hash));
+        assert.ok(agentModel.skillInvocations.includes('supervisor')&&agentModel.skillInvocations.includes('task'),'DSH 应向助手和委托子任务都注入实际技能正文');
+      }else assert.ok(sources.every(s=>s.requirementId===fixture.id));
       const receipts=(await state()).plans[0].steps.map(s=>s.receipt);assert(receipts.every(r=>r.requirementId===fixture.other&&r.versionId));
       await launcher.click();
+      await plansTab.click();await panel.getByText('完成 2/2',{exact:true}).waitFor();
       await panel.getByRole('button',{name:'项目记忆',exact:true}).click();
       await panel.getByRole('button',{name:'新增设定'}).click();
       await panel.getByLabel('设定名称').fill('画幅');await panel.getByLabel('设定原文').fill('横屏 16:9');
@@ -515,7 +589,7 @@ try {
       const select=page.getByRole('combobox',{name:'当前画布',exact:true});
       if(await select.inputValue()===fixture.other)await select.selectOption(fixture.id);else await select.selectOption(fixture.other);
       await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor();assert.equal((await state()).sessionId,bound);
-      await panel.getByRole('button',{name:'执行方式 · '+modeLabel}).click();await page.getByRole('menuitemradio',{name:mode==='step'?'按计划授权':'逐项确认'}).click();
+      await panel.getByRole('button',{name:'执行方式 · '+modeLabel}).click();await page.getByRole('menuitemradio',{name:mode==='step'?'先规划后执行':'逐项确认'}).click();
       await panel.getByRole('button',{name:'项目记忆',exact:true}).click();
       await panel.getByRole('button',{name:'用项目记忆开新对话'}).click();
       await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor();
@@ -523,8 +597,25 @@ try {
       const nextInput=panel.locator('[contenteditable=true]').last();await nextInput.click();await nextInput.press('End');await page.keyboard.insertText('回忆验收，查画幅和脚本');await nextInput.press('Enter');
       const until=Date.now()+18000;while(!agentModel.evidence.length&&Date.now()<until)await new Promise(r=>setTimeout(r,250));
       assert.ok(agentModel.evidence.some(r=>r.includes('横屏 16:9')&&r.includes(receipts[1].versionId)),'新会话应检索设定及上次委托的真实版本');
-      await page.setViewportSize({width:440,height:680});const box=await panel.boundingBox();assert(box.x>=0&&box.x+box.width<=441);
-      await panel.getByRole('button',{name:'收起项目总 Agent'}).click();await launcher.waitFor();
+      await page.setViewportSize({width:440,height:680});
+      await page.waitForFunction(()=>{
+        const box=document.querySelector('.wtt-agent-float.is-open')?.getBoundingClientRect();
+        return box&&box.width>0&&box.left>=0&&box.right<=innerWidth+1;
+      },null,{timeout:3000});
+      if(fixture.referenceId&&process.env.WTT_SMOKE_ARTIFACTS){
+        await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-narrow.png')});
+        await page.evaluate(()=>{
+          document.documentElement.dataset.dsThemeSource='dark';
+          document.documentElement.style.colorScheme='dark';
+          document.body.setAttribute('data-ds-dark-theme','');
+        });
+        assert.equal(await panel.evaluate(el=>getComputedStyle(el).colorScheme),'dark');
+        assert.equal(await nextInput.isVisible(),true);
+        await panel.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-dark.png')});
+      }
+      await panel.getByRole('button',{name:'收起项目助手'}).click();await launcher.waitFor();
+      const compact=await launcher.boundingBox();
+      assert(compact.width===40&&compact.x>=0&&compact.x+compact.width<=440);
       console.log('PASS 两份来源跨画布生成两项主成果、DSH 原生对话、后台派发、浮标拖动、原文记忆、新会话接续与窄屏收起');
     }
     if (['all', 'delete'].includes(scenario)) {

@@ -10,6 +10,12 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
   let closed=false;
   const getService=name=>ctx.get?.(name)||ctx[name];
   const controller=name=>{const v=getService(name);if(!v)throw Error('当前 DSH 尚未加载 '+name);return v;};
+  async function skillScope(sessionId){
+    const result=await controller('sessionController').resolveAgent(sessionId);
+    if(result.error)throw result.error;
+    if(!result.agent)throw Error('无法读取原生会话的技能范围');
+    return result.agent;
+  }
   // Standard questions and approvals live in the host waterfall while the user decides.
   const interactions=new Map();
   const observeInteraction=async(req,next)=>{
@@ -30,7 +36,9 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
     },
     async createTask(service,input,sources,settings,authorized,title){
       const names=extractSkillNames(input.instruction);
-      const skillRefs=names.length?await (await catalogReady).resolve(service.workspaceRoot,names):[];
+      const sessionId=runners.get(service)?.sessionId();
+      const scope=names.length&&sessionId?await skillScope(sessionId):undefined;
+      const skillRefs=names.length?await (await catalogReady).resolve(service.workspaceRoot,names,scope):[];
       if(!authorized())return null;
       return service.createTask({...input,selectedSkills:names},{skillRefs,projectInputs:{sources,settings,title}});
     },
@@ -38,7 +46,12 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
       const args={sessionId,requestId:prepared.requestId,mode:'queue',content:[{type:'text',text:projects.prepared(service,prepared).prompt}]};
       return controller('sessionController').prompt(args,new AbortController().signal);
     },
-    verify:verifyTaskSkills,
+    async verify(service,taskId){
+      const task=service.tasks.get(taskId);
+      if(!task.input.skillRefs?.length)return;
+      const scope=await skillScope(task.sessionId);
+      await verifyTaskSkills(service,taskId,scope);
+    },
     async pending(service,task){
       if(!task.sessionId)return null;
       const callId=interactions.get(task.sessionId)?.values().next().value;
@@ -83,7 +96,7 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
     if(!runners.has(service))runners.set(service,new ProjectAgent(service,host));
     return runners.get(service);
   };
-  const warn=e=>ctx.logger?.warn?.('项目总 Agent：'+e.message);
+  const warn=e=>ctx.logger?.warn?.('项目助手：'+e.message);
   const tick=()=>{for(const [service,agent] of runners)if(service.store.closed)runners.delete(service);else void agent.tick().catch(warn);};
   const recover=()=>{
     for(const record of projects.records.values()){
@@ -128,7 +141,7 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
         case 'bind-document':return agent.memory.bind(data);
         case 'save':{const result=agent.memory.save(data);if(!result.conflict && data.suggestionId)agent.db.prepare('DELETE FROM pa_suggestions WHERE id=?').run(data.suggestionId);return result;}
         case 'dismiss':agent.db.prepare('DELETE FROM pa_suggestions WHERE id=?').run(data.id);return {dismissed:true};
-        default:throw Error('未知的项目总 Agent 操作');
+        default:throw Error('未知的项目助手 操作');
       }
     }
   };
