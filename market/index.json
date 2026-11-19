@@ -57,6 +57,19 @@
       },
       "versions": [
         {
+          "version": "0.58.5",
+          "publishTimestamp": 1795072996,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+            "commit": "36fc1bcaf2f16635a8b354378335ce44f89c6b31",
+            "path": "plugins/dsh-creation-workbench"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
+          }
+        },
+        {
           "version": "0.58.4",
           "publishTimestamp": 1795069560,
           "source": {
