@@ -81,6 +81,27 @@ test('candidate videos need a matching project path and checksum', () => {
     [['初剪 V1.MP4', 'video'], ['final.webm', 'video'], ['cover.png', 'image']])
 })
 
+test('plain-text media rows with a SHA-256 work beside Markdown without guessing adjacent files', () => {
+  const root = '/tmp/项目', hash = 'ab'.repeat(32), imageHash = 'cd'.repeat(32)
+  const question = [
+    '请审阅样片：',
+    `视频： courses/task/working/开场 v1.mp4 — SHA-256: ${hash}`,
+    `四帧拼图： courses/task/working/四帧拼图.jpg — SHA-256:\n${imageHash}`,
+    `[候选](working/final.webm) — ${hash}`,
+    `视频： https://example.test/outside.mp4 — SHA-256: ${hash}`,
+    `视频： ../outside.mp4 — SHA-256: ${hash}`,
+    `视频： ./.wtt-workbench/private.mp4 — SHA-256: ${hash}`,
+    '视频： working/missing.mp4',
+    `拼图： working/other.png — SHA-256: ${imageHash}0`,
+    `视频： working/another.mp4 校验值：${hash.slice(1)}`,
+  ].join('\n')
+  assert.deepEqual(reviewMediaFromQuestion(root, question).map(({ path, kind, hash }) => [path, kind, hash]), [
+    ['courses/task/working/开场 v1.mp4', 'video', hash],
+    ['courses/task/working/四帧拼图.jpg', 'image', imageHash],
+    ['working/final.webm', 'video', hash],
+  ])
+})
+
 test('task reviews include candidates in detail and option descriptions without pairing hashes across fields or questions', () => {
   const root = '/tmp/项目', hash = 'ab'.repeat(32)
   const images = reviewMediaFromInteraction(root, { questions: [

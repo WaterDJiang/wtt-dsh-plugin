@@ -57,8 +57,11 @@ async function fixture(ctx) {
     s.append('step/end',{turn,step});s.append('turn/end',{turn,reason:{kind:f.budget ? 'blocked' : 'completed'}});await ctx.sessions.flush(s);
     ctx.effect(()=>ctx.connection.fetch.register({path:'/api/wtt-chat-file-fixture',methods:['GET'],requestBody:'buffered',fetch:async()=>Response.json({sessionId:s.id,seq:s.seq,callId:f.callId})}));return;
   }
-  const args = JSON.stringify({ questions: [{ id: 'review', header: '合成审核', question: '是否采用这份合成内容？',
-    options: [{ label: '采用', description: f.imageHash ? `[四帧拼图](working/review-grid.png) — SHA-256: ${f.imageHash}\n[预览视频](working/video.mp4) — SHA-256: ${f.videoHash}` : '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
+  const question = f.imageHash
+    ? `是否采用这份合成内容？\n\n四帧拼图： working/review-grid.png — SHA-256: ${f.imageHash}\n视频： working/video.mp4 — SHA-256: ${f.videoHash}`
+    : '是否采用这份合成内容？';
+  const args = JSON.stringify({ questions: [{ id: 'review', header: '合成审核', question,
+    options: [{ label: '采用', description: '仅明确提交才采用。' }, { label: '保留候选', description: '保留未提交选择。' }] }], timeout: 600 });
   s.append('turn/start', { turn }); s.append('step/start', { turn, step });
   s.append('request/header', { reason: 'initial', header: { config: { provider: 'manual-fixture', model: 'none' },
     tools: [{ name: 'ask_user_question', description: '合成问题', parameters: { type: 'object', properties: { questions: { type: 'array' }, timeout: { type: 'number' } } } }] } });
@@ -96,7 +99,7 @@ async function seedMedia(service, requirementId) {
     const marker = `${title} 原会话消息`;
     sessions.push({ sessionId, marker });
     const { node, version } = service.cards.describe({ requirementId, cardId: task.outputCardId });
-    return { id: node.id, cardId: task.outputCardId, versionId: version.id, marker };
+    return { id: node.id, cardId: task.outputCardId, versionId: version.id, artifactId: node.refId, marker };
   }
   const old = await publish('video', 'video.mp4', '合成视频第一版');
   const video = await publish('video', 'video.mp4', '合成视频第二版', { mode: 'revise', cardId: old.cardId, baseVersionId: old.versionId });
@@ -300,9 +303,32 @@ async function checkMedia(page, canvas, media) {
   await composer.locator('.wcc-creation-reference-chip').filter({ hasText: '上传图片' }).waitFor();
   assert.equal(await chat.count(), 0);
   await close();
-  await videoCard.locator('select').selectOption(media.old.versionId);
+  const versionSelect = videoCard.locator('select');
+  assert.equal(await versionSelect.inputValue(), media.video.versionId);
+  const matchesOldVersion = url => url.searchParams.get('outputCard') === media.video.cardId
+    && url.searchParams.get('cardVersion') === media.old.versionId;
+  const gate = Promise.withResolvers();
+  const delayedResponse = async route => { await gate.promise; await route.continue(); };
+  await page.route(matchesOldVersion, delayedResponse);
+  try {
+    const requested = page.waitForRequest(request => matchesOldVersion(new URL(request.url())));
+    await versionSelect.selectOption(media.old.versionId);
+    await requested;
+    // A native dropdown can deliver its closing click after the value change.
+    await versionSelect.dispatchEvent('click', { bubbles: true });
+    const returned = page.waitForResponse(response => matchesOldVersion(new URL(response.url())));
+    gate.resolve();
+    assert.equal((await returned).status(), 200);
+  } finally {
+    gate.resolve();
+    await page.unroute(matchesOldVersion, delayedResponse);
+  }
   const preview = canvas.getByRole('complementary', { name: '成果文件预览' });
   await preview.locator('video').waitFor();
+  assert.equal(await versionSelect.inputValue(), media.old.versionId);
+  for (const player of [body, preview.locator('video')]) {
+    assert.equal(new URL(await player.getAttribute('src'), page.url()).searchParams.get('downloadArtifact'), media.old.artifactId);
+  }
   await checkVideoRange(page, preview.locator('video'));
   await preview.getByRole('button', { name: '关闭成果预览' }).click();
   await action(videoCard).click();

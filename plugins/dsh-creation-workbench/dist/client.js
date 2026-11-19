@@ -47978,8 +47978,18 @@ function reviewMediaFromQuestion(root2, question) {
     references.push({ file, start: match.index, end: match.index + match[0].length });
     if (references.length >= 200) break;
   }
+  const plain = /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:([\p{L}\p{N}][\p{L}\p{N} _-]{0,39})(?:：[ \t]*|:[ \t]+))?(?=\S)([^\x00-\x1f\u2028\u2029`<>\[\]|:：;；]+?\.(?:mp4|webm|png|jpe?g|webp|gif))(?=[ \t—–;；,:：-]*(?:\r?\n[ \t]*)?(?:sha[- ]?256|哈希|校验值)(?=[\s:：=]))/gimu;
+  let plainCount = 0;
+  for (const match of text2.matchAll(plain)) {
+    const file = match[2].trim();
+    if (match[1] || /[\\/]/.test(file) || !/\s/.test(file)) {
+      references.push({ file, start: match.index, end: match.index + match[0].length });
+      if (++plainCount >= 200) break;
+    }
+  }
+  references.sort((a, b2) => a.start - b2.start);
   const media = /* @__PURE__ */ new Map();
-  for (let index2 = 0; index2 < references.length && media.size < 24; index2++) {
+  for (let index2 = 0; index2 < Math.min(references.length, 200) && media.size < 24; index2++) {
     const reference = references[index2];
     const kind = /\.(mp4|webm)$/i.test(reference.file) ? "video" : /\.(png|jpe?g|webp|gif)$/i.test(reference.file) ? "image" : null;
     if (!kind) continue;
@@ -50997,7 +51007,7 @@ var ContentCard = (0, import_react63.memo)(function ContentCard2({ id: id2, data
   ), /* @__PURE__ */ import_react63.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable, "aria-label": `\u8FDE\u63A5\u5230 ${data.title}` }), /* @__PURE__ */ import_react63.default.createElement("header", { className: "wcc-card-grip" }, /* @__PURE__ */ import_react63.default.createElement("div", { className: "wcc-card-heading" }, /* @__PURE__ */ import_react63.default.createElement("h3", { title: titleHint }, title)), /* @__PURE__ */ import_react63.default.createElement("div", { className: "wcc-card-metadata" }, /* @__PURE__ */ import_react63.default.createElement("span", { className: "wcc-card-kind" }, formatLabel), purpose && /* @__PURE__ */ import_react63.default.createElement("span", { className: "wcc-card-purpose" }, purpose)), /* @__PURE__ */ import_react63.default.createElement("div", { className: "wcc-card-heading-actions" }, caps.versioned && /* @__PURE__ */ import_react63.default.createElement(
     VersionSelect,
     {
-      className: "wtt-version-compact",
+      className: "wtt-version-compact nodrag nopan",
       ariaLabel: `\u9009\u62E9 ${data.title} \u7684\u7248\u672C`,
       versions: data.outputCard?.versions?.length ? data.outputCard.versions : data.materialVersions,
       value: data.outputCard?.versionId || data.currentMaterialVersionId,
@@ -52196,7 +52206,7 @@ function CanvasContent({
     setCreationVisible(false);
   }
   function dismissOtherCardCreation(event) {
-    if (referencePickRef.current) return;
+    if (referencePickRef.current || event.target.closest?.("select.wtt-version-select")) return;
     const node = event.target.closest?.(".react-flow__node");
     if (!node) return;
     const context = creationRef.current;

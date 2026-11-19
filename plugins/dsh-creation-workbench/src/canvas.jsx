@@ -149,7 +149,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
     <header className="wcc-card-grip">
       <div className="wcc-card-heading"><h3 title={titleHint}>{title}</h3></div>
       <div className="wcc-card-metadata"><span className="wcc-card-kind">{formatLabel}</span>{purpose && <span className="wcc-card-purpose">{purpose}</span>}</div>
-      <div className="wcc-card-heading-actions">{caps.versioned && <VersionSelect className="wtt-version-compact" ariaLabel={`选择 ${data.title} 的版本`}
+      <div className="wcc-card-heading-actions">{caps.versioned && <VersionSelect className="wtt-version-compact nodrag nopan" ariaLabel={`选择 ${data.title} 的版本`}
         versions={data.outputCard?.versions?.length ? data.outputCard.versions : data.materialVersions}
         value={data.outputCard?.versionId || data.currentMaterialVersionId}
         onChange={value => data.outputCard ? data.onVersionChange?.(value) : data.onMaterialVersionView?.(value)} />}
@@ -1113,7 +1113,8 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
   }
 
   function dismissOtherCardCreation(event) {
-    if (referencePickRef.current) return
+    // The native picker can dispatch its closing click after starting the version lookup.
+    if (referencePickRef.current || event.target.closest?.('select.wtt-version-select')) return
     const node = event.target.closest?.('.react-flow__node')
     if (!node) return
     const context = creationRef.current

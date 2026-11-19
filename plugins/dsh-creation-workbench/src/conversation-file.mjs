@@ -50,8 +50,19 @@ export function reviewMediaFromQuestion(root, question) {
     references.push({ file, start: match.index, end: match.index + match[0].length })
     if (references.length >= 200) break
   }
+  // Native review questions may list a plain path and its checksum as a text row.
+  const plain = /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:([\p{L}\p{N}][\p{L}\p{N} _-]{0,39})(?:：[ \t]*|:[ \t]+))?(?=\S)([^\x00-\x1f\u2028\u2029`<>\[\]|:：;；]+?\.(?:mp4|webm|png|jpe?g|webp|gif))(?=[ \t—–;；,:：-]*(?:\r?\n[ \t]*)?(?:sha[- ]?256|哈希|校验值)(?=[\s:：=]))/gimu
+  let plainCount = 0
+  for (const match of text.matchAll(plain)) {
+    const file = match[2].trim()
+    if (match[1] || /[\\/]/.test(file) || !/\s/.test(file)) {
+      references.push({ file, start: match.index, end: match.index + match[0].length })
+      if (++plainCount >= 200) break
+    }
+  }
+  references.sort((a, b) => a.start - b.start)
   const media = new Map()
-  for (let index = 0; index < references.length && media.size < 24; index++) {
+  for (let index = 0; index < Math.min(references.length, 200) && media.size < 24; index++) {
     const reference = references[index]
     const kind = /\.(mp4|webm)$/i.test(reference.file) ? 'video'
       : /\.(png|jpe?g|webp|gif)$/i.test(reference.file) ? 'image' : null
