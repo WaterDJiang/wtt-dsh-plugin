@@ -13,6 +13,11 @@ const sha = (value) => createHash('sha256').update(value).digest('hex');
 const uuid = (value) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const identifier = (value) => typeof value === 'string' && /^[a-zA-Z0-9:_-]{1,200}$/.test(value);
 const parse = (value, fallback) => value ? JSON.parse(value) : fallback;
+const sameLayout = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+
+function layoutToken({ revision, viewport, sizes, nodes, ...board }) {
+  return sha(JSON.stringify({ ...board, nodes: nodes.map(({ position, width, height, ...node }) => node) }));
+}
 const defaultViewport = { x: 30, y: 30, zoom: 0.8 };
 const whiteboardPrefix = 'whiteboard:';
 const elementKinds = new Set(['text', 'note', 'shape']);
@@ -354,7 +359,11 @@ export class CanvasStore {
     } catch { return 'unavailable'; }
   }
 
-  getBoard(requirementId) { const board=this.store.cards.project(this.getRawBoard(requirementId));return this.store.recycle?.filter(board)||board; }
+  getBoard(requirementId, { withLayoutToken = false } = {}) {
+    const projected = this.store.cards.project(this.getRawBoard(requirementId));
+    const board = this.store.recycle?.filter(projected) || projected;
+    return withLayoutToken ? { ...board, layoutToken: layoutToken(board) } : board;
+  }
 
   getRawBoard(requirementId) {
     const requirement = this.#requirement(requirementId);
@@ -625,11 +634,13 @@ export class CanvasStore {
     });
   }
 
-  saveBoard({ requirementId, expectedRevision, positions = {}, edges = [], groups = [], viewport, elements, sizes }) {
+  saveBoard({ requirementId, expectedRevision, positions = {}, edges = [], groups = [], viewport, elements, sizes, layoutToken: basis }) {
+    const withLayoutToken = typeof basis === 'string';
     const result = this.#transaction(() => {
       const board = this.store.cards.project(this.getRawBoard(requirementId));
       const hidden=this.store.recycle?.hiddenIds(requirementId)||new Set();
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || board.revision !== expectedRevision) throw new Error('画布已被其他操作修改，请保留当前布局并重新加载');
+      const layout = this.#layout(board.requirementId);
       const previousElements = board.elements;
       const nextElements = elements === undefined ? previousElements : whiteboardElements([...whiteboardElements(elements).filter(e=>!hidden.has(e.id)),...previousElements.filter(e=>hidden.has(e.id))]);
       const nextElementIds = new Set(nextElements.map((element) => element.id));
@@ -641,10 +652,9 @@ export class CanvasStore {
         }
       }
       if (!positions || Array.isArray(positions) || typeof positions !== 'object' || Object.keys(positions).length > 2000) throw new Error('画布位置数据无效');
-      const normalizedPositions = Object.fromEntries(Object.entries(this.#layout(requirementId).positions).filter(([id])=>hidden.has(id)));
+      const normalizedPositions = Object.fromEntries(Object.entries(layout.positions).filter(([id])=>hidden.has(id)));
       // Legacy Clients do not know the new element collection; retain their positions too.
       if (elements === undefined) {
-        const layout = this.#layout(board.requirementId);
         for (const element of previousElements) if (layout.positions[element.id]) normalizedPositions[element.id] = layout.positions[element.id];
       }
       for (const [id, value] of Object.entries(positions)) {
@@ -652,7 +662,7 @@ export class CanvasStore {
         const position = coordinate(value);
         if (!removed.has(id)) normalizedPositions[id] = position;
       }
-      const nextSizes = { ...this.#layout(board.requirementId).sizes };
+      const nextSizes = { ...layout.sizes };
       if (sizes !== undefined) {
         if (!sizes || typeof sizes !== 'object' || Array.isArray(sizes) || Object.keys(sizes).length > 2000) throw new Error('卡片尺寸数据无效');
         for (const key of Object.keys(nextSizes)) if (known.has(key)&&!hidden.has(key)) delete nextSizes[key];
@@ -702,10 +712,26 @@ export class CanvasStore {
         return { id: group.id, title, nodeIds };
       }).filter(Boolean);
       const nextViewport = canvasViewport(viewport || board.viewport);
-      this.#write(board.requirementId, { positions: normalizedPositions, edges: normalizedEdges, groups: normalizedGroups, viewport: nextViewport, elements: nextElements, sizes: nextSizes }, board.revision + 1);
-      return board.requirementId;
+      const revision = board.revision + 1;
+      let receipt;
+      if (withLayoutToken && basis.length === 64 && sameLayout(layout.edges, normalizedEdges)
+        && sameLayout(layout.groups, normalizedGroups) && sameLayout(previousElements, nextElements)) {
+        const visible = this.store.recycle?.filter(board) || board;
+        const complete = visible.nodes.every(node => Object.hasOwn(normalizedPositions, node.id)
+          && (!Object.hasOwn(layout.sizes, node.id) || Object.hasOwn(nextSizes, node.id)));
+        if (complete && basis === layoutToken(visible)) {
+          const changedPositions = Object.fromEntries(visible.nodes.flatMap(node => {
+            const position = normalizedPositions[node.id];
+            return position.x === node.position.x && position.y === node.position.y ? [] : [[node.id, position]];
+          }));
+          receipt = { revision, viewport: nextViewport, layoutToken: basis, tasks: visible.tasks,
+            layout: { positions: changedPositions, sizes: nextSizes } };
+        }
+      }
+      this.#write(board.requirementId, { positions: normalizedPositions, edges: normalizedEdges, groups: normalizedGroups, viewport: nextViewport, elements: nextElements, sizes: nextSizes }, revision);
+      return receipt;
     });
-    return this.getBoard(result);
+    return result || this.getBoard(requirementId, { withLayoutToken });
   }
 
   addMaterial(input) { return this.#addMaterial(input); }

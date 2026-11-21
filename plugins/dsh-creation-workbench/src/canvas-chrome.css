@@ -160,3 +160,16 @@
   .wtt-course-canvas .wcc-studio-divider.is-horizontal { margin-block: 2px; }
 }
 @media (prefers-reduced-motion: reduce) { .wtt-course-canvas .wcc-studio-icon.is-spinning { animation: none; } }
+
+.wcc-first-material {
+  display: grid;
+  justify-items: center;
+  gap: .5rem;
+  color: var(--wtt-ui-muted);
+}
+.wcc-graph > .wcc-first-material {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+}

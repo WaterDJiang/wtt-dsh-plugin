@@ -91,12 +91,18 @@ try {
   measure('boardRead', () => { board = service.canvas.getBoard(requirementId); return board; });
   measure('serialize', () => JSON.stringify(board));
   measure('deliverableSync', () => service.deliverables.sync(requirementId));
+  board = service.canvas.getBoard(requirementId, { withLayoutToken: true });
+  const baseLayout = { layoutToken: board.layoutToken, viewport: board.viewport };
   const positions = Object.fromEntries(board.nodes.map(node => [node.id, node.position]));
+  let layoutRevision = board.revision, layoutSaveResponseBytes;
   measure('layoutSave', () => {
     positions[shared.id] = { ...positions[shared.id], x: positions[shared.id].x + 1 };
-    board = service.canvas.saveBoard({ requirementId, expectedRevision: board.revision, positions, viewport: board.viewport });
-    return board;
-  });
+    const result = service.canvas.saveBoard({ requirementId, expectedRevision: layoutRevision, positions, ...baseLayout });
+    layoutRevision = result.revision;
+    return result;
+  }, undefined, result => { layoutSaveResponseBytes = Buffer.byteLength(JSON.stringify(result)); });
+  board = service.canvas.getBoard(requirementId);
+  assert.deepEqual(board.nodes.find(node => node.id === shared.id).position, positions[shared.id]);
   measure('deletePlan', () => {
     const plan = service.recycle.plan({ requirementId, selections });
     assert.equal(plan.files.find(file => file.path === '共享资料.md').references.length, 2);
@@ -107,10 +113,12 @@ try {
     result => service.recycle.restore({ entryId: result.id }));
   const report = { schema: 1, dataset: 1, environment: { node: process.version, platform: process.platform, arch: process.arch },
     cards, canvases: 3, samples, bodyBytes: Buffer.byteLength(body),
-    responseBytes: Buffer.byteLength(JSON.stringify(board)), results };
+    responseBytes: Buffer.byteLength(JSON.stringify(board)), layoutSaveResponseBytes, results };
   if (values.json) await writeFile(values.json, JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report, null, 2));
   if (values.check) {
+    assert.equal(results.layoutSave.cost.boards, 1, '常规布局保存只构建一次画布');
+    assert(layoutSaveResponseBytes <= report.responseBytes * 0.1, '轻量布局回执至少节省 90% 响应字节');
     for (const name of ['deletePlan', 'removeNode']) {
       assert(results[name].cost.boards <= 1, name + ' 不应重建其他画布或重复读取当前画布');
     }

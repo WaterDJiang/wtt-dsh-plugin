@@ -201,3 +201,20 @@
 .wtt-course-workbench .wtt-deliverable-feedback > span { min-width: 0; overflow-wrap: anywhere; }
 .wtt-course-workbench .wtt-deliverable-feedback.is-failed { color: var(--wtt-ui-warning, #a45b37); border-color: var(--wtt-ui-line, #eddbcf); background: var(--wtt-ui-surface, #fffcf9); }
 .wtt-course-workbench .wtt-deliverable-feedback > button { flex-shrink: 0; width: 24px; min-height: 24px; padding: 0; border: 0; color: inherit; background: transparent; font-size:var(--wtt-text-lg); cursor: pointer; }
+
+.wtt-project-menu > .wtt-project-button { position: relative; }
+.wtt-project-pending {
+  position:absolute;
+  inset-block-start:-3px;
+  inset-inline-end:-3px;
+  min-width:16px;
+  box-sizing:border-box;
+  padding:0 3px;
+  border:1px solid var(--wtt-ui-surface);
+  border-radius:999px;
+  background:var(--wtt-ui-danger-fill);
+  color:var(--wtt-ui-on-accent);
+  font:600 var(--wtt-text-xs)/14px system-ui,sans-serif;
+  text-align:center;
+  pointer-events:none;
+}

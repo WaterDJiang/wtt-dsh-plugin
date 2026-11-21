@@ -1,3 +1,4 @@
+import {openProjectAssistant} from './project-agent-idle-audit.mjs';
 import { seedCanvasStress, checkCanvasStress } from './canvas-stress-smoke.mjs';
 import { seedCanvasOverview, checkCanvasOverview } from './canvas-overview-smoke.mjs';
 import { seedReadPerformance, checkReadPerformance } from './canvas-read-perf.mjs';
@@ -18,7 +19,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent','preview'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent|preview]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent','preview','first-material'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent|preview|first-material]');
 const cli = process.env.WTT_SMOKE_DSH_BIN || path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const [hostCommand,...hostArguments] = process.env.WTT_SMOKE_DSH_BIN ? [cli] : [process.execPath,cli];
@@ -479,7 +480,10 @@ async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
     await page.mouse.up();
     const reply = await saved;
     assert(reply.ok(), `保存布局失败，HTTP ${reply.status()}`);
-    return (await reply.json()).nodes.find(node => node.id === nodeId).position;
+    const receipt = await reply.json();
+    const persisted = await board();
+    assert.equal(persisted.revision, receipt.revision);
+    return { receipt, position: persisted.nodes.find(node => node.id === nodeId).position, positionIds: Object.keys(reply.request().postDataJSON().data.positions) };
   }
 
   const source = (await board()).nodes.find(node => node.id === nodeId);
@@ -508,10 +512,13 @@ async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
   });
   const timeout = setTimeout(() => reject(new Error('没有收到后台画布读取')), 12_000);
   try {
-    const [before] = await Promise.all([drag(28, 22), captured]);
+    const [{ receipt: changedTask, position: before }] = await Promise.all([drag(28, 22), captured]);
+    assert(Array.isArray(changedTask.nodes), '任务变动需要完整画布回执');
     assert(await card.isVisible(), '后台读取期间，卡片应保持显示');
     assert.equal(await canvas.locator('.wcc-loading').count(), 0, '后台读取不应进入首次加载');
-    const after = await drag(47, 13);
+    const { receipt: moved, position: after, positionIds } = await drag(47, 13);
+    assert(!positionIds.includes(`output:${task.outputCardId}`), '刷新尚未送达，位置快照不包含新任务卡');
+    assert(Array.isArray(moved.nodes), '坐标覆盖不完整时继续返回完整画布');
     assert.notDeepEqual(after, before, '后台读取期间的新拖动应能保存');
     resume();
     await canvas.locator(`article[data-card-id="output:${task.outputCardId}"]`).waitFor();
@@ -527,6 +534,10 @@ async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
     resume();
     await page.unrouteAll({ behavior: 'wait' });
   }
+  const { receipt: compact, position: persisted } = await drag(23, 17);
+  if (!process.env.WTT_SMOKE_PACKAGE || 'layoutToken' in compact) {
+    assert.deepEqual(compact.layout?.positions[nodeId], persisted, '新任务卡已挂载后，拖动保存返回真实坐标的轻量回执');
+  }
   const beforeFit = await board();
   const savedView = page.waitForResponse(reply => new URL(reply.url()).pathname === api.pathname
     && reply.request().method() === 'POST' && ['save-canvas-viewport', 'save-canvas'].includes(reply.request().postDataJSON()?.action));
@@ -534,8 +545,16 @@ async function checkRefresh(page, canvas, card, api, { id, nodeId }) {
   const fitted = await savedView;
   assert(fitted.ok(), `保存适应全部后的视口失败，HTTP ${fitted.status()}`);
   assert.notDeepEqual((await fitted.json()).viewport, beforeFit.viewport, '查看全部必须实际改变视口');
-  assert.deepEqual((await board()).nodes.find(node => node.id === nodeId).position,
+  const latest = await board();
+  assert.deepEqual(latest.nodes.find(node => node.id === nodeId).position,
     beforeFit.nodes.find(node => node.id === nodeId).position, '适应全部不能修改卡片坐标');
+  assert.equal(latest.layoutToken, undefined, '旧画布读取入口维持完整回执协议');
+  const conflict = await page.request.post(api.href, { data: { action: 'save-canvas', data: {
+    requirementId: id, expectedRevision: latest.revision - 1, layoutToken: compact.layoutToken,
+  } } });
+  assert.equal(conflict.status(), 400, '轻量协议继续拒绝过期 revision');
+  assert.match(await conflict.text(), /已被其他操作修改/);
+  assert.equal((await board()).revision, latest.revision);
 }
 
 const start = performance.now();
@@ -545,7 +564,7 @@ try {
   await run(process.execPath, ['scripts/build.mjs'], { cwd: repo, timeout: 30_000 });
   const workspace = path.join(temporary, 'workspace');
   await mkdir(workspace);
-  const fixture = await seed(workspace);
+  const fixture = scenario === 'first-material' ? {} : await seed(workspace);
   const pptPreview = scenario==='preview' ? await seedPptPreview(workspace, fixture.id) : null;
   const invalidPreviewFonts = Boolean(pptPreview && process.env.WTT_SMOKE_INVALID_PREVIEW_FONTS==='1');
   if(fixture.referenceId){
@@ -587,13 +606,17 @@ try {
   const account = page.getByRole('dialog').filter({ hasText: '开始使用' }).getByRole('button', { name: '关闭', exact: true });
   if (await account.waitFor({ timeout: 1800 }).then(() => true, () => false)) await account.click();
   await page.getByRole('button', { name: 'WTT 创作工作台', exact: true }).click();
-  await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(fixture.id);
+  if (fixture.id) await page.getByRole('combobox', { name: '当前画布', exact: true }).selectOption(fixture.id);
   const canvas = page.locator('.wtt-course-canvas:visible');
   const card = canvas.locator(`article[data-card-id="${fixture.nodeId}"]`);
-  await card.waitFor();
+  if (fixture.nodeId) await card.waitFor();
   const api = new URL('/api/wtt-creation-workbench', login);
   api.searchParams.set('projectId', createHash('sha256').update(await realpath(workspace)).digest('hex'));
   try {
+    if (scenario === 'first-material') {
+      const {checkFirstMaterial} = await import('./canvas-first-material-smoke.mjs');
+      await checkFirstMaterial(page, workspace, api);
+    }
     if (pptPreview) await checkPptPreview(page, canvas, api, pptPreview, invalidPreviewFonts);
     if(scenario==='agent' && process.env.WTT_AGENT_AUDIT_STOP==='1'){
       const {checkProjectAgentStop}=await import('./project-agent-idle-audit.mjs');
@@ -609,27 +632,17 @@ try {
       const materialComposer=canvas.locator('.wcc-card-composer:visible');
       await materialComposer.locator('textarea').first().waitFor();
       await materialComposer.getByRole('button',{name:'关闭卡片创作框'}).click();
-      const toolbar=canvas.getByRole('toolbar',{name:'白板工具'});
-      const launcher=toolbar.getByRole('button',{name:'打开WTT 项目助手'});
+      const launcher=canvas.getByRole('button',{name:'画布菜单',exact:true});
       const before=await launcher.boundingBox();
-      const materialTool=await toolbar.getByRole('button',{name:'添加素材'}).boundingBox();
-      assert.equal(before.width,materialTool.width);
-      assert.equal(before.x,materialTool.x);
-      assert(before.y>=materialTool.y+materialTool.height);
-      assert.equal(await canvas.getByRole('button',{name:'打开WTT 项目助手'}).count(),1);
-      const logo=launcher.locator('img');
-      await logo.evaluate(img=>img.decode());
-      assert.equal(await logo.evaluate(img=>img.naturalWidth),128);
-      await canvas.getByRole('button',{name:'放大画布',exact:true}).click();
-      assert.deepEqual(await launcher.boundingBox(),before);
-      await canvas.getByRole('button',{name:'缩小画布',exact:true}).click();
       await canvas.focus();await page.keyboard.press('Meta+a');
       await launcher.focus();await launcher.press('Enter');
+      const menuItem=page.getByRole('menuitem',{name:'项目助手',exact:true});
+      await menuItem.focus();await menuItem.press('Enter');
       const panel=canvas.locator('.wtt-agent-float.is-open');
       await panel.getByRole('heading',{name:'WTT 项目助手',exact:true}).waitFor();
       assert.equal(await panel.evaluate(el=>getComputedStyle(el).borderColor),'rgb(0, 47, 167)');
       assert.match(await panel.evaluate(el=>getComputedStyle(el).boxShadow),/18px/,'浮窗应有克莱因蓝外光晕');
-      assert.equal(await launcher.getAttribute('aria-expanded'),'true');
+      assert.equal(await launcher.getAttribute('aria-expanded'),'false');
       const firstPosition=await panel.boundingBox();
       const titleBar=await panel.locator('.wtt-agent-grip').boundingBox();
       await page.mouse.move(titleBar.x+90,titleBar.y+16);await page.mouse.down();
@@ -644,7 +657,7 @@ try {
         await mkdir(process.env.WTT_SMOKE_ARTIFACTS,{recursive:true});
         await page.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-toolbar.png')});
       }
-      await launcher.click();
+      await openProjectAssistant(canvas);
       assert((await panel.boundingBox()).x<firstPosition.x-80);
       const state=async()=>page.evaluate(async url=>{const r=await fetch(url,{method:'POST',body:JSON.stringify({action:'project-agent-state',data:{}})});return r.json()},api.href);
       await panel.locator('.wtt-native-editor-conversation [contenteditable=true]').first().waitFor({timeout:20000}).catch(async e=>{throw Error(e.message+' · '+await panel.innerText());});
@@ -724,7 +737,7 @@ try {
         },{w:oldSize.width,h:oldSize.height},{timeout:3000});
         const resized=await panel.boundingBox();
         assert(resized.width<oldSize.width-25&&resized.height<oldSize.height-25);
-        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await launcher.click();
+        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await openProjectAssistant(canvas);
         assert.equal((await panel.boundingBox()).width,resized.width);
         await panel.getByText('已选 2 张',{exact:true}).click();
         await panel.getByRole('button',{name:'移除引用 采访乙'}).click();
@@ -804,7 +817,7 @@ try {
       assert(!checkHandoff||(mode==='plan'&&process.env.WTT_AGENT_SMOKE_QUESTION==='1'),'交接冒烟需要计划授权与原生提问');
       let adoptedVersion;
       if(process.env.WTT_AGENT_SMOKE_QUESTION==='1'){
-        await launcher.click();await plansTab.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({panel:await panel.innerText(),calls:agentModel.calls,state:await state()}));});
+        await openProjectAssistant(canvas);await plansTab.click();await panel.getByText('原任务待确认',{exact:true}).waitFor({timeout:16000}).catch(async e=>{throw Error(e.message+' '+JSON.stringify({panel:await panel.innerText(),calls:agentModel.calls,state:await state()}));});
         assert.equal(agentModel.calls.filter(c=>c.name==='course_save_outline').length,0);
         if(checkHandoff)await panel.getByRole('button',{name:'暂停',exact:true}).click();
         await panel.getByRole('button',{name:'打开卡片对话',exact:true}).first().click();
@@ -844,13 +857,13 @@ try {
         assert(result.ok(),await result.text());
         adoptedVersion=(await result.json()).versionId;
         await page.getByRole('button',{name:'交回助手 · V2',exact:true}).click();
-        await launcher.click();await plansTab.click();await panel.getByRole('button',{name:'定位 V2',exact:true}).waitFor();
+        await openProjectAssistant(canvas);await plansTab.click();await panel.getByRole('button',{name:'定位 V2',exact:true}).waitFor();
         assert.equal((await state()).plans[0].steps[1].taskId,null);
         await panel.getByRole('button',{name:'继续剩余步骤',exact:true}).click();
         await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
       }
       if(mode==='step'){
-        await launcher.click();
+        await openProjectAssistant(canvas);
         await review.getByText(/分镜 · /).waitFor({timeout:25000});
         await review.getByRole('button',{name:'执行此项',exact:true}).click();
         await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
@@ -877,7 +890,7 @@ try {
         assert.equal(task.input.sources[0].hash,receipts[0].hash);
         console.log('PASS 暂停同步、卡片接管与交回 V2、继续后仅派发一次并冻结对应版本和哈希');
       }
-      await launcher.click();
+      await openProjectAssistant(canvas);
       await plansTab.click();await panel.getByText('完成 2/2',{exact:true}).waitFor();
       await panel.getByRole('button',{name:'项目记忆',exact:true}).click();
       await panel.getByRole('button',{name:'新增设定'}).click();
@@ -944,11 +957,10 @@ try {
       }
       await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await launcher.waitFor();
       const compact=await launcher.boundingBox();
-      const rail=await toolbar.boundingBox();
-      assert(compact.x>=rail.x&&compact.x+compact.width<=rail.x+rail.width&&compact.y+compact.height<=680);
+      assert(compact.x>=0&&compact.y>=0&&compact.y+compact.height<=680);
       assert.equal(await launcher.getAttribute('aria-expanded'),'false');
       if(process.env.WTT_SMOKE_ARTIFACTS)await page.screenshot({path:path.join(process.env.WTT_SMOKE_ARTIFACTS,'project-assistant-toolbar-narrow.png')});
-      console.log('PASS 固定工具栏入口、窗口拖动及恢复、窄屏收起、跨画布引用、DSH 原生对话、后台派发与新会话接续');
+      console.log('PASS 项目菜单入口、窗口拖动及恢复、窄屏收起、跨画布引用、DSH 原生对话、后台派发与新会话接续');
     }
     if (['all', 'delete'].includes(scenario)) {
       await checkDelete(page, canvas, card, api.pathname);

@@ -113,12 +113,27 @@ export async function checkCanvasStress(page, canvas, cases, api) {
       const key = entry.drafts.at(-1).id;
       const waitForSave = () => page.waitForResponse(res => new URL(res.url()).pathname === api.pathname
         && res.request().method() === 'POST' && res.request().postDataJSON()?.action === 'save-canvas');
+      const boardUrl = new URL(api);
+      boardUrl.searchParams.set('canvas', entry.id);
+      report.layoutReceiptBytes = [];
+      const persistedBoard = async response => {
+        const receipt = await response.json();
+        report.layoutReceiptBytes.push(Buffer.byteLength(JSON.stringify(receipt)));
+        if (!process.env.WTT_SMOKE_PACKAGE || 'layoutToken' in response.request().postDataJSON().data) {
+          assert(receipt.layout, '密集画布位置保存应使用轻量回执');
+        }
+        const persisted = await page.request.get(boardUrl.href);
+        assert(persisted.ok(), '密集画布保存后可读取');
+        const board = await persisted.json();
+        assert.equal(board.revision, receipt.revision);
+        return board;
+      };
       const [reply, timing] = await Promise.all([
         waitForSave(),
         dragCard(page, card(key).locator('.wcc-card-grip')),
       ]);
       assert(reply.ok(), '密集画布拖动后须成功保存');
-      const saved = await reply.json();
+      const saved = await persistedBoard(reply);
       const moved = saved.nodes.find(n => n.id === key).position;
       assert.notDeepEqual(moved, entry.dragStart);
       assert.equal(saved.edges.length, entry.edges, '拖动后须保留画布连线');
@@ -127,7 +142,7 @@ export async function checkCanvasStress(page, canvas, cases, api) {
       for (const [shortcut, position] of [['Control+z', entry.dragStart], ['Control+Shift+z', moved]]) {
         const [response] = await Promise.all([waitForSave(), page.keyboard.press(shortcut)]);
         assert(response.ok(), '撤销和重做均须成功保存');
-        const board = await response.json();
+        const board = await persistedBoard(response);
         assert.deepEqual(board.nodes.find(n => n.id === key).position, position);
         assert.equal(board.edges.length, entry.edges);
       }

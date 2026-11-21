@@ -95,8 +95,8 @@ function ZoomValue({ onReset }) {
 export function CanvasChrome({
   tool = 'select', onTool, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected, onArrange, canArrange,
   onToggleMap, showMap = false, onAddMaterial, onAddElement, onUndo, onRedo, canUndo, canRedo,
-  onInspect, onAI, onTasks, onAssets, pendingCount = 0, completedCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
-  hasSelection = selectedCount > 0, busy = false, pickingReferences = false, projectAssistant,
+  onInspect, onTasks, hasTasks = false, pendingCount = 0, completedCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
+  hasSelection = selectedCount > 0, busy = false, pickingReferences = false, empty = false,
 }) {
   const status = {
     saved: ['已保存', 'check'], saving: ['保存中', 'loading'],
@@ -111,17 +111,16 @@ export function CanvasChrome({
   const taskCount = pendingCount + completedCount
   const taskStatus = [pendingCount && `${pendingCount} 个任务待确认`, completedCount && `${completedCount} 个新成果待查看`].filter(Boolean).join('，')
   return <div className={`wcc-studio-chrome${sidebar ? ' is-panel-open' : ''}`}>
-    <div className="wcc-studio-tools wcc-studio-surface" role="toolbar" aria-label="白板工具" aria-orientation="vertical">
+    {!empty && <div className="wcc-studio-tools wcc-studio-surface" role="toolbar" aria-label="白板工具" aria-orientation="vertical">
       {TOOLS.map(([value, label, shortcut], index) => <React.Fragment key={value}>
         {index === 2 && <span className="wcc-studio-divider is-horizontal" aria-hidden="true" />}
         <ToolButton icon={value} label={label} shortcut={shortcut} active={tool === value} disabled={controlsDisabled} onClick={(onTool || (!['select', 'hand'].includes(value) && onAddElement)) ? () => chooseTool(value) : undefined} />
       </React.Fragment>)}
       <span className="wcc-studio-divider is-horizontal" aria-hidden="true" />
       <ToolButton icon="material" label="添加素材" onClick={onAddMaterial} disabled={controlsDisabled} />
-      {projectAssistant}
-    </div>
+    </div>}
 
-    <div className="wcc-studio-status-dock wcc-studio-surface" role="toolbar" aria-label="画布操作">
+    {(!empty || canUndo || canRedo || hasTasks || taskCount > 0 || ['failed','conflict','saving'].includes(saveStatus)) && <div className="wcc-studio-status-dock wcc-studio-surface" role="toolbar" aria-label="画布操作">
       <span className={`wcc-studio-save-status is-${saveStatus}`} role="status" aria-live="polite" title={status[0]}>
         <CanvasIcon name={status[1]} size={14} className={saveStatus === 'saving' ? 'is-spinning' : ''} /><span>{status[0]}</span>
       </span>
@@ -137,11 +136,9 @@ export function CanvasChrome({
         {taskCount > 0 && <span className="wcc-studio-task-badge" aria-hidden="true">{taskCount > 99 ? '99+' : taskCount}</span>}
       </ToolButton>
       <span id={taskStatusId} className="wtt-visually-hidden" role="status">{taskStatus}</span>
-      <ToolButton icon="inspect" label="资产看板" onClick={onAssets} className="wcc-studio-panel-button"><span>资产</span></ToolButton>
-      <ToolButton icon="ai" label="AI 创作" active={typeof sidebar === 'string' ? sidebar === 'ai' : undefined} onClick={onAI} className="wcc-studio-panel-button is-ai"><span>AI 创作</span></ToolButton>
-    </div>
+    </div>}
 
-    <div className="wcc-studio-zoom-dock wcc-studio-surface" role="toolbar" aria-label="画布缩放与导航">
+    {!empty && <div className="wcc-studio-zoom-dock wcc-studio-surface" role="toolbar" aria-label="画布缩放与导航">
       <ToolButton icon="minus" label="缩小画布" onClick={onZoomOut} />
       <ZoomValue onReset={onZoom100} />
       <ToolButton icon="plus" label="放大画布" onClick={onZoomIn} />
@@ -150,14 +147,14 @@ export function CanvasChrome({
       <ToolButton icon="focus" label="定位所选卡片" onClick={onFitSelected} disabled={!hasSelection} />
       <ToolButton icon="map" label="显示小地图" active={showMap} onClick={onToggleMap} />
       <ToolButton icon="arrange" label="快速排版" onClick={onArrange} disabled={pickingReferences || !canArrange || controlsDisabled}><span>排版</span></ToolButton>
-    </div>
+    </div>}
 
-    <div className="wcc-studio-navigation-hint" aria-hidden="true">双指滑动／滚轮平移<span>·</span>捏合／＋－缩放</div>
+    <div className="wcc-studio-navigation-hint" hidden={empty} aria-hidden="true">双指滑动／滚轮平移<span>·</span>捏合／＋－缩放</div>
   </div>
 }
 
 export function SelectionActions({
-  x, y, selectedCount = 1, onInspect, onAI, onCreateFromSelection, onGroup, onUngroup,
+  x, y, selectedCount = 1, onInspect, onCreateFromSelection, onGroup, onUngroup,
   canGroup = selectedCount > 1, canUngroup = false, onAlign, busy = false,
   onPromote, canPromote = false, onDuplicate, canDuplicate = false,
   onDelete, canDelete = false,
@@ -171,7 +168,7 @@ export function SelectionActions({
     <ToolButton icon="inspect" label="查看内容" onClick={onInspect} />
     {selectedCount > 1 ? <ToolButton icon="plus" label="用选中卡片创作" onClick={onCreateFromSelection} disabled={busy} className="is-ai" />
       : onMediaAction ? <ToolButton icon={mediaActionLabel === '打开对话' ? 'chat' : 'ai'} label={mediaActionLabel} onClick={onMediaAction} className="is-ai"><span>{mediaActionLabel === '打开对话' ? '对话' : mediaActionLabel}</span></ToolButton>
-      : <ToolButton icon="ai" label="交给 AI" onClick={onAI} className="is-ai"><span>交给 AI</span></ToolButton>}
+      : null}
     {canPromote && <ToolButton icon="material" label="保存为素材" onClick={onPromote} disabled={busy} />}
     <span className="wcc-studio-divider" aria-hidden="true" />
     {canGroup && <ToolButton icon="group" label="编组" shortcut="⌘/Ctrl G" onClick={onGroup} disabled={busy} />}

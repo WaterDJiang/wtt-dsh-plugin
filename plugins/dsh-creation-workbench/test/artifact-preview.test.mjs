@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { WorkbenchService, runProcess } from '../src/service.mjs';
 import { createArtifactPreview } from '../src/artifact-preview.mjs';
 import { defaultPreviewFontCandidates, windowsOfficeExecutable } from '../src/preview-environment.mjs';
@@ -125,6 +126,32 @@ test('identical edited bytes reuse their validated preview across draft ids and 
   } finally { clearTimeout(timer) }
 });
 
+test('latest prewarm survives a busy render queue and never runs after close', async t => {
+  const f = await fixture(t);
+  const gate = Promise.withResolvers(), requested = Promise.withResolvers();
+  f.preview.queue = gate.promise;
+  let finished = false;
+  const blocked = f.preview.prepareBytes({ id: randomUUID(), bytes: f.bytes, hash: sha(f.bytes) },
+    { isCurrent: () => !finished, requestKey: 'prewarm-gate' });
+  const attempts = [];
+  f.preview.get = async (id, options) => { attempts.push({ id, hash: options.hash }); requested.resolve(); };
+  f.preview.prewarm({ id: randomUUID(), hash: 'a'.repeat(64) });
+  const latest = { id: f.artifact.id, hash: f.artifact.hash };
+  f.preview.prewarm(latest);
+  await delay(350);
+  assert.deepEqual(attempts, []);
+  finished = true;
+  gate.resolve();
+  assert.equal((await blocked).status, 'superseded');
+  const didStart = await Promise.race([requested.promise.then(() => true), delay(1300).then(() => false)]);
+  assert.equal(didStart, true, '繁忙时登记的最新版本须在空闲后预热');
+  assert.deepEqual(attempts, [latest]);
+  f.preview.prewarm({ id: randomUUID(), hash: 'b'.repeat(64) });
+  f.preview.close();
+  await delay(350);
+  assert.deepEqual(attempts, [latest]);
+});
+
 test('installed macOS asset KaiTi resolves to the real family and produces a Chinese preview without changing the PPTX', async t => {
   const assetRoot = '/System/Library/AssetsV2/com_apple_MobileAsset_Font8';
   if (!existsSync(assetRoot)) return t.skip('This regression requires the installed macOS font asset');
@@ -184,10 +211,13 @@ test('manual two-page editable PPTX: actual Builder rendering, exact pages, cach
   await t.test('a damaged PNG re-renders from the same immutable PPTX without producing another task or artifact', async () => {
     const before = f.service.tasks.files.list(f.requirement.id).length;
     const cached = cacheDirectory(f.preview, f.artifact);
+    const profile = f.preview.officeProfile;
+    if (process.platform === 'darwin') assert.equal(readdirSync(profile.directory).length, 1);
     writeFileSync(path.join(cached, 'P001.png'), 'broken PNG');
     const repaired = await f.preview.get(f.artifact.id);
     assert.equal(repaired.status, 'ready', repaired.error);
     assert.notEqual(repaired.createdAt, first.createdAt);
+    assert.equal(f.preview.officeProfile, profile);
     assert.equal(f.service.tasks.files.list(f.requirement.id).length, before);
     assert.equal(sha(readFileSync(f.file)), f.artifact.hash);
     assert.equal((await f.preview.readPage(f.artifact.id, 1, { hash: f.artifact.hash })).width, 1280);
@@ -300,7 +330,16 @@ Path(${JSON.stringify(evidence)}).write_text(json.dumps(checks))
       assert.equal(existsSync(cached), false);
       assert.equal(readFileSync(path.join(unrelated, 'keep.txt'), 'utf8'), 'another font configuration');
     } finally { f.preview.children.add = addChild; writeFileSync(f.file, f.bytes); }
-    assert.equal((await f.preview.get(f.artifact.id)).status, 'ready');
+    let brokenProfile;
+    if (process.platform === 'darwin') {
+      const root = f.preview.officeProfile.directory;
+      brokenProfile = path.join(root, readdirSync(root)[0]);
+      rmSync(brokenProfile, { recursive: true });
+      writeFileSync(brokenProfile, '模拟不可用的 LibreOffice 配置目录');
+    }
+    const recovered = await f.preview.get(f.artifact.id);
+    assert.equal(recovered.status, 'ready', recovered.error);
+    if (brokenProfile) assert.equal(existsSync(brokenProfile), false, '失败的复用配置被清理，独立配置继续渲染');
     assert.deepEqual((await f.service.tasks.files.download(f.artifact.id)).bytes, f.bytes);
   });
 
@@ -320,5 +359,12 @@ Path(${JSON.stringify(evidence)}).write_text(json.dumps(checks))
     const crossed = { ...other.service, tasks: f.service.tasks };
     assert.throws(() => createArtifactPreview(crossed), /必须绑定当前项目/);
     assert.equal(sha(readFileSync(f.file)), f.artifact.hash);
+    if (process.platform === 'darwin') {
+      const otherProfile = other.preview.officeProfile.directory;
+      assert.notEqual(otherProfile, f.preview.officeProfile.directory);
+      other.preview.close();
+      assert.equal(existsSync(otherProfile), false);
+      assert.equal(existsSync(f.preview.officeProfile.directory), true);
+    }
   });
 });

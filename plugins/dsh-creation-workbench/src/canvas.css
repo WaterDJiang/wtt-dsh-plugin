@@ -205,7 +205,6 @@
 .wtt-course-canvas .wcc-selected-list li span { flex-shrink: 0; color: var(--wtt-ui-muted, #9aa2af); font-size:var(--wtt-text-xs); }
 .wtt-course-canvas .wcc-selected-list li button { border: 0; min-width: 0; background: transparent; font-size:var(--wtt-text-sm); padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .wtt-course-canvas .wcc-edge-actions { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--wcc-line); font-size:var(--wtt-text-sm); color: var(--wtt-ui-text, #7a8598); }
-.wtt-course-canvas .wcc-ai-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .wtt-course-canvas .wcc-ai-composer { flex-shrink: 0; border-bottom: 1px solid var(--wtt-ui-line, #e9edf4); }
 .wtt-course-canvas .wcc-ai-composer > summary { padding: 11px 16px; cursor: pointer; color: var(--wtt-ui-text, #6a758b); font-size:var(--wtt-text-sm); user-select: none; }
 .wtt-course-canvas .wcc-ai-composer > summary::marker { color: var(--wtt-ui-muted, #8d99ae); }
@@ -217,8 +216,6 @@
 .wtt-course-canvas .wcc-ai-note { margin: 9px 0 0; color: var(--wtt-ui-muted, #9aa3b2); font-size:var(--wtt-text-xs); line-height: 1.65; }
 .wtt-course-canvas .wcc-ai-conversation { flex: 1; display: flex; min-height: 150px; overflow: hidden; position: relative; }
 .wtt-course-canvas .wcc-ai-conversation > * { width: 100%; min-height: 0; }
-.wtt-course-canvas .wcc-ai-placeholder { padding: 28px 24px; color: var(--wtt-ui-muted, #9aa3b2); font-size:var(--wtt-text-sm); line-height: 1.8; text-align: center; }
-.wtt-course-canvas .wcc-ai-placeholder > span { display: block; margin-bottom: 10px; color: var(--wtt-ui-muted, #7a87a0); font-size:var(--wtt-text-sm); }
 .wtt-course-canvas .wcc-loading, .wtt-course-canvas .wcc-load-error { position: absolute; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; inset: 0; padding: 30px; text-align: center; background: var(--wtt-ui-canvas, #f7f9fc); color: var(--wtt-ui-muted, #8993a5); font-size:var(--wtt-text-sm); }
 .wtt-course-canvas .wcc-load-error { color: var(--wtt-ui-danger, #a75242); }
 .wtt-course-canvas .wcc-load-error p { max-width: 460px; overflow-wrap: anywhere; }

@@ -1,3 +1,4 @@
+import { CanvasMaterialEntry, canvasMaterialExtensions, checkMaterialFile, uploadCanvasMaterial } from './canvas-material-entry.jsx'
 import {ProjectAgentFloat} from './project-agent.jsx'
 import { CanvasConversationReferenceContext } from './conversation-references.jsx'
 import { loadConversationReferenceFiles } from './conversation-references.mjs'
@@ -56,9 +57,6 @@ const SETTLED_TASK_REFRESH_MS = 12_000
 const LABELS = { requirement: '背景', material: '素材', excerpt: '摘录', outline: '课程大纲', word: 'Word 文档', whiteboard: '白板', artifact: '成果文件', generation: '创作任务' }
 const OUTPUT_LABELS = { text: '文本', image: '图片', video: '视频', outline: '课程大纲', pptx: 'PPT', exercise: '课堂练习', script: '讲师逐字稿', storyboard: 'PPT 分镜', support: '制作资料', material: '素材卡', excerpt: '摘录卡', word: 'Word 文档' }
 const EMPTY_MATERIAL = { title: '', content: '', sourcePath: '' }
-const REFERENCE_FILE_TYPES = /\.(txt|md|csv|json|jsonl|pdf|docx|pptx|png|jpe?g|webp|gif|mp4|webm)$/i
-const REFERENCE_FILE_LIMIT = 20 * 1024 * 1024
-
 function contentCardTitle(card) {
   return cardDisplayTitle(card) || pendingCardTitle(card)
 }
@@ -230,7 +228,7 @@ export const ContentCard = memo(function ContentCard({ id, data, selected, isCon
         onClick={event => { event.stopPropagation(); data.onOpenOutcome?.(pendingMedia.sourceRef) }}>
         <span>{pendingMedia.type === 'video' ? '查看视频附件' : '查看图片附件'}</span>
       </UiButton> : ['artifact', 'outline', 'word'].includes(data.kind) ? <UiButton variant="custom" type="button" className="wcc-card-file nodrag nopan" aria-label={`显示所在文件夹：${data.delivery?.fileName || data.title}`} title={data.delivery?.error || data.delivery?.path || '在文件夹中显示此版本'} onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onOpenFile?.() }}>
-        <span>{data.delivery?.fileName || '整理并定位文件'}</span><small>{data.delivery?.version === 0 ? '制作资料' : `V${String(data.delivery?.version || data.outputCard?.number || 1).padStart(3, '0')}`}</small><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z" /></svg>
+        <span>{data.delivery?.fileName || '整理并定位文件'}</span>{data.delivery?.version === 0 && <small>制作资料</small>}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3Z" /></svg>
       </UiButton> : data.projectFile ? <span>{data.projectFile.status==='ready'?'文件引用':'原文件已变化 · 引用保留'}</span> : stateLabel({ ...data, pendingGeneration: pending })}
     </footer>
     <Handle type="source" position={Position.Right} isConnectable={isConnectable} aria-label={`从 ${data.title} 连线`} />
@@ -2067,15 +2065,24 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
         setBoard(boardRef.current)
         return
       }
+      const basis = boardRef.current.layoutToken || ''
       const result = await requestRef.current('save-canvas', {
-        requirementId, expectedRevision: boardRef.current.revision, ...snapshot,
+        requirementId, expectedRevision: boardRef.current.revision, layoutToken: basis, ...snapshot,
       })
       if (!mounted.current || epoch !== epochRef.current) return
+      if (result.revision < boardRef.current.revision) return
       savedLayoutSignature.current = layoutSignature
-      if (generationStateSignature(result.tasks) !== generationStateSignature(boardRef.current?.tasks)) mediaBoardRefresh.current = true
-      boardRef.current = versionedBoard(result)
+      if (result.layout) {
+        const current = boardRef.current
+        const { positions, sizes } = result.layout
+        boardRef.current = { ...current, revision: result.revision, viewport: result.viewport, sizes,
+          nodes: current.nodes.map(node => ({ ...node, position: positions[node.id] || node.position, ...sizes[node.id] })) }
+      } else {
+        if (generationStateSignature(result.tasks) !== generationStateSignature(boardRef.current?.tasks)) mediaBoardRefresh.current = true
+        boardRef.current = versionedBoard(result)
+        setTasks(result.tasks || [])
+      }
       setBoard(boardRef.current)
-      setTasks(result.tasks || [])
     }).catch(cause => {
       if (!mounted.current || epoch !== epochRef.current) return
       const message = messageOf(cause)
@@ -2124,7 +2131,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
       backgroundLayoutReady() && revision === boardRef.current?.revision && previousLayout === JSON.stringify(layoutSnapshot())))
     if (!requireStableLayout) { if (!keepVisible) setLoading(true); setLoadError('') }
     try {
-      const response = await fetch(endpoint({ canvas: requirement.id }), { credentials: 'same-origin' })
+      const response = await fetch(endpoint({ canvas: requirement.id, layoutToken: '1' }), { credentials: 'same-origin' })
       let result = await response.json().catch(() => null)
       if (!response.ok || result?.ok === false || !result?.nodes) {
         throw new Error(result?.error?.message || result?.error || `画布加载失败（${response.status}）`)
@@ -2925,17 +2932,14 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
         for (const file of files) {
           try {
             if (mediaType && !(mediaType === 'image' ? /\.(png|jpe?g|webp|gif)$/i : /\.(mp4|webm)$/i).test(file.name)) throw new Error(`此入口只接受${mediaType === 'image' ? '图片' : 'MP4／WebM 视频'}文件。`)
-            if (!REFERENCE_FILE_TYPES.test(file.name)) throw new Error('暂不支持该格式，请选择文本、PDF、DOCX、PPTX 或常见图片。')
-            if (!file.size || file.size > REFERENCE_FILE_LIMIT) throw new Error('必须为非空文件，且不能超过 20 MB。')
+            checkMaterialFile(file)
             const digest = await referenceHash(await file.arrayBuffer())
             const operationId = referenceOperation(`${context.key}:file:${mediaType || 'reference'}:${file.name}:${digest}`)
             const frame = cache.current.drafts.get(context.key) || context
             const url = endpoint({ importMaterial: context.requirementId, operationId, filename: file.name,
               ...(mediaType && !context.blank ? { associate: JSON.stringify({ cardId: context.anchor.id, hash: context.anchor.sourceHash }) } : {}),
               x: frame.outputPosition.x, y: frame.outputPosition.y })
-            const response = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: file })
-            const result = await response.json().catch(() => null)
-            if (!response.ok || result?.ok === false || !result?.material) throw new Error(result?.error?.message || result?.error || `素材导入失败（${response.status}）`)
+            const result = await uploadCanvasMaterial(file, url)
             const card = referenceResultCard(result)
             updateCreation(context.key, current => ({ ...updateCreationReferences(current, [...current.references, card]),
               outputPosition: nextReferencePosition(current, result.board), referencesEdited: true, error: '' }))
@@ -3183,17 +3187,33 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     event.preventDefault()
     setDraggingFile(false)
     if (busy) { setError('当前操作正在进行，请完成后再拖入素材。'); return }
-    const files = [...event.dataTransfer.files]
-    if (files.length !== 1) { setError('请每次拖入一份文本素材。'); return }
+    await importBoardFile([...event.dataTransfer.files], flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }))
+  }
+
+  const materialPicker = useRef(null)
+  const boardImportAttempt = useRef(null)
+  async function importBoardFile(files, point) {
+    if (files.length !== 1) { setError('请每次添加一份素材。'); return }
     const file = files[0]
-    if (!/\.(md|txt)$/i.test(file.name)) { setError('当前拖入支持 .md、.txt；其他格式请通过“添加素材”关联工作目录内文件。'); return }
-    if (file.size > 1024 * 1024) { setError('文本文件超过 1 MB。请通过“添加素材”关联工作目录内文件。'); return }
-    try {
-      const content = await file.text()
-      if (!content.trim()) throw new Error('文本文件为空，未添加素材。')
-      const position = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
-      await addMaterial({ title: file.name.replace(/\.(md|txt)$/i, ''), content, sourcePath: '' }, position)
-    } catch (cause) { setError(messageOf(cause)) }
+    const intent = creationIntent.current
+    const center = viewCenter()
+    const position = point || { x: center.x - CARD_WIDTH / 2, y: center.y - CARD_HEIGHT / 2 }
+    await perform('import-material', async epoch => {
+      checkMaterialFile(file)
+      const digest = await referenceHash(await file.arrayBuffer())
+      if (/\.(md|txt)$/i.test(file.name) && !(await file.text()).trim()) throw new Error('文本文件为空，未添加素材。')
+      if (!mounted.current || epoch !== epochRef.current) return
+      const operationId = stableOperation(boardImportAttempt, { requirementId: requirement.id, name: file.name, digest })
+      const result = await uploadCanvasMaterial(file, endpoint({ importMaterial: requirement.id, operationId, filename: file.name, x: position.x, y: position.y }))
+      if (!mounted.current || epoch !== epochRef.current) return
+      const id = 'material:' + result.material.id
+      const board = await loadBoard({ selectIds: [id], selectionIntent: intent, keepVisible: true })
+      onFilesChanged?.()
+      if (!board) return
+      boardImportAttempt.current = null
+      const card = board.nodes.find(node => node.id === id)
+      if (card && intent === creationIntent.current && activeRef.current) openCreation(card)
+    })
   }
 
   function selectAllCards() {
@@ -3250,6 +3270,11 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     if (event.target.closest('dialog,input,textarea,select,[contenteditable="true"],[role="textbox"],[role="separator"]') || event.nativeEvent?.isComposing) return
     cancelPaneInsert()
     const key = event.key.toLowerCase(), command = event.metaKey || event.ctrlKey
+    if (key === 'enter' && event.target === rootRef.current && selectedNodes.length && !busy && !operationLock.current && !conflictRef.current) {
+      event.preventDefault()
+      openSelectedCreation()
+      return
+    }
     if (key === 'escape') { setTool('select'); setContextMenu(null); selectCard(null); return }
     if (command && key === 'a') { event.preventDefault(); selectAllCards(); return }
     if (command && key === 'z') { event.preventDefault(); undo(event.shiftKey); return }
@@ -3300,6 +3325,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     }catch(error){if(mounted.current&&handoffScope.current===cardId)setHandoffError({cardId,message:messageOf(error)})}
     finally{handoffWrite.current=false;if(mounted.current)setHandoffBusy(false)}
   }
+  const emptyCanvas = hasLoadedBoard && nodes.length === 0
   const showSelectionActions = !pickingReferences && selectedNodes.length > 0 && !(creationVisible && selectedNodes.length === 1)
     && !deckPreview && !assetsOpen && !deskVisible && tool === 'select' && !busy && !contextMenu
   const bounds = showSelectionActions ? selectedNodes.map(node => ({ ...absolutePosition(node, nodes), ...nodeSize(node) })) : []
@@ -3321,6 +3347,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     { label: '解除分组', onClick: ungroup, disabled: !hasSelectedGroup },
     { label: '删除节点', onClick: removeElements, disabled: !selectedNodes.length, shortcut: 'Delete' },
   ] : [
+    { label: '录入文字或文件路径', onClick: () => { setMaterialError(''); setMaterialDialog(EMPTY_MATERIAL) } },
     ...[['note', '便签', 'N'], ['text', '文本', 'T'], ['rectangle', '矩形', 'R'], ['ellipse', '椭圆', 'O']].map(([kind, label, shortcut]) => ({ label: `添加${label}`, onClick: () => addElement(kind, contextMenu.point), shortcut })),
     { label: '撤销', onClick: () => undo(), disabled: !historyRef.current.canUndo, shortcut: '⌘Z' },
     { label: '全选', onClick: selectAllCards, shortcut: '⌘A' },
@@ -3356,7 +3383,9 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     agentSelection.current=selectedNodes.map(n=>n.data);
   }
   const agentActions=useRef(null);
-  agentActions.current={refresh:()=>{void refreshTasks();void loadBoard({preserveViewport:true,keepVisible:true});},
+  agentActions.current={openAssets:()=>{
+      setAssetsOpen(true); setSidebar(false); setDeckPreview(null); setOutcomeView(null); setDocumentView(null)
+    },refresh:()=>{void refreshTasks();void loadBoard({preserveViewport:true,keepVisible:true});},
     cardRead:()=>assistantStepRead.current,
     showCardStep:(cardId,value,read)=>{
       if(handoffScope.current!==cardId||handoffWrite.current||read!==assistantStepRead.current)return
@@ -3386,6 +3415,11 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     {(feedbackError || notice || busy === 'upload-card') && <div className={`wcc-message${feedbackError ? ' is-error' : ''}${board && loadError ? ' has-retry' : ''}`} role={feedbackError ? 'alert' : 'status'}>{feedbackError ? <UserError error={feedbackError} announce={false} /> : <span>{busy === 'upload-card' ? '正在上传文件…' : notice}</span>}
       {board && loadError && <UiButton variant="quiet" size="compact" disabled={!!busy} onClick={() => void perform('refresh', async () => { await saveLayout(); await loadBoard({ preserveViewport: true, keepVisible: true }) })}>重试刷新</UiButton>}
       {busy !== 'upload-card' && <UiButton variant="ghost" size="compact" onClick={() => { setError(''); setNotice(''); setLoadError('') }} aria-label="关闭提示">×</UiButton>}</div>}
+    <input ref={materialPicker} type="file" hidden accept={canvasMaterialExtensions} aria-label="选择素材文件" onChange={event => {
+      const files = [...event.target.files]
+      event.target.value = ''
+      if (files.length) void importBoardFile(files)
+    }}/>
     <input ref={contentPicker} type="file" hidden aria-label="上传卡片内容" onChange={uploadCardFile}/>
     {renameCard && <CardNameDialog title={cardDisplayTitle(renameCard)} busy={!!busy} error={renameError} onSave={saveCardName} onClose={() => { if (!busy) setRenameCard(null) }}/>}
     <div className="wcc-workspace">
@@ -3421,21 +3455,20 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
           <UiButton ref={referenceDoneButton} variant="primary" disabled={referencePick.busy} onClick={() => void confirmReferencePick()}>{referencePick.busy ? '正在添加…' : '完成'}</UiButton>
           {referencePick.error && <UserError error={referencePick.error} />}
         </div>}
-        <CanvasChrome pickingReferences={pickingReferences} tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
-          projectAssistant={active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current} cardId={assistantCardId}
-            request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/>}
+        {emptyCanvas && !loading && !loadError && !pickingReferences && !creationMenu && !contextMenu && !dockOpen &&
+          <CanvasMaterialEntry busy={Boolean(busy)} onPick={() => materialPicker.current?.click()}/>}
+        <CanvasChrome empty={emptyCanvas} pickingReferences={pickingReferences} tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
           onZoom100={zoom100} onFitAll={fitAllCards} onFitSelected={fitSelection}
-          showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => { setMaterialError(''); setMaterialDialog(EMPTY_MATERIAL) }}
+          showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => materialPicker.current?.click()}
           onUndo={() => undo()} onRedo={() => undo(true)} canUndo={historyRef.current.canUndo} canRedo={historyRef.current.canRedo}
           onArrange={arrangeCards} canArrange={canArrange}
-          sidebar={creationVisible ? 'ai' : sidebar ? tab : false} onInspect={() => sidebar && tab === 'inspect' ? setSidebar(false) : openPanel('inspect')}
-          onAI={() => { cancelCardOpen(); creationIntent.current += 1; if (creationVisible) closeCreation(); else if (creationRef.current) { cache.current.visible = true; setCreationVisible(true); setSidebar(false) } else openSelectedCreation() }} selectedCount={selectedNodes.length}
-          onTasks={() => sidebar && tab === 'tasks' ? setSidebar(false) : openPanel('tasks')} onAssets={() => { setAssetsOpen(true); setSidebar(false); setDeckPreview(null); setOutcomeView(null);setDocumentView(null) }}
+          sidebar={sidebar ? tab : false} onInspect={() => sidebar && tab === 'inspect' ? setSidebar(false) : openPanel('inspect')}
+          selectedCount={selectedNodes.length} hasTasks={tasks.length > 0} onTasks={() => sidebar && tab === 'tasks' ? setSidebar(false) : openPanel('tasks')}
           pendingCount={pendingTaskIds.size} completedCount={taskNotices.unseen.size}
           saveStatus={loading ? '加载中' : draftCount ? 'draft' : saveStatus} onRefresh={refresh} onRetry={saveStatus === 'conflict' ? refresh : () => void saveLayout(true)} busy={!!busy || loading || !board} />
         {interactions.length > 0 && <details className="wcc-skill-inbox"><summary>待你处理 · {interactions.length}</summary><div>{interactions.map(entry => <UiButton variant="custom" type="button" key={entry.key} onClick={() => openSkillReview(entry)}>{entry.interaction.questions?.[0]?.header || entry.interaction.questions?.[0]?.question?.slice(0, 120) || '执行权限待确认'}<small>{entry.task.title}</small></UiButton>)}</div></details>}
         {showSelectionActions && <CanvasViewportLayer follow={active}>{view => <SelectionActions {...selectionPosition(view)} selectedCount={selectedNodes.length}
-          onInspect={() => openPanel('inspect')} onAI={() => openPanel('ai')} onCreateFromSelection={event => openSelectionCreationMenu(event.currentTarget)} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
+          onInspect={() => openPanel('inspect')} onCreateFromSelection={event => openSelectionCreationMenu(event.currentTarget)} canGroup={selectedNodes.length >= 2} onGroup={() => setGroupDialog(true)}
           mediaActionLabel={selectedCard?.mediaActionLabel} onMediaAction={selectedCard?.onMediaAction}
           canUngroup={hasSelectedGroup} onUngroup={ungroup} onAlign={alignSelection}
           canPromote={onlyWhiteboard && selectedNodes.length === 1 && !!selectedCard?.text?.trim()} onPromote={promoteWhiteboard}
@@ -3443,10 +3476,11 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
         {contextMenu && <CanvasContextMenu {...contextMenu} items={contextItems} onClose={() => setContextMenu(null)} />}
         {creationMenu && <NodeCreateMenu caption={creationMenu.blank ? '新建卡片' : creationMenu.referenceCards ? '用选中卡片创作' : undefined}
           trigger={creationMenu.trigger} position={creationMenu.position} items={creationMenuItems(creationMenu.blank?{kind:'canvas'}:creationMenu.anchor).map(item=>creationMenu.blank?{...item,description:undefined}:item)} onAction={chooseNewType} onClose={() => setCreationMenu(null)} />}
-        {board && !loading && !loadError && <div className="wcc-canvas-hint">V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 空白双击新建 · 卡片双击编辑</div>}
+        {board && !loading && !loadError && <div className="wcc-canvas-hint" hidden={emptyCanvas}>V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 空白双击新建 · 卡片双击编辑</div>}
         {draggingFile && <div className="wcc-drop-overlay">松开以添加到画布</div>}
-        {projectBar}
-    <CanvasSearch width={canvasSize.width} panelOpen={false} hidden={pickingReferences || deskVisible || Boolean(deckPreview) || assetsOpen || Boolean(documentView)}
+        {active ? <ProjectAgentFloat projectBar={projectBar} notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current} cardId={assistantCardId}
+            request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/> : projectBar}
+    <CanvasSearch width={canvasSize.width} panelOpen={false} hidden={emptyCanvas || pickingReferences || deskVisible || Boolean(deckPreview) || assetsOpen || Boolean(documentView)}
       query={searchQuery} onQuery={setSearchQuery} nodes={nodes} allRelations={allRelations} onRelations={() => setAllRelations(value => !value)}
       onOpen={() => setSidebar(false)} onSelect={node => { selectCard(node.id); void flow.fitView({ nodes: [node], padding: .4, maxZoom: 1, duration: 160 }) }} />
     <CanvasViewportLayer follow={Boolean(active && composerVisible && creation && !draggingCard)}>{view =>
@@ -3521,11 +3555,10 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
         <PanelHeader title={tab==='tasks'?'创作任务':selectedCard?.title||'内容详情'} subtitle={tab==='tasks'?`${tasks.length} 个任务`:undefined} downloadHref={tab==='inspect'&&selectedCard?(selectedCard.importedFile?endpoint({materialFile:selectedCard.refId}).href:selectedCard.kind==='artifact'?endpoint({downloadArtifact:selectedCard.refId}).href:selectedCard.kind==='word'?endpoint({download:selectedCard.refId}).href:undefined):undefined} expanded={dock.expanded} onToggleWidth={dock.toggleExpanded} onClose={()=>setSidebar(false)} closeLabel="关闭画布侧栏"/>
         <div className="wcc-tabs" role="tablist" aria-label="侧栏内容">
           <UiButton variant="custom" role="tab" aria-selected={tab === 'inspect'} aria-controls={`${panelId}-inspect-panel`} id={`${panelId}-inspect-tab`} onClick={() => setTab('inspect')}>内容详情</UiButton>
-          <UiButton variant="custom" role="tab" aria-selected={tab === 'ai'} aria-controls={`${panelId}-ai-panel`} id={`${panelId}-ai-tab`} onClick={openSelectedCreation}>AI 创作</UiButton>
           <UiButton variant="custom" role="tab" aria-selected={tab === 'tasks'} aria-controls={`${panelId}-tasks-panel`} id={`${panelId}-tasks-tab`} onClick={() => setTab('tasks')}>创作任务</UiButton>
         </div>
         <div hidden={tab !== 'inspect'} className="wcc-inspector" role="tabpanel" id={`${panelId}-inspect-panel`} aria-labelledby={`${panelId}-inspect-tab`}>
-          <div className="wcc-inspector-heading"><span>{selectedNodes.length ? `已选择 ${selectedNodes.length} 张卡片` : selectedGroups.length ? '已选择分组' : '选一张卡片查看内容'}</span>{selectedNodes.length > 0 && <UiButton variant="quiet" className="wcc-text-button" onClick={() => setTab('ai')}>交给 AI →</UiButton>}</div>
+          <div className="wcc-inspector-heading"><span>{selectedNodes.length ? `已选择 ${selectedNodes.length} 张卡片` : selectedGroups.length ? '已选择分组' : '选一张卡片查看内容'}</span></div>
           {selectedCard ? <>
             <span className={`wcc-inspector-type is-${selectedCard.kind}`}>{LABELS[selectedCard.kind]}{selectedCard.number != null ? ` · v${String(selectedCard.number).padStart(3, '0')}` : ''}</span>
             <h2>{selectedCard.title}</h2>
@@ -3570,12 +3603,10 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
               <pre className="wcc-content-preview">{selectedCard.kind === 'requirement' && typeof selectedCard.requirementBackground === 'string' ? selectedCard.requirementBackground || '暂无背景信息。' : selectedCard.content || '暂无可预览正文。'}</pre>
               {selectedCard.kind === 'material' && <UiButton variant="quiet" onClick={() => { setMaterialError(''); setMaterialDialog({ title: `${selectedCard.title}（修订）`, content: selectedCard.content || '', sourcePath: '', snapshot: true }) }} disabled={!!busy}>编辑并另存新素材</UiButton>}
             </>}
-          </> : selectedNodes.length > 1 ? <><p className="wcc-muted">可以分组整理，或将所选内容一起交给 AI。</p><ul className="wcc-selected-list">{selectedNodes.map(node => <li key={node.id}><span>{LABELS[node.data.kind]}</span><UiButton variant="quiet" onClick={() => selectCard(node.id)}>{node.data.title}</UiButton></li>)}</ul><UiButton variant="primary" className="wcc-primary" onClick={() => setTab('ai')}>用所选卡片创作</UiButton></> : <div className="wcc-inspector-empty"><span aria-hidden="true">▧</span><p>点击画布上的卡片，<br />在这里查看正文和文件。</p><small>按住 Shift 可选择多张卡片。</small></div>}
+          </> : selectedNodes.length > 1 ? <><p className="wcc-muted">可以分组整理，或将所选内容一起交给 AI。</p><ul className="wcc-selected-list">{selectedNodes.map(node => <li key={node.id}><span>{LABELS[node.data.kind]}</span><UiButton variant="quiet" onClick={() => selectCard(node.id)}>{node.data.title}</UiButton></li>)}</ul><UiButton variant="primary" className="wcc-primary" onClick={openSelectedCreation}>用所选卡片创作</UiButton></> : <div className="wcc-inspector-empty"><span aria-hidden="true">▧</span><p>点击画布上的卡片，<br />在这里查看正文和文件。</p><small>按住 Shift 可选择多张卡片。</small></div>}
           {edgeSelection.length > 0 && <div className="wcc-edge-actions"><p>已选择 {edgeSelection.length} 条手动关联线</p><UiButton variant="quiet" onClick={deleteSelectedEdges}>删除所选关联线</UiButton></div>}
         </div>
-        <div hidden={tab !== 'ai'} className="wcc-ai-panel" role="tabpanel" id={`${panelId}-ai-panel`} aria-labelledby={`${panelId}-ai-tab`}>
-          <div className="wcc-ai-placeholder"><p>点击卡片可切换创作对象，各卡片草稿分别保留；已提交任务的引用独立保存。</p><UiButton variant="quiet" onClick={openSelectedCreation}>打开卡片创作框</UiButton></div>
-        </div>
+
         <div hidden={tab !== 'tasks'} className="wcc-task-panel" role="tabpanel" id={`${panelId}-tasks-panel`} aria-labelledby={`${panelId}-tasks-tab`}>
           <CourseTasks tasks={tasks} pendingTaskIds={pendingTaskIds} newTaskIds={taskNotices.unseen} onViewTask={taskNotices.markSeen}
             onOpenPending={id => openSkillReview(interactionsRef.current.find(entry => entry.task.id === id))}

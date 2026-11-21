@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync,
+  closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,
   realpathSync, renameSync, rmSync, writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { resolvePreviewFontDirectories, windowsOfficeExecutable } from './preview-environment.mjs';
 
 const VERSION = 'cw10-ppt-preview-2';
@@ -19,7 +20,7 @@ const PREFLIGHT_AND_RENDER = String.raw`
 import collections,hashlib,json,math,os,posixpath,runpy,sys,zipfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
-source,script,out,script_hash,max_pages,max_pixels,max_total,max_expanded,max_bytes,timeout,fontconfig,fontconfig_hash,office=sys.argv[1:]
+source,script,out,script_hash,max_pages,max_pixels,max_total,max_expanded,max_bytes,timeout,fontconfig,fontconfig_hash,office,profile_root=sys.argv[1:]
 script=Path(script)
 if hashlib.sha256(script.read_bytes()).hexdigest()!=script_hash: raise ValueError('渲染脚本已变更，请重试预览')
 with zipfile.ZipFile(source) as package:
@@ -91,10 +92,37 @@ fitz.Page.get_pixmap=bounded_pixmap
 fitz.Pixmap.save=bounded_save
 sys.argv=[str(script),source,'--out',out,'--timeout',timeout,'--fontconfig',fontconfig]
 if office: sys.argv+=['--soffice',office]
+if profile_root:
+ import shutil,subprocess
+ original_run=subprocess.run
+ isolated_profile_arg='-env:UserInstallation='+(Path(out).resolve()/'lo-profile').as_uri()
+ def convert_with_project_profile(command,*args,**kwargs):
+  # Wrap only the renderer's isolated headless PDF conversion.
+  if (not isinstance(command,list) or len(command)<7 or command[1:6]!=[isolated_profile_arg,'--headless','--convert-to','pdf','--outdir']):
+   return original_run(command,*args,**kwargs)
+  try:
+   executable=Path(command[0]).resolve(strict=True)
+   info=executable.stat()
+   identity=(str(executable),info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns)
+   profile=Path(profile_root)/hashlib.sha256(repr(identity).encode()).hexdigest()
+   if profile.is_symlink(): return original_run(command,*args,**kwargs)
+  except OSError:
+   return original_run(command,*args,**kwargs)
+  result=original_run([command[0],'-env:UserInstallation='+profile.as_uri(),*command[2:]],*args,**kwargs)
+  pdf=Path(out)/(Path(source).stem+'.pdf')
+  if not result.returncode and pdf.is_file() and pdf.stat().st_size>0:
+   return result
+  pdf.unlink(missing_ok=True)
+  if profile.is_dir(): shutil.rmtree(profile,ignore_errors=True)
+  else: profile.unlink(missing_ok=True)
+  return original_run(command,*args,**kwargs)
+ subprocess.run=convert_with_project_profile
 try:
  runpy.run_path(str(script),run_name='__main__')
 except SystemExit as error:
  if error.code not in {0,None}: raise
+finally:
+ if profile_root: subprocess.run=original_run
 # Text extraction alone can include invisible text. Compare Chinese characters
 # against actual painted glyph traces, rejecting missing/.notdef/transparent
 # glyphs. PNGs are still real PDF rasterizations and require visual review.
@@ -297,6 +325,23 @@ export class ArtifactPreview {
     });
   }
 
+  #discardOfficeProfile() {
+    const directory = this.officeProfile?.directory;
+    this.officeProfile = undefined;
+    if (directory) try { rmSync(directory, { recursive: true, force: true }); } catch { /* Temporary profile cleanup is best effort. */ }
+  }
+
+  #profileFor(renderer) {
+    if (process.platform !== 'darwin') return '';
+    if (this.officeProfile?.rendererVersion === renderer.rendererVersion) return this.officeProfile.directory;
+    this.#discardOfficeProfile();
+    try {
+      const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'wtt-ppt-office-')));
+      this.officeProfile = { directory, rendererVersion: renderer.rendererVersion };
+      return directory;
+    } catch { return ''; }
+  }
+
   async #render(artifact, bytes, renderer, directory, verifySource = () => this.#source(artifact.id).artifact) {
     this.#directory(path.dirname(directory), true);
     const attempt = `${directory}.attempt-${randomUUID()}`;
@@ -306,7 +351,7 @@ export class ArtifactPreview {
     try {
       await this.#run(['-c', PREFLIGHT_AND_RENDER, source, this.script, output, renderer.scriptHash,
         String(this.maxPages), String(this.maxPagePixels), String(this.maxTotalPixels), String(512 * 1024 * 1024),
-        String(this.maxCacheBytes), String(Math.max(1, (this.timeoutMs - 20_000) / 1000)), renderer.fontconfigPath, renderer.fontconfigHash, renderer.office || '']);
+        String(this.maxCacheBytes), String(Math.max(1, (this.timeoutMs - 20_000) / 1000)), renderer.fontconfigPath, renderer.fontconfigHash, renderer.office || '', this.#profileFor(renderer)]);
       const rendered = JSON.parse(this.#read(path.join(output, 'manifest.json'), 1_048_576));
       if (rendered.pptx_sha256 !== artifact.hash || rendered.fontconfig_sha256 !== renderer.fontconfigHash || rendered.chinese_glyph_check !== 'passed'
         || rendered.status !== 'rendered_requires_review' || !Array.isArray(rendered.pages)
@@ -349,11 +394,31 @@ export class ArtifactPreview {
   }
 
   prewarm({ id, hash }) {
+    if (this.closed || this.service.store.closed) return;
+    this.pendingPrewarm = { id, hash };
+    this.#schedulePrewarm();
+  }
+
+  #schedulePrewarm() {
     clearTimeout(this.prewarmTimer);
+    if (!this.pendingPrewarm || this.closed || this.service.store.closed || this.inflight.size) return;
     this.prewarmTimer = setTimeout(() => {
-      if (!this.closed && !this.service.store.closed && this.inflight.size === 0) void this.get(id, { hash });
+      if (!this.pendingPrewarm || this.closed || this.service.store.closed || this.inflight.size) return;
+      const { id, hash } = this.pendingPrewarm;
+      this.pendingPrewarm = undefined;
+      void this.get(id, { hash });
     }, 250);
     this.prewarmTimer.unref();
+  }
+
+  #queuePreview(key, render) {
+    const job = this.queue.catch(() => {}).then(render);
+    this.queue = job;
+    this.inflight.set(key, job);
+    job.finally(() => {
+      this.inflight.delete(key);
+      this.#schedulePrewarm();
+    }).catch(() => {});
   }
 
   async get(id, { hash } = {}) {
@@ -362,6 +427,7 @@ export class ArtifactPreview {
       artifact = this.files.get(id); // Keep the registered identity in honest failure DTOs too.
       const source = this.#source(id); artifact = source.artifact;
       if (hash !== undefined && hash !== artifact.hash) throw new Error('预览请求的 PPTX 版本已不匹配');
+      if (this.pendingPrewarm?.id === id && this.pendingPrewarm.hash === artifact.hash) this.pendingPrewarm = undefined;
       renderer = this.#renderer();
       const key = `${artifact.id}:${artifact.hash}:${renderer.rendererVersion}`;
       const directory = path.join(this.cacheRoot, artifact.id, `${artifact.hash}-${renderer.rendererVersion}`);
@@ -370,12 +436,10 @@ export class ArtifactPreview {
         if (existsSync(directory)) this.#directory(directory); // Never replace a symlink masquerading as a cache.
       }
       if (!this.inflight.has(key)) {
-        const job = this.queue.catch(() => {}).then(() => {
+        this.#queuePreview(key, () => {
           if (this.closed) throw new Error('预览服务已关闭');
           return this.#render(artifact, source.bytes, renderer, directory);
         });
-        this.queue = job; this.inflight.set(key, job);
-        job.finally(() => this.inflight.delete(key)).catch(() => {});
       }
       return await this.inflight.get(key);
     } catch (error) {
@@ -429,7 +493,7 @@ export class ArtifactPreview {
     catch { if (existsSync(directory)) this.#directory(directory); }
     const key = `editable:${artifact.id}:${artifact.hash}:${renderer.rendererVersion}:${requestKey}`;
     if (!this.inflight.has(key)) {
-      const job = this.queue.catch(() => {}).then(() => {
+      this.#queuePreview(key, () => {
         if (this.closed || this.service.store.closed) throw new Error('PPT 编辑预览服务已关闭');
         if (!isCurrent()) return superseded();
         try { return this.#public(this.#cached(directory, artifact, renderer.rendererVersion)); } catch {}
@@ -438,8 +502,6 @@ export class ArtifactPreview {
           return artifact;
         });
       });
-      this.queue = job; this.inflight.set(key, job);
-      job.finally(() => this.inflight.delete(key)).catch(() => {});
     }
     return bind(await this.inflight.get(key));
   }
@@ -463,9 +525,15 @@ export class ArtifactPreview {
   }
 
   close() {
+    if (this.closed) return;
     this.closed = true;
     clearTimeout(this.prewarmTimer);
+    this.pendingPrewarm = undefined;
     for (const child of this.children) child.previewStop?.();
+    if (this.children.size) {
+      const cleanup = () => this.#discardOfficeProfile();
+      void this.queue.then(cleanup, cleanup);
+    } else this.#discardOfficeProfile();
   }
 }
 

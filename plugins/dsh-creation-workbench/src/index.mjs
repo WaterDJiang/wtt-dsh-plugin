@@ -266,7 +266,8 @@ export function apply(ctx, config = {}) {
             const result = task.kind === 'media' ? { ...task, mediaJob: service.media.get(task.id).job } : task;
             return Response.json(result, { headers });
           }
-          if (url.searchParams.has('canvas')) return Response.json(service.canvas.getBoard(url.searchParams.get('canvas')), { headers });
+          if (url.searchParams.has('canvas')) return Response.json(
+            service.canvas.getBoard(url.searchParams.get('canvas'), { withLayoutToken: url.searchParams.get('layoutToken') === '1' }), { headers });
           if (url.searchParams.has('outputDraft')) {
             if(!projectId)throw new Error('草稿操作必须指定当前项目');
             return Response.json(service.cards.describeDraft({requirementId:url.searchParams.get('requirementId'),cardId:url.searchParams.get('outputDraft')}),{headers});

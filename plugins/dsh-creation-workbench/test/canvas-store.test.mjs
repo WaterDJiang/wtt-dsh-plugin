@@ -112,6 +112,46 @@ test('layout, manual edges, groups and viewport survive reopening; new versions 
   } finally { reopened.close(); }
 });
 
+test('layout receipt keeps canonical coordinates and sizes and falls back on file or graph changes', t => {
+  const { root, store, canvas } = fixture(t), req = requirement(store);
+  const { material: asset } = material(canvas, req.id);
+  const assetId = `material:${asset.id}`, requirementId = `requirement:${req.id}`;
+  const read = () => canvas.getBoard(req.id, { withLayoutToken: true });
+  const legacy = canvas.getBoard(req.id);
+  assert.equal(legacy.layoutToken, undefined);
+  const base = read();
+  const request = (board, extra = {}) => ({ requirementId: req.id, expectedRevision: board.revision,
+    layoutToken: board.layoutToken, positions: Object.fromEntries(board.nodes.map(node => [node.id, node.position])), ...extra });
+  const initial = request(base);
+  const position = { x: 624, y: 338 };
+  const size = { width: 480, height: 364 };
+  const saved = canvas.saveBoard({ ...initial, positions: { ...initial.positions, [assetId]: position }, sizes: { [assetId]: size } });
+  assert.deepEqual(saved.layout, { positions: { [assetId]: position }, sizes: { [assetId]: size } });
+  assert.equal(saved.layoutToken, base.layoutToken);
+  assert.throws(() => canvas.saveBoard(initial), /已被其他操作修改/);
+  const current = read();
+  assert.equal(current.layoutToken, saved.layoutToken);
+  assert.deepEqual(current.nodes.find(node => node.id === assetId).position, position);
+  assert.equal(current.nodes.find(node => node.id === assetId).width, size.width);
+
+  writeFileSync(path.join(root, asset.path), '文件内容已在同一布局版本下变更');
+  const changed = canvas.saveBoard(request(current));
+  assert.equal(changed.layout, undefined);
+  assert.notEqual(changed.layoutToken, current.layoutToken);
+  assert.equal(changed.nodes.find(node => node.id === assetId).status, 'changed');
+
+  const edges = [{ id: 'new:edge', source: requirementId, target: assetId }];
+  const connected = canvas.saveBoard(request(changed, { edges }));
+  assert.equal(connected.layout, undefined);
+  assert.deepEqual(connected.edges, edges);
+
+  const movedAgain = canvas.saveBoard(request(connected, { edges }));
+  assert(movedAgain.layout);
+  const withoutSize = canvas.saveBoard(request(read(), { edges, sizes: {} }));
+  assert.equal(withoutSize.layout, undefined);
+  assert.equal(withoutSize.sizes[assetId], undefined);
+});
+
 test('stale revisions reject without overwriting; unknown cards and forged body cannot alter truth', (t) => {
   const { root, store, canvas } = fixture(t);
   const req = requirement(store), id = `requirement:${req.id}`;

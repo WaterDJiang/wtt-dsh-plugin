@@ -108,7 +108,10 @@ export async function checkCanvasReads(page, canvas, entries, api) {
   // Parent workspace refresh followed by a normal canvas read, including error and retry.
   await pausedRead(entry, 'manual-refresh-failure', () => canvas.getByRole('button', { name: '刷新画布', exact: true }).click(), { failure: true });
   await pausedRead(entry, 'retry-refresh', () => canvas.getByRole('button', { name: '重试刷新', exact: true }).click());
-  await canvas.getByRole('button', { name: '添加素材', exact: true }).click();
+  const pane = canvas.locator('.react-flow__pane');
+  const bounds = await pane.boundingBox();
+  await pane.click({button:'right', position:{x:bounds.width - 100, y:500}});
+  await canvas.getByRole('menuitem', { name:'录入文字或文件路径' }).click();
   const dialog = page.getByRole('dialog', { name: '添加素材', exact: true });
   await dialog.getByLabel('素材名称', { exact: true }).fill('同画布新增素材');
   await dialog.getByLabel('文字内容', { exact: true }).fill('新增成功必须保留来源卡。');
@@ -135,9 +138,10 @@ export async function checkCanvasReads(page, canvas, entries, api) {
   await remove.getByRole('radio', { name: '只移除画布节点', exact: true }).check();
   await remove.getByRole('button', { name: '移除节点', exact: true }).click(); await card(second.id).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: /^打开文件栏/ }).click();
-  await page.getByRole('button', { name: '项目回收站', exact: true }).click();
+  await page.getByRole('button', { name: '文件栏操作', exact: true }).click();
+  await page.getByRole('menuitem', { name: '项目回收站', exact: true }).click();
   const recycle = page.getByRole('dialog', { name: '项目回收站', exact: true });
-  await pausedRead(entry, 'recycle-restore', () => recycle.getByRole('button', { name: '恢复', exact: true }).click());
+  await pausedRead(entry, 'recycle-restore', () => recycle.locator('article').filter({hasText:second.title}).getByRole('button', { name: '恢复', exact: true }).click());
   await card(second.id).waitFor({ state: 'attached' });
   await recycle.getByRole('button', { name: '关闭项目回收站', exact: true }).click(); await closePanels();
   // Finish an old real read after moving to a different canvas: it must not repopulate the new one.
