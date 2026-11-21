@@ -3383,9 +3383,10 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
     agentSelection.current=selectedNodes.map(n=>n.data);
   }
   const agentActions=useRef(null);
-  agentActions.current={openAssets:()=>{
-      setAssetsOpen(true); setSidebar(false); setDeckPreview(null); setOutcomeView(null); setDocumentView(null)
-    },refresh:()=>{void refreshTasks();void loadBoard({preserveViewport:true,keepVisible:true});},
+  function openAssets() {
+    setAssetsOpen(true); setSidebar(false); setDeckPreview(null); setOutcomeView(null); setDocumentView(null)
+  }
+  agentActions.current={refresh:()=>{void refreshTasks();void loadBoard({preserveViewport:true,keepVisible:true});},
     cardRead:()=>assistantStepRead.current,
     showCardStep:(cardId,value,read)=>{
       if(handoffScope.current!==cardId||handoffWrite.current||read!==assistantStepRead.current)return
@@ -3458,6 +3459,8 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
         {emptyCanvas && !loading && !loadError && !pickingReferences && !creationMenu && !contextMenu && !dockOpen &&
           <CanvasMaterialEntry busy={Boolean(busy)} onPick={() => materialPicker.current?.click()}/>}
         <CanvasChrome empty={emptyCanvas} pickingReferences={pickingReferences} tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
+          projectAssistant={active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current} cardId={assistantCardId}
+            request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/>}
           onZoom100={zoom100} onFitAll={fitAllCards} onFitSelected={fitSelection}
           showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => materialPicker.current?.click()}
           onUndo={() => undo()} onRedo={() => undo(true)} canUndo={historyRef.current.canUndo} canRedo={historyRef.current.canRedo}
@@ -3478,8 +3481,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
           trigger={creationMenu.trigger} position={creationMenu.position} items={creationMenuItems(creationMenu.blank?{kind:'canvas'}:creationMenu.anchor).map(item=>creationMenu.blank?{...item,description:undefined}:item)} onAction={chooseNewType} onClose={() => setCreationMenu(null)} />}
         {board && !loading && !loadError && <div className="wcc-canvas-hint" hidden={emptyCanvas}>V 选择 · H 手型 · 双指滑动／滚轮平移 · 捏合／＋－缩放 · 空白双击新建 · 卡片双击编辑</div>}
         {draggingFile && <div className="wcc-drop-overlay">松开以添加到画布</div>}
-        {active ? <ProjectAgentFloat projectBar={projectBar} notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current} cardId={assistantCardId}
-            request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/> : projectBar}
+        {active ? React.cloneElement(projectBar, { onAssets: openAssets }) : projectBar}
     <CanvasSearch width={canvasSize.width} panelOpen={false} hidden={emptyCanvas || pickingReferences || deskVisible || Boolean(deckPreview) || assetsOpen || Boolean(documentView)}
       query={searchQuery} onQuery={setSearchQuery} nodes={nodes} allRelations={allRelations} onRelations={() => setAllRelations(value => !value)}
       onOpen={() => setSidebar(false)} onSelect={node => { selectCard(node.id); void flow.fitView({ nodes: [node], padding: .4, maxZoom: 1, duration: 160 }) }} />

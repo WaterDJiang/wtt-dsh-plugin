@@ -96,7 +96,7 @@ export function CanvasChrome({
   tool = 'select', onTool, onZoomIn, onZoomOut, onZoom100, onFitAll, onFitSelected, onArrange, canArrange,
   onToggleMap, showMap = false, onAddMaterial, onAddElement, onUndo, onRedo, canUndo, canRedo,
   onInspect, onTasks, hasTasks = false, pendingCount = 0, completedCount = 0, sidebar, selectedCount = 0, onRefresh, saveStatus = 'saved', onRetry,
-  hasSelection = selectedCount > 0, busy = false, pickingReferences = false, empty = false,
+  hasSelection = selectedCount > 0, busy = false, pickingReferences = false, empty = false, projectAssistant,
 }) {
   const status = {
     saved: ['已保存', 'check'], saving: ['保存中', 'loading'],
@@ -111,14 +111,15 @@ export function CanvasChrome({
   const taskCount = pendingCount + completedCount
   const taskStatus = [pendingCount && `${pendingCount} 个任务待确认`, completedCount && `${completedCount} 个新成果待查看`].filter(Boolean).join('，')
   return <div className={`wcc-studio-chrome${sidebar ? ' is-panel-open' : ''}`}>
-    {!empty && <div className="wcc-studio-tools wcc-studio-surface" role="toolbar" aria-label="白板工具" aria-orientation="vertical">
+    <div className={`wcc-studio-tools wcc-studio-surface${empty ? ' is-empty' : ''}`} role="toolbar" aria-label="白板工具" aria-orientation="vertical">
       {TOOLS.map(([value, label, shortcut], index) => <React.Fragment key={value}>
         {index === 2 && <span className="wcc-studio-divider is-horizontal" aria-hidden="true" />}
         <ToolButton icon={value} label={label} shortcut={shortcut} active={tool === value} disabled={controlsDisabled} onClick={(onTool || (!['select', 'hand'].includes(value) && onAddElement)) ? () => chooseTool(value) : undefined} />
       </React.Fragment>)}
       <span className="wcc-studio-divider is-horizontal" aria-hidden="true" />
       <ToolButton icon="material" label="添加素材" onClick={onAddMaterial} disabled={controlsDisabled} />
-    </div>}
+      {projectAssistant}
+    </div>
 
     {(!empty || canUndo || canRedo || hasTasks || taskCount > 0 || ['failed','conflict','saving'].includes(saveStatus)) && <div className="wcc-studio-status-dock wcc-studio-surface" role="toolbar" aria-label="画布操作">
       <span className={`wcc-studio-save-status is-${saveStatus}`} role="status" aria-live="polite" title={status[0]}>

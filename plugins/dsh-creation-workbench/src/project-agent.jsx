@@ -1,11 +1,13 @@
 import React,{useCallback,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {PanelHeader,UiButton} from './ui/controls.jsx';
+import {ToolButton} from './canvas-chrome.jsx';
 import {CanvasPopover} from './ui/canvas-popover.jsx';
 import {ProjectInputContext} from './conversation-references.jsx';
 import {ProjectMemoryPanel} from './project-agent-memory.jsx';
 import {StepHandoff} from './project-agent-handoff.jsx';
 import {creationSource, usableCreationSource} from './creation-context.mjs';
+import wattterAgentLogo from './assets/wattter-agent.png';
 import './project-agent.css';
 
 const labels={auto:'全自动',plan:'先规划后执行',step:'逐项确认'};
@@ -90,7 +92,7 @@ function Plans({plans,act,locate,busy}){
         {p.state!=='stopping'&&<ModeMenu label="委托执行方式" value={p.mode} onChange={mode=>act(p,'mode',{mode})}/>}<UiButton disabled={busy} onClick={()=>act(p,'stop')}>{p.state==='stopping'?'重试停止':'停止委托'}</UiButton></div>}</details>;
   })}</div>;
 }
-export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({projectBar,notices,project,requirement,selected,request,renderConversation,canvasActions,picking,cardId}){
+export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,project,requirement,selected,request,renderConversation,canvasActions,picking,cardId}){
   const key='wtt-project-agent:'+project.id;
   const [tracking,setTracking]=useState(()=>stored(sessionStorage,key+':tracking',false));
   const [open,setOpen]=useState(()=>stored(sessionStorage,key+':open',false)),[tab,setTab]=useState('chat');
@@ -251,7 +253,12 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({projectBar
   };
   const locate=ref=>{toggle(false);canvasActions.current.locate(ref);};
   return <>
-    {React.cloneElement(projectBar, { assistantMenuRef: launcher, assistantWaiting: waiting, onAssistant: () => toggle(true), onAssets: () => canvasActions.current.openAssets() })}
+    <ToolButton label={'打开'+assistantName} buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
+      expanded={open} controlsId={open?panelId:undefined} description={waiting>0?waiting+' 项待确认':undefined}
+      onClick={()=>toggle(!open)}>
+      <img src={wattterAgentLogo} alt="" draggable={false}/>
+      {waiting>0&&<span className="wtt-agent-badge" aria-hidden="true">{waiting}</span>}
+    </ToolButton>
     {open&&canvas&&createPortal(<div className="wtt-agent-layer"><div id={panelId} className="wtt-agent-float is-open" data-picking={picking||undefined} style={{width,height,left:Math.round(clamp(position.x)*dx),top:Math.round(clamp(position.y)*dy)}}
       onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()} onWheel={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}>
     <div className="wtt-agent-grip" {...grip}><PanelHeader title={assistantName} subtitle={requirement.title} onClose={()=>{toggle(false);launcher.current?.focus({preventScroll:true});}} closeLabel={'收起'+assistantName}/></div>

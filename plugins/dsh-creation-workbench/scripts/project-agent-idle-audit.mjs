@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-export async function openProjectAssistant(canvas) {
-  await canvas.getByRole('button',{name:'画布菜单',exact:true}).click();
-  await canvas.page().getByRole('menuitem',{name:/^项目助手/}).click();
-}
-
 export async function checkProjectAgentIdle(page, canvas, api, model) {
   const calls = [];
   const record = request => {
@@ -21,11 +16,12 @@ export async function checkProjectAgentIdle(page, canvas, api, model) {
   };
   try {
     const closedBeforeUse = await observe();
+    const launcher = canvas.getByRole('button', { name: '打开WTT 项目助手' });
     const panel = canvas.locator('.wtt-agent-float.is-open');
     const times = [];
     for (let i = 0; i < 8; i++) {
       const start = performance.now();
-      await openProjectAssistant(canvas);
+      await launcher.click();
       const input = panel.locator('[contenteditable=true]').last();
       await input.waitFor();
       times.push(Math.round(performance.now() - start));
@@ -51,7 +47,7 @@ export async function checkProjectAgentIdle(page, canvas, api, model) {
   }
 }
 export async function checkProjectAgentStop(page,canvas,api,model){
-  await openProjectAssistant(canvas);
+  await canvas.getByRole('button',{name:'打开WTT 项目助手'}).click();
   const panel=canvas.locator('.wtt-agent-float.is-open');
   const input=panel.locator('[contenteditable=true]').last();
   await input.click();await input.press('End');await page.keyboard.insertText('从采访写脚本和分镜');await input.press('Enter');
@@ -71,8 +67,8 @@ export async function checkProjectAgentStop(page,canvas,api,model){
 }
 
 export async function checkProjectAgentPages(canvas){
-  const launcher=canvas.getByRole('button',{name:'画布菜单',exact:true});
-  await openProjectAssistant(canvas);
+  const launcher=canvas.getByRole('button',{name:'打开WTT 项目助手'});
+  await launcher.click();
   const panel=canvas.locator('.wtt-agent-float.is-open');
   await panel.getByRole('button',{name:'委托',exact:true}).click();
   for(let page=1;page<6;page++){
@@ -85,7 +81,10 @@ export async function checkProjectAgentPages(canvas){
   await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
   const badge=launcher.getByText('100',{exact:true});
   await badge.waitFor();
-  await launcher.click();
-  await canvas.page().getByRole('menuitem',{name:/项目助手.*100 项待确认/}).waitFor();
-  console.log('PASS 分页处理第 101 份待办，画布菜单提示其余 100 份');
+  assert.equal(await launcher.getAttribute('aria-description'),'100 项待确认');
+  const box=await launcher.boundingBox(), count=await badge.boundingBox();
+  const tools=await canvas.getByRole('toolbar',{name:'白板工具'}).boundingBox();
+  assert(box.x>tools.x&&box.x+box.width<tools.x+tools.width&&box.y+box.height<=tools.y+tools.height);
+  assert(count.x>box.x&&count.x+count.width>=box.x+box.width&&count.y<box.y);
+  console.log('PASS 分页定位并处理第 101 份待办，工具栏 W 按钮显示其余 100 份');
 }

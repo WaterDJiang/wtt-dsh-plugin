@@ -14,7 +14,12 @@ export async function checkFirstMaterial(page, workspace, api) {
     await mkdir(directory,{recursive:true});
     await page.screenshot({path:path.join(directory, name+'.png')});
   };
-  await action('添加素材').waitFor();
+  await canvas.locator('.wcc-first-material').getByRole('button',{name:'添加素材',exact:true}).waitFor();
+  const assistant = action('打开WTT 项目助手');
+  const emptyPosition = await assistant.boundingBox();
+  await assistant.click();
+  await action('收起WTT 项目助手').click();
+  assert.equal(await assistant.evaluate(el => el === document.activeElement), true);
   const picker = page.getByLabel('选择素材文件');
   await picker.setInputFiles({ name:'采访笔记.exe', mimeType:'application/octet-stream', buffer:Buffer.from('sample') });
   await page.getByText(/请选择文本、PDF/).first().waitFor();
@@ -24,6 +29,7 @@ export async function checkFirstMaterial(page, workspace, api) {
   await (await chooser).setFiles({ name:'采访笔记.md', mimeType:'text/markdown',buffer:Buffer.from('# 城市清晨\n第一班公交，卷帘门和面包店。') });
   await composer.locator('textarea').first().waitFor();
   assert(await composer.locator('textarea').first().evaluate(el => el === document.activeElement),'导入后输入框应已获得焦点');
+  assert.deepEqual(await assistant.boundingBox(), emptyPosition, '首份素材导入后 W 按钮仍在原位');
   await composer.locator('textarea').first().fill('整理成三个分镜');
   assert.equal(await page.getByRole('combobox',{name:'当前画布'}).locator('option').count(),1);
   assert.equal(await canvas.getByRole('button',{name:'AI 创作',exact:true}).count(),0);

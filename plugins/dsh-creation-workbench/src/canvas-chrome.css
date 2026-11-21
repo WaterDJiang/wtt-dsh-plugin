@@ -79,6 +79,12 @@
   padding: 6px;
   transform: translateY(-50%);
 }
+.wtt-course-canvas .wcc-studio-tools.is-empty { visibility: hidden; }
+.wtt-course-canvas .wcc-studio-tools.is-empty .wtt-agent-launch {
+  visibility: visible;
+  background: var(--wtt-ui-surface);
+  border-color: var(--wtt-ui-line);
+}
 .wtt-course-canvas .wcc-studio-tools .wcc-studio-button { width: 35px; height: 35px; min-height: 35px; padding: 7px; }
 .wtt-course-canvas .wcc-studio-status-dock {
   position: absolute;

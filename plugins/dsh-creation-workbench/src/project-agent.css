@@ -7,6 +7,23 @@
 }
 .wtt-agent-float[data-picking] { visibility:hidden; }
 .wtt-agent-grip { touch-action:none; user-select:none; cursor:grab; }
+.wtt-agent-launch img { display:block; width:100%; height:100%; pointer-events:none; }
+.wtt-agent-launch:focus-visible { outline:2px solid var(--wtt-ui-accent); outline-offset:2px; }
+.wtt-agent-badge {
+  position:absolute;
+  inset-block-start:-3px;
+  inset-inline-end:-3px;
+  min-width:16px;
+  box-sizing:border-box;
+  padding:0 3px;
+  border:1px solid var(--wtt-ui-surface);
+  border-radius:999px;
+  background:var(--wtt-ui-danger-fill);
+  color:var(--wtt-ui-on-accent);
+  font:600 var(--wtt-text-xs)/14px system-ui,sans-serif;
+  text-align:center;
+  pointer-events:none;
+}
 .wtt-agent-nav,.wtt-agent-actions,.wtt-agent-section,.wtt-agent-step,.wtt-agent-input-actions {
   display:flex;
   gap:var(--wtt-space-2);

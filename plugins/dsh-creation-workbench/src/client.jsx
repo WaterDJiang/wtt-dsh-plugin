@@ -85,11 +85,10 @@ function BookIcon() {
   </svg>
 }
 
-function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssistant, assistantWaiting, assistantMenuRef, onAssets, onList, onRefresh, onRename, onModelSettings, onSyncDeliverables, onBackground, notificationChannel }) {
+function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssets, onList, onRefresh, onRename, onModelSettings, onSyncDeliverables, onBackground, notificationChannel }) {
   const menuId = useId()
   const [menuOpen, setMenuOpen] = useState(false)
-  const localMenuButton = useRef(null)
-  const menuButton = assistantMenuRef || localMenuButton
+  const menuButton = useRef(null)
   return <header className="wtt-project-bar" aria-label="当前画布">
     <h1 className="wtt-visually-hidden">创作画布</h1>
     {!filesOpen&&<UiButton variant="ghost" type="button" className="wtt-open-files" aria-label={`打开文件栏 · ${project.name}`} title={`打开文件栏 · ${project.name}`} onClick={onToggleFiles} aria-expanded={false}>
@@ -108,14 +107,12 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
       setMenuOpen(false)
       menuButton.current?.focus({ preventScroll: true })
     }}>
-      <UiButton ref={menuButton} variant="quiet" type="button" className="wtt-project-button" aria-label="画布菜单" aria-description={assistantWaiting > 0 ? assistantWaiting + ' 项委托待确认' : undefined} title="画布菜单" aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined} aria-haspopup="menu" onClick={() => setMenuOpen(open => !open)}>
+      <UiButton ref={menuButton} variant="quiet" type="button" className="wtt-project-button" aria-label="画布菜单" title="画布菜单" aria-expanded={menuOpen} aria-controls={menuOpen ? menuId : undefined} aria-haspopup="menu" onClick={() => setMenuOpen(open => !open)}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
-        {assistantWaiting > 0 && <small className="wtt-project-pending" aria-hidden="true">{assistantWaiting}</small>}
       </UiButton>
       {menuOpen && <CanvasPopover anchorRef={menuButton} placement="bottom-end" onDismiss={() => setMenuOpen(false)}
         className="wtt-project-options" id={menuId} role="menu" aria-label="画布菜单">
         <UiButton variant="custom" role="menuitem" disabled={!workspace || Boolean(busy)} onClick={() => { setMenuOpen(false); onNew() }}>新建画布</UiButton>
-        {onAssistant && <UiButton variant="custom" role="menuitem" onClick={() => { setMenuOpen(false); onAssistant() }}>项目助手{assistantWaiting > 0 && <span>{assistantWaiting} 项待确认</span>}</UiButton>}
         {onAssets && <UiButton variant="custom" role="menuitem" onClick={() => { setMenuOpen(false); onAssets() }}>资产看板</UiButton>}
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onList() }}>列表编辑<span>查看大纲与版本</span></UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onRename() }}>重命名画布</UiButton>
