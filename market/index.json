@@ -32,8 +32,14 @@
       },
       "project-assistant": {
         "title": {
-          "zh": "项目助手",
-          "en": "Project Assistant"
+          "zh": "Super Agent 项目助手",
+          "en": "Super Agent"
+        }
+      },
+      "wechat-bot": {
+        "title": {
+          "zh": "微信 Bot",
+          "en": "WeChat Bot"
         }
       }
     },
@@ -47,8 +53,8 @@
         "en": "WTT Creation Workbench"
       },
       "description": {
-        "zh": "在无限画布上做 PPT、图片或视频，想改哪一步就回到那张卡接着做，也能让 Agent 安排 Sub-agent 用你库里的 Skill 接力。",
-        "en": "Create presentations, images, or videos on an infinite canvas, return to a card to revise that step, and let the Agent delegate work to sub-agents using Skills from your library."
+        "zh": "Super Agent 项目助手在无限画布上拆解目标、派发任务、验收和修订成果，可按步骤选用 DSH 模型或授权 Codex CLI 处理文本任务，扫码连接微信 Bot 后可切换项目和画布、确认计划并查进度。",
+        "en": "The Super Agent project assistant plans, delegates, reviews, and revises work across canvases with DSH models or approved Codex CLI text steps, and the QR-paired WeChat bot lets you switch projects or canvases, approve plans, and check progress."
       },
       "author": "Wattter (WTT)",
       "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin",
@@ -84,12 +90,20 @@
           "文件导航",
           "批量整理",
           "file explorer",
-          "file organization"
+          "file organization",
+          "Super Agent",
+          "微信 Bot",
+          "微信",
+          "WeChat Bot",
+          "任务验收",
+          "跨画布",
+          "Codex CLI"
         ],
         "labels": [
           "presentations",
           "image-video",
-          "project-assistant"
+          "project-assistant",
+          "wechat-bot"
         ],
         "sortKeys": {}
       },
