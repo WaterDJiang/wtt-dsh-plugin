@@ -278,8 +278,10 @@ export class OutputCardStore {
   #pendingGeneration(task) {
     const status = task.dispatchStatus || task.status;
     const mediaJob = task.mediaJob;
+    const executor = task.input.projectExecutor;
     let phase = 'unknown', message;
-    if (task.kind === 'media' && mediaJob) {
+    if (executor && task.runtimeState) ({phase,message}=task.runtimeState);
+    else if (task.kind === 'media' && mediaJob) {
       if (mediaJob.status === 'paused') phase = 'idle';
       else if (mediaJob.status === 'cancelled') phase = 'cancelled';
       else if (['queued', 'submitting'].includes(mediaJob.status)) phase = 'submitting';
@@ -292,7 +294,8 @@ export class OutputCardStore {
       'awaiting-input': '等待你确认或补充信息', 'awaiting-approval': '等待授权', idle: '等待继续，请查看执行',
       failed: '生成失败，请查看原任务', unknown: '状态待核对，请查看执行' };
     return { taskId: task.id, outputType: task.input.outputType || 'outline', status, phase,
-      message: message || messages[phase], sessionId: task.sessionId,
+      message: message || messages[phase], sessionId: executor?null:task.sessionId,
+      ...(executor ? {projectExecutor:executor,...(phase==='generating'?{nativeLabel:'Codex 正在执行'}:{})} : {}),
       ...(phase === 'idle' && task.runtimeState?.budgetStopped ? { budgetStopped: true } : {}),
       ...(task.cardVersionId ? { published: true } : {}),
       ...(task.error || mediaJob?.error ? { error: mediaJob?.error || task.error } : {}),

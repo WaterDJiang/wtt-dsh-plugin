@@ -1078,6 +1078,39 @@
 .wtt-course-workbench .wtt-dialog::backdrop {
   background: var(--wtt-ui-scrim, #11182755);
 }
+.wtt-course-workbench .wtt-wechat-dialog {
+  max-width: 430px;
+}
+.wtt-wechat-dialog .wtt-wechat-scan {
+  text-align: center;
+}
+.wtt-wechat-dialog .wtt-wechat-qr {
+  display: block;
+  width: min(190px, 100%);
+  height: auto;
+  margin: var(--wtt-space-3) auto;
+  image-rendering: pixelated;
+}
+.wtt-wechat-dialog select {
+  width: 100%;
+}
+.wtt-wechat-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wtt-wechat-settings summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.wtt-wechat-settings[open] .wtt-field {
+  margin-top: var(--wtt-space-2);
+}
+.wtt-wechat-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--wtt-space-2);
+}
 .wtt-course-workbench .wtt-dialog-heading {
   margin-bottom: 20px;
 }
@@ -2011,6 +2044,21 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
   outline: 2px solid var(--wtt-ui-accent);
   outline-offset: 2px;
 }
+.wtt-agent-return {
+  position: absolute;
+  inset-inline-start: -3px;
+  inset-block-end: -3px;
+  pointer-events: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--wtt-ui-accent-paper);
+  border: 1px solid var(--wtt-ui-surface);
+  color: var(--wtt-ui-accent);
+  font: 600 var(--wtt-text-xs)/14px system-ui, sans-serif;
+  text-align: center;
+}
 .wtt-agent-badge {
   position: absolute;
   inset-block-start: -3px;
@@ -2149,6 +2197,37 @@ html:not([data-ds-theme-source]) body[data-ds-dark-theme] .wtt-project-workbench
 .wtt-agent-plan > .wtt-agent-step {
   padding-block: var(--wtt-space-1);
   border-top: 1px solid var(--wtt-ui-line);
+}
+.wtt-agent-step-details {
+  min-width: 0;
+  flex: 1;
+}
+.wtt-agent-step-details p {
+  white-space: pre-wrap;
+}
+.wtt-agent-step-note {
+  color: var(--wtt-ui-muted);
+  font-size: var(--wtt-text-xs);
+  line-height: 1.5;
+}
+.wtt-agent-step-note ul {
+  margin-block: var(--wtt-space-1);
+  padding-inline-start: var(--wtt-space-4);
+}
+.wtt-agent-step > .wtt-agent-step-note,
+.wtt-agent-step-results {
+  flex-basis: 100%;
+}
+.wtt-agent-step-results {
+  display: flex;
+  gap: var(--wtt-space-1);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.wtt-agent-step-results button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .wtt-agent-queue > .wtt-agent-actions {
   margin-top: var(--wtt-space-3);

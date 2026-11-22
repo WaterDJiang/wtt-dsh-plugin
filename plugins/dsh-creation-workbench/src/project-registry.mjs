@@ -134,7 +134,7 @@ export class ProjectRegistry {
       activeProjectId, defaultProjectId: this.defaultProjectId, ...(error ? { error } : {}) };
   }
 
-  open(value) {
+  open(value, { activate = true } = {}) {
     this.#assertOpen();
     const canonical = directoryOf(value);
     const record = this.#record(canonical);
@@ -144,15 +144,16 @@ export class ProjectRegistry {
     if (created) candidate = new WorkbenchService({ ...this.config, workspaceRoot: canonical });
     const next = new Map(this.records);
     next.set(record.id, record);
+    const activeProjectId = activate ? record.id : this.activeProjectId;
     // Synchronous publication serializes concurrent HTTP opens and only advances memory after durable success.
-    try { atomicWrite(this.registryFile, { version: 1, activeProjectId: record.id, projects: [...next.values()] }); }
+    try { atomicWrite(this.registryFile, { version: 1, activeProjectId, projects: [...next.values()] }); }
     catch (error) {
       if (created) candidate.close();
       throw new Error(`保存项目列表失败，当前项目未切换：${error.message}`, { cause: error });
     }
     this.records = next;
-    if(this.activeProjectId!==record.id)this.services.get(this.activeProjectId)?.projectFiles.clearFileIndex();
-    this.activeProjectId = record.id;
+    if(this.activeProjectId!==activeProjectId)this.services.get(this.activeProjectId)?.projectFiles.clearFileIndex();
+    this.activeProjectId = activeProjectId;
     this.registryError = undefined;
     if (created) this.#retain(record.id, candidate);
     return record;

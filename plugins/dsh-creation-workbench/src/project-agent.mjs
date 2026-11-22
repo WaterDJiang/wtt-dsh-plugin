@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { ProjectMemory } from './project-memory.mjs';
+import { ProjectResultReview, readReceipts } from './project-result-review.mjs';
+import { normalizeModelSelection } from './model-selection.mjs';
 import { extractSkillNames } from './skill-commands.mjs';
 
 export const modes = ['plan','auto','step'];
@@ -9,6 +11,7 @@ const json = JSON.stringify;
 const parse = JSON.parse;
 const summary = ({cardId,requirementId,title,hash,versionId,outputCardId})=>({cardId,requirementId,title,hash,versionId,outputCardId});
 const openPlans = "('approval','running','paused')";
+const planOrder = "CASE WHEN state='approval' THEN 0 WHEN state IN ('done','stopped') THEN 2 ELSE 1 END,rowid DESC";
 const activePhases = ['awaiting-input','awaiting-approval','generating','unknown','failed'];
 
 function limitSourceContent(sources) {
@@ -44,6 +47,7 @@ export class ProjectAgent {
     this.db.exec(`UPDATE pa_plans SET state='stopping' WHERE state='stopped' AND EXISTS
       (SELECT 1 FROM pa_steps s WHERE s.plan_id=pa_plans.id AND s.task_id IS NOT NULL AND s.state NOT IN ('done','stopped'))`);
     this.memory=new ProjectMemory(service);
+    this.results=new ProjectResultReview(this);
   }
   sessionId(){return this.db.prepare('SELECT session_id AS id FROM pa_session').get()?.id;}
   async session(replace) {
@@ -67,8 +71,19 @@ export class ProjectAgent {
     if (!Array.isArray(refs)||refs.length>24)throw Error('一次最多引用 24 张卡片');
     if (!refs.length)return [];
     this.canvas(requirementId);
-    const visible=this.service.canvas.getBoard(requirementId).nodes;
+    const exact=this.db.prepare(`SELECT v.primary_ref AS cardId,coalesce(c.node_id,'output:'||c.id) AS nodeId FROM output_card_versions v JOIN output_cards c ON c.id=v.card_id
+      WHERE v.id=? AND v.card_id=? AND c.requirement_id=?`);
+    let visible,hidden;
     const identities=refs.map(ref=>{
+      if(ref.versionId){
+        const direct=exact.get(ref.versionId,ref.cardId,requirementId);
+        if(direct){
+          hidden??=this.service.store.recycle.hiddenIds(requirementId);
+          if(hidden.has(direct.nodeId))throw Error('所选卡片已移除或不属于来源画布');
+          return {cardId:direct.cardId,hash:ref.hash,requirementId,outputCardId:ref.cardId,versionId:ref.versionId};
+        }
+      }
+      visible??=this.service.canvas.getBoard(requirementId).nodes;
       const card=visible.find(n=>n.id===ref.cardId||n.sourceId===ref.cardId||n.outputCard?.id===ref.cardId);
       if(!card)throw Error('所选卡片已移除或不属于来源画布');
       const output=card.outputCard;
@@ -99,14 +114,20 @@ export class ProjectAgent {
     }
     return result;
   }
-  turn({sessionId,requirementId,refs=[],mode,text}) {
+  turn({sessionId,requirementId,refs=[],mode,text},{id=randomUUID(),origin}={}) {
     if(this.opening)throw Error('项目会话正在切换，请稍后发送');
     this.requireSession(sessionId); if(!modes.includes(mode)||!checkText(text,8000))throw Error('执行档位或创作要求无效');
     this.canvas(requirementId);
     if(!Array.isArray(refs)||refs.length>24)throw Error('一次最多引用 24 张卡片');
+    const prior=this.db.prepare('SELECT data FROM pa_turns WHERE id=?').get(id);
+    if(prior){
+      const saved=parse(prior.data);
+      if(saved.sessionId!==sessionId||saved.requirementId!==requirementId||saved.mode!==mode||saved.text!==text||saved.origin!==origin||refs.length)
+        throw Error('项目助手请求标识已使用');
+      return {id};
+    }
     const sources=limitSourceContent(this.freezeByCanvas(refs,requirementId));
-    const id=randomUUID();
-    this.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(id,sessionId,json({sessionId,requirementId,mode,sources,text,skills:extractSkillNames(text)}));
+    this.db.prepare('INSERT INTO pa_turns VALUES(?,?,?)').run(id,sessionId,json({sessionId,requirementId,mode,sources,text,skills:extractSkillNames(text),origin}));
     return {id};
   }
   promptContext(sessionId,requestId){
@@ -116,12 +137,13 @@ export class ProjectAgent {
     const turn=parse(row.data);
     const context={turnId:requestId,mode:turn.mode,canvas:{id:turn.requirementId,title:this.canvas(turn.requirementId).title},sources:turn.sources.map(summary)};
     if(turn.skills?.length)context.skills=turn.skills;
-    return '[工作台发送现场] '+json(context)+'\n你是这个项目的画布助手。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。发送现场的 skills 是用户为本轮调用的技能。委托步骤需要其中的技能时，在该步骤 instruction 中用独立的 /技能名 标明，使原任务也加载该技能。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
+    if(turn.origin==='wechat')context.origin='微信';
+    return '[工作台发送现场] '+json(context)+'\n你是这个项目的画布助手。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。需要验收的步骤用 acceptance 声明可核对的条件、最少成果数。选择特定模型或外部执行者前用 context 查询可用路线。发送现场的 skills 是用户为本轮调用的技能。委托步骤需要其中的技能时，在该步骤 instruction 中用独立的 /技能名 标明，使原任务也加载该技能。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
   }
   steps(id){return this.db.prepare('SELECT * FROM pa_steps WHERE plan_id=? ORDER BY seq').all(id).map(r=>({...r,data:parse(r.data),receipt:r.receipt?parse(r.receipt):null}));}
   waitingConsumers(step){
     return this.db.prepare(`SELECT json_extract(s.data,'$.title') AS title FROM pa_steps s
-      JOIN json_each(s.data,'$.deps') d ON d.value=? LEFT JOIN operations o ON o.id=s.id AND o.kind='create-task'
+      JOIN json_each(s.data,'$.deps') d ON d.value=? LEFT JOIN operations o ON o.id=coalesce(s.operation_id,s.id) AND o.kind='create-task'
       WHERE s.plan_id=? AND s.seq>? AND s.state IN ('ready','blocked') AND s.task_id IS NULL AND o.id IS NULL
       ORDER BY s.seq`).all(step.seq,step.plan_id,step.seq).map(row=>row.title);
   }
@@ -131,18 +153,22 @@ export class ProjectAgent {
     const card=cardId||this.service.cards.binding(taskId)?.outputCardId;
     if(!card)return null;
     return this.db.prepare(`SELECT s.*,c.id AS card_id,c.requirement_id
-      FROM output_cards c JOIN output_card_tasks b ON b.card_id=c.id JOIN pa_steps s ON s.task_id=b.task_id
+      FROM output_cards c JOIN pa_steps s ON (
+        EXISTS (SELECT 1 FROM output_card_tasks b WHERE b.card_id=c.id AND b.task_id=s.task_id)
+        OR EXISTS (SELECT 1 FROM json_each(s.artifact_set) r WHERE json_extract(r.value,'$.cardId')=c.id))
       JOIN pa_plans p ON p.id=s.plan_id WHERE c.id=? AND c.requirement_id=? AND p.state IN ${openPlans}
       AND (? IS NULL OR s.id=?) ORDER BY s.rowid DESC LIMIT 1`).get(card,requirementId,stepId??null,stepId??null)||null;
   }
   versionChoice(step){
-    const receipt=typeof step.receipt==='string'?parse(step.receipt):step.receipt;
-    const cardId=step.card_id||receipt?.cardId;
+    const receipts=readReceipts(step);
+    const cardId=step.card_id||receipts[0]?.cardId;
+    const receipt=receipts.find(card=>card.cardId===cardId);
     if(!cardId||(!step.handoff&&!receipt))return null;
     const head=this.db.prepare(`SELECT v.id AS versionId,v.number,v.task_id AS taskId,c.requirement_id AS requirementId
       FROM output_cards c JOIN output_card_versions v ON v.id=c.head_version_id
       WHERE c.id=? AND v.card_id=c.id AND v.legacy=0`).get(cardId);
-    if(!head||(!step.handoff && [receipt.versionId,step.kept_version].includes(head.versionId)))return null;
+    const kept=step.kept_version?.startsWith('{')?parse(step.kept_version)[cardId]:step.kept_version;
+    if(!head||(!step.handoff && [receipt.versionId,kept].includes(head.versionId)))return null;
     if(receipt && head.versionId!==receipt.versionId && !this.db.prepare(`WITH RECURSIVE ancestors(id) AS (
         SELECT ? UNION SELECT v.base_version_id FROM output_card_versions v JOIN ancestors a ON a.id=v.id
         WHERE v.card_id=? AND v.base_version_id IS NOT NULL) SELECT 1 FROM ancestors WHERE id=?`).get(head.versionId,cardId,receipt.versionId))return null;
@@ -154,7 +180,7 @@ export class ProjectAgent {
     const consumers=this.waitingConsumers(s);
     if(s.state==='done'&&!consumers.length&&!s.handoff)return null;
     return {planId:s.plan_id,stepId:s.id,taskId:s.task_id,cardId:s.card_id,requirementId:s.requirement_id,
-      handoff:Boolean(s.handoff),title:parse(s.data).title,receipt:s.receipt?parse(s.receipt):null,choice:this.versionChoice(s),consumers};
+      handoff:Boolean(s.handoff),title:parse(s.data).title,receipt:readReceipts(s).find(receipt=>receipt.cardId===s.card_id)||null,choice:this.versionChoice(s),consumers};
   }
   takeOver(input){
     const s=this.linkedCard(input);
@@ -180,12 +206,17 @@ export class ProjectAgent {
     const keep=input.command==='keep-version';
     if(keep){
       if(current.handoff||!current.receipt)throw Error('请先选择此步骤的交付版本');
-      this.db.prepare('UPDATE pa_steps SET kept_version=? WHERE id=?').run(input.versionId,input.stepId);
+      const row=this.linkedCard(input);
+      const kept=row.kept_version?.startsWith('{')?parse(row.kept_version):{};
+      this.db.prepare('UPDATE pa_steps SET kept_version=? WHERE id=?').run(json({...kept,[current.cardId]:input.versionId}),input.stepId);
       return read();
     }
-    for(const taskId of new Set([current.taskId,current.choice.taskId])){
+    const step=this.linkedCard(input);
+    for(const taskId of new Set([current.taskId,current.choice.taskId].filter(Boolean))){
       const task=this.service.tasks.get(taskId);
-      if(task.kind==='ai' && (task.dispatchStatus==='submitting'||await this.host.pending?.(this.service,task)||
+      if(task.id===current.taskId && parse(step.data).executor==='codex') {
+        if(this.host.externalRunning?.(task.id))throw Error('Codex 仍在执行，请等待当前任务结束');
+      } else if(task.kind==='ai' && (task.dispatchStatus==='submitting'||await this.host.pending?.(this.service,task)||
         (task.sessionId&&this.host.settled&&!await this.host.settled(this.service,task))))throw Error('卡片任务仍在运行或待确认，请先在原对话处理');
     }
     const latest=read();
@@ -196,8 +227,15 @@ export class ProjectAgent {
     const {number,cardId,requirementId,versionId,taskId}=current.choice;
     const {node}=this.service.cards.describe({requirementId,cardId,versionId});
     if(!node.sourceHash||['missing','changed','modified','unavailable'].includes(node.status))throw Error('正式成果文件不可用，请重新核对版本');
-    this.db.prepare("UPDATE pa_steps SET state='done',handoff=0,receipt=?,kept_version=NULL,interaction=NULL,error=NULL WHERE id=?")
-      .run(json({number,cardId,requirementId,versionId,hash:node.sourceHash}),input.stepId);
+    const updated={number,cardId,requirementId,versionId,taskId,title:node.title,hash:node.sourceHash};
+    const prior=readReceipts(this.linkedCard(input));
+    const receipts=prior.some(card=>card.cardId===cardId)?prior.map(card=>card.cardId===cardId?updated:card):[updated,...prior];
+    const kept=step.kept_version?.startsWith('{')?parse(step.kept_version):{};
+    delete kept[cardId];
+    const minCards=parse(step.data).acceptance?.minCards??1;
+    const enough=receipts.length>=minCards;
+    this.db.prepare("UPDATE pa_steps SET state=?,handoff=0,receipt=?,artifact_set=?,kept_version=?,revision_task=NULL,interaction=NULL,error=? WHERE id=?")
+      .run(enough?'done':'review-waiting',json(receipts[0]),json(receipts),json(kept),enough?null:'正式成果总数不足，请核对交付范围',input.stepId);
     this.memory.event(randomUUID(),'任务交接',current.title,`已采用 V${number}`,{planId:current.planId,taskId,cardId,versionId});
     return read();
   }
@@ -217,7 +255,7 @@ export class ProjectAgent {
       else if(row.planState==='approval')key='plan:'+row.planId;
       else if(row.interaction)key=json([row.taskId,row.interaction]);
       else if(row.handoff)key='handoff:'+row.id;
-      else if(row.planState==='running'&&(row.state==='blocked'||!row.authorized||row.error))key=row.state+':'+row.id;
+      else if(row.planState==='running'&&(['blocked','review-waiting'].includes(row.state)||!row.authorized||row.error))key=row.state+':'+row.id;
       if(key)pending.push({planId:row.planId,key});
     }
     return pending;
@@ -234,7 +272,12 @@ export class ProjectAgent {
   }
   plans(page=0){
     if(!Number.isSafeInteger(page)||page<0||page>1000000)throw Error('委托页码无效');
-    return this.db.prepare("SELECT * FROM pa_plans ORDER BY CASE WHEN state='approval' THEN 0 WHEN state IN ('done','stopped') THEN 2 ELSE 1 END,rowid DESC LIMIT 20 OFFSET ?").all(page*20).map(plan=>this.planView(plan));
+    return this.db.prepare('SELECT * FROM pa_plans ORDER BY '+planOrder+' LIMIT 20 OFFSET ?').all(page*20).map(plan=>this.planView(plan));
+  }
+  planPage(id){
+    if(typeof id!=='string')return null;
+    const row=this.db.prepare(`SELECT position FROM (SELECT id,row_number() OVER (ORDER BY ${planOrder}) AS position FROM pa_plans) WHERE id=?`).get(id);
+    return row?Math.floor((row.position-1)/20):null;
   }
   reviews(sessionId,page=0){
     if(!Number.isSafeInteger(page)||page<0)throw Error('确认页码无效');
@@ -259,17 +302,22 @@ export class ProjectAgent {
     return {total,page:index,item:{kind,stepId,plan:this.planView(plan)}};
   }
   planView(plan){
-    const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps});
+    const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps,
+      executor:d.executor||'dsh',modelSelection:d.modelSelection,acceptance:d.acceptance});
     const change=this.change(plan.id);
     return {...plan,scopeToken:this.approvalToken(plan.id),change:change&&{id:change.id,start:change.start,steps:change.data.map(describe)},
       steps:this.steps(plan.id).map(s=>{
         const binding=s.task_id?this.service.cards.binding(s.task_id):null;
-        const cardId=binding?.outputCardId;
+        const receipts=readReceipts(s);
+        const cardId=binding?.outputCardId||s.receipt?.cardId;
         const active=!['done','stopped','stopping'].includes(plan.state);
         const consumers=cardId&&active&&(s.handoff||s.receipt)?this.waitingConsumers(s):[];
-        const choice=cardId&&active&&(s.handoff||consumers.length)?this.versionChoice({...s,card_id:cardId}):null;
+        const choice=cardId&&active&&(s.handoff||consumers.length||s.state==='review-waiting')
+          ? [cardId,...receipts.filter(card=>card.cardId!==cardId).map(card=>card.cardId)].map(card=>this.versionChoice({...s,card_id:card})).find(Boolean):null;
         return {id:s.id,...describe(s.data),state:s.state,authorized:!!s.authorized,error:s.error,interaction:s.interaction,
-          taskId:s.task_id,outputCardId:cardId,receipt:s.receipt,handoff:active&&Boolean(s.handoff),choice,consumers};
+          taskId:s.task_id,outputCardId:cardId,receipt:s.receipt,receipts,handoff:active&&Boolean(s.handoff),choice,consumers,
+          resultReviewId:s.result_review_id,resultReview:this.results.view(s.result_review_id),revisionCount:s.revision_count,revising:Boolean(s.revision_task),
+          canRecheck:s.state==='blocked'&&(!s.task_id||Boolean(this.db.prepare("SELECT 1 FROM course_tasks WHERE id=? AND status='draft'").get(s.task_id)))};
       })};
   }
   normalizeSteps(data,turn,offset=0) {
@@ -286,13 +334,28 @@ export class ProjectAgent {
       if(sources.size+deps.length>24)throw Error('每步引用与依赖总数不可超过 24');
       const scope=step.scope||'';
       if(typeof scope!=='string'||scope.length>120)throw Error('设定范围无效');
+      const executor=step.executor??'dsh';
+      const modelSelection=normalizeModelSelection(step.modelSelection);
+      if(!['dsh','codex'].includes(executor))throw Error('执行者只能选择 DSH 或 Codex');
+      if(executor==='codex'&&(step.type!=='text'||modelSelection||extractSkillNames(step.instruction).length))
+        throw Error('Codex 当前只执行文本任务，请使用 DSH 运行指定模型、Skill 或媒体任务');
+      let acceptance=null;
+      if(step.acceptance!==undefined){
+        const criteria=step.acceptance?.criteria,minCards=step.acceptance?.minCards??1;
+        if(!Array.isArray(criteria)||!criteria.length||criteria.length>8||criteria.some(text=>!checkText(text,360))||!Number.isInteger(minCards)||minCards<1||minCards>24)
+          throw Error('请提供 1–8 条可核对的验收条件，正式成果数应为 1–24');
+        acceptance={criteria,minCards};
+      }
       const revisions=this.memory.effective([requirementId,scope].filter(Boolean)).map(s=>[s.id,s.revision]);
-      return {title:step.title,type:step.type,instruction:step.instruction,requirementId,revisions,deps:[...new Set(deps)],sources:limitSourceContent([...sources.values()]),scope,review:step.review===true,sessionId:turn.sessionId};
+      return {title:step.title,type:step.type,instruction:step.instruction,requirementId,revisions,deps:[...new Set(deps)],sources:limitSourceContent([...sources.values()]),scope,review:step.review===true,sessionId:turn.sessionId,executor,modelSelection,acceptance};
     });
   }
   change(planId){
     const row=this.db.prepare("SELECT * FROM pa_changes WHERE plan_id=? AND state='pending'").get(planId);
     return row && {...row,data:parse(row.data)};
+  }
+  started(step){
+    return step.task_id||this.db.prepare("SELECT 1 FROM operations WHERE id=? AND kind='create-task'").get(step.operation_id||step.id);
   }
   amend(turnId,data,turn){
     const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(data.planId||'');
@@ -301,7 +364,7 @@ export class ProjectAgent {
     if(prior)return prior;
     if(this.change(plan.id))throw Error('请先处理现有范围变更');
     const previous=this.steps(plan.id),start=data.replaceFrom??previous.length+1;
-    if(!Number.isInteger(start)||start<1||start>previous.length+1||previous.slice(start-1).some(s=>s.task_id||s.state!=='ready'))throw Error('只能变更未派发的步骤');
+    if(!Number.isInteger(start)||start<1||start>previous.length+1||previous.slice(start-1).some(s=>s.state!=='ready'||this.started(s)))throw Error('只能变更未派发的步骤');
     const steps=this.normalizeSteps(data,turn,start-1);
     this.db.prepare("INSERT INTO pa_changes VALUES(?,?,?,?, 'pending')").run(turnId,plan.id,start,json(steps));
     this.memory.event('change-'+turnId,'委托',plan.title,'提出范围变更：'+steps.map(s=>s.title).join('、'),{planId:plan.id});
@@ -315,10 +378,10 @@ export class ProjectAgent {
       if(!change||change.id!==changeId)throw Error('范围变更已处理，请刷新');
       if(approve){
         const affected=this.steps(plan.id).slice(change.start-1);
-        if(affected.some(s=>s.task_id||s.state!=='ready'))throw Error('步骤已经派发，请重新拟定变更');
+        if(affected.some(s=>s.state!=='ready'||this.started(s)))throw Error('步骤已经派发，请重新拟定变更');
         this.db.prepare('DELETE FROM pa_steps WHERE plan_id=? AND seq>=?').run(plan.id,change.start);
         for(const [i,item] of change.data.entries())this.db.prepare('INSERT INTO pa_steps(id,plan_id,seq,data,authorized) VALUES(?,?,?,?,?)')
-          .run(randomUUID(),plan.id,change.start+i,json(item),Number(plan.mode!=='step'&&plan.state!=='approval'&&!item.review));
+          .run(randomUUID(),plan.id,change.start+i,json(item),Number(plan.mode!=='step'&&plan.state!=='approval'&&!item.review&&item.executor!=='codex'));
       }
       this.db.prepare('UPDATE pa_changes SET state=? WHERE id=?').run(approve?'accepted':'rejected',change.id);
       this.memory.event('decision-'+change.id,'委托',plan.title,approve?'已批准范围变更':'已保留原计划',{planId:plan.id});
@@ -332,7 +395,7 @@ export class ProjectAgent {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       this.db.prepare('INSERT INTO pa_plans VALUES(?,?,?,?)').run(turnId,data.title,turn.mode,turn.mode==='plan'?'approval':'running');
-      steps.forEach((s,i)=>this.db.prepare('INSERT INTO pa_steps(id,plan_id,seq,data,authorized) VALUES(?,?,?,?,?)').run(randomUUID(),turnId,i+1,json(s),Number(turn.mode==='auto'&&!s.review)));
+      steps.forEach((s,i)=>this.db.prepare('INSERT INTO pa_steps(id,plan_id,seq,data,authorized) VALUES(?,?,?,?,?)').run(randomUUID(),turnId,i+1,json(s),Number(turn.mode==='auto'&&!s.review&&s.executor!=='codex')));
       this.memory.event('plan-'+turnId,'委托',data.title,steps.map(s=>s.title).join(' → '),{planId:turnId});
       this.db.exec('COMMIT');
     } catch(e){this.db.exec('ROLLBACK');throw e;}
@@ -352,9 +415,12 @@ export class ProjectAgent {
     const turn=parse(row.data);
     if(action==='details'){
       const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(data.planId||'');
-      if(!plan)throw Error('委托不存在');return {...plan,steps:this.steps(plan.id).map(s=>({title:s.data.title,instruction:s.data.instruction,refs:s.data.sources.map(summary),state:s.state,handoff:Boolean(s.handoff),taskId:s.task_id,receipt:s.receipt}))};
+      if(!plan)throw Error('委托不存在');return this.planView(plan);
     }
-    if(action==='context') return {current:{canvas:turn.requirementId,sources:turn.sources.map(summary)},canvases:this.db.prepare('SELECT id,title FROM requirements ORDER BY updated_at DESC,id').all(),settings:this.memory.effective([turn.requirementId,data.scope].filter(Boolean)),scopes:this.db.prepare('SELECT DISTINCT scope FROM pa_settings WHERE rev IS NOT NULL ORDER BY scope LIMIT 60').all().map(s=>s.scope),plans:this.plans().slice(0,8).map(p=>({id:p.id,title:p.title,state:p.state,next:p.steps.find(s=>s.state!=='done'||s.handoff)?.title,handoff:p.steps.find(s=>s.handoff)?.title,lastResult:p.steps.filter(s=>s.receipt).at(-1)?.receipt})),history:this.memory.search(data.query||turn.text).slice(0,2)};
+    if(action==='context') {
+      const context={current:{canvas:turn.requirementId,sources:turn.sources.map(summary)},canvases:this.db.prepare('SELECT id,title FROM requirements ORDER BY updated_at DESC,id').all(),settings:this.memory.effective([turn.requirementId,data.scope].filter(Boolean)),scopes:this.db.prepare('SELECT DISTINCT scope FROM pa_settings WHERE rev IS NOT NULL ORDER BY scope LIMIT 60').all().map(s=>s.scope),plans:this.plans().slice(0,8).map(p=>({id:p.id,title:p.title,state:p.state,next:p.steps.find(s=>s.state!=='done'||s.handoff)?.title,handoff:p.steps.find(s=>s.handoff)?.title,lastResult:p.steps.filter(s=>s.receipt).at(-1)?.receipts})),history:this.memory.search(data.query||turn.text).slice(0,2)};
+      return this.host.routes?this.host.routes(data.modelQuery).then(routes=>({...context,routes})):context;
+    }
     if(action==='pause'||action==='stop')return this.control({id:data.planId,command:action});
     if(action==='amend')return this.amend(turnId,data,turn);
     if(action==='plan')return this.proposal(turnId,data,turn);
@@ -376,12 +442,16 @@ export class ProjectAgent {
     if(this.stops.has(id))return this.stops.get(id);
     const operation=(async()=>{
       const pending=this.db.prepare(`SELECT s.id,coalesce(s.task_id,o.result_id) AS taskId,json_extract(s.data,'$.requirementId') AS canvas
-        FROM pa_steps s LEFT JOIN operations o ON o.id=s.id AND o.kind='create-task'
+        FROM pa_steps s LEFT JOIN operations o ON o.id=coalesce(s.operation_id,s.id) AND o.kind='create-task'
         WHERE s.plan_id=? AND s.handoff=0 AND s.state NOT IN ('done','stopped') AND coalesce(s.task_id,o.result_id) IS NOT NULL`).all(id);
       for(const step of pending){
         this.db.prepare('UPDATE pa_steps SET task_id=? WHERE id=? AND task_id IS NULL').run(step.taskId,step.id);
         try{
-          if(inspectOnly){
+          const external=parse(this.db.prepare('SELECT data FROM pa_steps WHERE id=?').get(step.id).data).executor==='codex';
+          if(external){
+            if(inspectOnly&&this.host.externalRunning?.(step.taskId))return;
+            await this.host.stopExternal?.(this.service,step.taskId);
+          }else if(inspectOnly){
             if(!await this.host.stopConfirmed?.(this.service,step.canvas,step.taskId))return;
           }else await this.host.stop(this.service,step.canvas,step.taskId);
           this.db.prepare("UPDATE pa_steps SET state='stopped',error=NULL,interaction=NULL WHERE id=?").run(step.id);
@@ -392,6 +462,7 @@ export class ProjectAgent {
         }
       }
       this.db.prepare("UPDATE pa_steps SET state=CASE WHEN state='done' THEN state ELSE 'stopped' END,handoff=0,interaction=NULL,error=NULL WHERE plan_id=? AND handoff=1").run(id);
+      this.db.prepare("UPDATE pa_steps SET state='stopped',error=NULL WHERE plan_id=? AND task_id IS NULL AND state NOT IN ('done','stopped')").run(id);
       if(this.db.prepare("UPDATE pa_plans SET state='stopped' WHERE id=? AND state='stopping'").run(id).changes){
         this.memory.event('stopped-'+id,'授权与控制','停止委托','已停止派发并核对助手负责的步骤',{planId:id});
       }
@@ -413,9 +484,19 @@ export class ProjectAgent {
     const setState=s=>this.db.prepare('UPDATE pa_plans SET state=? WHERE id=?').run(s,id);
     const steps=this.steps(id);
     if(command==='approve-plan' && this.approvalToken(id)!==scopeToken)throw Error('批准范围已变化，请刷新后核对计划');
+    if(['review-again','accept-result'].includes(command)){
+      const next=steps.find(s=>s.state!=='done'||s.handoff);
+      if(next?.id!==stepId||next.result_review_id!==input.resultReviewId||this.approvalToken(id)!==scopeToken)
+        throw Error('本次验收已变化，请刷新后重新核对');
+      if(command==='accept-result')this.results.acceptManually(next,plan);
+      else this.results.retry(next,plan);
+      return this.plans();
+    }
     if(command==='recheck'){
       const s=steps.find(s=>s.id===stepId);
-      if(!s||s.state!=='blocked'||s.task_id||this.db.prepare('SELECT 1 FROM operations WHERE id=?').get(s.id))throw Error('已有发送记录，请核对原任务');
+      if(!s||s.state!=='blocked')throw Error('当前步骤已变化');
+      const taskId=s.task_id||this.db.prepare("SELECT result_id FROM operations WHERE kind='create-task' AND id=?").get(s.operation_id||s.id)?.result_id;
+      if(taskId&&this.service.tasks.get(taskId).dispatchStatus!=='draft')throw Error('已有发送记录，请核对原任务');
       this.db.prepare("UPDATE pa_steps SET state='ready',error=NULL WHERE id=?").run(s.id);return this.plans();
     }
     if(command==='accept-change'||command==='reject-change'){this.resolveChange(plan,changeId,command==='accept-change');return this.plans();}
@@ -425,11 +506,11 @@ export class ProjectAgent {
       const next=steps.find(s=>s.state!=='done'||s.handoff);
       if(next?.state!=='ready'||next.id!==stepId||next.authorized)throw Error('当前步骤已变化');
       this.db.prepare('UPDATE pa_steps SET authorized=1 WHERE id=?').run(stepId);
-    } else if(command==='pause' && plan.state==='running')setState('paused');
+    } else if(command==='pause' && plan.state==='running')this.results.pausePlan(id);
     else if(command==='resume' && plan.state==='paused')setState(plan.mode==='plan'&&steps.some(s=>s.state==='ready'&&!s.authorized&&!s.data.review)?'approval':'running');
     else if(command==='mode' && modes.includes(mode)){
       this.db.prepare('UPDATE pa_plans SET mode=?,state=? WHERE id=?').run(mode,plan.state==='paused'?'paused':mode==='plan'?'approval':'running',id);
-      this.db.prepare("UPDATE pa_steps SET state='ready',authorized=CASE WHEN ?='auto' AND json_extract(data,'$.review')=0 THEN 1 ELSE 0 END WHERE plan_id=? AND (state='ready' OR (state='working' AND task_id IN (SELECT id FROM course_tasks WHERE status='draft')))").run(mode,id);
+      this.db.prepare("UPDATE pa_steps SET state='ready',authorized=CASE WHEN ?='auto' AND json_extract(data,'$.review')=0 AND coalesce(json_extract(data,'$.executor'),'dsh')<>'codex' THEN 1 ELSE 0 END WHERE plan_id=? AND (state='ready' OR (state='working' AND task_id IN (SELECT id FROM course_tasks WHERE status='draft')))").run(mode,id);
     } else if(command==='stop'){
       setState('stopping');
       if(this.stops.has(id))await this.stops.get(id);
@@ -449,12 +530,14 @@ export class ProjectAgent {
         (state='approval' AND EXISTS (SELECT 1 FROM pa_steps s WHERE s.plan_id=p.id AND s.task_id IS NOT NULL AND s.state<>'done'))
         ORDER BY rowid`).all()){
         const pending=this.db.prepare(`SELECT s.*,o.result_id AS recovered_task FROM pa_steps s
-          LEFT JOIN operations o ON s.task_id IS NULL AND o.id=s.id AND o.kind='create-task'
+          LEFT JOIN operations o ON s.task_id IS NULL AND o.id=coalesce(s.operation_id,s.id) AND o.kind='create-task'
           WHERE s.plan_id=? AND (s.state<>'done' OR s.handoff=1) ORDER BY s.seq LIMIT 1`).get(id);
         const s=pending&&{...pending,data:parse(pending.data)};
         const change=this.change(id);
         if(!s){if(state==='running'&&!change){this.db.prepare("UPDATE pa_plans SET state='done' WHERE id=?").run(id);this.memory.event('done-'+id,'委托',this.db.prepare('SELECT title FROM pa_plans WHERE id=?').get(id).title,'已完成全部交付',{planId:id});}continue;}
         const dispatch=state==='running'&&s.authorized&&!s.handoff&&(!change||s.seq<change.start);
+        if(s.state==='checking'){if(dispatch)await this.results.deliver(s);continue;}
+        if(s.state==='review-waiting'||s.handoff)continue;
         if(!s.task_id&&!s.recovered_task&&(!dispatch||s.state==='blocked'))continue;
         try {await this.advance(id,s,dispatch);}
         catch(e){if(!this.service.store.closed){this.db.prepare("UPDATE pa_steps SET state='blocked',error=? WHERE id=? AND state<>'done'").run(String(e.message).slice(0,1200),s.id);
@@ -466,13 +549,16 @@ export class ProjectAgent {
   dependencyReceipts(id,deps){
     if(!deps.length)return [];
     const read=this.db.prepare("SELECT * FROM pa_steps WHERE plan_id=? AND seq=? AND state='done' AND handoff=0");
-    return deps.map(seq=>{
+    return deps.flatMap(seq=>{
       const step=read.get(id,seq);
-      return step?.receipt&&!this.versionChoice(step)?parse(step.receipt):null;
+      const cards=step?readReceipts(step):[];
+      return cards.length&&!cards.some(card=>this.versionChoice({...step,card_id:card.cardId}))?cards:[null];
     });
   }
   async advance(id,s,dispatch) {
     const d=s.data;
+    const revision=s.revision_task&&parse(s.revision_task);
+    const external=d.executor==='codex';
     let receipts;
     const allowed=()=>dispatch&&this.live(id)&&this.db.prepare("SELECT authorized FROM pa_steps WHERE id=? AND handoff=0 AND state<>'done' AND NOT EXISTS (SELECT 1 FROM pa_changes WHERE plan_id=? AND state='pending' AND start<=?)").get(s.id,id,s.seq)?.authorized
       &&(!receipts||json(receipts)===json(this.dependencyReceipts(id,d.deps)));
@@ -482,23 +568,32 @@ export class ProjectAgent {
     let task=existingId&&this.service.tasks.get(existingId);
     if(task&&!s.task_id)this.db.prepare("UPDATE pa_steps SET task_id=?,state='working' WHERE id=?").run(task.id,s.id);
     if(task){
-      const saved=this.db.prepare('SELECT v.id AS versionId,v.card_id AS cardId,c.requirement_id AS requirementId,v.number FROM output_card_versions v JOIN output_card_tasks b ON b.card_id=v.card_id AND b.task_id=v.task_id JOIN output_cards c ON c.id=v.card_id WHERE v.task_id=? ORDER BY v.number LIMIT 1').get(task.id);
-      const pending=await this.host.pending?.(this.service,task);
+      if(external&&this.host.externalRunning(task.id))return;
+      const saved=this.db.prepare(`SELECT v.id AS versionId,v.card_id AS cardId,c.requirement_id AS requirementId,v.number,v.task_id AS taskId
+        FROM output_card_outputs o JOIN output_card_versions v ON v.id=o.version_id AND v.primary_ref=o.source_ref
+        JOIN output_cards c ON c.id=v.card_id LEFT JOIN output_card_tasks b ON b.card_id=c.id AND b.task_id=o.task_id
+        WHERE o.task_id=? AND o.role='primary' AND v.legacy=0 ORDER BY b.task_id IS NULL,o.rowid`).all(task.id);
+      const pending=!external&&await this.host.pending?.(this.service,task);
       if(!stillObserving())return;
       if(pending){
         if(s.interaction!==pending.callId)this.db.prepare("UPDATE pa_steps SET interaction=?,error='原任务待确认' WHERE id=?").run(pending.callId,s.id);
         return;
       }
       if(s.interaction)this.db.prepare('UPDATE pa_steps SET interaction=NULL,error=NULL WHERE id=?').run(s.id);
-      const phase=task.runtimeState?.phase;
+      const phase=external?null:task.runtimeState?.phase;
       const budget=this.service.production.usage(task.id)?.budgetStop;
       if(budget)throw Error(budget);
-      if(saved && !s.handoff && !activePhases.includes(phase) && (!this.host.settled || await this.host.settled(this.service,task))){
-        if(stillObserving())this.db.prepare("UPDATE pa_steps SET state='done',receipt=?,error=NULL WHERE id=? AND handoff=0").run(json(saved),s.id);
+      if(saved.length && !activePhases.includes(phase) && (external || !this.host.settled || await this.host.settled(this.service,task))){
+        if(stillObserving())this.results.collect(s,task,saved);
         return;
       }
       if(!stillObserving())return;
       if(s.state==='blocked')return;
+      if(external&&['submitting','accepted','output'].includes(task.dispatchStatus)){
+        const error='Codex 执行回执不明，请核对原任务；本次不会自动重发';
+        this.service.tasks.setDispatch({taskId:task.id,status:'unknown',error});
+        throw Error(error);
+      }
       if(task.dispatchStatus==='submitting')return;
       if(['failed','unknown','cancelled'].includes(task.dispatchStatus))throw Error(task.error||'发送回执待核对，请打开原任务');
       if(task.dispatchStatus!=='draft'){
@@ -513,6 +608,8 @@ export class ProjectAgent {
         return;
       }
       const files=d.sources.filter(src=>src.path||src.importedFile||src.generatedFile);
+      if(files.length+receipts.length>24 || d.sources.length+receipts.length>24)
+        throw Error('上游成果与已选来源超过 24 张，请调整步骤的引用范围');
       const verified=this.freezeByCanvas([...files.map(src=>({...src,cardId:src.outputCardId||src.cardId})),...receipts],d.requirementId);
       const sources=[...d.sources,...verified.slice(files.length)];
       const settings=this.memory.effective([d.requirementId,d.scope].filter(Boolean));
@@ -523,7 +620,11 @@ export class ProjectAgent {
         return;
       }
       const origin=d.sessionId||this.db.prepare('SELECT session_id AS id FROM pa_turns WHERE id=?').get(id)?.id;
-      const created=await this.host.createTask(this.service,{requirementId:d.requirementId,operationId:s.id,selectedCardIds:[],generation:{mode:'new'},outputType:d.type,instruction:d.instruction},limitSourceContent([...new Map(sources.map(r=>[r.cardId,r])).values()]),settings,allowed,d.title,origin);
+      const generation=revision?{mode:'revise',cardId:revision.cardId,baseVersionId:revision.versionId}:{mode:'new'};
+      const instruction=revision?d.instruction+'\n\n本次修订要求：'+revision.instruction:d.instruction;
+      if(revision)this.verifyRevisionBase(s,revision);
+      if(external)await this.host.externalPreflight();
+      const created=await this.host.createTask(this.service,{requirementId:d.requirementId,operationId:s.operation_id||s.id,selectedCardIds:[],generation,outputType:d.type,instruction,modelSelection:d.modelSelection??undefined},limitSourceContent([...new Map(sources.map(r=>[r.cardId,r])).values()]),settings,allowed,d.title,origin,d.executor);
       if(!created)return;
       task=created.task;
       this.db.prepare("UPDATE pa_steps SET task_id=?,state='working',error=NULL WHERE id=?").run(task.id,s.id);
@@ -531,7 +632,7 @@ export class ProjectAgent {
       receipts=undefined;
     }
     if(!allowed())return;
-    const prepared=this.service.prepareTask({taskId:task.id}).prepared;
+    const prepared=this.service.prepareTask({taskId:task.id},{projectExecutor:external?'codex':undefined}).prepared;
     let sessionId=task.sessionId;
     if(!sessionId){
       sessionId=await this.host.createSession(this.service,prepared.agentPreset);
@@ -539,12 +640,28 @@ export class ProjectAgent {
       sessionId=this.service.tasks.get(task.id).sessionId||sessionId;
       this.service.tasks.bindSession({taskId:task.id,sessionId});
     }
-    await this.host.verify?.(this.service,task.id);
+    let binary;
+    if(external)binary=await this.host.externalPreflight();
+    else {
+      if(d.modelSelection)await this.host.selectModel(this.service,sessionId,d.modelSelection);
+      await this.host.verify?.(this.service,task.id);
+    }
+    const revisionEvidence=revision&&allowed()?this.verifyRevisionBase(s,revision):null;
     if(!allowed()||!this.service.tasks.claimDraftDispatch(task.id,sessionId))return;
+    if(external){
+      this.host.runExternal(this.service,task.id,prepared,d,binary,revisionEvidence);
+      return;
+    }
     try{
       const ack=await this.host.prompt(this.service,sessionId,prepared);
       if(ack?.accepted!==true)throw Error('DSH 没有返回受理回执');
       this.service.tasks.setDispatch({taskId:task.id,status:'accepted'});
     }catch(e){this.service.tasks.setDispatch({taskId:task.id,status:'unknown',error:e.message});throw e;}
+  }
+  verifyRevisionBase(step,revision){
+    const target=readReceipts(step).find(card=>card.cardId===revision.cardId&&card.versionId===revision.versionId);
+    if(!target||this.db.prepare('SELECT head_version_id FROM output_cards WHERE id=?').get(target.cardId)?.head_version_id!==target.versionId)
+      throw Error('原卡已出现新版，请选择交付版本');
+    return this.freezeByCanvas([target],step.data.requirementId)[0];
   }
 }

@@ -2,7 +2,9 @@ import { realpath } from 'node:fs/promises';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { projectAgents } from './project-agent-host.mjs';
+import { resultReviewSource } from './project-result-review.mjs';
 import { ProjectRegistry } from './project-registry.mjs';
+import { ProjectWeChat } from './project-wechat.mjs';
 import { listProjectDirectory } from './project-directory.mjs';
 import { registerWorkbenchSkills } from './skills.mjs';
 import { IMPORT_MAX_BYTES } from './material-import.mjs';
@@ -38,6 +40,7 @@ export function apply(ctx, config = {}) {
   const taskRuntime = createNativeTaskStateTracker(ctx);
   const taskControl = createTaskControl(ctx, taskRuntime);
   const productionObserver = createProductionObserver(ctx);
+  let coordinators;
   ctx.effect(() => () => productionObserver.close());
   const projects = new ProjectRegistry({ ...config, mediaServiceAccess, prewarmArtifactPreviews: true,
     attachProduction: productionObserver.attach, readProductionUsage: productionObserver.read, refreshProductionUsage: productionObserver.refresh,
@@ -46,6 +49,7 @@ export function apply(ctx, config = {}) {
       if (!agent) throw new Error('原课程会话未恢复，批注保留在工程内；请恢复执行与确认后重新发送批注');
       if (agent.status === 'idle') agent.followup(message); else agent.inject(message);
     }, runtimeStateReader: (task, service) => {
+      if (task.input.projectExecutor === 'codex') return coordinators?.externalState(task);
       const state = taskRuntime.read(task, service);
       if (isActiveTaskPhase(state?.phase)) return state;
       const budget = service.production?.budgetStop(task.id);
@@ -85,14 +89,24 @@ export function apply(ctx, config = {}) {
     const identity = async values => JSON.stringify(await Promise.all(values.map(async ref => [ref.name, ref.path ? await realpath(ref.path).catch(() => ref.path) : null, ref.hash])));
     if (await identity(current) !== await identity(refs)) throw new Error('Skill 已变化，旧任务输入已保留；请核对后新建任务。');
   }
-  const coordinators = projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskControl});
+  coordinators = projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskControl});
+  function requireNativeTask(service,taskId){
+    if(service.tasks.get(taskId).input.projectExecutor==='codex')throw Error('请在项目助手控制此 Codex 步骤');
+  }
   ctx.effect(() => () => coordinators.close());
+  const wechat = new ProjectWeChat(ctx,projects,coordinators);
+  ctx.effect(() => () => wechat.close());
   ctx.on?.('agent/pre-step',async({agent,messages},next)=>{
     const decision=await next();
     if(decision.kind!=='enter')return decision;
     const incoming=messages.filter(m=>m.source?.kind==='user'&&m.source.rpcId);
     if(incoming.length)coordinators.nativeInput(agent.session,incoming.map(m=>m.source.rpcId));
     const runner=coordinators.bySession(agent);
+    const review=decision.messages.find(message=>message.source?.kind===resultReviewSource);
+    if(review){
+      if(!runner?.results.admit(agent.id,review.id))return {kind:'reject'};
+      runner.activeTurns.clear();
+    }
     if(!runner||runner.sessionId()!==agent.id)return decision;
     if(incoming.length)runner.activeTurns.clear();
     const contexts=incoming.map(m=>runner.promptContext(agent.id,m.source.rpcId)).filter(Boolean);
@@ -101,7 +115,12 @@ export function apply(ctx, config = {}) {
     return {...decision,messages:[...decision.messages,createUserMessage({content:[{type:'text',text}],source:{kind:'wtt-project-agent',form:'snapshot',sections:[{name:'画布与授权',text}]}})]};
   });
   ctx.on?.('tools/pre-execute',(exec,next)=>{
-    if (!coordinators.bySession(exec.agent) || ['workbench_project','ask_user_question','run_code','tool_search'].includes(exec.name)) return next();
+    const runner=coordinators.bySession(exec.agent);
+    if (!runner) return next();
+    const allowed=runner.results.active.has(exec.agent.id)
+      ? ['workbench_project_review','run_code','tool_search']
+      : ['workbench_project','ask_user_question','run_code','tool_search'];
+    if(allowed.includes(exec.name))return next();
     return Promise.resolve({kind:'deny',reason:'请通过 workbench_project 提交项目计划，原任务会话在用户授权后执行创作。'});
   });
   ctx.effect(() => ctx.connection.fetch.register({
@@ -402,6 +421,13 @@ export function apply(ctx, config = {}) {
         if (Buffer.byteLength(body) > 1_500_000) throw new Error('请求内容过大');
         const { action, data } = JSON.parse(body);
         if (action === 'discover-media-models') return Response.json(await discoverMediaModels(mediaServiceAccess, data), { headers });
+        if (typeof action==='string'&&action.startsWith('project-wechat-')) {
+          const site=request.headers.get('sec-fetch-site');
+          if(request.headers.get('x-wtt-wechat')!=='1'||(site&&site!=='same-origin'&&site!=='none')||
+             !request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))
+            return Response.json({error:'请从当前 WTT 工作台管理微信连接'},{status:403,headers});
+          return Response.json(await wechat.action(action.slice('project-wechat-'.length),data,projectId),{headers});
+        }
         if(['document-external-open','document-external-status','document-open-application','document-reveal-file','document-external-save-version'].includes(action)&&!projectId)throw new Error('本机文档操作必须指定当前项目');
         if (action === 'open-project') return Response.json({ project: projects.open(data?.path) }, { headers });
         const service = projects.get(projectId);
@@ -550,8 +576,14 @@ export function apply(ctx, config = {}) {
           if(['draft','failed'].includes(prepared.task.dispatchStatus))coordinators.existing(service)?.takeOver({requirementId:prepared.task.requirementId,taskId:data.taskId});
           result = { ...prepared, prepared: projects.prepared(service, prepared.prepared) };
         }
-        else if (action === 'bind-task-session') { await verifyTaskSkills(service, data.taskId); result = service.tasks.bindSession(data); }
-        else if (action === 'set-task-dispatch') { if (data.status === 'submitting') await verifyTaskSkills(service, data.taskId); result = service.tasks.setDispatch(data); }
+        else if (action === 'bind-task-session') {
+          requireNativeTask(service,data.taskId);await verifyTaskSkills(service,data.taskId);result=service.tasks.bindSession(data);
+        }
+        else if (action === 'set-task-dispatch') {
+          requireNativeTask(service,data.taskId);
+          if(data.status==='submitting')await verifyTaskSkills(service,data.taskId);
+          result=service.tasks.setDispatch(data);
+        }
         else if (action === 'bind-canvas-session') result = service.canvas.setSession(data);
         else throw new Error('不支持的工作台操作');
         return Response.json(result, { headers });
@@ -568,14 +600,27 @@ export function apply(ctx, config = {}) {
   const projectParameter = { type: 'string', description: '准备输入返回的 projectId；必须属于当前会话的原始项目目录' };
   ctx.effect(() => ctx.tools.register(defineTool({
     name:'workbench_project',
-    description:'项目助手 专用。context 读取项目画布、计划、有效设定（可传 scope 查局部设定）。cards 按画布查询卡，search 查日志。plan 提交同一发送现场的一份计划，数据为 {title,steps:[{title,type:text|pptx|image|video,instruction,requirementId?,useSelection?,refs?:[{requirementId,cardId,versionId?}],dependsOn?:[前序步骤序号，从1开始],scope?,review?}]}。amend 使用 planId、steps 和可选 replaceFrom（从该序号起替换未派发部分，省略则追加）。suggest 提议长期设定 {name,scope,body}，log 保存事实 {title,body,taskId?,requirementId?,cardId?,versionId?}，details/pause/stop 传 {planId}。所有审批由用户在浮窗操作。',
+    description:'项目助手专用。context 读取画布、计划、有效设定与执行路线，可传 scope、modelQuery。cards、read-card、search、evidence 查卡和日志。plan 数据为 {title,steps:[{title,type:text|pptx|image|video,instruction,requirementId?,useSelection?,refs?:[{requirementId,cardId,versionId?}],dependsOn?:[前序步骤序号，从1开始],scope?,review?,acceptance?:{criteria:[可核对的字符串],minCards?},executor?:dsh|codex,modelSelection?:{provider,model,reasoningEffort?}}]}。review 为派发前逐项审批；acceptance 为成果复核条件。模型只可用 context 返回的 DSH 提供商、模型及推理等级，Codex 只做文本并需用户授权。amend 用 planId、steps、replaceFrom（从该序号起替换未派发部分，省略为追加）。suggest 保存候选设定 {name,scope,body}。log 保存事实 {title,body,taskId?,requirementId?,cardId?,versionId?}。details/pause/stop 传 {planId}。',
     parameters:{action:{type:'string',required:true,enum:['context','cards','read-card','search','evidence','plan','suggest','log','pause','stop','details','amend']},turnId:{type:'string',description:'当前用户消息的 turnId'},data:{type:'string',description:'JSON 对象字符串，cards 使用 requirementId 和可选 query，检索用 query，可带 requirementId、cardId 或 versionId。evidence 用 eventId；read-card 用 requirementId、cardId 和可选 versionId'}},
     output:textOutput,execute:async(args,execution)=>{
       execution.signal.throwIfAborted();
-      const service=projects.forExecution(undefined,execution);
-      const runner=coordinators.get(service);
+      const runner=coordinators.bySession(execution.agent);
+      if(!runner||runner.results.active.has(execution.agent.id))throw Error('此工具需要当前用户在项目助手发起的对话');
       if(!['search','cards','read-card','evidence'].includes(args.action)&&!runner.activeTurns.has(args.turnId))throw Error('请以本轮用户消息的发送现场执行');
       return JSON.stringify(await runner.tool(execution.agent?.id,args.action,args.turnId,JSON.parse(args.data||'{}')));
+    },
+  })));
+  ctx.effect(() => ctx.tools.register(defineTool({
+    name:'workbench_project_review',
+    description:'项目助手在本轮收到 [工作台成果验收] 时才能提交一个决定。accept 通过当前验收。revise 修订本轮的一张成果，data 为 {cardId,versionId,instruction}。adjust 通过当前验收并提出剩余计划调整，data 为 {steps,replaceFrom?}，需用户授权。ask 报告需要用户判断。reason 写具体标准与所见证据。',
+    parameters:{reviewId:{type:'string',required:true},decision:{type:'string',required:true,enum:['accept','revise','adjust','ask']},
+      reason:{type:'string',required:true},data:{type:'string',description:'修订或变更所需的 JSON 对象字符串'}},
+    output:textOutput,isConcurrencySafe:false,execute:async(args,execution)=>{
+      execution.signal.throwIfAborted();
+      const runner=coordinators.bySession(execution.agent);
+      if(!runner)throw Error('只能由原项目助手会话验收');
+      const {cardId,versionId,instruction,steps,replaceFrom}=JSON.parse(args.data||'{}');
+      return JSON.stringify(runner.results.decide(execution.agent.id,{...args,cardId,versionId,instruction,steps,replaceFrom}));
     },
   })));
   ctx.effect(() => ctx.tools.register(defineTool({

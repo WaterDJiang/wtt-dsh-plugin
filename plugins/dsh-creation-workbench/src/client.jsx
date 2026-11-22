@@ -20,6 +20,7 @@ import { ProjectRecycleDialog } from './canvas-recycle.jsx'
 import { ProjectExplorer, ProjectFilePreview } from './project-explorer.jsx'
 import {remapProjectFilePath} from './project-file-paths.mjs'
 import { ProjectPicker } from './project-picker.jsx'
+import { ProjectWeChatDialog } from './project-wechat-dialog.jsx'
 import { normalizeModelCatalog, openNativeModelSettings } from './model-selection.mjs'
 import { createNativeModelSeat } from './model-selection.jsx'
 import { CANVAS_CONVERSATION_SLOT, CANVAS_CONVERSATION_CHILDREN, registerCanvasConversation, registerConversationFilePreview } from './embedded-conversation.jsx'
@@ -46,7 +47,7 @@ async function apiRequest(action, data, projectId, query, signal) {
     signal,
     ...(action ? {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(action.startsWith('project-wechat-') ? { 'X-WTT-WeChat': '1' } : {}) },
       body: JSON.stringify({ action, data }),
     } : {}),
   })
@@ -85,7 +86,7 @@ function BookIcon() {
   </svg>
 }
 
-function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssets, onList, onRefresh, onRename, onModelSettings, onSyncDeliverables, onBackground, notificationChannel }) {
+function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssets, onList, onRefresh, onRename, onModelSettings, onWeChat, onSyncDeliverables, onBackground, notificationChannel }) {
   const menuId = useId()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButton = useRef(null)
@@ -119,6 +120,7 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onBackground() }}>背景资料</UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => { setMenuOpen(false); onSyncDeliverables() }}>整理成果文件夹<span>按白板名称整理全部已保存版本</span></UiButton>
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onModelSettings() }}>模型设置<span>连接第三方模型或自定义 API</span></UiButton>
+        <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onWeChat() }}>微信项目助手</UiButton>
         {notificationChannel?.permission === 'default' && <UiButton variant="custom" type="button" role="menuitem" onClick={() => {
           setMenuOpen(false)
           void notificationChannel.requestPermission().catch(error => console.warn('DSH 桌面通知授权失败', error))
@@ -208,6 +210,7 @@ function RenameRequirementDialog({ value, onChange, busy, error, onClose, onSubm
 function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStart, onStartCanvas, onRestoreCanvas, onPrepareContinuation, onOpenNativeConversation, onWatchTaskSessions, acquirePreviewSession, acquireEditingSession,nativeEditorBridge,SessionProvider, renderSlot,
   nativeModelSeat, modelCatalog, modelSelection, onModelChange, onRefreshModels, onOpenModelSettings, onOpenMediaSettings, onWatchMediaSettings, modelLoading, modelError, nativeSessionStatuses, desktopTaskNotices }) {
   const outlineTitleId = useId()
+  const [showWeChat,setShowWeChat] = useState(false)
   const activeRef = useRef(active)
   activeRef.current = active
   const request = useCallback((action, data) => apiRequest(action, data, project.id), [project.id])
@@ -656,7 +659,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     setFileRecycleSignal({token:crypto.randomUUID(),requirements:plan.courses.map(c=>c.requirementId)})
     await load()
   }
-  const projectBar = <CanvasProjectBar workspace={workspace} project={project} onToggleFiles={()=>setFilesOpen(true)} filesOpen={filesOpen} selectedId={selectedId} busy={busy} loading={loading} onSelect={selectRequirement} onNew={() => { setFormError(''); setShowNew(true) }} onList={showList} onRefresh={() => load()} onRename={showRename} onBackground={showBackground} onSyncDeliverables={syncDeliverables} onModelSettings={onOpenModelSettings} notificationChannel={desktopTaskNotices?.channel} />
+  const projectBar = <CanvasProjectBar workspace={workspace} project={project} onToggleFiles={()=>setFilesOpen(true)} filesOpen={filesOpen} selectedId={selectedId} busy={busy} loading={loading} onSelect={selectRequirement} onNew={() => { setFormError(''); setShowNew(true) }} onList={showList} onRefresh={() => load()} onRename={showRename} onBackground={showBackground} onSyncDeliverables={syncDeliverables} onModelSettings={onOpenModelSettings} onWeChat={()=>setShowWeChat(true)} notificationChannel={desktopTaskNotices?.channel} />
 
   return <div className="wtt-project-layout">{filesOpen&&<ProjectExplorer onChanged={fileTreeChanged} clipboard={fileClipboard} setClipboard={setFileClipboard} onOrganized={fileOrganizationChanged} refreshSignal={fileRefresh} onRecycle={()=>setRecycleRequest(crypto.randomUUID())} project={project} request={request} active={active} onClose={()=>setFilesOpen(false)} onChooseProject={onChooseProject} onOpenProject={onOpenProject} onPreview={previewProjectFile} previewPath={projectFileSelection?.path} revealRequest={fileRevealRequest} onAdd={addProjectFile} canAdd={view==='canvas'&&Boolean(selected)}/>}<div className="wtt-project-main"><div className={`wtt-course-workbench ${view === 'canvas' ? 'wtt-canvas-mode' : ''}`}>
     {view === 'canvas' && !selected && projectBar}
@@ -667,6 +670,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
         {!filesOpen&&<UiButton variant="ghost" onClick={()=>setFilesOpen(true)} aria-label="打开文件栏">打开文件栏</UiButton>}
       </div>
       <div className="wtt-heading-actions">
+        <UiButton variant="quiet" onClick={()=>setShowWeChat(true)}>微信项目助手</UiButton>
         <UiButton variant="quiet" className="wtt-button wtt-button-text" onClick={() => load()} disabled={loading || Boolean(busy)}>{loading ? '读取中…' : '刷新'}</UiButton>
         <UiButton variant="primary" className="wtt-button wtt-button-primary" disabled={!workspace || Boolean(busy)} onClick={() => { setFormError(''); setShowNew(true) }}>新建画布</UiButton>
       </div>
@@ -743,6 +747,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {showNew && <RenameRequirementDialog creating value={form.title} onChange={title => setForm({title})} busy={busy === 'create'} error={formError} onClose={() => setShowNew(false)} onSubmit={createRequirement} />}
     {backgroundEdit && <BackgroundDialog values={backgroundEdit} setValues={setBackgroundEdit} busy={busy === 'background'} error={backgroundError} onClose={() => setBackgroundEdit(null)} onSubmit={saveBackground} />}
     {rename && <RenameRequirementDialog value={rename.title} onChange={title => setRename(previous => ({ ...previous, title }))} busy={busy === 'rename'} error={renameError} onClose={() => setRename(null)} onSubmit={renameRequirement} />}
+    {active&&showWeChat&&<ProjectWeChatDialog projectId={project.id} canvasId={selected?.id} request={apiRequest} onClose={()=>setShowWeChat(false)}/>}
   </div></div></div>
 }
 
@@ -753,6 +758,7 @@ function ProjectWorkbench(props) {
   const [error, setError] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const mounted = useRef(true)
+  const registryReadEpoch = useRef(0)
   const [modelCatalog, setModelCatalog] = useState(null)
   const [modelSelection, setModelSelection] = useState(null)
   const [modelLoading, setModelLoading] = useState(true)
@@ -812,11 +818,22 @@ function ProjectWorkbench(props) {
     if (!mounted.current) return
     const project = result.project
     if (!project?.id || !project.path) throw new Error('服务器未返回有效项目，请保留当前内容后重试。')
+    registryReadEpoch.current++
     setRegistry(previous => ({ ...previous, activeProjectId: project.id,
       projects: [project, ...(previous?.projects || []).filter(item => item.id !== project.id)] }))
     setOpened(previous => previous.some(item => item.id === project.id) ? previous : [...previous, project])
     setError('')
     setPickerOpen(false)
+  }
+
+  function chooseProject() {
+    setPickerOpen(true)
+    const epoch = ++registryReadEpoch.current
+    void apiRequest(undefined, undefined, undefined, { projects: 1 }).then(next => {
+      if (mounted.current && epoch === registryReadEpoch.current) {
+        setRegistry(previous => previous ? { ...previous, projects: next.projects } : next)
+      }
+    }).catch(cause => { if (mounted.current && epoch === registryReadEpoch.current) setError(messageOf(cause)) })
   }
 
   const project = registry?.projects.find(item => item.id === registry.activeProjectId)
@@ -828,7 +845,7 @@ function ProjectWorkbench(props) {
     </div>}
     {registry && error && <div className="wtt-project-warning" role="alert">{error}<UiButton variant="ghost" size="compact" onClick={() => setError('')} aria-label="关闭项目提示">×</UiButton></div>}
     {opened.map(item => <div key={item.id} className="wtt-project-surface" hidden={registry?.activeProjectId !== item.id}>
-      <WorkbenchPage {...props} project={item} active={registry?.activeProjectId === item.id} onChooseProject={() => setPickerOpen(true)} onOpenProject={openProject}
+      <WorkbenchPage {...props} project={item} active={registry?.activeProjectId === item.id} onChooseProject={chooseProject} onOpenProject={openProject}
         modelCatalog={modelCatalog} modelSelection={modelSelection} onModelChange={setModelSelection} onRefreshModels={loadModels} onOpenModelSettings={openModelSettings} modelLoading={modelLoading} modelError={modelError} nativeSessionStatuses={nativeSessionStatuses} />
     </div>)}
     {pickerOpen && <ProjectPicker currentProject={project} projects={registry?.projects || []}

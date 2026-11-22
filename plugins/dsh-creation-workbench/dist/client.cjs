@@ -47,7 +47,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
         return x2 === y2 && (0 !== x2 || 1 / x2 === 1 / y2) || x2 !== x2 && y2 !== y2;
       }
       function useSyncExternalStore$2(subscribe, getSnapshot) {
-        didWarnOld18Alpha || void 0 === React56.startTransition || (didWarnOld18Alpha = true, console.error(
+        didWarnOld18Alpha || void 0 === React57.startTransition || (didWarnOld18Alpha = true, console.error(
           "You are using an outdated, pre-release alpha of React 18 that does not support useSyncExternalStore. The use-sync-external-store shim will not work correctly. Upgrade to a newer pre-release."
         ));
         var value = getSnapshot();
@@ -57,7 +57,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
             "The result of getSnapshot should be cached to avoid an infinite loop"
           ), didWarnUncachedGetSnapshot = true);
         }
-        cachedValue = useState50({
+        cachedValue = useState51({
           inst: { value, getSnapshot }
         });
         var inst = cachedValue[0].inst, forceUpdate = cachedValue[1];
@@ -69,7 +69,7 @@ var require_use_sync_external_store_shim_development = __commonJS({
           },
           [subscribe, value, getSnapshot]
         );
-        useEffect51(
+        useEffect52(
           function() {
             checkIfSnapshotChanged(inst) && forceUpdate({ inst });
             return subscribe(function() {
@@ -95,8 +95,8 @@ var require_use_sync_external_store_shim_development = __commonJS({
         return getSnapshot();
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React56 = require("react"), objectIs = "function" === typeof Object.is ? Object.is : is, useState50 = React56.useState, useEffect51 = React56.useEffect, useLayoutEffect11 = React56.useLayoutEffect, useDebugValue3 = React56.useDebugValue, didWarnOld18Alpha = false, didWarnUncachedGetSnapshot = false, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
-      exports.useSyncExternalStore = void 0 !== React56.useSyncExternalStore ? React56.useSyncExternalStore : shim;
+      var React57 = require("react"), objectIs = "function" === typeof Object.is ? Object.is : is, useState51 = React57.useState, useEffect52 = React57.useEffect, useLayoutEffect11 = React57.useLayoutEffect, useDebugValue3 = React57.useDebugValue, didWarnOld18Alpha = false, didWarnUncachedGetSnapshot = false, shim = "undefined" === typeof window || "undefined" === typeof window.document || "undefined" === typeof window.document.createElement ? useSyncExternalStore$1 : useSyncExternalStore$2;
+      exports.useSyncExternalStore = void 0 !== React57.useSyncExternalStore ? React57.useSyncExternalStore : shim;
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
     })();
   }
@@ -132,14 +132,14 @@ var require_with_selector_development = __commonJS({
         return x2 === y2 && (0 !== x2 || 1 / x2 === 1 / y2) || x2 !== x2 && y2 !== y2;
       }
       "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-      var React56 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore7 = shim.useSyncExternalStore, useRef48 = React56.useRef, useEffect51 = React56.useEffect, useMemo13 = React56.useMemo, useDebugValue3 = React56.useDebugValue;
+      var React57 = require("react"), shim = require_shim(), objectIs = "function" === typeof Object.is ? Object.is : is, useSyncExternalStore7 = shim.useSyncExternalStore, useRef49 = React57.useRef, useEffect52 = React57.useEffect, useMemo14 = React57.useMemo, useDebugValue3 = React57.useDebugValue;
       exports.useSyncExternalStoreWithSelector = function(subscribe, getSnapshot, getServerSnapshot, selector2, isEqual) {
-        var instRef = useRef48(null);
+        var instRef = useRef49(null);
         if (null === instRef.current) {
           var inst = { hasValue: false, value: null };
           instRef.current = inst;
         } else inst = instRef.current;
-        instRef = useMemo13(
+        instRef = useMemo14(
           function() {
             function memoizedSelector(nextSnapshot) {
               if (!hasMemo) {
@@ -175,7 +175,7 @@ var require_with_selector_development = __commonJS({
           [getSnapshot, getServerSnapshot, selector2, isEqual]
         );
         var value = useSyncExternalStore7(subscribe, instRef[0], instRef[1]);
-        useEffect51(
+        useEffect52(
           function() {
             inst.hasValue = true;
             inst.value = value;
@@ -2385,7 +2385,7 @@ function nativePendingState(pending, status) {
   return pending;
 }
 function pendingRetryAllowed(taskOrPending) {
-  return ["draft", "failed"].includes(taskOrPending?.dispatchStatus || taskOrPending?.status);
+  return !taskOrPending?.projectExecutor && !taskOrPending?.input?.projectExecutor && ["draft", "failed"].includes(taskOrPending?.dispatchStatus || taskOrPending?.status);
 }
 function pendingContinueAllowed(pending) {
   return Boolean(pending?.sessionId && !pending.mediaJob && !pending.budgetStopped && ["accepted", "output"].includes(pending.status) && ["idle", "failed"].includes(pending.phase));
@@ -2431,6 +2431,7 @@ function createPendingContext({ projectId, projectName: projectName2, projectPat
   const { card, node, task, pendingGeneration } = descriptor || {};
   if (!projectId || !requirement?.id || !card?.id || !node?.id || !task?.id || task.requirementId !== requirement.id || task.outputCardId !== card.id) throw new Error("\u5F85\u5B8C\u6210\u5361\u7247\u4E0E\u539F\u4EFB\u52A1\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u52A0\u8F7D\u3002");
   const input = JSON.parse(JSON.stringify(task.input || {}));
+  const sessionId = input.projectExecutor ? null : task.sessionId || null;
   const references = (input.sources || []).map((source) => ({
     ...source,
     id: source.cardId,
@@ -2451,7 +2452,7 @@ function createPendingContext({ projectId, projectName: projectName2, projectPat
     intent: "pending",
     pendingTaskId: task.id,
     taskId: task.id,
-    sessionId: task.sessionId || null,
+    sessionId,
     pendingGeneration: pendingGeneration || node.pendingGeneration,
     outputType: card.type,
     ...card.type === "pptx" ? { pptEngine: input.pptEngine || "native" } : {},
@@ -2466,7 +2467,7 @@ function createPendingContext({ projectId, projectName: projectName2, projectPat
     ...input.providerId ? { providerId: input.providerId } : {},
     ...input.media ? { mediaOptions: input.media } : {},
     ...task.mediaJob ? { mediaJob: task.mediaJob } : {},
-    originalInput: { instruction: input.instruction || task.instruction || "", references: JSON.parse(JSON.stringify(references)), taskId: task.id, sessionId: task.sessionId || null }
+    originalInput: { instruction: input.instruction || task.instruction || "", references: JSON.parse(JSON.stringify(references)), taskId: task.id, sessionId }
   };
 }
 
@@ -2527,17 +2528,17 @@ function buildQuestionAnswer(interaction, drafts, mode = "answer") {
   return { answers: interaction.questions.map((question) => {
     const draft = drafts[question.id] || {};
     const custom = String(draft.custom || "").trim();
-    const labels2 = new Set((question.options || []).map((option) => option.label));
+    const labels3 = new Set((question.options || []).map((option) => option.label));
     let selected2 = [...new Set(draft.selected || [])];
     if (mode === "approve") {
-      if (question.intent?.kind !== "plan-review" || !labels2.has(question.intent.approve)) throw new Error("\u6B64\u95EE\u9898\u672A\u63D0\u4F9B\u786E\u8BA4\u9009\u9879\u3002");
+      if (question.intent?.kind !== "plan-review" || !labels3.has(question.intent.approve)) throw new Error("\u6B64\u95EE\u9898\u672A\u63D0\u4F9B\u786E\u8BA4\u9009\u9879\u3002");
       selected2 = [question.intent.approve];
     }
     if (mode === "modify") {
       if (!custom) throw new Error("\u8BF7\u586B\u5199\u4FEE\u6539\u610F\u89C1\u3002");
       selected2 = question.intent?.kind === "plan-review" ? (question.options || []).filter((option) => option.label !== question.intent.approve).slice(0, 1).map((option) => option.label) : [];
     }
-    if (selected2.some((label2) => !labels2.has(label2)) || !question.multiSelect && selected2.length > 1) throw new Error("\u9009\u9879\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u95EE\u9898\u3002");
+    if (selected2.some((label2) => !labels3.has(label2)) || !question.multiSelect && selected2.length > 1) throw new Error("\u9009\u9879\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u6838\u5BF9\u95EE\u9898\u3002");
     if (!selected2.length && !custom) throw new Error("\u8BF7\u56DE\u7B54\u6BCF\u4E00\u4E2A\u95EE\u9898\uFF0C\u6216\u586B\u5199\u8865\u5145\u610F\u89C1\u3002");
     if (custom.length > 8e3) throw new Error("\u8865\u5145\u610F\u89C1\u6700\u591A 8000 \u5B57\u3002");
     return { id: question.id, selected: selected2, ...custom ? { custom } : {} };
@@ -3210,7 +3211,7 @@ function createMediaSettingsOperations(ctx) {
 }
 
 // src/client.jsx
-var import_react66 = __toESM(require("react"), 1);
+var import_react67 = __toESM(require("react"), 1);
 
 // src/model-selection.mjs
 var EFFORT_LABELS = { off: "\u5173\u95ED", minimal: "\u6781\u4F4E", low: "\u4F4E", medium: "\u4E2D", high: "\u9AD8", xhigh: "\u66F4\u9AD8", max: "\u6700\u9AD8" };
@@ -13739,7 +13740,7 @@ var wattter_agent_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAA
 
 // src/project-agent.jsx
 var labels = { auto: "\u5168\u81EA\u52A8", plan: "\u5148\u89C4\u5212\u540E\u6267\u884C", step: "\u9010\u9879\u786E\u8BA4" };
-var statuses = { done: "\u5DF2\u5B8C\u6210", running: "\u6267\u884C\u4E2D", paused: "\u5DF2\u6682\u505C", approval: "\u5F85\u6388\u6743", stopped: "\u5DF2\u505C\u6B62", stopping: "\u505C\u6B62\u5F85\u6838\u5BF9", blocked: "\u5F85\u6838\u5BF9", working: "\u6267\u884C\u4E2D", ready: "\u5F85\u6267\u884C" };
+var statuses = { done: "\u5DF2\u5B8C\u6210", running: "\u6267\u884C\u4E2D", paused: "\u5DF2\u6682\u505C", approval: "\u5F85\u6388\u6743", stopped: "\u5DF2\u505C\u6B62", stopping: "\u505C\u6B62\u5F85\u6838\u5BF9", blocked: "\u5F85\u6838\u5BF9", working: "\u6267\u884C\u4E2D", ready: "\u5F85\u6267\u884C", checking: "\u5F85\u9A8C\u6536", "review-waiting": "\u9700\u8981\u4F60" };
 var reviewLabel = "\u6388\u6743\u5E76\u6267\u884C";
 var assistantName = "WTT \u9879\u76EE\u52A9\u624B";
 function stored(storage, key, fallback) {
@@ -13768,7 +13769,9 @@ function ModeMenu({ value, onChange, label: label2 = "\u6267\u884C\u65B9\u5F0F" 
   } }, name2, value === id2 ? " \u2713" : ""))));
 }
 function PlanStepDetails({ step, locate }) {
-  return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("details", null, /* @__PURE__ */ import_react19.default.createElement("summary", null, step.title, " \xB7 ", step.target), /* @__PURE__ */ import_react19.default.createElement("p", null, step.instruction), !!step.deps.length && /* @__PURE__ */ import_react19.default.createElement("small", null, "\u4F9D\u8D56\u6B65\u9AA4 ", step.deps.join("\u3001"))), !!step.refs?.length && /* @__PURE__ */ import_react19.default.createElement("details", null, /* @__PURE__ */ import_react19.default.createElement("summary", null, step.refs.length, " \u4EFD\u5F15\u7528"), step.refs.map((ref) => /* @__PURE__ */ import_react19.default.createElement("div", { key: ref.cardId }, ref.title, ref.versionId && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => locate({ ...ref, cardId: ref.outputCardId }) }, "\u67E5\u770B\u5F15\u7528\u7248\u672C")))));
+  const model = step.modelSelection;
+  const executor = step.executor === "codex" ? "Codex CLI" : model ? [model.model, model.provider, EFFORT_LABELS[model.reasoningEffort] || model.reasoningEffort].filter(Boolean).join(" \xB7 ") : "DSH \u9ED8\u8BA4\u6A21\u578B";
+  return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("details", { className: "wtt-agent-step-details" }, /* @__PURE__ */ import_react19.default.createElement("summary", null, step.title, " \xB7 ", step.target, step.executor === "codex" && " \xB7 Codex"), /* @__PURE__ */ import_react19.default.createElement("p", null, step.instruction), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, "\u6267\u884C\u8005 \xB7 ", executor), !!step.deps.length && /* @__PURE__ */ import_react19.default.createElement("small", null, "\u4F9D\u8D56\u6B65\u9AA4 ", step.deps.join("\u3001")), step.acceptance && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, "\u9A8C\u6536 \xB7 \u81F3\u5C11 ", step.acceptance.minCards, " \u5F20\u6B63\u5F0F\u6210\u679C", /* @__PURE__ */ import_react19.default.createElement("ul", null, step.acceptance.criteria.map((criterion, index2) => /* @__PURE__ */ import_react19.default.createElement("li", { key: index2 }, criterion)))), step.resultReview?.reason && step.resultReview.reason !== step.error && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, step.resultReview.reason)), !!step.refs?.length && /* @__PURE__ */ import_react19.default.createElement("details", null, /* @__PURE__ */ import_react19.default.createElement("summary", null, step.refs.length, " \u4EFD\u5F15\u7528"), step.refs.map((ref) => /* @__PURE__ */ import_react19.default.createElement("div", { key: ref.cardId }, ref.title, ref.versionId && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => locate({ ...ref, cardId: ref.outputCardId }) }, "\u67E5\u770B\u5F15\u7528\u7248\u672C")))));
 }
 function ReviewActions({ kind, plan, stepId, act, busy }) {
   if (kind === "change") return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(plan, "accept-change", { changeId: plan.change.id }) }, "\u6279\u51C6\u53D8\u66F4"), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act(plan, "reject-change", { changeId: plan.change.id }) }, "\u4FDD\u7559\u539F\u8BA1\u5212"));
@@ -13778,16 +13781,24 @@ function ChatReview({ review, act, locate, busy, onPage }) {
   if (!review?.item) return null;
   const { plan, kind, stepId } = review.item;
   const steps = kind === "change" ? plan.change.steps : kind === "plan" ? plan.steps : plan.steps.filter((step) => step.id === stepId);
-  return /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-review", "aria-label": "\u5BF9\u8BDD\u6388\u6743" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-heading" }, /* @__PURE__ */ import_react19.default.createElement("strong", { title: plan.title }, plan.title), /* @__PURE__ */ import_react19.default.createElement("small", { role: "status" }, kind === "change" ? "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C " + plan.change.start + " \u9879\u8D77" : kind === "step" ? "\u5F85\u786E\u8BA4\u6B65\u9AA4" : "\u5F85\u6388\u6743")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-steps", key: plan.id + ":" + kind + ":" + (stepId || "") }, steps.map((step, index2) => /* @__PURE__ */ import_react19.default.createElement("div", { key: step.id || index2 }, /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { step, locate }), kind === "step" && step.error && /* @__PURE__ */ import_react19.default.createElement("small", null, step.error)))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions" }, /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind, plan, stepId, act, busy }), review.total > 1 && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-pager", "aria-label": "\u5BF9\u8BDD\u5F85\u6388\u6743\u5206\u9875" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy || review.page === 0, onClick: () => onPage(review.page - 1) }, "\u4E0A\u4E00\u9879"), /* @__PURE__ */ import_react19.default.createElement("small", null, review.page + 1, " / ", review.total), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy || review.page + 1 === review.total, onClick: () => onPage(review.page + 1) }, "\u4E0B\u4E00\u9879"))));
+  return /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-review", "aria-label": "\u5BF9\u8BDD\u6388\u6743" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-heading" }, /* @__PURE__ */ import_react19.default.createElement("strong", { title: plan.title }, plan.title), /* @__PURE__ */ import_react19.default.createElement("small", { role: "status" }, kind === "change" ? "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C " + plan.change.start + " \u9879\u8D77" : kind === "step" ? "\u5F85\u786E\u8BA4\u6B65\u9AA4" : "\u8BA1\u5212\u5DF2\u751F\u6210 \xB7 \u5F85\u6388\u6743")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-steps", key: plan.id + ":" + kind + ":" + (stepId || "") }, steps.map((step, index2) => /* @__PURE__ */ import_react19.default.createElement("div", { key: step.id || index2 }, /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { step, locate: (ref) => locate(ref, plan.id) }), kind === "step" && step.error && /* @__PURE__ */ import_react19.default.createElement("small", null, step.error)))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions" }, /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind, plan, stepId, act, busy }), review.total > 1 && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-pager", "aria-label": "\u5BF9\u8BDD\u5F85\u6388\u6743\u5206\u9875" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy || review.page === 0, onClick: () => onPage(review.page - 1) }, "\u4E0A\u4E00\u9879"), /* @__PURE__ */ import_react19.default.createElement("small", null, review.page + 1, " / ", review.total), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy || review.page + 1 === review.total, onClick: () => onPage(review.page + 1) }, "\u4E0B\u4E00\u9879"))));
 }
-function Plans({ plans, act, locate, busy }) {
+function Plans({ plans, act, locate, busy, focusPlan }) {
   if (!plans?.length) return null;
   return /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-plans" }, plans.map((p, index2) => {
     const next = p.steps.find((s) => s.state !== "done" || s.handoff), ended = ["done", "stopped"].includes(p.state);
     const completed = p.steps.filter((step) => step.state === "done" && !step.handoff).length;
     const waitingVersion = p.steps.some((s) => s.choice && !s.handoff);
-    const status = p.state === "running" && next?.interaction ? "\u5F85\u786E\u8BA4" : p.state === "running" && next?.handoff ? "\u4F60\u6B63\u5728\u5904\u7406" : p.state === "running" && waitingVersion ? "\u5F85\u9009\u62E9\u7248\u672C" : p.state === "running" && next?.state === "blocked" ? "\u5F85\u6838\u5BF9" : statuses[p.state];
-    return /* @__PURE__ */ import_react19.default.createElement("details", { className: "wtt-agent-plan", key: p.id, open: !ended && index2 === 0 || void 0 }, /* @__PURE__ */ import_react19.default.createElement("summary", null, /* @__PURE__ */ import_react19.default.createElement("span", null, p.title), /* @__PURE__ */ import_react19.default.createElement("small", null, status), /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-plan-progress" }, /* @__PURE__ */ import_react19.default.createElement("progress", { value: completed, max: p.steps.length || 1, "aria-label": p.title + "\u8FDB\u5EA6" }), /* @__PURE__ */ import_react19.default.createElement("span", null, "\u5B8C\u6210 ", completed, "/", p.steps.length))), p.steps.map((s) => /* @__PURE__ */ import_react19.default.createElement("div", { key: s.id, className: "wtt-agent-step" }, /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { step: s, locate }), s.receipt ? /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => locate(s.receipt) }, "\u5B9A\u4F4D V", s.receipt.number) : /* @__PURE__ */ import_react19.default.createElement("small", null, s.error || statuses[s.state]), s.state === "blocked" && !s.taskId && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => act(p, "recheck", { stepId: s.id }) }, "\u91CD\u65B0\u6838\u5BF9\u6765\u6E90"), s.taskId && s.outputCardId && (!s.receipt || s.handoff || s.choice) && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => locate({ requirementId: s.requirementId, taskId: s.taskId, cardId: s.outputCardId }) }, "\u6253\u5F00\u5361\u7247\u5BF9\u8BDD"), !ended && p.state !== "stopping" && /* @__PURE__ */ import_react19.default.createElement(StepHandoff, { step: s, busy, act: (command2) => act(p, command2, { stepId: s.id, cardId: s.outputCardId, requirementId: s.requirementId, versionId: s.choice?.versionId }) }), s.id === next?.id && p.state === "running" && !s.authorized && !s.handoff && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "approve-step", { stepId: s.id }) }, "\u6267\u884C\u6B64\u9879"))), !ended && p.state !== "stopping" && p.change && /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement("strong", null, "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C ", p.change.start, " \u9879\u8D77"), p.change.steps.map((s, i) => /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { key: i, step: s, locate })), /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind: "change", plan: p, act, busy })), !ended && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions" }, p.state === "approval" && /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind: "plan", plan: p, act, busy }), ["running", "paused"].includes(p.state) && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, p.state === "paused" ? "resume" : "pause") }, p.state === "paused" ? "\u7EE7\u7EED\u5269\u4F59\u6B65\u9AA4" : "\u6682\u505C"), p.state !== "stopping" && /* @__PURE__ */ import_react19.default.createElement(ModeMenu, { label: "\u59D4\u6258\u6267\u884C\u65B9\u5F0F", value: p.mode, onChange: (mode) => act(p, "mode", { mode }) }), /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "stop") }, p.state === "stopping" ? "\u91CD\u8BD5\u505C\u6B62" : "\u505C\u6B62\u59D4\u6258")));
+    const target = (ref) => locate(ref, p.id);
+    const stepStatus = (s) => s.state === "working" && s.revising ? "\u4FEE\u8BA2\u4E2D" : statuses[s.state];
+    const status = p.state === "running" && next?.interaction ? "\u5F85\u786E\u8BA4" : p.state === "running" && next?.handoff ? "\u4F60\u6B63\u5728\u5904\u7406" : p.state === "running" && waitingVersion ? "\u5F85\u9009\u62E9\u7248\u672C" : p.state === "running" && next && (["checking", "review-waiting", "blocked"].includes(next.state) || next.revising) ? stepStatus(next) : statuses[p.state];
+    return /* @__PURE__ */ import_react19.default.createElement("details", { className: "wtt-agent-plan", key: p.id, open: focusPlan === p.id || !focusPlan && !ended && index2 === 0 || void 0 }, /* @__PURE__ */ import_react19.default.createElement("summary", null, /* @__PURE__ */ import_react19.default.createElement("span", null, p.title), /* @__PURE__ */ import_react19.default.createElement("small", null, status), /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-plan-progress" }, /* @__PURE__ */ import_react19.default.createElement("progress", { value: completed, max: p.steps.length || 1, "aria-label": p.title + "\u8FDB\u5EA6" }), /* @__PURE__ */ import_react19.default.createElement("span", null, "\u5B8C\u6210 ", completed, "/", p.steps.length))), p.steps.map((s) => {
+      const receipts = s.receipts || [s.receipt].filter(Boolean);
+      const currentTarget = s.choice?.cardId || s.outputCardId;
+      const context = s.choice ? { ...s, receipt: receipts.find((card) => card.cardId === s.choice.cardId) || s.receipt } : s;
+      const canDecide = p.state === "running" && s.id === next?.id && s.state === "review-waiting" && !s.handoff && s.resultReviewId;
+      return /* @__PURE__ */ import_react19.default.createElement("div", { key: s.id, className: "wtt-agent-step" }, /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { step: s, locate: target }), s.state !== "done" && /* @__PURE__ */ import_react19.default.createElement("small", { role: s.id === next?.id ? "status" : void 0 }, s.revising && s.state === "ready" && s.authorized ? "\u5F85\u4FEE\u8BA2" : stepStatus(s)), s.error && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, s.error), !!receipts.length && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-results", "aria-label": s.title + "\u6210\u679C" }, receipts.map((card) => /* @__PURE__ */ import_react19.default.createElement(UiButton, { key: card.cardId, size: "compact", onClick: () => target(card) }, receipts.length > 1 ? card.title + " \xB7 V" + card.number : "\u5B9A\u4F4D V" + card.number))), s.canRecheck && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "recheck", { stepId: s.id }) }, "\u91CD\u65B0\u6838\u5BF9"), s.taskId && s.outputCardId && (!receipts.length || s.handoff || s.choice || canDecide) && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => target({ requirementId: s.requirementId, taskId: s.taskId, cardId: s.outputCardId }) }, s.executor === "codex" ? "\u67E5\u770B\u6267\u884C\u5361" : "\u6253\u5F00\u5361\u7247\u5BF9\u8BDD"), !ended && p.state !== "stopping" && /* @__PURE__ */ import_react19.default.createElement(StepHandoff, { step: context, busy, act: (command2) => act(p, command2, { stepId: s.id, cardId: currentTarget, requirementId: s.choice?.requirementId || s.requirementId, versionId: s.choice?.versionId }) }), canDecide && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-results" }, receipts.length >= s.acceptance?.minCards && !s.choice && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(p, "accept-result", { stepId: s.id, resultReviewId: s.resultReviewId }) }, "\u786E\u8BA4\u91C7\u7528\u6210\u679C"), !s.choice && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act(p, "review-again", { stepId: s.id, resultReviewId: s.resultReviewId }) }, "\u91CD\u65B0\u9A8C\u6536")), s.id === next?.id && p.state === "running" && s.state === "ready" && !s.authorized && !s.handoff && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "approve-step", { stepId: s.id }) }, "\u6267\u884C\u6B64\u9879"));
+    }), !ended && p.state !== "stopping" && p.change && /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement("strong", null, "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C ", p.change.start, " \u9879\u8D77"), p.change.steps.map((s, i) => /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { key: i, step: s, locate: target })), /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind: "change", plan: p, act, busy })), !ended && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions" }, p.state === "approval" && /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind: "plan", plan: p, act, busy }), ["running", "paused"].includes(p.state) && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, p.state === "paused" ? "resume" : "pause") }, p.state === "paused" ? "\u7EE7\u7EED\u5269\u4F59\u6B65\u9AA4" : "\u6682\u505C"), p.state !== "stopping" && /* @__PURE__ */ import_react19.default.createElement(ModeMenu, { label: "\u59D4\u6258\u6267\u884C\u65B9\u5F0F", value: p.mode, onChange: (mode) => act(p, "mode", { mode }) }), /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "stop") }, p.state === "stopping" ? "\u91CD\u8BD5\u505C\u6B62" : "\u505C\u6B62\u59D4\u6258")));
   }));
 }
 var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2({ notices, project, requirement, selected: selected2, request, renderConversation, canvasActions, picking, cardId }) {
@@ -13804,17 +13815,19 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
   const [canvas, setCanvas] = (0, import_react19.useState)(null);
   const call = (0, import_react19.useCallback)((action, data = {}) => request("project-agent-" + action, data), [request]);
   const [page, setPage] = (0, import_react19.useState)(0), [reviewPage, setReviewPage] = (0, import_react19.useState)(0), [waiting2, setWaiting] = (0, import_react19.useState)(0);
+  const [returnPlan, setReturnPlan] = (0, import_react19.useState)(() => stored(sessionStorage, key + ":return-plan", null));
+  const [focusPlan, setFocusPlan] = (0, import_react19.useState)(null);
   const [starting, setStarting] = (0, import_react19.useState)(false), startPending = (0, import_react19.useRef)(false);
   const readEpoch = (0, import_react19.useRef)(0), sendEpoch = (0, import_react19.useRef)(0), sending = (0, import_react19.useRef)(0);
-  const view = (0, import_react19.useRef)({ tab, page, reviewPage });
-  view.current = { tab, page, reviewPage };
+  const view = (0, import_react19.useRef)({ tab, page, reviewPage, focusPlan });
+  view.current = { tab, page, reviewPage, focusPlan };
   const refresh = (0, import_react19.useCallback)(async (full = true) => {
     const epoch = ++readEpoch.current, sent = sendEpoch.current;
-    const { tab: tab2, page: page2, reviewPage: reviewPage2 } = view.current;
+    const { tab: tab2, page: page2, reviewPage: reviewPage2, focusPlan: focusPlan2 } = view.current;
     const cardRead = cardId ? canvasActions.current.cardRead() : null;
-    const v2 = await call(full ? "state" : "progress", { ...full ? { page: page2, view: tab2, reviewPage: reviewPage2 } : {}, ...cardId ? { cardId, requirementId: requirement.id } : {} });
+    const v2 = await call(full ? "state" : "progress", { ...full ? { page: page2, view: tab2, reviewPage: reviewPage2, planId: tab2 === "plans" ? focusPlan2 : void 0 } : {}, ...cardId ? { cardId, requirementId: requirement.id } : {} });
     if (!alive.current || epoch !== readEpoch.current) return;
-    if (full && (view.current.tab !== tab2 || view.current.page !== page2 || view.current.reviewPage !== reviewPage2)) return;
+    if (full && (view.current.tab !== tab2 || view.current.page !== page2 || view.current.reviewPage !== reviewPage2 || view.current.focusPlan !== focusPlan2)) return;
     if (full) {
       setState({ ...v2, view: tab2 });
       if (v2.page !== page2) setPage(v2.page);
@@ -13886,7 +13899,7 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       readEpoch.current++;
       clearTimeout(timer2);
     };
-  }, [open, tracking, cardId, refresh, call, requirement.id, canvasActions, key, tab, page, reviewPage]);
+  }, [open, tracking, cardId, refresh, call, requirement.id, canvasActions, key, tab, page, reviewPage, focusPlan]);
   (0, import_react19.useLayoutEffect)(() => {
     if (!open) return;
     const el = launcher.current?.closest(".wtt-course-canvas");
@@ -14053,9 +14066,27 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       };
     }
   };
-  const locate = (ref) => {
+  const updateReturn = (planId) => {
+    setReturnPlan(planId);
+    persist(sessionStorage, key + ":return-plan", planId);
+  };
+  const locate = (ref, planId) => {
+    updateReturn(planId || null);
     toggle(false);
     canvasActions.current.locate(ref);
+  };
+  const openAssistant = () => {
+    const target = returnPlan || stored(sessionStorage, key + ":return-plan", null);
+    if (!open && target) {
+      setTab("plans");
+      setFocusPlan(target);
+      updateReturn(null);
+    }
+    toggle(!open);
+  };
+  const pageTo = (value) => {
+    setFocusPlan(null);
+    setPage(value);
   };
   return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(
     ToolButton,
@@ -14065,10 +14096,12 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       className: `wtt-agent-launch${open ? " is-active" : ""}`,
       expanded: open,
       controlsId: open ? panelId : void 0,
-      description: waiting2 > 0 ? waiting2 + " \u9879\u5F85\u786E\u8BA4" : void 0,
-      onClick: () => toggle(!open)
+      description: [!open && returnPlan ? "\u8FD4\u56DE\u521A\u624D\u7684\u59D4\u6258" : "", waiting2 > 0 ? waiting2 + " \u9879\u5F85\u786E\u8BA4" : ""].filter(Boolean).join("\u3002") || void 0,
+      hint: !open && returnPlan ? "\u8FD4\u56DE\u59D4\u6258" : void 0,
+      onClick: openAssistant
     },
     /* @__PURE__ */ import_react19.default.createElement("img", { src: wattter_agent_default, alt: "", draggable: false }),
+    !open && returnPlan && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-return", "aria-hidden": "true" }, "\u21A9"),
     waiting2 > 0 && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-badge", "aria-hidden": "true" }, waiting2)
   ), open && canvas && (0, import_react_dom2.createPortal)(/* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-layer" }, /* @__PURE__ */ import_react19.default.createElement(
     "div",
@@ -14093,7 +14126,7 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
     } }))),
     error && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-feedback", role: "alert" }, /* @__PURE__ */ import_react19.default.createElement("span", null, error), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => setError("") }, "\u5173\u95ED\u63D0\u793A")),
     /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-chat", "aria-label": assistantName + "\u5BF9\u8BDD", hidden: tab !== "chat" }, tab === "chat" && state?.sessionId === session && /* @__PURE__ */ import_react19.default.createElement(ChatReview, { review: state?.review, act, locate, busy: busy || starting, onPage: setReviewPage }), session ? /* @__PURE__ */ import_react19.default.createElement(ProjectInputContext.Provider, { key: session, value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: assistantName, editing: false, onSettled: () => refresh().catch((e) => setError(e.message)) })) : !error && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wtt-agent-empty", role: "status" }, "\u6B63\u5728\u6253\u5F00\u5BF9\u8BDD\u2026")),
-    tab === "plans" && /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-queue", "aria-label": "\u9879\u76EE\u59D4\u6258" }, !state?.plans?.length && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wtt-agent-empty" }, state?.view === "plans" ? "\u6682\u65E0\u59D4\u6258" : "\u6B63\u5728\u8BFB\u53D6\u59D4\u6258\u2026"), /* @__PURE__ */ import_react19.default.createElement(Plans, { plans: state?.plans, act, locate, busy }), state?.total > 20 && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react19.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875"))),
+    tab === "plans" && /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-queue", "aria-label": "\u9879\u76EE\u59D4\u6258" }, !state?.plans?.length && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wtt-agent-empty" }, state?.view === "plans" ? "\u6682\u65E0\u59D4\u6258" : "\u6B63\u5728\u8BFB\u53D6\u59D4\u6258\u2026"), /* @__PURE__ */ import_react19.default.createElement(Plans, { plans: state?.plans, act, locate, busy, focusPlan }), state?.total > 20 && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => pageTo(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react19.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => pageTo(page + 1) }, "\u4E0B\u4E00\u9875"))),
     tab === "memory" && /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(ProjectMemoryPanel, { call, onChanged: () => refresh().catch((e) => setError(e.message)), suggestions: state?.suggestions, onLocate: locate }), session && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-footer" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: starting || busy || state?.running, onClick: newConversation }, "\u7528\u9879\u76EE\u8BB0\u5FC6\u5F00\u65B0\u5BF9\u8BDD"))),
     /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "custom", className: "wtt-agent-resize", "aria-label": "\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", title: "\u62D6\u52A8\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", ...resizeGrip })
   )), canvas));
@@ -15124,10 +15157,10 @@ function FileOrganizeNotice({ organizer }) {
   const { working, feedback, status } = organizer;
   if (working) return /* @__PURE__ */ import_react25.default.createElement("div", { className: "wtt-file-batch-status", role: "status" }, working);
   if (!feedback && !status?.attention.length) return null;
-  const labels2 = { move: "\u5DF2\u79FB\u52A8", copy: "\u5DF2\u590D\u5236", rename: "\u5DF2\u91CD\u547D\u540D", import: "\u5DF2\u5BFC\u5165", undo: "\u5DF2\u64A4\u9500" };
+  const labels3 = { move: "\u5DF2\u79FB\u52A8", copy: "\u5DF2\u590D\u5236", rename: "\u5DF2\u91CD\u547D\u540D", import: "\u5DF2\u5BFC\u5165", undo: "\u5DF2\u64A4\u9500" };
   const changed = feedback?.result?.results.filter((item) => item.mode !== "unchanged") || [];
   const failed = feedback?.result?.failed || [];
-  return /* @__PURE__ */ import_react25.default.createElement("div", { className: "wtt-file-batch-status wtt-file-organize-feedback" }, feedback?.error && /* @__PURE__ */ import_react25.default.createElement(UserError, { error: feedback.error }), feedback?.message && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, feedback.message), feedback?.clipboard && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, feedback.clipboard.mode === "move" ? "\u5DF2\u526A\u5207 " : "\u5DF2\u590D\u5236 ", feedback.clipboard.count, " \u9879\uFF0C\u53EF\u7C98\u8D34\u5230\u76EE\u5F55"), feedback?.result && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, changed.length ? (labels2[feedback.mode] || "\u5DF2\u5B8C\u6210") + " " + changed.length + " \u9879" : failed.length ? "\u6587\u4EF6\u6574\u7406\u672A\u5B8C\u6210" : feedback.mode === "undo" ? "\u5F53\u524D\u6CA1\u6709\u5F85\u64A4\u9500\u7684\u6587\u4EF6\u64CD\u4F5C" : "\u6587\u4EF6\u5DF2\u5728\u76EE\u6807\u4F4D\u7F6E", changed.length && failed.length ? "\uFF0C" + failed.length + " \u9879\u672A\u5904\u7406" : ""), feedback?.retry && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: feedback.retry }, "\u91CD\u8BD5"), changed.length > 0 && feedback.mode !== "undo" && status?.undoBatch && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: organizer.undo }, "\u64A4\u9500"), feedback && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", iconOnly: true, "aria-label": "\u5173\u95ED\u6574\u7406\u7ED3\u679C", onClick: () => organizer.setFeedback(null) }, /* @__PURE__ */ import_react25.default.createElement(UiIcon, { name: "close", size: 14 })), failed.length > 0 && /* @__PURE__ */ import_react25.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react25.default.createElement("summary", null, "\u67E5\u770B\u672A\u5904\u7406\u7684\u6587\u4EF6"), /* @__PURE__ */ import_react25.default.createElement("ul", null, failed.map((item, index2) => /* @__PURE__ */ import_react25.default.createElement("li", { key: index2 }, /* @__PURE__ */ import_react25.default.createElement("strong", null, item.name || parentName(item.source)), /* @__PURE__ */ import_react25.default.createElement("span", null, item.error))))), status?.attention.length > 0 && /* @__PURE__ */ import_react25.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react25.default.createElement("summary", null, "\u5F85\u6838\u5BF9\u7684\u6587\u4EF6\u64CD\u4F5C"), /* @__PURE__ */ import_react25.default.createElement("ul", null, status.attention.map((item) => /* @__PURE__ */ import_react25.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react25.default.createElement("strong", null, item.from || item.to), /* @__PURE__ */ import_react25.default.createElement("span", null, item.reason), /* @__PURE__ */ import_react25.default.createElement("code", null, item.staging), /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void organizer.recover(item.id) }, "\u91CD\u8BD5\u6062\u590D"))))));
+  return /* @__PURE__ */ import_react25.default.createElement("div", { className: "wtt-file-batch-status wtt-file-organize-feedback" }, feedback?.error && /* @__PURE__ */ import_react25.default.createElement(UserError, { error: feedback.error }), feedback?.message && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, feedback.message), feedback?.clipboard && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, feedback.clipboard.mode === "move" ? "\u5DF2\u526A\u5207 " : "\u5DF2\u590D\u5236 ", feedback.clipboard.count, " \u9879\uFF0C\u53EF\u7C98\u8D34\u5230\u76EE\u5F55"), feedback?.result && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, changed.length ? (labels3[feedback.mode] || "\u5DF2\u5B8C\u6210") + " " + changed.length + " \u9879" : failed.length ? "\u6587\u4EF6\u6574\u7406\u672A\u5B8C\u6210" : feedback.mode === "undo" ? "\u5F53\u524D\u6CA1\u6709\u5F85\u64A4\u9500\u7684\u6587\u4EF6\u64CD\u4F5C" : "\u6587\u4EF6\u5DF2\u5728\u76EE\u6807\u4F4D\u7F6E", changed.length && failed.length ? "\uFF0C" + failed.length + " \u9879\u672A\u5904\u7406" : ""), feedback?.retry && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: feedback.retry }, "\u91CD\u8BD5"), changed.length > 0 && feedback.mode !== "undo" && status?.undoBatch && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: organizer.undo }, "\u64A4\u9500"), feedback && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", iconOnly: true, "aria-label": "\u5173\u95ED\u6574\u7406\u7ED3\u679C", onClick: () => organizer.setFeedback(null) }, /* @__PURE__ */ import_react25.default.createElement(UiIcon, { name: "close", size: 14 })), failed.length > 0 && /* @__PURE__ */ import_react25.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react25.default.createElement("summary", null, "\u67E5\u770B\u672A\u5904\u7406\u7684\u6587\u4EF6"), /* @__PURE__ */ import_react25.default.createElement("ul", null, failed.map((item, index2) => /* @__PURE__ */ import_react25.default.createElement("li", { key: index2 }, /* @__PURE__ */ import_react25.default.createElement("strong", null, item.name || parentName(item.source)), /* @__PURE__ */ import_react25.default.createElement("span", null, item.error))))), status?.attention.length > 0 && /* @__PURE__ */ import_react25.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react25.default.createElement("summary", null, "\u5F85\u6838\u5BF9\u7684\u6587\u4EF6\u64CD\u4F5C"), /* @__PURE__ */ import_react25.default.createElement("ul", null, status.attention.map((item) => /* @__PURE__ */ import_react25.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react25.default.createElement("strong", null, item.from || item.to), /* @__PURE__ */ import_react25.default.createElement("span", null, item.reason), /* @__PURE__ */ import_react25.default.createElement("code", null, item.staging), /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void organizer.recover(item.id) }, "\u91CD\u8BD5\u6062\u590D"))))));
 }
 function FileConflictDialog({ matches: matches3, onResolve }) {
   const dialog = (0, import_react25.useRef)(null), title = (0, import_react25.useId)();
@@ -50937,7 +50970,7 @@ function stableOperation(attempt, payload) {
 }
 function stateLabel(card) {
   if (card.kind === "generation") return pendingLabel(card.pendingGeneration);
-  const labels2 = {
+  const labels3 = {
     ready: "\u53EF\u67E5\u770B\u6B63\u6587",
     available: "\u53EF\u67E5\u770B\u6B63\u6587",
     missing: "\u6587\u4EF6\u7F3A\u5931",
@@ -50948,8 +50981,8 @@ function stateLabel(card) {
     not_extracted: "\u672A\u63D0\u53D6\u6B63\u6587",
     linked: "\u5DF2\u5173\u8054\u6587\u4EF6"
   };
-  if (card.status && card.status !== "ready") return labels2[card.status] || card.status;
-  if (card.sourceStatus && card.sourceStatus !== "ready") return `\u7D20\u6750\u5DF2\u4FDD\u5B58 \xB7 \u539F${labels2[card.sourceStatus] || card.sourceStatus}`;
+  if (card.status && card.status !== "ready") return labels3[card.status] || card.status;
+  if (card.sourceStatus && card.sourceStatus !== "ready") return `\u7D20\u6750\u5DF2\u4FDD\u5B58 \xB7 \u539F${labels3[card.sourceStatus] || card.sourceStatus}`;
   if (card.kind === "word") return "\u5DF2\u5BFC\u51FA \xB7 \u7ED1\u5B9A\u539F\u7248\u672C";
   if (card.kind === "outline") return "\u5DF2\u4FDD\u5B58 \xB7 \u72EC\u7ACB\u7248\u672C";
   if (card.kind === "material") return card.importedFile?.mime?.startsWith("video/") ? "\u89C6\u9891\u7D20\u6750 \xB7 \u539F\u4EF6\u5DF2\u4FDD\u5B58" : card.importedFile?.mime?.startsWith("image/") ? "\u56FE\u7247\u7D20\u6750 \xB7 \u539F\u56FE\u5DF2\u4FDD\u5B58" : card.sourcePath && card.extracted === false ? "\u672A\u63D0\u53D6\u6B63\u6587" : "\u5DF2\u4FDD\u5B58\u7D20\u6750";
@@ -55599,6 +55632,1754 @@ function CourseCanvas(props) {
   return /* @__PURE__ */ import_react64.default.createElement(ReactFlowProvider, null, /* @__PURE__ */ import_react64.default.createElement(CanvasContent, { ...props }));
 }
 
+// src/project-wechat-dialog.jsx
+var import_react66 = __toESM(require("react"), 1);
+
+// node_modules/qrcode-generator/dist/qrcode.mjs
+var qrcode = function(typeNumber, errorCorrectionLevel) {
+  const PAD0 = 236;
+  const PAD1 = 17;
+  let _typeNumber = typeNumber;
+  const _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+  let _modules = null;
+  let _moduleCount = 0;
+  let _dataCache = null;
+  const _dataList = [];
+  const _this = {};
+  const makeImpl = function(test, maskPattern) {
+    _moduleCount = _typeNumber * 4 + 17;
+    _modules = (function(moduleCount) {
+      const modules = new Array(moduleCount);
+      for (let row = 0; row < moduleCount; row += 1) {
+        modules[row] = new Array(moduleCount);
+        for (let col = 0; col < moduleCount; col += 1) {
+          modules[row][col] = null;
+        }
+      }
+      return modules;
+    })(_moduleCount);
+    setupPositionProbePattern(0, 0);
+    setupPositionProbePattern(_moduleCount - 7, 0);
+    setupPositionProbePattern(0, _moduleCount - 7);
+    setupPositionAdjustPattern();
+    setupTimingPattern();
+    setupTypeInfo(test, maskPattern);
+    if (_typeNumber >= 7) {
+      setupTypeNumber(test);
+    }
+    if (_dataCache == null) {
+      _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+    }
+    mapData(_dataCache, maskPattern);
+  };
+  const setupPositionProbePattern = function(row, col) {
+    for (let r = -1; r <= 7; r += 1) {
+      if (row + r <= -1 || _moduleCount <= row + r) continue;
+      for (let c = -1; c <= 7; c += 1) {
+        if (col + c <= -1 || _moduleCount <= col + c) continue;
+        if (0 <= r && r <= 6 && (c == 0 || c == 6) || 0 <= c && c <= 6 && (r == 0 || r == 6) || 2 <= r && r <= 4 && 2 <= c && c <= 4) {
+          _modules[row + r][col + c] = true;
+        } else {
+          _modules[row + r][col + c] = false;
+        }
+      }
+    }
+  };
+  const getBestMaskPattern = function() {
+    let minLostPoint = 0;
+    let pattern = 0;
+    for (let i = 0; i < 8; i += 1) {
+      makeImpl(true, i);
+      const lostPoint = QRUtil.getLostPoint(_this);
+      if (i == 0 || minLostPoint > lostPoint) {
+        minLostPoint = lostPoint;
+        pattern = i;
+      }
+    }
+    return pattern;
+  };
+  const setupTimingPattern = function() {
+    for (let r = 8; r < _moduleCount - 8; r += 1) {
+      if (_modules[r][6] != null) {
+        continue;
+      }
+      _modules[r][6] = r % 2 == 0;
+    }
+    for (let c = 8; c < _moduleCount - 8; c += 1) {
+      if (_modules[6][c] != null) {
+        continue;
+      }
+      _modules[6][c] = c % 2 == 0;
+    }
+  };
+  const setupPositionAdjustPattern = function() {
+    const pos = QRUtil.getPatternPosition(_typeNumber);
+    for (let i = 0; i < pos.length; i += 1) {
+      for (let j2 = 0; j2 < pos.length; j2 += 1) {
+        const row = pos[i];
+        const col = pos[j2];
+        if (_modules[row][col] != null) {
+          continue;
+        }
+        for (let r = -2; r <= 2; r += 1) {
+          for (let c = -2; c <= 2; c += 1) {
+            if (r == -2 || r == 2 || c == -2 || c == 2 || r == 0 && c == 0) {
+              _modules[row + r][col + c] = true;
+            } else {
+              _modules[row + r][col + c] = false;
+            }
+          }
+        }
+      }
+    }
+  };
+  const setupTypeNumber = function(test) {
+    const bits = QRUtil.getBCHTypeNumber(_typeNumber);
+    for (let i = 0; i < 18; i += 1) {
+      const mod = !test && (bits >> i & 1) == 1;
+      _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+    }
+    for (let i = 0; i < 18; i += 1) {
+      const mod = !test && (bits >> i & 1) == 1;
+      _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+    }
+  };
+  const setupTypeInfo = function(test, maskPattern) {
+    const data = _errorCorrectionLevel << 3 | maskPattern;
+    const bits = QRUtil.getBCHTypeInfo(data);
+    for (let i = 0; i < 15; i += 1) {
+      const mod = !test && (bits >> i & 1) == 1;
+      if (i < 6) {
+        _modules[i][8] = mod;
+      } else if (i < 8) {
+        _modules[i + 1][8] = mod;
+      } else {
+        _modules[_moduleCount - 15 + i][8] = mod;
+      }
+    }
+    for (let i = 0; i < 15; i += 1) {
+      const mod = !test && (bits >> i & 1) == 1;
+      if (i < 8) {
+        _modules[8][_moduleCount - i - 1] = mod;
+      } else if (i < 9) {
+        _modules[8][15 - i - 1 + 1] = mod;
+      } else {
+        _modules[8][15 - i - 1] = mod;
+      }
+    }
+    _modules[_moduleCount - 8][8] = !test;
+  };
+  const mapData = function(data, maskPattern) {
+    let inc = -1;
+    let row = _moduleCount - 1;
+    let bitIndex = 7;
+    let byteIndex = 0;
+    const maskFunc = QRUtil.getMaskFunction(maskPattern);
+    for (let col = _moduleCount - 1; col > 0; col -= 2) {
+      if (col == 6) col -= 1;
+      while (true) {
+        for (let c = 0; c < 2; c += 1) {
+          if (_modules[row][col - c] == null) {
+            let dark = false;
+            if (byteIndex < data.length) {
+              dark = (data[byteIndex] >>> bitIndex & 1) == 1;
+            }
+            const mask = maskFunc(row, col - c);
+            if (mask) {
+              dark = !dark;
+            }
+            _modules[row][col - c] = dark;
+            bitIndex -= 1;
+            if (bitIndex == -1) {
+              byteIndex += 1;
+              bitIndex = 7;
+            }
+          }
+        }
+        row += inc;
+        if (row < 0 || _moduleCount <= row) {
+          row -= inc;
+          inc = -inc;
+          break;
+        }
+      }
+    }
+  };
+  const createBytes = function(buffer, rsBlocks) {
+    let offset3 = 0;
+    let maxDcCount = 0;
+    let maxEcCount = 0;
+    const dcdata = new Array(rsBlocks.length);
+    const ecdata = new Array(rsBlocks.length);
+    for (let r = 0; r < rsBlocks.length; r += 1) {
+      const dcCount = rsBlocks[r].dataCount;
+      const ecCount = rsBlocks[r].totalCount - dcCount;
+      maxDcCount = Math.max(maxDcCount, dcCount);
+      maxEcCount = Math.max(maxEcCount, ecCount);
+      dcdata[r] = new Array(dcCount);
+      for (let i = 0; i < dcdata[r].length; i += 1) {
+        dcdata[r][i] = 255 & buffer.getBuffer()[i + offset3];
+      }
+      offset3 += dcCount;
+      const rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+      const rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+      const modPoly = rawPoly.mod(rsPoly);
+      ecdata[r] = new Array(rsPoly.getLength() - 1);
+      for (let i = 0; i < ecdata[r].length; i += 1) {
+        const modIndex = i + modPoly.getLength() - ecdata[r].length;
+        ecdata[r][i] = modIndex >= 0 ? modPoly.getAt(modIndex) : 0;
+      }
+    }
+    let totalCodeCount = 0;
+    for (let i = 0; i < rsBlocks.length; i += 1) {
+      totalCodeCount += rsBlocks[i].totalCount;
+    }
+    const data = new Array(totalCodeCount);
+    let index2 = 0;
+    for (let i = 0; i < maxDcCount; i += 1) {
+      for (let r = 0; r < rsBlocks.length; r += 1) {
+        if (i < dcdata[r].length) {
+          data[index2] = dcdata[r][i];
+          index2 += 1;
+        }
+      }
+    }
+    for (let i = 0; i < maxEcCount; i += 1) {
+      for (let r = 0; r < rsBlocks.length; r += 1) {
+        if (i < ecdata[r].length) {
+          data[index2] = ecdata[r][i];
+          index2 += 1;
+        }
+      }
+    }
+    return data;
+  };
+  const createData = function(typeNumber2, errorCorrectionLevel2, dataList) {
+    const rsBlocks = QRRSBlock.getRSBlocks(typeNumber2, errorCorrectionLevel2);
+    const buffer = qrBitBuffer();
+    for (let i = 0; i < dataList.length; i += 1) {
+      const data = dataList[i];
+      buffer.put(data.getMode(), 4);
+      buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber2));
+      data.write(buffer);
+    }
+    let totalDataCount = 0;
+    for (let i = 0; i < rsBlocks.length; i += 1) {
+      totalDataCount += rsBlocks[i].dataCount;
+    }
+    if (buffer.getLengthInBits() > totalDataCount * 8) {
+      throw "code length overflow. (" + buffer.getLengthInBits() + ">" + totalDataCount * 8 + ")";
+    }
+    if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+      buffer.put(0, 4);
+    }
+    while (buffer.getLengthInBits() % 8 != 0) {
+      buffer.putBit(false);
+    }
+    while (true) {
+      if (buffer.getLengthInBits() >= totalDataCount * 8) {
+        break;
+      }
+      buffer.put(PAD0, 8);
+      if (buffer.getLengthInBits() >= totalDataCount * 8) {
+        break;
+      }
+      buffer.put(PAD1, 8);
+    }
+    return createBytes(buffer, rsBlocks);
+  };
+  _this.addData = function(data, mode) {
+    mode = mode || "Byte";
+    let newData = null;
+    switch (mode) {
+      case "Numeric":
+        newData = qrNumber(data);
+        break;
+      case "Alphanumeric":
+        newData = qrAlphaNum(data);
+        break;
+      case "Byte":
+        newData = qr8BitByte(data);
+        break;
+      case "Kanji":
+        newData = qrKanji(data);
+        break;
+      default:
+        throw "mode:" + mode;
+    }
+    _dataList.push(newData);
+    _dataCache = null;
+  };
+  _this.isDark = function(row, col) {
+    if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+      throw row + "," + col;
+    }
+    return _modules[row][col];
+  };
+  _this.getModuleCount = function() {
+    return _moduleCount;
+  };
+  _this.make = function() {
+    if (_typeNumber < 1) {
+      let typeNumber2 = 1;
+      for (; typeNumber2 < 40; typeNumber2++) {
+        const rsBlocks = QRRSBlock.getRSBlocks(typeNumber2, _errorCorrectionLevel);
+        const buffer = qrBitBuffer();
+        for (let i = 0; i < _dataList.length; i++) {
+          const data = _dataList[i];
+          buffer.put(data.getMode(), 4);
+          buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber2));
+          data.write(buffer);
+        }
+        let totalDataCount = 0;
+        for (let i = 0; i < rsBlocks.length; i++) {
+          totalDataCount += rsBlocks[i].dataCount;
+        }
+        if (buffer.getLengthInBits() <= totalDataCount * 8) {
+          break;
+        }
+      }
+      _typeNumber = typeNumber2;
+    }
+    makeImpl(false, getBestMaskPattern());
+  };
+  _this.createTableTag = function(cellSize, margin) {
+    cellSize = cellSize || 2;
+    margin = typeof margin == "undefined" ? cellSize * 4 : margin;
+    let qrHtml = "";
+    qrHtml += '<table style="';
+    qrHtml += " border-width: 0px; border-style: none;";
+    qrHtml += " border-collapse: collapse;";
+    qrHtml += " padding: 0px; margin: " + margin + "px;";
+    qrHtml += '">';
+    qrHtml += "<tbody>";
+    for (let r = 0; r < _this.getModuleCount(); r += 1) {
+      qrHtml += "<tr>";
+      for (let c = 0; c < _this.getModuleCount(); c += 1) {
+        qrHtml += '<td style="';
+        qrHtml += " border-width: 0px; border-style: none;";
+        qrHtml += " border-collapse: collapse;";
+        qrHtml += " padding: 0px; margin: 0px;";
+        qrHtml += " width: " + cellSize + "px;";
+        qrHtml += " height: " + cellSize + "px;";
+        qrHtml += " background-color: ";
+        qrHtml += _this.isDark(r, c) ? "#000000" : "#ffffff";
+        qrHtml += ";";
+        qrHtml += '"/>';
+      }
+      qrHtml += "</tr>";
+    }
+    qrHtml += "</tbody>";
+    qrHtml += "</table>";
+    return qrHtml;
+  };
+  _this.createSvgTag = function(cellSize, margin, alt, title) {
+    let opts = {};
+    if (typeof arguments[0] == "object") {
+      opts = arguments[0];
+      cellSize = opts.cellSize;
+      margin = opts.margin;
+      alt = opts.alt;
+      title = opts.title;
+    }
+    cellSize = cellSize || 2;
+    margin = typeof margin == "undefined" ? cellSize * 4 : margin;
+    alt = typeof alt === "string" ? { text: alt } : alt || {};
+    alt.text = alt.text || null;
+    alt.id = alt.text ? alt.id || "qrcode-description" : null;
+    title = typeof title === "string" ? { text: title } : title || {};
+    title.text = title.text || null;
+    title.id = title.text ? title.id || "qrcode-title" : null;
+    const size3 = _this.getModuleCount() * cellSize + margin * 2;
+    let c, mc, r, mr, qrSvg = "", rect;
+    rect = "l" + cellSize + ",0 0," + cellSize + " -" + cellSize + ",0 0,-" + cellSize + "z ";
+    qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+    qrSvg += !opts.scalable ? ' width="' + size3 + 'px" height="' + size3 + 'px"' : "";
+    qrSvg += ' viewBox="0 0 ' + size3 + " " + size3 + '" ';
+    qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+    qrSvg += title.text || alt.text ? ' role="img" aria-labelledby="' + escapeXml([title.id, alt.id].join(" ").trim()) + '"' : "";
+    qrSvg += ">";
+    qrSvg += title.text ? '<title id="' + escapeXml(title.id) + '">' + escapeXml(title.text) + "</title>" : "";
+    qrSvg += alt.text ? '<description id="' + escapeXml(alt.id) + '">' + escapeXml(alt.text) + "</description>" : "";
+    qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+    qrSvg += '<path d="';
+    for (r = 0; r < _this.getModuleCount(); r += 1) {
+      mr = r * cellSize + margin;
+      for (c = 0; c < _this.getModuleCount(); c += 1) {
+        if (_this.isDark(r, c)) {
+          mc = c * cellSize + margin;
+          qrSvg += "M" + mc + "," + mr + rect;
+        }
+      }
+    }
+    qrSvg += '" stroke="transparent" fill="black"/>';
+    qrSvg += "</svg>";
+    return qrSvg;
+  };
+  _this.createDataURL = function(cellSize, margin) {
+    cellSize = cellSize || 2;
+    margin = typeof margin == "undefined" ? cellSize * 4 : margin;
+    const size3 = _this.getModuleCount() * cellSize + margin * 2;
+    const min2 = margin;
+    const max2 = size3 - margin;
+    return createDataURL(size3, size3, function(x2, y2) {
+      if (min2 <= x2 && x2 < max2 && min2 <= y2 && y2 < max2) {
+        const c = Math.floor((x2 - min2) / cellSize);
+        const r = Math.floor((y2 - min2) / cellSize);
+        return _this.isDark(r, c) ? 0 : 1;
+      } else {
+        return 1;
+      }
+    });
+  };
+  _this.createImgTag = function(cellSize, margin, alt) {
+    cellSize = cellSize || 2;
+    margin = typeof margin == "undefined" ? cellSize * 4 : margin;
+    const size3 = _this.getModuleCount() * cellSize + margin * 2;
+    let img = "";
+    img += "<img";
+    img += ' src="';
+    img += _this.createDataURL(cellSize, margin);
+    img += '"';
+    img += ' width="';
+    img += size3;
+    img += '"';
+    img += ' height="';
+    img += size3;
+    img += '"';
+    if (alt) {
+      img += ' alt="';
+      img += escapeXml(alt);
+      img += '"';
+    }
+    img += "/>";
+    return img;
+  };
+  const escapeXml = function(s) {
+    let escaped = "";
+    for (let i = 0; i < s.length; i += 1) {
+      const c = s.charAt(i);
+      switch (c) {
+        case "<":
+          escaped += "&lt;";
+          break;
+        case ">":
+          escaped += "&gt;";
+          break;
+        case "&":
+          escaped += "&amp;";
+          break;
+        case '"':
+          escaped += "&quot;";
+          break;
+        default:
+          escaped += c;
+          break;
+      }
+    }
+    return escaped;
+  };
+  const _createHalfASCII = function(margin) {
+    const cellSize = 1;
+    margin = typeof margin == "undefined" ? cellSize * 2 : margin;
+    const size3 = _this.getModuleCount() * cellSize + margin * 2;
+    const min2 = margin;
+    const max2 = size3 - margin;
+    let y2, x2, r1, r2, p;
+    const blocks = {
+      "\u2588\u2588": "\u2588",
+      "\u2588 ": "\u2580",
+      " \u2588": "\u2584",
+      "  ": " "
+    };
+    const blocksLastLineNoMargin = {
+      "\u2588\u2588": "\u2580",
+      "\u2588 ": "\u2580",
+      " \u2588": " ",
+      "  ": " "
+    };
+    let ascii2 = "";
+    for (y2 = 0; y2 < size3; y2 += 2) {
+      r1 = Math.floor((y2 - min2) / cellSize);
+      r2 = Math.floor((y2 + 1 - min2) / cellSize);
+      for (x2 = 0; x2 < size3; x2 += 1) {
+        p = "\u2588";
+        if (min2 <= x2 && x2 < max2 && min2 <= y2 && y2 < max2 && _this.isDark(r1, Math.floor((x2 - min2) / cellSize))) {
+          p = " ";
+        }
+        if (min2 <= x2 && x2 < max2 && min2 <= y2 + 1 && y2 + 1 < max2 && _this.isDark(r2, Math.floor((x2 - min2) / cellSize))) {
+          p += " ";
+        } else {
+          p += "\u2588";
+        }
+        ascii2 += margin < 1 && y2 + 1 >= max2 ? blocksLastLineNoMargin[p] : blocks[p];
+      }
+      ascii2 += "\n";
+    }
+    if (size3 % 2 && margin > 0) {
+      return ascii2.substring(0, ascii2.length - size3 - 1) + Array(size3 + 1).join("\u2580");
+    }
+    return ascii2.substring(0, ascii2.length - 1);
+  };
+  _this.createASCII = function(cellSize, margin) {
+    cellSize = cellSize || 1;
+    if (cellSize < 2) {
+      return _createHalfASCII(margin);
+    }
+    cellSize -= 1;
+    margin = typeof margin == "undefined" ? cellSize * 2 : margin;
+    const size3 = _this.getModuleCount() * cellSize + margin * 2;
+    const min2 = margin;
+    const max2 = size3 - margin;
+    let y2, x2, r, p;
+    const white = Array(cellSize + 1).join("\u2588\u2588");
+    const black = Array(cellSize + 1).join("  ");
+    let ascii2 = "";
+    let line = "";
+    for (y2 = 0; y2 < size3; y2 += 1) {
+      r = Math.floor((y2 - min2) / cellSize);
+      line = "";
+      for (x2 = 0; x2 < size3; x2 += 1) {
+        p = 1;
+        if (min2 <= x2 && x2 < max2 && min2 <= y2 && y2 < max2 && _this.isDark(r, Math.floor((x2 - min2) / cellSize))) {
+          p = 0;
+        }
+        line += p ? white : black;
+      }
+      for (r = 0; r < cellSize; r += 1) {
+        ascii2 += line + "\n";
+      }
+    }
+    return ascii2.substring(0, ascii2.length - 1);
+  };
+  _this.renderTo2dContext = function(context, cellSize) {
+    cellSize = cellSize || 2;
+    const length = _this.getModuleCount();
+    for (let row = 0; row < length; row++) {
+      for (let col = 0; col < length; col++) {
+        context.fillStyle = _this.isDark(row, col) ? "black" : "white";
+        context.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+      }
+    }
+  };
+  return _this;
+};
+qrcode.stringToBytes = function(s) {
+  const bytes = [];
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    bytes.push(c & 255);
+  }
+  return bytes;
+};
+qrcode.createStringToBytes = function(unicodeData, numChars) {
+  const unicodeMap = (function() {
+    const bin = base64DecodeInputStream(unicodeData);
+    const read = function() {
+      const b2 = bin.read();
+      if (b2 == -1) throw "eof";
+      return b2;
+    };
+    let count2 = 0;
+    const unicodeMap2 = {};
+    while (true) {
+      const b0 = bin.read();
+      if (b0 == -1) break;
+      const b1 = read();
+      const b2 = read();
+      const b3 = read();
+      const k2 = String.fromCharCode(b0 << 8 | b1);
+      const v2 = b2 << 8 | b3;
+      unicodeMap2[k2] = v2;
+      count2 += 1;
+    }
+    if (count2 != numChars) {
+      throw count2 + " != " + numChars;
+    }
+    return unicodeMap2;
+  })();
+  const unknownChar = "?".charCodeAt(0);
+  return function(s) {
+    const bytes = [];
+    for (let i = 0; i < s.length; i += 1) {
+      const c = s.charCodeAt(i);
+      if (c < 128) {
+        bytes.push(c);
+      } else {
+        const b2 = unicodeMap[s.charAt(i)];
+        if (typeof b2 == "number") {
+          if ((b2 & 255) == b2) {
+            bytes.push(b2);
+          } else {
+            bytes.push(b2 >>> 8);
+            bytes.push(b2 & 255);
+          }
+        } else {
+          bytes.push(unknownChar);
+        }
+      }
+    }
+    return bytes;
+  };
+};
+var QRMode = {
+  MODE_NUMBER: 1 << 0,
+  MODE_ALPHA_NUM: 1 << 1,
+  MODE_8BIT_BYTE: 1 << 2,
+  MODE_KANJI: 1 << 3
+};
+var QRErrorCorrectionLevel = {
+  L: 1,
+  M: 0,
+  Q: 3,
+  H: 2
+};
+var QRMaskPattern = {
+  PATTERN000: 0,
+  PATTERN001: 1,
+  PATTERN010: 2,
+  PATTERN011: 3,
+  PATTERN100: 4,
+  PATTERN101: 5,
+  PATTERN110: 6,
+  PATTERN111: 7
+};
+var QRUtil = (function() {
+  const PATTERN_POSITION_TABLE = [
+    [],
+    [6, 18],
+    [6, 22],
+    [6, 26],
+    [6, 30],
+    [6, 34],
+    [6, 22, 38],
+    [6, 24, 42],
+    [6, 26, 46],
+    [6, 28, 50],
+    [6, 30, 54],
+    [6, 32, 58],
+    [6, 34, 62],
+    [6, 26, 46, 66],
+    [6, 26, 48, 70],
+    [6, 26, 50, 74],
+    [6, 30, 54, 78],
+    [6, 30, 56, 82],
+    [6, 30, 58, 86],
+    [6, 34, 62, 90],
+    [6, 28, 50, 72, 94],
+    [6, 26, 50, 74, 98],
+    [6, 30, 54, 78, 102],
+    [6, 28, 54, 80, 106],
+    [6, 32, 58, 84, 110],
+    [6, 30, 58, 86, 114],
+    [6, 34, 62, 90, 118],
+    [6, 26, 50, 74, 98, 122],
+    [6, 30, 54, 78, 102, 126],
+    [6, 26, 52, 78, 104, 130],
+    [6, 30, 56, 82, 108, 134],
+    [6, 34, 60, 86, 112, 138],
+    [6, 30, 58, 86, 114, 142],
+    [6, 34, 62, 90, 118, 146],
+    [6, 30, 54, 78, 102, 126, 150],
+    [6, 24, 50, 76, 102, 128, 154],
+    [6, 28, 54, 80, 106, 132, 158],
+    [6, 32, 58, 84, 110, 136, 162],
+    [6, 26, 54, 82, 110, 138, 166],
+    [6, 30, 58, 86, 114, 142, 170]
+  ];
+  const G15 = 1 << 10 | 1 << 8 | 1 << 5 | 1 << 4 | 1 << 2 | 1 << 1 | 1 << 0;
+  const G18 = 1 << 12 | 1 << 11 | 1 << 10 | 1 << 9 | 1 << 8 | 1 << 5 | 1 << 2 | 1 << 0;
+  const G15_MASK = 1 << 14 | 1 << 12 | 1 << 10 | 1 << 4 | 1 << 1;
+  const _this = {};
+  const getBCHDigit = function(data) {
+    let digit = 0;
+    while (data != 0) {
+      digit += 1;
+      data >>>= 1;
+    }
+    return digit;
+  };
+  _this.getBCHTypeInfo = function(data) {
+    let d = data << 10;
+    while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+      d ^= G15 << getBCHDigit(d) - getBCHDigit(G15);
+    }
+    return (data << 10 | d) ^ G15_MASK;
+  };
+  _this.getBCHTypeNumber = function(data) {
+    let d = data << 12;
+    while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+      d ^= G18 << getBCHDigit(d) - getBCHDigit(G18);
+    }
+    return data << 12 | d;
+  };
+  _this.getPatternPosition = function(typeNumber) {
+    return PATTERN_POSITION_TABLE[typeNumber - 1];
+  };
+  _this.getMaskFunction = function(maskPattern) {
+    switch (maskPattern) {
+      case QRMaskPattern.PATTERN000:
+        return function(i, j2) {
+          return (i + j2) % 2 == 0;
+        };
+      case QRMaskPattern.PATTERN001:
+        return function(i, j2) {
+          return i % 2 == 0;
+        };
+      case QRMaskPattern.PATTERN010:
+        return function(i, j2) {
+          return j2 % 3 == 0;
+        };
+      case QRMaskPattern.PATTERN011:
+        return function(i, j2) {
+          return (i + j2) % 3 == 0;
+        };
+      case QRMaskPattern.PATTERN100:
+        return function(i, j2) {
+          return (Math.floor(i / 2) + Math.floor(j2 / 3)) % 2 == 0;
+        };
+      case QRMaskPattern.PATTERN101:
+        return function(i, j2) {
+          return i * j2 % 2 + i * j2 % 3 == 0;
+        };
+      case QRMaskPattern.PATTERN110:
+        return function(i, j2) {
+          return (i * j2 % 2 + i * j2 % 3) % 2 == 0;
+        };
+      case QRMaskPattern.PATTERN111:
+        return function(i, j2) {
+          return (i * j2 % 3 + (i + j2) % 2) % 2 == 0;
+        };
+      default:
+        throw "bad maskPattern:" + maskPattern;
+    }
+  };
+  _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+    let a = qrPolynomial([1], 0);
+    for (let i = 0; i < errorCorrectLength; i += 1) {
+      a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0));
+    }
+    return a;
+  };
+  _this.getLengthInBits = function(mode, type) {
+    if (1 <= type && type < 10) {
+      switch (mode) {
+        case QRMode.MODE_NUMBER:
+          return 10;
+        case QRMode.MODE_ALPHA_NUM:
+          return 9;
+        case QRMode.MODE_8BIT_BYTE:
+          return 8;
+        case QRMode.MODE_KANJI:
+          return 8;
+        default:
+          throw "mode:" + mode;
+      }
+    } else if (type < 27) {
+      switch (mode) {
+        case QRMode.MODE_NUMBER:
+          return 12;
+        case QRMode.MODE_ALPHA_NUM:
+          return 11;
+        case QRMode.MODE_8BIT_BYTE:
+          return 16;
+        case QRMode.MODE_KANJI:
+          return 10;
+        default:
+          throw "mode:" + mode;
+      }
+    } else if (type < 41) {
+      switch (mode) {
+        case QRMode.MODE_NUMBER:
+          return 14;
+        case QRMode.MODE_ALPHA_NUM:
+          return 13;
+        case QRMode.MODE_8BIT_BYTE:
+          return 16;
+        case QRMode.MODE_KANJI:
+          return 12;
+        default:
+          throw "mode:" + mode;
+      }
+    } else {
+      throw "type:" + type;
+    }
+  };
+  _this.getLostPoint = function(qrcode2) {
+    const moduleCount = qrcode2.getModuleCount();
+    let lostPoint = 0;
+    for (let row = 0; row < moduleCount; row += 1) {
+      for (let col = 0; col < moduleCount; col += 1) {
+        let sameCount = 0;
+        const dark = qrcode2.isDark(row, col);
+        for (let r = -1; r <= 1; r += 1) {
+          if (row + r < 0 || moduleCount <= row + r) {
+            continue;
+          }
+          for (let c = -1; c <= 1; c += 1) {
+            if (col + c < 0 || moduleCount <= col + c) {
+              continue;
+            }
+            if (r == 0 && c == 0) {
+              continue;
+            }
+            if (dark == qrcode2.isDark(row + r, col + c)) {
+              sameCount += 1;
+            }
+          }
+        }
+        if (sameCount > 5) {
+          lostPoint += 3 + sameCount - 5;
+        }
+      }
+    }
+    ;
+    for (let row = 0; row < moduleCount - 1; row += 1) {
+      for (let col = 0; col < moduleCount - 1; col += 1) {
+        let count2 = 0;
+        if (qrcode2.isDark(row, col)) count2 += 1;
+        if (qrcode2.isDark(row + 1, col)) count2 += 1;
+        if (qrcode2.isDark(row, col + 1)) count2 += 1;
+        if (qrcode2.isDark(row + 1, col + 1)) count2 += 1;
+        if (count2 == 0 || count2 == 4) {
+          lostPoint += 3;
+        }
+      }
+    }
+    for (let row = 0; row < moduleCount; row += 1) {
+      for (let col = 0; col < moduleCount - 6; col += 1) {
+        if (qrcode2.isDark(row, col) && !qrcode2.isDark(row, col + 1) && qrcode2.isDark(row, col + 2) && qrcode2.isDark(row, col + 3) && qrcode2.isDark(row, col + 4) && !qrcode2.isDark(row, col + 5) && qrcode2.isDark(row, col + 6)) {
+          lostPoint += 40;
+        }
+      }
+    }
+    for (let col = 0; col < moduleCount; col += 1) {
+      for (let row = 0; row < moduleCount - 6; row += 1) {
+        if (qrcode2.isDark(row, col) && !qrcode2.isDark(row + 1, col) && qrcode2.isDark(row + 2, col) && qrcode2.isDark(row + 3, col) && qrcode2.isDark(row + 4, col) && !qrcode2.isDark(row + 5, col) && qrcode2.isDark(row + 6, col)) {
+          lostPoint += 40;
+        }
+      }
+    }
+    let darkCount = 0;
+    for (let col = 0; col < moduleCount; col += 1) {
+      for (let row = 0; row < moduleCount; row += 1) {
+        if (qrcode2.isDark(row, col)) {
+          darkCount += 1;
+        }
+      }
+    }
+    const ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+    lostPoint += ratio * 10;
+    return lostPoint;
+  };
+  return _this;
+})();
+var QRMath = (function() {
+  const EXP_TABLE = new Array(256);
+  const LOG_TABLE = new Array(256);
+  for (let i = 0; i < 8; i += 1) {
+    EXP_TABLE[i] = 1 << i;
+  }
+  for (let i = 8; i < 256; i += 1) {
+    EXP_TABLE[i] = EXP_TABLE[i - 4] ^ EXP_TABLE[i - 5] ^ EXP_TABLE[i - 6] ^ EXP_TABLE[i - 8];
+  }
+  for (let i = 0; i < 255; i += 1) {
+    LOG_TABLE[EXP_TABLE[i]] = i;
+  }
+  const _this = {};
+  _this.glog = function(n) {
+    if (n < 1) {
+      throw "glog(" + n + ")";
+    }
+    return LOG_TABLE[n];
+  };
+  _this.gexp = function(n) {
+    while (n < 0) {
+      n += 255;
+    }
+    while (n >= 256) {
+      n -= 255;
+    }
+    return EXP_TABLE[n];
+  };
+  return _this;
+})();
+var qrPolynomial = function(num, shift4) {
+  if (typeof num.length == "undefined") {
+    throw num.length + "/" + shift4;
+  }
+  const _num = (function() {
+    let offset3 = 0;
+    while (offset3 < num.length && num[offset3] == 0) {
+      offset3 += 1;
+    }
+    const _num2 = new Array(num.length - offset3 + shift4);
+    for (let i = 0; i < num.length - offset3; i += 1) {
+      _num2[i] = num[i + offset3];
+    }
+    return _num2;
+  })();
+  const _this = {};
+  _this.getAt = function(index2) {
+    return _num[index2];
+  };
+  _this.getLength = function() {
+    return _num.length;
+  };
+  _this.multiply = function(e) {
+    const num2 = new Array(_this.getLength() + e.getLength() - 1);
+    for (let i = 0; i < _this.getLength(); i += 1) {
+      for (let j2 = 0; j2 < e.getLength(); j2 += 1) {
+        num2[i + j2] ^= QRMath.gexp(QRMath.glog(_this.getAt(i)) + QRMath.glog(e.getAt(j2)));
+      }
+    }
+    return qrPolynomial(num2, 0);
+  };
+  _this.mod = function(e) {
+    if (_this.getLength() - e.getLength() < 0) {
+      return _this;
+    }
+    const ratio = QRMath.glog(_this.getAt(0)) - QRMath.glog(e.getAt(0));
+    const num2 = new Array(_this.getLength());
+    for (let i = 0; i < _this.getLength(); i += 1) {
+      num2[i] = _this.getAt(i);
+    }
+    for (let i = 0; i < e.getLength(); i += 1) {
+      num2[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i)) + ratio);
+    }
+    return qrPolynomial(num2, 0).mod(e);
+  };
+  return _this;
+};
+var QRRSBlock = (function() {
+  const RS_BLOCK_TABLE = [
+    // L
+    // M
+    // Q
+    // H
+    // 1
+    [1, 26, 19],
+    [1, 26, 16],
+    [1, 26, 13],
+    [1, 26, 9],
+    // 2
+    [1, 44, 34],
+    [1, 44, 28],
+    [1, 44, 22],
+    [1, 44, 16],
+    // 3
+    [1, 70, 55],
+    [1, 70, 44],
+    [2, 35, 17],
+    [2, 35, 13],
+    // 4
+    [1, 100, 80],
+    [2, 50, 32],
+    [2, 50, 24],
+    [4, 25, 9],
+    // 5
+    [1, 134, 108],
+    [2, 67, 43],
+    [2, 33, 15, 2, 34, 16],
+    [2, 33, 11, 2, 34, 12],
+    // 6
+    [2, 86, 68],
+    [4, 43, 27],
+    [4, 43, 19],
+    [4, 43, 15],
+    // 7
+    [2, 98, 78],
+    [4, 49, 31],
+    [2, 32, 14, 4, 33, 15],
+    [4, 39, 13, 1, 40, 14],
+    // 8
+    [2, 121, 97],
+    [2, 60, 38, 2, 61, 39],
+    [4, 40, 18, 2, 41, 19],
+    [4, 40, 14, 2, 41, 15],
+    // 9
+    [2, 146, 116],
+    [3, 58, 36, 2, 59, 37],
+    [4, 36, 16, 4, 37, 17],
+    [4, 36, 12, 4, 37, 13],
+    // 10
+    [2, 86, 68, 2, 87, 69],
+    [4, 69, 43, 1, 70, 44],
+    [6, 43, 19, 2, 44, 20],
+    [6, 43, 15, 2, 44, 16],
+    // 11
+    [4, 101, 81],
+    [1, 80, 50, 4, 81, 51],
+    [4, 50, 22, 4, 51, 23],
+    [3, 36, 12, 8, 37, 13],
+    // 12
+    [2, 116, 92, 2, 117, 93],
+    [6, 58, 36, 2, 59, 37],
+    [4, 46, 20, 6, 47, 21],
+    [7, 42, 14, 4, 43, 15],
+    // 13
+    [4, 133, 107],
+    [8, 59, 37, 1, 60, 38],
+    [8, 44, 20, 4, 45, 21],
+    [12, 33, 11, 4, 34, 12],
+    // 14
+    [3, 145, 115, 1, 146, 116],
+    [4, 64, 40, 5, 65, 41],
+    [11, 36, 16, 5, 37, 17],
+    [11, 36, 12, 5, 37, 13],
+    // 15
+    [5, 109, 87, 1, 110, 88],
+    [5, 65, 41, 5, 66, 42],
+    [5, 54, 24, 7, 55, 25],
+    [11, 36, 12, 7, 37, 13],
+    // 16
+    [5, 122, 98, 1, 123, 99],
+    [7, 73, 45, 3, 74, 46],
+    [15, 43, 19, 2, 44, 20],
+    [3, 45, 15, 13, 46, 16],
+    // 17
+    [1, 135, 107, 5, 136, 108],
+    [10, 74, 46, 1, 75, 47],
+    [1, 50, 22, 15, 51, 23],
+    [2, 42, 14, 17, 43, 15],
+    // 18
+    [5, 150, 120, 1, 151, 121],
+    [9, 69, 43, 4, 70, 44],
+    [17, 50, 22, 1, 51, 23],
+    [2, 42, 14, 19, 43, 15],
+    // 19
+    [3, 141, 113, 4, 142, 114],
+    [3, 70, 44, 11, 71, 45],
+    [17, 47, 21, 4, 48, 22],
+    [9, 39, 13, 16, 40, 14],
+    // 20
+    [3, 135, 107, 5, 136, 108],
+    [3, 67, 41, 13, 68, 42],
+    [15, 54, 24, 5, 55, 25],
+    [15, 43, 15, 10, 44, 16],
+    // 21
+    [4, 144, 116, 4, 145, 117],
+    [17, 68, 42],
+    [17, 50, 22, 6, 51, 23],
+    [19, 46, 16, 6, 47, 17],
+    // 22
+    [2, 139, 111, 7, 140, 112],
+    [17, 74, 46],
+    [7, 54, 24, 16, 55, 25],
+    [34, 37, 13],
+    // 23
+    [4, 151, 121, 5, 152, 122],
+    [4, 75, 47, 14, 76, 48],
+    [11, 54, 24, 14, 55, 25],
+    [16, 45, 15, 14, 46, 16],
+    // 24
+    [6, 147, 117, 4, 148, 118],
+    [6, 73, 45, 14, 74, 46],
+    [11, 54, 24, 16, 55, 25],
+    [30, 46, 16, 2, 47, 17],
+    // 25
+    [8, 132, 106, 4, 133, 107],
+    [8, 75, 47, 13, 76, 48],
+    [7, 54, 24, 22, 55, 25],
+    [22, 45, 15, 13, 46, 16],
+    // 26
+    [10, 142, 114, 2, 143, 115],
+    [19, 74, 46, 4, 75, 47],
+    [28, 50, 22, 6, 51, 23],
+    [33, 46, 16, 4, 47, 17],
+    // 27
+    [8, 152, 122, 4, 153, 123],
+    [22, 73, 45, 3, 74, 46],
+    [8, 53, 23, 26, 54, 24],
+    [12, 45, 15, 28, 46, 16],
+    // 28
+    [3, 147, 117, 10, 148, 118],
+    [3, 73, 45, 23, 74, 46],
+    [4, 54, 24, 31, 55, 25],
+    [11, 45, 15, 31, 46, 16],
+    // 29
+    [7, 146, 116, 7, 147, 117],
+    [21, 73, 45, 7, 74, 46],
+    [1, 53, 23, 37, 54, 24],
+    [19, 45, 15, 26, 46, 16],
+    // 30
+    [5, 145, 115, 10, 146, 116],
+    [19, 75, 47, 10, 76, 48],
+    [15, 54, 24, 25, 55, 25],
+    [23, 45, 15, 25, 46, 16],
+    // 31
+    [13, 145, 115, 3, 146, 116],
+    [2, 74, 46, 29, 75, 47],
+    [42, 54, 24, 1, 55, 25],
+    [23, 45, 15, 28, 46, 16],
+    // 32
+    [17, 145, 115],
+    [10, 74, 46, 23, 75, 47],
+    [10, 54, 24, 35, 55, 25],
+    [19, 45, 15, 35, 46, 16],
+    // 33
+    [17, 145, 115, 1, 146, 116],
+    [14, 74, 46, 21, 75, 47],
+    [29, 54, 24, 19, 55, 25],
+    [11, 45, 15, 46, 46, 16],
+    // 34
+    [13, 145, 115, 6, 146, 116],
+    [14, 74, 46, 23, 75, 47],
+    [44, 54, 24, 7, 55, 25],
+    [59, 46, 16, 1, 47, 17],
+    // 35
+    [12, 151, 121, 7, 152, 122],
+    [12, 75, 47, 26, 76, 48],
+    [39, 54, 24, 14, 55, 25],
+    [22, 45, 15, 41, 46, 16],
+    // 36
+    [6, 151, 121, 14, 152, 122],
+    [6, 75, 47, 34, 76, 48],
+    [46, 54, 24, 10, 55, 25],
+    [2, 45, 15, 64, 46, 16],
+    // 37
+    [17, 152, 122, 4, 153, 123],
+    [29, 74, 46, 14, 75, 47],
+    [49, 54, 24, 10, 55, 25],
+    [24, 45, 15, 46, 46, 16],
+    // 38
+    [4, 152, 122, 18, 153, 123],
+    [13, 74, 46, 32, 75, 47],
+    [48, 54, 24, 14, 55, 25],
+    [42, 45, 15, 32, 46, 16],
+    // 39
+    [20, 147, 117, 4, 148, 118],
+    [40, 75, 47, 7, 76, 48],
+    [43, 54, 24, 22, 55, 25],
+    [10, 45, 15, 67, 46, 16],
+    // 40
+    [19, 148, 118, 6, 149, 119],
+    [18, 75, 47, 31, 76, 48],
+    [34, 54, 24, 34, 55, 25],
+    [20, 45, 15, 61, 46, 16]
+  ];
+  const qrRSBlock = function(totalCount, dataCount) {
+    const _this2 = {};
+    _this2.totalCount = totalCount;
+    _this2.dataCount = dataCount;
+    return _this2;
+  };
+  const _this = {};
+  const getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+    switch (errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L:
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M:
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q:
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H:
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default:
+        return void 0;
+    }
+  };
+  _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+    const rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+    if (typeof rsBlock == "undefined") {
+      throw "bad rs block @ typeNumber:" + typeNumber + "/errorCorrectionLevel:" + errorCorrectionLevel;
+    }
+    const length = rsBlock.length / 3;
+    const list = [];
+    for (let i = 0; i < length; i += 1) {
+      const count2 = rsBlock[i * 3 + 0];
+      const totalCount = rsBlock[i * 3 + 1];
+      const dataCount = rsBlock[i * 3 + 2];
+      for (let j2 = 0; j2 < count2; j2 += 1) {
+        list.push(qrRSBlock(totalCount, dataCount));
+      }
+    }
+    return list;
+  };
+  return _this;
+})();
+var qrBitBuffer = function() {
+  const _buffer = [];
+  let _length = 0;
+  const _this = {};
+  _this.getBuffer = function() {
+    return _buffer;
+  };
+  _this.getAt = function(index2) {
+    const bufIndex = Math.floor(index2 / 8);
+    return (_buffer[bufIndex] >>> 7 - index2 % 8 & 1) == 1;
+  };
+  _this.put = function(num, length) {
+    for (let i = 0; i < length; i += 1) {
+      _this.putBit((num >>> length - i - 1 & 1) == 1);
+    }
+  };
+  _this.getLengthInBits = function() {
+    return _length;
+  };
+  _this.putBit = function(bit) {
+    const bufIndex = Math.floor(_length / 8);
+    if (_buffer.length <= bufIndex) {
+      _buffer.push(0);
+    }
+    if (bit) {
+      _buffer[bufIndex] |= 128 >>> _length % 8;
+    }
+    _length += 1;
+  };
+  return _this;
+};
+var qrNumber = function(data) {
+  const _mode = QRMode.MODE_NUMBER;
+  const _data = data;
+  const _this = {};
+  _this.getMode = function() {
+    return _mode;
+  };
+  _this.getLength = function(buffer) {
+    return _data.length;
+  };
+  _this.write = function(buffer) {
+    const data2 = _data;
+    let i = 0;
+    while (i + 2 < data2.length) {
+      buffer.put(strToNum(data2.substring(i, i + 3)), 10);
+      i += 3;
+    }
+    if (i < data2.length) {
+      if (data2.length - i == 1) {
+        buffer.put(strToNum(data2.substring(i, i + 1)), 4);
+      } else if (data2.length - i == 2) {
+        buffer.put(strToNum(data2.substring(i, i + 2)), 7);
+      }
+    }
+  };
+  const strToNum = function(s) {
+    let num = 0;
+    for (let i = 0; i < s.length; i += 1) {
+      num = num * 10 + chatToNum(s.charAt(i));
+    }
+    return num;
+  };
+  const chatToNum = function(c) {
+    if ("0" <= c && c <= "9") {
+      return c.charCodeAt(0) - "0".charCodeAt(0);
+    }
+    throw "illegal char :" + c;
+  };
+  return _this;
+};
+var qrAlphaNum = function(data) {
+  const _mode = QRMode.MODE_ALPHA_NUM;
+  const _data = data;
+  const _this = {};
+  _this.getMode = function() {
+    return _mode;
+  };
+  _this.getLength = function(buffer) {
+    return _data.length;
+  };
+  _this.write = function(buffer) {
+    const s = _data;
+    let i = 0;
+    while (i + 1 < s.length) {
+      buffer.put(
+        getCode(s.charAt(i)) * 45 + getCode(s.charAt(i + 1)),
+        11
+      );
+      i += 2;
+    }
+    if (i < s.length) {
+      buffer.put(getCode(s.charAt(i)), 6);
+    }
+  };
+  const getCode = function(c) {
+    if ("0" <= c && c <= "9") {
+      return c.charCodeAt(0) - "0".charCodeAt(0);
+    } else if ("A" <= c && c <= "Z") {
+      return c.charCodeAt(0) - "A".charCodeAt(0) + 10;
+    } else {
+      switch (c) {
+        case " ":
+          return 36;
+        case "$":
+          return 37;
+        case "%":
+          return 38;
+        case "*":
+          return 39;
+        case "+":
+          return 40;
+        case "-":
+          return 41;
+        case ".":
+          return 42;
+        case "/":
+          return 43;
+        case ":":
+          return 44;
+        default:
+          throw "illegal char :" + c;
+      }
+    }
+  };
+  return _this;
+};
+var qr8BitByte = function(data) {
+  const _mode = QRMode.MODE_8BIT_BYTE;
+  const _data = data;
+  const _bytes = qrcode.stringToBytes(data);
+  const _this = {};
+  _this.getMode = function() {
+    return _mode;
+  };
+  _this.getLength = function(buffer) {
+    return _bytes.length;
+  };
+  _this.write = function(buffer) {
+    for (let i = 0; i < _bytes.length; i += 1) {
+      buffer.put(_bytes[i], 8);
+    }
+  };
+  return _this;
+};
+var qrKanji = function(data) {
+  const _mode = QRMode.MODE_KANJI;
+  const _data = data;
+  const stringToBytes2 = qrcode.stringToBytes;
+  !(function(c, code) {
+    const test = stringToBytes2(c);
+    if (test.length != 2 || (test[0] << 8 | test[1]) != code) {
+      throw "sjis not supported.";
+    }
+  })("\u53CB", 38726);
+  const _bytes = stringToBytes2(data);
+  const _this = {};
+  _this.getMode = function() {
+    return _mode;
+  };
+  _this.getLength = function(buffer) {
+    return ~~(_bytes.length / 2);
+  };
+  _this.write = function(buffer) {
+    const data2 = _bytes;
+    let i = 0;
+    while (i + 1 < data2.length) {
+      let c = (255 & data2[i]) << 8 | 255 & data2[i + 1];
+      if (33088 <= c && c <= 40956) {
+        c -= 33088;
+      } else if (57408 <= c && c <= 60351) {
+        c -= 49472;
+      } else {
+        throw "illegal char at " + (i + 1) + "/" + c;
+      }
+      c = (c >>> 8 & 255) * 192 + (c & 255);
+      buffer.put(c, 13);
+      i += 2;
+    }
+    if (i < data2.length) {
+      throw "illegal char at " + (i + 1);
+    }
+  };
+  return _this;
+};
+var byteArrayOutputStream = function() {
+  const _bytes = [];
+  const _this = {};
+  _this.writeByte = function(b2) {
+    _bytes.push(b2 & 255);
+  };
+  _this.writeShort = function(i) {
+    _this.writeByte(i);
+    _this.writeByte(i >>> 8);
+  };
+  _this.writeBytes = function(b2, off, len) {
+    off = off || 0;
+    len = len || b2.length;
+    for (let i = 0; i < len; i += 1) {
+      _this.writeByte(b2[i + off]);
+    }
+  };
+  _this.writeString = function(s) {
+    for (let i = 0; i < s.length; i += 1) {
+      _this.writeByte(s.charCodeAt(i));
+    }
+  };
+  _this.toByteArray = function() {
+    return _bytes;
+  };
+  _this.toString = function() {
+    let s = "";
+    s += "[";
+    for (let i = 0; i < _bytes.length; i += 1) {
+      if (i > 0) {
+        s += ",";
+      }
+      s += _bytes[i];
+    }
+    s += "]";
+    return s;
+  };
+  return _this;
+};
+var base64EncodeOutputStream = function() {
+  let _buffer = 0;
+  let _buflen = 0;
+  let _length = 0;
+  let _base64 = "";
+  const _this = {};
+  const writeEncoded = function(b2) {
+    _base64 += String.fromCharCode(encode(b2 & 63));
+  };
+  const encode = function(n) {
+    if (n < 0) {
+      throw "n:" + n;
+    } else if (n < 26) {
+      return 65 + n;
+    } else if (n < 52) {
+      return 97 + (n - 26);
+    } else if (n < 62) {
+      return 48 + (n - 52);
+    } else if (n == 62) {
+      return 43;
+    } else if (n == 63) {
+      return 47;
+    } else {
+      throw "n:" + n;
+    }
+  };
+  _this.writeByte = function(n) {
+    _buffer = _buffer << 8 | n & 255;
+    _buflen += 8;
+    _length += 1;
+    while (_buflen >= 6) {
+      writeEncoded(_buffer >>> _buflen - 6);
+      _buflen -= 6;
+    }
+  };
+  _this.flush = function() {
+    if (_buflen > 0) {
+      writeEncoded(_buffer << 6 - _buflen);
+      _buffer = 0;
+      _buflen = 0;
+    }
+    if (_length % 3 != 0) {
+      const padlen = 3 - _length % 3;
+      for (let i = 0; i < padlen; i += 1) {
+        _base64 += "=";
+      }
+    }
+  };
+  _this.toString = function() {
+    return _base64;
+  };
+  return _this;
+};
+var base64DecodeInputStream = function(str) {
+  const _str = str;
+  let _pos = 0;
+  let _buffer = 0;
+  let _buflen = 0;
+  const _this = {};
+  _this.read = function() {
+    while (_buflen < 8) {
+      if (_pos >= _str.length) {
+        if (_buflen == 0) {
+          return -1;
+        }
+        throw "unexpected end of file./" + _buflen;
+      }
+      const c = _str.charAt(_pos);
+      _pos += 1;
+      if (c == "=") {
+        _buflen = 0;
+        return -1;
+      } else if (c.match(/^\s$/)) {
+        continue;
+      }
+      _buffer = _buffer << 6 | decode(c.charCodeAt(0));
+      _buflen += 6;
+    }
+    const n = _buffer >>> _buflen - 8 & 255;
+    _buflen -= 8;
+    return n;
+  };
+  const decode = function(c) {
+    if (65 <= c && c <= 90) {
+      return c - 65;
+    } else if (97 <= c && c <= 122) {
+      return c - 97 + 26;
+    } else if (48 <= c && c <= 57) {
+      return c - 48 + 52;
+    } else if (c == 43) {
+      return 62;
+    } else if (c == 47) {
+      return 63;
+    } else {
+      throw "c:" + c;
+    }
+  };
+  return _this;
+};
+var gifImage = function(width, height) {
+  const _width = width;
+  const _height = height;
+  const _data = new Array(width * height);
+  const _this = {};
+  _this.setPixel = function(x2, y2, pixel) {
+    _data[y2 * _width + x2] = pixel;
+  };
+  _this.write = function(out) {
+    out.writeString("GIF87a");
+    out.writeShort(_width);
+    out.writeShort(_height);
+    out.writeByte(128);
+    out.writeByte(0);
+    out.writeByte(0);
+    out.writeByte(0);
+    out.writeByte(0);
+    out.writeByte(0);
+    out.writeByte(255);
+    out.writeByte(255);
+    out.writeByte(255);
+    out.writeString(",");
+    out.writeShort(0);
+    out.writeShort(0);
+    out.writeShort(_width);
+    out.writeShort(_height);
+    out.writeByte(0);
+    const lzwMinCodeSize = 2;
+    const raster = getLZWRaster(lzwMinCodeSize);
+    out.writeByte(lzwMinCodeSize);
+    let offset3 = 0;
+    while (raster.length - offset3 > 255) {
+      out.writeByte(255);
+      out.writeBytes(raster, offset3, 255);
+      offset3 += 255;
+    }
+    out.writeByte(raster.length - offset3);
+    out.writeBytes(raster, offset3, raster.length - offset3);
+    out.writeByte(0);
+    out.writeString(";");
+  };
+  const bitOutputStream = function(out) {
+    const _out = out;
+    let _bitLength = 0;
+    let _bitBuffer = 0;
+    const _this2 = {};
+    _this2.write = function(data, length) {
+      if (data >>> length != 0) {
+        throw "length over";
+      }
+      while (_bitLength + length >= 8) {
+        _out.writeByte(255 & (data << _bitLength | _bitBuffer));
+        length -= 8 - _bitLength;
+        data >>>= 8 - _bitLength;
+        _bitBuffer = 0;
+        _bitLength = 0;
+      }
+      _bitBuffer = data << _bitLength | _bitBuffer;
+      _bitLength = _bitLength + length;
+    };
+    _this2.flush = function() {
+      if (_bitLength > 0) {
+        _out.writeByte(_bitBuffer);
+      }
+    };
+    return _this2;
+  };
+  const getLZWRaster = function(lzwMinCodeSize) {
+    const clearCode = 1 << lzwMinCodeSize;
+    const endCode = (1 << lzwMinCodeSize) + 1;
+    let bitLength = lzwMinCodeSize + 1;
+    const table = lzwTable();
+    for (let i = 0; i < clearCode; i += 1) {
+      table.add(String.fromCharCode(i));
+    }
+    table.add(String.fromCharCode(clearCode));
+    table.add(String.fromCharCode(endCode));
+    const byteOut = byteArrayOutputStream();
+    const bitOut = bitOutputStream(byteOut);
+    bitOut.write(clearCode, bitLength);
+    let dataIndex = 0;
+    let s = String.fromCharCode(_data[dataIndex]);
+    dataIndex += 1;
+    while (dataIndex < _data.length) {
+      const c = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+      if (table.contains(s + c)) {
+        s = s + c;
+      } else {
+        bitOut.write(table.indexOf(s), bitLength);
+        if (table.size() < 4095) {
+          if (table.size() == 1 << bitLength) {
+            bitLength += 1;
+          }
+          table.add(s + c);
+        }
+        s = c;
+      }
+    }
+    bitOut.write(table.indexOf(s), bitLength);
+    bitOut.write(endCode, bitLength);
+    bitOut.flush();
+    return byteOut.toByteArray();
+  };
+  const lzwTable = function() {
+    const _map = {};
+    let _size = 0;
+    const _this2 = {};
+    _this2.add = function(key) {
+      if (_this2.contains(key)) {
+        throw "dup key:" + key;
+      }
+      _map[key] = _size;
+      _size += 1;
+    };
+    _this2.size = function() {
+      return _size;
+    };
+    _this2.indexOf = function(key) {
+      return _map[key];
+    };
+    _this2.contains = function(key) {
+      return typeof _map[key] != "undefined";
+    };
+    return _this2;
+  };
+  return _this;
+};
+var createDataURL = function(width, height, getPixel) {
+  const gif = gifImage(width, height);
+  for (let y2 = 0; y2 < height; y2 += 1) {
+    for (let x2 = 0; x2 < width; x2 += 1) {
+      gif.setPixel(x2, y2, getPixel(x2, y2));
+    }
+  }
+  const b2 = byteArrayOutputStream();
+  gif.write(b2);
+  const base64 = base64EncodeOutputStream();
+  const bytes = b2.toByteArray();
+  for (let i = 0; i < bytes.length; i += 1) {
+    base64.writeByte(bytes[i]);
+  }
+  base64.flush();
+  return "data:image/gif;base64," + base64;
+};
+var qrcode_default = qrcode;
+var stringToBytes = qrcode.stringToBytes;
+
+// src/project-wechat-dialog.jsx
+var labels2 = {
+  unbound: "\u5FAE\u4FE1\u672A\u8FDE\u63A5",
+  preparing: "\u6B63\u5728\u83B7\u53D6\u4E8C\u7EF4\u7801\u2026",
+  scan: "\u7528\u5FAE\u4FE1\u626B\u4E00\u626B",
+  scanned: "\u8BF7\u5728\u624B\u673A\u5FAE\u4FE1\u4E0A\u786E\u8BA4",
+  pin: "\u5FAE\u4FE1\u9700\u8981\u9A8C\u8BC1",
+  connecting: "\u5FAE\u4FE1\u5DF2\u7ED1\u5B9A",
+  online: "\u5FAE\u4FE1\u5DF2\u8FDE\u63A5",
+  expired: "\u5FAE\u4FE1\u6388\u6743\u5DF2\u8FC7\u671F",
+  retrying: "\u6B63\u5728\u91CD\u8FDE\u5FAE\u4FE1\u2026",
+  elsewhere: "\u5FAE\u4FE1\u5DF2\u5728\u53E6\u4E00\u4E2A DSH \u5B9E\u4F8B\u8FD0\u884C"
+};
+function qrImage(text2) {
+  if (!text2) return null;
+  const code = qrcode_default(0, "M");
+  code.addData(text2);
+  code.make();
+  return code.createDataURL(4, 16);
+}
+function ProjectWeChatDialog({ projectId, canvasId, request, onClose }) {
+  const titleId = (0, import_react66.useId)(), dialog = (0, import_react66.useRef)(null), busyRef = (0, import_react66.useRef)(false), epoch = (0, import_react66.useRef)(0);
+  const openingCanvas = (0, import_react66.useRef)(canvasId);
+  const [state, setState] = (0, import_react66.useState)(null), [parent, setParent] = (0, import_react66.useState)("");
+  const [pin, setPin] = (0, import_react66.useState)(""), [busy, setBusy] = (0, import_react66.useState)(false), [error, setError] = (0, import_react66.useState)("");
+  (0, import_react66.useEffect)(() => {
+    dialog.current?.showModal();
+    const controller = new AbortController();
+    let ready = false;
+    async function read(action, data = {}) {
+      if (busyRef.current) return;
+      const version2 = epoch.current;
+      try {
+        const result = await request("project-wechat-" + action, data, projectId, void 0, controller.signal);
+        if (!controller.signal.aborted && version2 === epoch.current) {
+          setState(result);
+          setParent((current) => current || result.parentProjectId || "");
+        }
+      } catch (cause) {
+        if (!controller.signal.aborted && version2 === epoch.current) setError(cause.message);
+      }
+    }
+    void read("connect", { canvasId: openingCanvas.current }).finally(() => {
+      ready = true;
+    });
+    const timer2 = setInterval(() => {
+      if (ready) void read("status");
+    }, 1300);
+    return () => {
+      epoch.current++;
+      clearInterval(timer2);
+      controller.abort();
+    };
+  }, [projectId, request]);
+  const qr = (0, import_react66.useMemo)(() => {
+    if (state?.phase !== "scan") return {};
+    try {
+      return { image: qrImage(state.qr) };
+    } catch {
+      return { error: "\u4E8C\u7EF4\u7801\u5185\u5BB9\u65E0\u6CD5\u663E\u793A\uFF0C\u8BF7\u91CD\u65B0\u83B7\u53D6" };
+    }
+  }, [state?.phase, state?.qr]);
+  async function change(action, data) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    const version2 = ++epoch.current;
+    try {
+      const result = await request("project-wechat-" + action, data, projectId);
+      if (version2 === epoch.current) {
+        setState(result);
+        setParent(result.parentProjectId || "");
+      }
+    } catch (cause) {
+      if (version2 === epoch.current) setError(cause.message);
+    } finally {
+      if (version2 === epoch.current) {
+        setBusy(false);
+        setPin("");
+      }
+      busyRef.current = false;
+    }
+  }
+  const phase = state?.phase;
+  const pairing = ["preparing", "scan", "scanned", "pin"].includes(phase);
+  const selected2 = state?.projects.find((item) => item.id === parent);
+  const canPair = phase === "unbound" || phase === "expired" || Boolean(qr.error) || !state && Boolean(error);
+  const canSave = state?.bound && !pairing && parent && parent !== state.parentProjectId;
+  const visibleError = error || qr.error || state?.error;
+  return /* @__PURE__ */ import_react66.default.createElement("dialog", { ref: dialog, className: "wtt-dialog wtt-wechat-dialog", "aria-labelledby": titleId, onCancel: (event) => {
+    event.preventDefault();
+    onClose();
+  } }, /* @__PURE__ */ import_react66.default.createElement("form", { onSubmit: (event) => {
+    event.preventDefault();
+    if (phase === "pin" && pin) void change("pin", { pairingId: state.pairingId, pin });
+  } }, /* @__PURE__ */ import_react66.default.createElement(DialogHeader, { title: "\u5FAE\u4FE1\u9879\u76EE\u52A9\u624B", titleId, onClose }), /* @__PURE__ */ import_react66.default.createElement(DialogBody, null, /* @__PURE__ */ import_react66.default.createElement("p", { className: phase === "scan" ? "wtt-wechat-scan" : void 0, role: "status" }, labels2[phase] || (error ? "\u65E0\u6CD5\u83B7\u53D6\u4E8C\u7EF4\u7801" : "\u6B63\u5728\u83B7\u53D6\u4E8C\u7EF4\u7801\u2026")), qr.image && /* @__PURE__ */ import_react66.default.createElement("img", { className: "wtt-wechat-qr", src: qr.image, alt: "\u5FAE\u4FE1\u626B\u7801\u7ED1\u5B9A\u4E8C\u7EF4\u7801" }), phase === "pin" && /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u624B\u673A\u5FAE\u4FE1\u6821\u9A8C\u7801"), /* @__PURE__ */ import_react66.default.createElement(
+    "input",
+    {
+      autoFocus: true,
+      type: "password",
+      inputMode: "numeric",
+      autoComplete: "one-time-code",
+      maxLength: 10,
+      value: pin,
+      onChange: (event) => setPin(event.target.value.replace(/[^0-9]/g, "")),
+      disabled: busy
+    }
+  )), (phase === "connecting" || phase === "online") && /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-muted" }, "\u5728\u5FAE\u4FE1\u91CC\u6253\u5F00 ClawBot\uFF0C\u8BF4\u4E00\u53E5\u300C\u4F60\u597D\u300D\u3002"), visibleError && /* @__PURE__ */ import_react66.default.createElement(UserError, { error: visibleError }), state?.bound && !pairing && /* @__PURE__ */ import_react66.default.createElement("details", { className: "wtt-wechat-settings" }, /* @__PURE__ */ import_react66.default.createElement("summary", null, "\u8FDE\u63A5\u8BBE\u7F6E"), /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u5FAE\u4FE1\u65B0\u5EFA\u9879\u76EE\u7684\u5B58\u653E\u76EE\u5F55"), /* @__PURE__ */ import_react66.default.createElement("select", { className: "wtt-select", value: parent, disabled: busy, onChange: (event) => setParent(event.target.value) }, state.projects.map((project) => /* @__PURE__ */ import_react66.default.createElement("option", { key: project.id, value: project.id }, project.name))), selected2 && /* @__PURE__ */ import_react66.default.createElement("small", { className: "wtt-muted wtt-wechat-path", title: selected2.path }, selected2.path)), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-wechat-actions" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { disabled: busy, onClick: () => void change("disconnect", {}) }, "\u65AD\u5F00\u5FAE\u4FE1"), canSave && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", disabled: busy, onClick: () => void change("parent", { parentProjectId: parent }) }, "\u4FDD\u5B58\u76EE\u5F55")))), (canPair || phase === "pin") && /* @__PURE__ */ import_react66.default.createElement(DialogFooter, null, canPair && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", disabled: busy, onClick: () => void change("pair", { canvasId: openingCanvas.current, refresh: Boolean(qr.error) }) }, busy ? "\u6B63\u5728\u83B7\u53D6\u2026" : "\u83B7\u53D6\u4E8C\u7EF4\u7801"), phase === "pin" && /* @__PURE__ */ import_react66.default.createElement(UiButton, { type: "submit", variant: "primary", disabled: busy || !pin }, "\u63D0\u4EA4\u6821\u9A8C\u7801"))));
+}
+
 // src/client.jsx
 var PANEL_ID = "wtt-creation-workbench";
 var EMPTY_SESSION_STATUSES = /* @__PURE__ */ new Map();
@@ -55616,7 +57397,7 @@ async function apiRequest(action, data, projectId, query, signal) {
     signal,
     ...action ? {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...action.startsWith("project-wechat-") ? { "X-WTT-WeChat": "1" } : {} },
       body: JSON.stringify({ action, data })
     } : {}
   });
@@ -55649,19 +57430,19 @@ function formatTime(value) {
   }).format(date);
 }
 function BookIcon() {
-  return /* @__PURE__ */ import_react66.default.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /* @__PURE__ */ import_react66.default.createElement("path", { d: "M12 5.5C9 3.7 5.5 3.7 3 4.5v15c2.5-.8 6-.8 9 1 3-1.8 6.5-1.8 9-1v-15c-2.5-.8-6-.8-9 1Z" }), /* @__PURE__ */ import_react66.default.createElement("path", { d: "M12 5.5v15M6 8h3M15 8h3" }));
+  return /* @__PURE__ */ import_react67.default.createElement("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /* @__PURE__ */ import_react67.default.createElement("path", { d: "M12 5.5C9 3.7 5.5 3.7 3 4.5v15c2.5-.8 6-.8 9 1 3-1.8 6.5-1.8 9-1v-15c-2.5-.8-6-.8-9 1Z" }), /* @__PURE__ */ import_react67.default.createElement("path", { d: "M12 5.5v15M6 8h3M15 8h3" }));
 }
-function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssets, onList, onRefresh, onRename, onModelSettings, onSyncDeliverables, onBackground, notificationChannel }) {
-  const menuId = (0, import_react66.useId)();
-  const [menuOpen, setMenuOpen] = (0, import_react66.useState)(false);
-  const menuButton = (0, import_react66.useRef)(null);
-  return /* @__PURE__ */ import_react66.default.createElement("header", { className: "wtt-project-bar", "aria-label": "\u5F53\u524D\u753B\u5E03" }, /* @__PURE__ */ import_react66.default.createElement("h1", { className: "wtt-visually-hidden" }, "\u521B\u4F5C\u753B\u5E03"), !filesOpen && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "ghost", type: "button", className: "wtt-open-files", "aria-label": `\u6253\u5F00\u6587\u4EF6\u680F \xB7 ${project.name}`, title: `\u6253\u5F00\u6587\u4EF6\u680F \xB7 ${project.name}`, onClick: onToggleFiles, "aria-expanded": false }, /* @__PURE__ */ import_react66.default.createElement("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react66.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" })), /* @__PURE__ */ import_react66.default.createElement("span", { className: "wtt-open-files-name" }, project.name || "\u6587\u4EF6\u680F")), /* @__PURE__ */ import_react66.default.createElement("select", { className: "wtt-project-select", "aria-label": "\u5F53\u524D\u753B\u5E03", title: workspace?.requirements?.find((item) => item.id === selectedId)?.title || "\u9009\u62E9\u753B\u5E03", value: selectedId || "", disabled: !workspace || Boolean(busy), onChange: (event) => onSelect(workspace.requirements.find((item) => item.id === event.target.value)) }, !selectedId && /* @__PURE__ */ import_react66.default.createElement("option", { value: "" }, loading ? "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u2026" : "\u9009\u62E9\u4E00\u5F20\u753B\u5E03"), (workspace?.requirements || []).map((item) => /* @__PURE__ */ import_react66.default.createElement("option", { key: item.id, value: item.id }, item.title))), /* @__PURE__ */ import_react66.default.createElement("span", { className: "wtt-project-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-project-menu", onKeyDown: (event) => {
+function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssets, onList, onRefresh, onRename, onModelSettings, onWeChat, onSyncDeliverables, onBackground, notificationChannel }) {
+  const menuId = (0, import_react67.useId)();
+  const [menuOpen, setMenuOpen] = (0, import_react67.useState)(false);
+  const menuButton = (0, import_react67.useRef)(null);
+  return /* @__PURE__ */ import_react67.default.createElement("header", { className: "wtt-project-bar", "aria-label": "\u5F53\u524D\u753B\u5E03" }, /* @__PURE__ */ import_react67.default.createElement("h1", { className: "wtt-visually-hidden" }, "\u521B\u4F5C\u753B\u5E03"), !filesOpen && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", type: "button", className: "wtt-open-files", "aria-label": `\u6253\u5F00\u6587\u4EF6\u680F \xB7 ${project.name}`, title: `\u6253\u5F00\u6587\u4EF6\u680F \xB7 ${project.name}`, onClick: onToggleFiles, "aria-expanded": false }, /* @__PURE__ */ import_react67.default.createElement("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", "aria-hidden": "true" }, /* @__PURE__ */ import_react67.default.createElement("path", { d: "M3 7V5h7l2 2h9v13H3Z" })), /* @__PURE__ */ import_react67.default.createElement("span", { className: "wtt-open-files-name" }, project.name || "\u6587\u4EF6\u680F")), /* @__PURE__ */ import_react67.default.createElement("select", { className: "wtt-project-select", "aria-label": "\u5F53\u524D\u753B\u5E03", title: workspace?.requirements?.find((item) => item.id === selectedId)?.title || "\u9009\u62E9\u753B\u5E03", value: selectedId || "", disabled: !workspace || Boolean(busy), onChange: (event) => onSelect(workspace.requirements.find((item) => item.id === event.target.value)) }, !selectedId && /* @__PURE__ */ import_react67.default.createElement("option", { value: "" }, loading ? "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u2026" : "\u9009\u62E9\u4E00\u5F20\u753B\u5E03"), (workspace?.requirements || []).map((item) => /* @__PURE__ */ import_react67.default.createElement("option", { key: item.id, value: item.id }, item.title))), /* @__PURE__ */ import_react67.default.createElement("span", { className: "wtt-project-divider", "aria-hidden": "true" }), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-menu", onKeyDown: (event) => {
     if (!menuOpen || event.key !== "Escape") return;
     event.preventDefault();
     event.stopPropagation();
     setMenuOpen(false);
     menuButton.current?.focus({ preventScroll: true });
-  } }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { ref: menuButton, variant: "quiet", type: "button", className: "wtt-project-button", "aria-label": "\u753B\u5E03\u83DC\u5355", title: "\u753B\u5E03\u83DC\u5355", "aria-expanded": menuOpen, "aria-controls": menuOpen ? menuId : void 0, "aria-haspopup": "menu", onClick: () => setMenuOpen((open) => !open) }, /* @__PURE__ */ import_react66.default.createElement("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true" }, /* @__PURE__ */ import_react66.default.createElement("circle", { cx: "5", cy: "12", r: "1.6" }), /* @__PURE__ */ import_react66.default.createElement("circle", { cx: "12", cy: "12", r: "1.6" }), /* @__PURE__ */ import_react66.default.createElement("circle", { cx: "19", cy: "12", r: "1.6" }))), menuOpen && /* @__PURE__ */ import_react66.default.createElement(
+  } }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { ref: menuButton, variant: "quiet", type: "button", className: "wtt-project-button", "aria-label": "\u753B\u5E03\u83DC\u5355", title: "\u753B\u5E03\u83DC\u5355", "aria-expanded": menuOpen, "aria-controls": menuOpen ? menuId : void 0, "aria-haspopup": "menu", onClick: () => setMenuOpen((open) => !open) }, /* @__PURE__ */ import_react67.default.createElement("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true" }, /* @__PURE__ */ import_react67.default.createElement("circle", { cx: "5", cy: "12", r: "1.6" }), /* @__PURE__ */ import_react67.default.createElement("circle", { cx: "12", cy: "12", r: "1.6" }), /* @__PURE__ */ import_react67.default.createElement("circle", { cx: "19", cy: "12", r: "1.6" }))), menuOpen && /* @__PURE__ */ import_react67.default.createElement(
     CanvasPopover,
     {
       anchorRef: menuButton,
@@ -55672,39 +57453,43 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
       role: "menu",
       "aria-label": "\u753B\u5E03\u83DC\u5355"
     },
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", role: "menuitem", disabled: !workspace || Boolean(busy), onClick: () => {
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", role: "menuitem", disabled: !workspace || Boolean(busy), onClick: () => {
       setMenuOpen(false);
       onNew();
     } }, "\u65B0\u5EFA\u753B\u5E03"),
-    onAssets && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", role: "menuitem", onClick: () => {
+    onAssets && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       onAssets();
     } }, "\u8D44\u4EA7\u770B\u677F"),
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       onList();
-    } }, "\u5217\u8868\u7F16\u8F91", /* @__PURE__ */ import_react66.default.createElement("span", null, "\u67E5\u770B\u5927\u7EB2\u4E0E\u7248\u672C")),
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", disabled: !selectedId || Boolean(busy), onClick: () => {
+    } }, "\u5217\u8868\u7F16\u8F91", /* @__PURE__ */ import_react67.default.createElement("span", null, "\u67E5\u770B\u5927\u7EB2\u4E0E\u7248\u672C")),
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", disabled: !selectedId || Boolean(busy), onClick: () => {
       setMenuOpen(false);
       onRename();
     } }, "\u91CD\u547D\u540D\u753B\u5E03"),
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", disabled: !selectedId || Boolean(busy), onClick: () => {
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", disabled: !selectedId || Boolean(busy), onClick: () => {
       setMenuOpen(false);
       onBackground();
     } }, "\u80CC\u666F\u8D44\u6599"),
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", disabled: Boolean(busy), onClick: () => {
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", disabled: Boolean(busy), onClick: () => {
       setMenuOpen(false);
       onSyncDeliverables();
-    } }, "\u6574\u7406\u6210\u679C\u6587\u4EF6\u5939", /* @__PURE__ */ import_react66.default.createElement("span", null, "\u6309\u767D\u677F\u540D\u79F0\u6574\u7406\u5168\u90E8\u5DF2\u4FDD\u5B58\u7248\u672C")),
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+    } }, "\u6574\u7406\u6210\u679C\u6587\u4EF6\u5939", /* @__PURE__ */ import_react67.default.createElement("span", null, "\u6309\u767D\u677F\u540D\u79F0\u6574\u7406\u5168\u90E8\u5DF2\u4FDD\u5B58\u7248\u672C")),
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       onModelSettings();
-    } }, "\u6A21\u578B\u8BBE\u7F6E", /* @__PURE__ */ import_react66.default.createElement("span", null, "\u8FDE\u63A5\u7B2C\u4E09\u65B9\u6A21\u578B\u6216\u81EA\u5B9A\u4E49 API")),
-    notificationChannel?.permission === "default" && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+    } }, "\u6A21\u578B\u8BBE\u7F6E", /* @__PURE__ */ import_react67.default.createElement("span", null, "\u8FDE\u63A5\u7B2C\u4E09\u65B9\u6A21\u578B\u6216\u81EA\u5B9A\u4E49 API")),
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+      setMenuOpen(false);
+      onWeChat();
+    } }, "\u5FAE\u4FE1\u9879\u76EE\u52A9\u624B"),
+    notificationChannel?.permission === "default" && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       void notificationChannel.requestPermission().catch((error) => console.warn("DSH \u684C\u9762\u901A\u77E5\u6388\u6743\u5931\u8D25", error));
     } }, "\u542F\u7528\u684C\u9762\u901A\u77E5"),
-    /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
+    /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       onRefresh();
     }, disabled: loading || Boolean(busy) }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0\u753B\u5E03")
@@ -55717,38 +57502,38 @@ function dependencyRows(dependencies) {
 function EnvironmentStatus({ dependencies }) {
   const rows = dependencyRows(dependencies);
   if (!rows.length) return null;
-  const labels2 = { python: "Python", word: "Word \u8F6C\u6362", docx: "Word \u8F6C\u6362", skill: "\u8BFE\u7A0B\u6280\u80FD", courseSkill: "\u8BFE\u7A0B\u6280\u80FD", converter: "Word \u8F6C\u6362\u5668" };
-  return /* @__PURE__ */ import_react66.default.createElement("details", { className: "wtt-environment" }, /* @__PURE__ */ import_react66.default.createElement("summary", null, "\u73AF\u5883\u68C0\u67E5"), /* @__PURE__ */ import_react66.default.createElement("ul", null, rows.map(([key, value]) => {
+  const labels3 = { python: "Python", word: "Word \u8F6C\u6362", docx: "Word \u8F6C\u6362", skill: "\u8BFE\u7A0B\u6280\u80FD", courseSkill: "\u8BFE\u7A0B\u6280\u80FD", converter: "Word \u8F6C\u6362\u5668" };
+  return /* @__PURE__ */ import_react67.default.createElement("details", { className: "wtt-environment" }, /* @__PURE__ */ import_react67.default.createElement("summary", null, "\u73AF\u5883\u68C0\u67E5"), /* @__PURE__ */ import_react67.default.createElement("ul", null, rows.map(([key, value]) => {
     const item = value && typeof value === "object" ? value : {};
     const available = typeof value === "boolean" ? value : item.available ?? item.ok ?? item.ready;
     const status = available === true ? "\u53EF\u7528" : available === false ? "\u5F85\u914D\u7F6E" : item.status || "\u5DF2\u68C0\u6D4B";
     const detail = item.message || item.error || item.path || (typeof value === "string" ? value : "");
-    return /* @__PURE__ */ import_react66.default.createElement("li", { key }, /* @__PURE__ */ import_react66.default.createElement("span", null, item.label || item.name || labels2[key] || key), /* @__PURE__ */ import_react66.default.createElement("span", { className: available === false ? "wtt-status-warning" : "wtt-muted" }, status), detail && /* @__PURE__ */ import_react66.default.createElement("span", { className: "wtt-environment-detail" }, detail));
+    return /* @__PURE__ */ import_react67.default.createElement("li", { key }, /* @__PURE__ */ import_react67.default.createElement("span", null, item.label || item.name || labels3[key] || key), /* @__PURE__ */ import_react67.default.createElement("span", { className: available === false ? "wtt-status-warning" : "wtt-muted" }, status), detail && /* @__PURE__ */ import_react67.default.createElement("span", { className: "wtt-environment-detail" }, detail));
   })));
 }
 var EMPTY_FORM = { title: "" };
 function BackgroundDialog({ values, setValues, busy, error, onClose, onSubmit }) {
-  const dialog = (0, import_react66.useRef)(null);
-  (0, import_react66.useEffect)(() => {
+  const dialog = (0, import_react67.useRef)(null);
+  (0, import_react67.useEffect)(() => {
     dialog.current?.showModal();
   }, []);
-  return /* @__PURE__ */ import_react66.default.createElement("dialog", { ref: dialog, className: "wtt-dialog", "aria-labelledby": "wtt-new-title", onCancel: (event) => {
+  return /* @__PURE__ */ import_react67.default.createElement("dialog", { ref: dialog, className: "wtt-dialog", "aria-labelledby": "wtt-new-title", onCancel: (event) => {
     event.preventDefault();
     if (!busy) onClose();
-  } }, /* @__PURE__ */ import_react66.default.createElement("form", { onSubmit }, /* @__PURE__ */ import_react66.default.createElement(DialogHeader, { title: "\u80CC\u666F\u8D44\u6599", titleId: "wtt-new-title", onClose, busy }), /* @__PURE__ */ import_react66.default.createElement(DialogBody, null, /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u80CC\u666F\u4FE1\u606F\uFF08\u9009\u586B\uFF09"), /* @__PURE__ */ import_react66.default.createElement("textarea", { autoFocus: true, rows: 6, maxLength: 3e4, value: values.background, onChange: (event) => setValues((previous) => ({ ...previous, background: event.target.value })), placeholder: "\u76F4\u63A5\u63CF\u8FF0\u8FD9\u6B21\u9700\u6C42\uFF0C\u6216\u7C98\u8D34\u5BF9\u65B9\u53D1\u6765\u7684\u539F\u8BDD\u3001\u8D44\u6599\u548C\u8981\u6C42\u3002" })), /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-muted" }, "\u53EA\u8865\u5145\u672C\u6B21\u521B\u4F5C\u9700\u8981\u7684\u80CC\u666F\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5F15\u7528\u6587\u4EF6\u3002"), error && /* @__PURE__ */ import_react66.default.createElement(UserError, { className: "wtt-inline-error", error })), /* @__PURE__ */ import_react66.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wtt-button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", type: "submit", className: "wtt-button wtt-button-primary", disabled: busy }, busy ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u80CC\u666F"))));
+  } }, /* @__PURE__ */ import_react67.default.createElement("form", { onSubmit }, /* @__PURE__ */ import_react67.default.createElement(DialogHeader, { title: "\u80CC\u666F\u8D44\u6599", titleId: "wtt-new-title", onClose, busy }), /* @__PURE__ */ import_react67.default.createElement(DialogBody, null, /* @__PURE__ */ import_react67.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react67.default.createElement("span", null, "\u80CC\u666F\u4FE1\u606F\uFF08\u9009\u586B\uFF09"), /* @__PURE__ */ import_react67.default.createElement("textarea", { autoFocus: true, rows: 6, maxLength: 3e4, value: values.background, onChange: (event) => setValues((previous) => ({ ...previous, background: event.target.value })), placeholder: "\u76F4\u63A5\u63CF\u8FF0\u8FD9\u6B21\u9700\u6C42\uFF0C\u6216\u7C98\u8D34\u5BF9\u65B9\u53D1\u6765\u7684\u539F\u8BDD\u3001\u8D44\u6599\u548C\u8981\u6C42\u3002" })), /* @__PURE__ */ import_react67.default.createElement("p", { className: "wtt-muted" }, "\u53EA\u8865\u5145\u672C\u6B21\u521B\u4F5C\u9700\u8981\u7684\u80CC\u666F\uFF0C\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5F15\u7528\u6587\u4EF6\u3002"), error && /* @__PURE__ */ import_react67.default.createElement(UserError, { className: "wtt-inline-error", error })), /* @__PURE__ */ import_react67.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wtt-button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", type: "submit", className: "wtt-button wtt-button-primary", disabled: busy }, busy ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u80CC\u666F"))));
 }
 function RequirementBrief({ requirement }) {
-  return /* @__PURE__ */ import_react66.default.createElement("details", { className: "wtt-brief" }, /* @__PURE__ */ import_react66.default.createElement("summary", null, "\u80CC\u666F\u4FE1\u606F"), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-brief-content" }, /* @__PURE__ */ import_react66.default.createElement("p", null, requirement.background || "\u6682\u672A\u586B\u5199\u80CC\u666F\u4FE1\u606F")));
+  return /* @__PURE__ */ import_react67.default.createElement("details", { className: "wtt-brief" }, /* @__PURE__ */ import_react67.default.createElement("summary", null, "\u80CC\u666F\u4FE1\u606F"), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-brief-content" }, /* @__PURE__ */ import_react67.default.createElement("p", null, requirement.background || "\u6682\u672A\u586B\u5199\u80CC\u666F\u4FE1\u606F")));
 }
 function RenameRequirementDialog({ value, onChange, busy, error, onClose, onSubmit, creating = false }) {
-  const dialog = (0, import_react66.useRef)(null);
-  (0, import_react66.useEffect)(() => {
+  const dialog = (0, import_react67.useRef)(null);
+  (0, import_react67.useEffect)(() => {
     dialog.current?.showModal();
   }, []);
-  return /* @__PURE__ */ import_react66.default.createElement("dialog", { ref: dialog, className: "wtt-dialog", "aria-labelledby": "wtt-rename-title", onCancel: (event) => {
+  return /* @__PURE__ */ import_react67.default.createElement("dialog", { ref: dialog, className: "wtt-dialog", "aria-labelledby": "wtt-rename-title", onCancel: (event) => {
     event.preventDefault();
     if (!busy) onClose();
-  } }, /* @__PURE__ */ import_react66.default.createElement("form", { onSubmit }, /* @__PURE__ */ import_react66.default.createElement(DialogHeader, { title: creating ? "\u65B0\u5EFA\u753B\u5E03" : "\u91CD\u547D\u540D\u753B\u5E03", titleId: "wtt-rename-title", onClose, busy }), /* @__PURE__ */ import_react66.default.createElement(DialogBody, null, /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u753B\u5E03\u540D\u79F0", creating ? "\uFF08\u9009\u586B\uFF09" : ""), /* @__PURE__ */ import_react66.default.createElement("input", { autoFocus: true, required: !creating, maxLength: 200, value, onChange: (event) => onChange(event.target.value) })), error && /* @__PURE__ */ import_react66.default.createElement(UserError, { className: "wtt-inline-error", error })), /* @__PURE__ */ import_react66.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wtt-button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", type: "submit", className: "wtt-button wtt-button-primary", disabled: busy || !creating && !value.trim() }, busy ? "\u6B63\u5728\u4FDD\u5B58\u2026" : creating ? "\u521B\u5EFA\u753B\u5E03" : "\u4FDD\u5B58\u540D\u79F0"))));
+  } }, /* @__PURE__ */ import_react67.default.createElement("form", { onSubmit }, /* @__PURE__ */ import_react67.default.createElement(DialogHeader, { title: creating ? "\u65B0\u5EFA\u753B\u5E03" : "\u91CD\u547D\u540D\u753B\u5E03", titleId: "wtt-rename-title", onClose, busy }), /* @__PURE__ */ import_react67.default.createElement(DialogBody, null, /* @__PURE__ */ import_react67.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react67.default.createElement("span", null, "\u753B\u5E03\u540D\u79F0", creating ? "\uFF08\u9009\u586B\uFF09" : ""), /* @__PURE__ */ import_react67.default.createElement("input", { autoFocus: true, required: !creating, maxLength: 200, value, onChange: (event) => onChange(event.target.value) })), error && /* @__PURE__ */ import_react67.default.createElement(UserError, { className: "wtt-inline-error", error })), /* @__PURE__ */ import_react67.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wtt-button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", type: "submit", className: "wtt-button wtt-button-primary", disabled: busy || !creating && !value.trim() }, busy ? "\u6B63\u5728\u4FDD\u5B58\u2026" : creating ? "\u521B\u5EFA\u753B\u5E03" : "\u4FDD\u5B58\u540D\u79F0"))));
 }
 function WorkbenchPage({
   project,
@@ -55779,11 +57564,12 @@ function WorkbenchPage({
   nativeSessionStatuses,
   desktopTaskNotices
 }) {
-  const outlineTitleId = (0, import_react66.useId)();
-  const activeRef = (0, import_react66.useRef)(active);
+  const outlineTitleId = (0, import_react67.useId)();
+  const [showWeChat, setShowWeChat] = (0, import_react67.useState)(false);
+  const activeRef = (0, import_react67.useRef)(active);
   activeRef.current = active;
-  const request = (0, import_react66.useCallback)((action, data) => apiRequest(action, data, project.id), [project.id]);
-  const renderNativePreview = (source) => /* @__PURE__ */ import_react66.default.createElement(
+  const request = (0, import_react67.useCallback)((action, data) => apiRequest(action, data, project.id), [project.id]);
+  const renderNativePreview = (source) => /* @__PURE__ */ import_react67.default.createElement(
     HostFilePreview,
     {
       key: `${source.path}:${source.hash}`,
@@ -55795,38 +57581,38 @@ function WorkbenchPage({
       renderSlot
     }
   );
-  const renderEditorConversation = (props) => /* @__PURE__ */ import_react66.default.createElement(NativeEditorConversation, { ...props, project, acquire: acquireEditingSession, bridge: nativeEditorBridge, SessionProvider, renderSlot, onFileClick: openConversationFile, onOpenFile: previewConversationFile, fileError: conversationFileError });
-  const [deliverableFeedback, setDeliverableFeedback] = (0, import_react66.useState)(null);
-  const [workspace, setWorkspace] = (0, import_react66.useState)(null);
-  const [loading, setLoading] = (0, import_react66.useState)(true);
-  const [loadError, setLoadError] = (0, import_react66.useState)("");
-  const [selectedId, setSelectedId] = (0, import_react66.useState)(null);
-  const [versionId, setVersionId] = (0, import_react66.useState)(null);
-  const [markdown, setMarkdown] = (0, import_react66.useState)("");
-  const [filter2, setFilter] = (0, import_react66.useState)("");
-  const [showNew, setShowNew] = (0, import_react66.useState)(false);
-  const [rename, setRename] = (0, import_react66.useState)(null);
-  const [renameError, setRenameError] = (0, import_react66.useState)("");
-  const [form, setForm] = (0, import_react66.useState)(EMPTY_FORM);
-  const [busy, setBusy] = (0, import_react66.useState)("");
-  const [error, setError] = (0, import_react66.useState)("");
-  const [formError, setFormError] = (0, import_react66.useState)("");
-  const [notice, setNotice] = (0, import_react66.useState)("");
-  const [view, setView] = (0, import_react66.useState)("canvas");
-  const [filesOpen, setFilesOpen] = (0, import_react66.useState)(false);
-  const [projectFileSelection, setProjectFileSelection] = (0, import_react66.useState)(null);
-  const [conversationFileError, setConversationFileError] = (0, import_react66.useState)(null);
-  const [fileAddRequest, setFileAddRequest] = (0, import_react66.useState)(null);
-  const [fileRevealRequest, setFileRevealRequest] = (0, import_react66.useState)(null);
-  const fileRequestPending = (0, import_react66.useRef)(null);
-  const [recycleRequest, setRecycleRequest] = (0, import_react66.useState)(null);
-  const [fileRefresh, setFileRefresh] = (0, import_react66.useState)(0);
-  const [fileRecycleSignal, setFileRecycleSignal] = (0, import_react66.useState)(null);
-  const [fileClipboard, setFileClipboard] = (0, import_react66.useState)(null);
-  const [fileOrganizationSignal, setFileOrganizationSignal] = (0, import_react66.useState)(null);
-  const [backgroundEdit, setBackgroundEdit] = (0, import_react66.useState)(null);
-  const [backgroundError, setBackgroundError] = (0, import_react66.useState)("");
-  const backgroundAttempt = (0, import_react66.useRef)(null);
+  const renderEditorConversation = (props) => /* @__PURE__ */ import_react67.default.createElement(NativeEditorConversation, { ...props, project, acquire: acquireEditingSession, bridge: nativeEditorBridge, SessionProvider, renderSlot, onFileClick: openConversationFile, onOpenFile: previewConversationFile, fileError: conversationFileError });
+  const [deliverableFeedback, setDeliverableFeedback] = (0, import_react67.useState)(null);
+  const [workspace, setWorkspace] = (0, import_react67.useState)(null);
+  const [loading, setLoading] = (0, import_react67.useState)(true);
+  const [loadError, setLoadError] = (0, import_react67.useState)("");
+  const [selectedId, setSelectedId] = (0, import_react67.useState)(null);
+  const [versionId, setVersionId] = (0, import_react67.useState)(null);
+  const [markdown, setMarkdown] = (0, import_react67.useState)("");
+  const [filter2, setFilter] = (0, import_react67.useState)("");
+  const [showNew, setShowNew] = (0, import_react67.useState)(false);
+  const [rename, setRename] = (0, import_react67.useState)(null);
+  const [renameError, setRenameError] = (0, import_react67.useState)("");
+  const [form, setForm] = (0, import_react67.useState)(EMPTY_FORM);
+  const [busy, setBusy] = (0, import_react67.useState)("");
+  const [error, setError] = (0, import_react67.useState)("");
+  const [formError, setFormError] = (0, import_react67.useState)("");
+  const [notice, setNotice] = (0, import_react67.useState)("");
+  const [view, setView] = (0, import_react67.useState)("canvas");
+  const [filesOpen, setFilesOpen] = (0, import_react67.useState)(false);
+  const [projectFileSelection, setProjectFileSelection] = (0, import_react67.useState)(null);
+  const [conversationFileError, setConversationFileError] = (0, import_react67.useState)(null);
+  const [fileAddRequest, setFileAddRequest] = (0, import_react67.useState)(null);
+  const [fileRevealRequest, setFileRevealRequest] = (0, import_react67.useState)(null);
+  const fileRequestPending = (0, import_react67.useRef)(null);
+  const [recycleRequest, setRecycleRequest] = (0, import_react67.useState)(null);
+  const [fileRefresh, setFileRefresh] = (0, import_react67.useState)(0);
+  const [fileRecycleSignal, setFileRecycleSignal] = (0, import_react67.useState)(null);
+  const [fileClipboard, setFileClipboard] = (0, import_react67.useState)(null);
+  const [fileOrganizationSignal, setFileOrganizationSignal] = (0, import_react67.useState)(null);
+  const [backgroundEdit, setBackgroundEdit] = (0, import_react67.useState)(null);
+  const [backgroundError, setBackgroundError] = (0, import_react67.useState)("");
+  const backgroundAttempt = (0, import_react67.useRef)(null);
   function previewProjectFile(entry, { temporary = false, pinned = false } = {}) {
     setProjectFileSelection((previous) => {
       if (temporary && previous?.pinned) return previous;
@@ -55877,24 +57663,24 @@ function WorkbenchPage({
       if (result.done && !result.failed.length && window.innerWidth <= 700) setFilesOpen(false);
     } });
   }
-  (0, import_react66.useEffect)(() => {
+  (0, import_react67.useEffect)(() => {
     if (fileRequestPending.current === fileAddRequest?.token && (!active || view !== "canvas" || selectedId !== fileAddRequest.requirementId)) {
       fileAddRequest.onResult({ done: 0, failed: fileAddRequest.entries.map((entry) => ({ ...entry, error: "\u753B\u5E03\u5DF2\u5207\u6362\uFF0C\u8BF7\u5728\u76EE\u6807\u753B\u5E03\u91CD\u8BD5\u3002" })) });
     }
   }, [active, view, selectedId, fileAddRequest]);
-  const [sessionGeneration, setSessionGeneration] = (0, import_react66.useState)(0);
-  const [sessionErrors, setSessionErrors] = (0, import_react66.useState)({});
-  const [canvasSignals, setCanvasSignals] = (0, import_react66.useState)({});
-  const canvasSessions = (0, import_react66.useRef)(/* @__PURE__ */ new Map());
-  const retiredSessions = (0, import_react66.useRef)(/* @__PURE__ */ new Set());
-  const sessionNavigation = (0, import_react66.useRef)(/* @__PURE__ */ new Map());
-  const canvasDrafts = (0, import_react66.useRef)(/* @__PURE__ */ new Map());
-  const creationDrafts = (0, import_react66.useRef)(/* @__PURE__ */ new Map());
-  const createAttempt = (0, import_react66.useRef)(null);
-  const courseAttempt = (0, import_react66.useRef)(null);
-  const renameAttempt = (0, import_react66.useRef)(null);
-  const saveAttempt = (0, import_react66.useRef)(null);
-  const mounted = (0, import_react66.useRef)(true);
+  const [sessionGeneration, setSessionGeneration] = (0, import_react67.useState)(0);
+  const [sessionErrors, setSessionErrors] = (0, import_react67.useState)({});
+  const [canvasSignals, setCanvasSignals] = (0, import_react67.useState)({});
+  const canvasSessions = (0, import_react67.useRef)(/* @__PURE__ */ new Map());
+  const retiredSessions = (0, import_react67.useRef)(/* @__PURE__ */ new Set());
+  const sessionNavigation = (0, import_react67.useRef)(/* @__PURE__ */ new Map());
+  const canvasDrafts = (0, import_react67.useRef)(/* @__PURE__ */ new Map());
+  const creationDrafts = (0, import_react67.useRef)(/* @__PURE__ */ new Map());
+  const createAttempt = (0, import_react67.useRef)(null);
+  const courseAttempt = (0, import_react67.useRef)(null);
+  const renameAttempt = (0, import_react67.useRef)(null);
+  const saveAttempt = (0, import_react67.useRef)(null);
+  const mounted = (0, import_react67.useRef)(true);
   const selected2 = workspace?.requirements?.find((item) => item.id === selectedId);
   if (selectedId && !canvasDrafts.current.has(selectedId)) canvasDrafts.current.set(selectedId, /* @__PURE__ */ new Map());
   const draftCache = canvasDrafts.current.get(selectedId);
@@ -55904,7 +57690,7 @@ function WorkbenchPage({
   const activeVersion = versions.find((version2) => version2.id === versionId);
   const filtered = (workspace?.requirements || []).filter((item) => `${item.title} ${item.customer || ""} ${item.audience || ""}`.toLowerCase().includes(filter2.toLowerCase()));
   const dirty = markdown !== (activeVersion?.markdown || "");
-  const dirtyRef = (0, import_react66.useRef)(dirty);
+  const dirtyRef = (0, import_react67.useRef)(dirty);
   dirtyRef.current = dirty;
   async function chooseRequirement(requirement) {
     await creationDrafts.current.get(selectedId)?.beforeDocumentLeave?.();
@@ -55932,7 +57718,7 @@ function WorkbenchPage({
       if (mounted.current) setLoading(false);
     }
   }
-  (0, import_react66.useEffect)(() => {
+  (0, import_react67.useEffect)(() => {
     mounted.current = true;
     void load(true);
     return () => {
@@ -55945,7 +57731,7 @@ function WorkbenchPage({
       });
     };
   }, []);
-  (0, import_react66.useEffect)(() => {
+  (0, import_react67.useEffect)(() => {
     const warnBeforeReload = (event) => {
       const hasCreationDraft = [...creationDrafts.current.values()].some((cache) => [...cache.drafts.values()].some((draft) => draft.instruction?.trim() && draft.instruction.trim() !== (draft.originalInput?.instruction || "").trim() || draft.materialContent?.trim() || draft.excerptDraft?.annotation?.trim() || draft.excerptDraft?.selection && !draft.excerptDraft.saved));
       if (!dirtyRef.current && !hasCreationDraft && ![...canvasDrafts.current.values()].some((cache) => cache.size)) return;
@@ -56223,14 +58009,14 @@ function WorkbenchPage({
     }
   }
   const reference = canvasSessions.current.get(selectedId);
-  (0, import_react66.useEffect)(() => {
+  (0, import_react67.useEffect)(() => {
     for (const retired of retiredSessions.current) {
       if (retired === reference) continue;
       retiredSessions.current.delete(retired);
       retired.release();
     }
   }, [sessionGeneration, reference]);
-  const conversation = reference || sessionErrors[selectedId] ? /* @__PURE__ */ import_react66.default.createElement(import_react66.default.Fragment, null, sessionErrors[selectedId] && /* @__PURE__ */ import_react66.default.createElement(UserError, { className: "wtt-inline-error", error: sessionErrors[selectedId] }), reference && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-native-conversation", "data-generation": sessionGeneration, onClickCapture: openConversationFile }, conversationFileError?.sessionId === reference.sessionId && /* @__PURE__ */ import_react66.default.createElement(UserError, { className: "wtt-inline-error", error: conversationFileError.message }), /* @__PURE__ */ import_react66.default.createElement(SessionProvider, { key: reference.sessionId, session: reference }, renderSlot(CANVAS_CONVERSATION_SLOT, {
+  const conversation = reference || sessionErrors[selectedId] ? /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, sessionErrors[selectedId] && /* @__PURE__ */ import_react67.default.createElement(UserError, { className: "wtt-inline-error", error: sessionErrors[selectedId] }), reference && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-native-conversation", "data-generation": sessionGeneration, onClickCapture: openConversationFile }, conversationFileError?.sessionId === reference.sessionId && /* @__PURE__ */ import_react67.default.createElement(UserError, { className: "wtt-inline-error", error: conversationFileError.message }), /* @__PURE__ */ import_react67.default.createElement(SessionProvider, { key: reference.sessionId, session: reference }, renderSlot(CANVAS_CONVERSATION_SLOT, {
     onOpenFile: (file) => previewConversationFile(file, reference.sessionId),
     onSettled: () => setCanvasSignals((signals) => ({ ...signals, [selectedId]: (signals[selectedId] || 0) + 1 }))
   })))) : null;
@@ -56254,14 +58040,14 @@ function WorkbenchPage({
     setFileRecycleSignal({ token: crypto.randomUUID(), requirements: plan.courses.map((c) => c.requirementId) });
     await load();
   }
-  const projectBar = /* @__PURE__ */ import_react66.default.createElement(CanvasProjectBar, { workspace, project, onToggleFiles: () => setFilesOpen(true), filesOpen, selectedId, busy, loading, onSelect: selectRequirement, onNew: () => {
+  const projectBar = /* @__PURE__ */ import_react67.default.createElement(CanvasProjectBar, { workspace, project, onToggleFiles: () => setFilesOpen(true), filesOpen, selectedId, busy, loading, onSelect: selectRequirement, onNew: () => {
     setFormError("");
     setShowNew(true);
-  }, onList: showList, onRefresh: () => load(), onRename: showRename, onBackground: showBackground, onSyncDeliverables: syncDeliverables, onModelSettings: onOpenModelSettings, notificationChannel: desktopTaskNotices?.channel });
-  return /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-project-layout" }, filesOpen && /* @__PURE__ */ import_react66.default.createElement(ProjectExplorer, { onChanged: fileTreeChanged, clipboard: fileClipboard, setClipboard: setFileClipboard, onOrganized: fileOrganizationChanged, refreshSignal: fileRefresh, onRecycle: () => setRecycleRequest(crypto.randomUUID()), project, request, active, onClose: () => setFilesOpen(false), onChooseProject, onOpenProject, onPreview: previewProjectFile, previewPath: projectFileSelection?.path, revealRequest: fileRevealRequest, onAdd: addProjectFile, canAdd: view === "canvas" && Boolean(selected2) }), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-project-main" }, /* @__PURE__ */ import_react66.default.createElement("div", { className: `wtt-course-workbench ${view === "canvas" ? "wtt-canvas-mode" : ""}` }, view === "canvas" && !selected2 && projectBar, view !== "canvas" && /* @__PURE__ */ import_react66.default.createElement(import_react66.default.Fragment, null, /* @__PURE__ */ import_react66.default.createElement("header", { className: "wtt-page-heading" }, /* @__PURE__ */ import_react66.default.createElement("div", null, /* @__PURE__ */ import_react66.default.createElement("h1", null, "WTT \u521B\u4F5C\u5DE5\u4F5C\u53F0"), !filesOpen && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "ghost", onClick: () => setFilesOpen(true), "aria-label": "\u6253\u5F00\u6587\u4EF6\u680F" }, "\u6253\u5F00\u6587\u4EF6\u680F")), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-heading-actions" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", onClick: () => load(), disabled: loading || Boolean(busy) }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: !workspace || Boolean(busy), onClick: () => {
+  }, onList: showList, onRefresh: () => load(), onRename: showRename, onBackground: showBackground, onSyncDeliverables: syncDeliverables, onModelSettings: onOpenModelSettings, onWeChat: () => setShowWeChat(true), notificationChannel: desktopTaskNotices?.channel });
+  return /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-layout" }, filesOpen && /* @__PURE__ */ import_react67.default.createElement(ProjectExplorer, { onChanged: fileTreeChanged, clipboard: fileClipboard, setClipboard: setFileClipboard, onOrganized: fileOrganizationChanged, refreshSignal: fileRefresh, onRecycle: () => setRecycleRequest(crypto.randomUUID()), project, request, active, onClose: () => setFilesOpen(false), onChooseProject, onOpenProject, onPreview: previewProjectFile, previewPath: projectFileSelection?.path, revealRequest: fileRevealRequest, onAdd: addProjectFile, canAdd: view === "canvas" && Boolean(selected2) }), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-main" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: `wtt-course-workbench ${view === "canvas" ? "wtt-canvas-mode" : ""}` }, view === "canvas" && !selected2 && projectBar, view !== "canvas" && /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, /* @__PURE__ */ import_react67.default.createElement("header", { className: "wtt-page-heading" }, /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement("h1", null, "WTT \u521B\u4F5C\u5DE5\u4F5C\u53F0"), !filesOpen && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", onClick: () => setFilesOpen(true), "aria-label": "\u6253\u5F00\u6587\u4EF6\u680F" }, "\u6253\u5F00\u6587\u4EF6\u680F")), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-heading-actions" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", onClick: () => setShowWeChat(true) }, "\u5FAE\u4FE1\u9879\u76EE\u52A9\u624B"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", onClick: () => load(), disabled: loading || Boolean(busy) }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: !workspace || Boolean(busy), onClick: () => {
     setFormError("");
     setShowNew(true);
-  } }, "\u65B0\u5EFA\u753B\u5E03"))), workspace && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-view-toolbar" }, /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-view-toggle", "aria-label": "\u5DE5\u4F5C\u53F0\u89C6\u56FE" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", "aria-pressed": view === "canvas", onClick: () => setView("canvas") }, "\u81EA\u7531\u753B\u5E03"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", "aria-pressed": view === "list", onClick: showList }, "\u5217\u8868\u7F16\u8F91")))), view === "canvas" && deliverableFeedback && /* @__PURE__ */ import_react66.default.createElement("div", { className: `wtt-deliverable-feedback is-${deliverableFeedback.status}`, role: deliverableFeedback.status === "failed" ? "alert" : "status" }, /* @__PURE__ */ import_react66.default.createElement("span", null, deliverableFeedback.text), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "button", "aria-label": "\u5173\u95ED\u6587\u4EF6\u6574\u7406\u63D0\u793A", onClick: () => setDeliverableFeedback(null) }, "\xD7")), loadError && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-feedback wtt-feedback-error", role: "alert" }, /* @__PURE__ */ import_react66.default.createElement(UserError, { error: loadError, announce: false }), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", onClick: () => load(!workspace), disabled: loading }, "\u91CD\u65B0\u8BFB\u53D6")), modelError && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-feedback wtt-feedback-error wtt-model-feedback", role: "alert" }, /* @__PURE__ */ import_react66.default.createElement(UserError, { error: modelError, announce: false }), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", onClick: onRefreshModels, disabled: modelLoading }, "\u5237\u65B0\u6A21\u578B")), view === "canvas" && selected2 && /* @__PURE__ */ import_react66.default.createElement(
+  } }, "\u65B0\u5EFA\u753B\u5E03"))), workspace && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-view-toolbar" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-view-toggle", "aria-label": "\u5DE5\u4F5C\u53F0\u89C6\u56FE" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", "aria-pressed": view === "canvas", onClick: () => setView("canvas") }, "\u81EA\u7531\u753B\u5E03"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", "aria-pressed": view === "list", onClick: showList }, "\u5217\u8868\u7F16\u8F91")))), view === "canvas" && deliverableFeedback && /* @__PURE__ */ import_react67.default.createElement("div", { className: `wtt-deliverable-feedback is-${deliverableFeedback.status}`, role: deliverableFeedback.status === "failed" ? "alert" : "status" }, /* @__PURE__ */ import_react67.default.createElement("span", null, deliverableFeedback.text), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "button", "aria-label": "\u5173\u95ED\u6587\u4EF6\u6574\u7406\u63D0\u793A", onClick: () => setDeliverableFeedback(null) }, "\xD7")), loadError && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-feedback wtt-feedback-error", role: "alert" }, /* @__PURE__ */ import_react67.default.createElement(UserError, { error: loadError, announce: false }), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", onClick: () => load(!workspace), disabled: loading }, "\u91CD\u65B0\u8BFB\u53D6")), modelError && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-feedback wtt-feedback-error wtt-model-feedback", role: "alert" }, /* @__PURE__ */ import_react67.default.createElement(UserError, { error: modelError, announce: false }), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", onClick: onRefreshModels, disabled: modelLoading }, "\u5237\u65B0\u6A21\u578B")), view === "canvas" && selected2 && /* @__PURE__ */ import_react67.default.createElement(
     CourseCanvas,
     {
       renderEditorConversation,
@@ -56320,29 +58106,30 @@ function WorkbenchPage({
         onOpenNativeConversation(sessionId);
       })
     }
-  ), !selected2 && recycleRequest && /* @__PURE__ */ import_react66.default.createElement(ProjectRecycleDialog, { request, endpoint: (q2) => endpoint(q2, project.id), onClose: () => setRecycleRequest(null), onChanged: () => setFileRefresh((v2) => v2 + 1) }), view === "canvas" && !selected2 && projectFileSelection && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-empty-file-preview" }, /* @__PURE__ */ import_react66.default.createElement(ProjectFilePreview, { selection: projectFileSelection, endpoint: (q2) => endpoint(q2, project.id), onClose: () => setProjectFileSelection(null), onPin: pinProjectFile, onLocate: () => locateProjectFile(projectFileSelection.path) })), view === "canvas" && workspace && !selected2 && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-page-empty" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", onClick: () => setShowNew(true) }, "\u65B0\u5EFA\u753B\u5E03")), loading && !workspace ? /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-page-empty", role: "status" }, /* @__PURE__ */ import_react66.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u548C\u5DF2\u4FDD\u5B58\u7248\u672C\u2026")) : workspace && view === "list" && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-workspace-layout" }, /* @__PURE__ */ import_react66.default.createElement("aside", { className: "wtt-requirements", "aria-label": "\u9879\u76EE\u753B\u5E03" }, /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-list-heading" }, /* @__PURE__ */ import_react66.default.createElement("h2", null, "\u753B\u5E03"), /* @__PURE__ */ import_react66.default.createElement("span", null, workspace.requirements?.length || 0)), (workspace.requirements?.length || 0) > 0 && /* @__PURE__ */ import_react66.default.createElement("input", { className: "wtt-search", "aria-label": "\u641C\u7D22\u753B\u5E03", value: filter2, onChange: (event) => setFilter(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u5BA2\u6237\u6216\u53D7\u4F17" }), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-requirement-list" }, filtered.map((requirement) => /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", key: requirement.id, className: `wtt-requirement-item ${requirement.id === selectedId ? "is-selected" : ""}`, "aria-current": requirement.id === selectedId ? "true" : void 0, disabled: Boolean(busy), onClick: () => selectRequirement(requirement) }, /* @__PURE__ */ import_react66.default.createElement("strong", null, requirement.title), /* @__PURE__ */ import_react66.default.createElement("span", null, requirement.background?.slice(0, 70) || "\u6682\u672A\u586B\u5199\u80CC\u666F\u4FE1\u606F"), /* @__PURE__ */ import_react66.default.createElement("small", null, requirement.versions?.length ? `${requirement.versions.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "\u5C1A\u65E0\u5927\u7EB2"))), !filtered.length && /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-list-empty" }, filter2 ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03\u3002")), /* @__PURE__ */ import_react66.default.createElement(EnvironmentStatus, { dependencies: workspace.dependencies })), /* @__PURE__ */ import_react66.default.createElement("main", { className: "wtt-detail" }, !selected2 ? /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-page-empty" }, /* @__PURE__ */ import_react66.default.createElement(BookIcon, null), /* @__PURE__ */ import_react66.default.createElement("h2", null, "\u521B\u5EFA\u4E00\u5F20\u753B\u5E03"), /* @__PURE__ */ import_react66.default.createElement("p", null, "\u4F7F\u7528\u5DF2\u6709\u8D44\u6599\u7EE7\u7EED\u521B\u4F5C\u3002"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", onClick: () => setShowNew(true) }, "\u65B0\u5EFA\u753B\u5E03")) : /* @__PURE__ */ import_react66.default.createElement(import_react66.default.Fragment, null, /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-detail-heading" }, /* @__PURE__ */ import_react66.default.createElement("div", null, /* @__PURE__ */ import_react66.default.createElement("h2", null, selected2.title), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", disabled: Boolean(busy), onClick: showRename }, "\u91CD\u547D\u540D\u753B\u5E03")), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: Boolean(busy), onClick: startCourse }, busy === "prepare-course" ? "\u6B63\u5728\u51C6\u5907\u4F1A\u8BDD\u2026" : "\u751F\u6210\u8BFE\u7A0B\u5927\u7EB2")), /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-session-hint" }, "\u6839\u636E\u753B\u5E03\u80CC\u666F\u751F\u6210\u5927\u7EB2\uFF0C\u786E\u8BA4\u6B65\u9AA4\u5728 DSH \u5BF9\u8BDD\u4E2D\u5B8C\u6210\u3002"), /* @__PURE__ */ import_react66.default.createElement(RequirementBrief, { requirement: selected2 }), /* @__PURE__ */ import_react66.default.createElement("section", { className: "wtt-outline-section", "aria-labelledby": outlineTitleId }, /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-outline-heading" }, /* @__PURE__ */ import_react66.default.createElement("h3", { id: outlineTitleId }, "\u8BFE\u7A0B\u5927\u7EB2"), /* @__PURE__ */ import_react66.default.createElement("span", { className: "wtt-muted" }, activeVersion ? `\u6B63\u5728\u67E5\u770B v${activeVersion.number}${dirty ? " \xB7 \u6709\u672A\u4FDD\u5B58\u4FEE\u6539" : ""}` : "\u5C1A\u672A\u4FDD\u5B58\u7248\u672C")), versions.length > 0 && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-versions", "aria-label": "\u5927\u7EB2\u7248\u672C" }, [...versions].sort((a, b2) => b2.number - a.number).map((version2) => /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "custom", key: version2.id, className: `wtt-version ${version2.id === versionId ? "is-selected" : ""}`, "aria-pressed": version2.id === versionId, title: formatTime(version2.createdAt), disabled: Boolean(busy), onClick: () => chooseVersion(version2) }, "v", version2.number, /* @__PURE__ */ import_react66.default.createElement("span", null, formatTime(version2.createdAt))))), /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-outline-editor" }, /* @__PURE__ */ import_react66.default.createElement("span", { className: "wtt-visually-hidden" }, "\u5927\u7EB2 Markdown \u5185\u5BB9"), /* @__PURE__ */ import_react66.default.createElement("textarea", { value: markdown, disabled: Boolean(busy), onChange: (event) => {
+  ), !selected2 && recycleRequest && /* @__PURE__ */ import_react67.default.createElement(ProjectRecycleDialog, { request, endpoint: (q2) => endpoint(q2, project.id), onClose: () => setRecycleRequest(null), onChanged: () => setFileRefresh((v2) => v2 + 1) }), view === "canvas" && !selected2 && projectFileSelection && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-empty-file-preview" }, /* @__PURE__ */ import_react67.default.createElement(ProjectFilePreview, { selection: projectFileSelection, endpoint: (q2) => endpoint(q2, project.id), onClose: () => setProjectFileSelection(null), onPin: pinProjectFile, onLocate: () => locateProjectFile(projectFileSelection.path) })), view === "canvas" && workspace && !selected2 && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-page-empty" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", onClick: () => setShowNew(true) }, "\u65B0\u5EFA\u753B\u5E03")), loading && !workspace ? /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-page-empty", role: "status" }, /* @__PURE__ */ import_react67.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u753B\u5E03\u548C\u5DF2\u4FDD\u5B58\u7248\u672C\u2026")) : workspace && view === "list" && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-workspace-layout" }, /* @__PURE__ */ import_react67.default.createElement("aside", { className: "wtt-requirements", "aria-label": "\u9879\u76EE\u753B\u5E03" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-list-heading" }, /* @__PURE__ */ import_react67.default.createElement("h2", null, "\u753B\u5E03"), /* @__PURE__ */ import_react67.default.createElement("span", null, workspace.requirements?.length || 0)), (workspace.requirements?.length || 0) > 0 && /* @__PURE__ */ import_react67.default.createElement("input", { className: "wtt-search", "aria-label": "\u641C\u7D22\u753B\u5E03", value: filter2, onChange: (event) => setFilter(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u5BA2\u6237\u6216\u53D7\u4F17" }), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-requirement-list" }, filtered.map((requirement) => /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", key: requirement.id, className: `wtt-requirement-item ${requirement.id === selectedId ? "is-selected" : ""}`, "aria-current": requirement.id === selectedId ? "true" : void 0, disabled: Boolean(busy), onClick: () => selectRequirement(requirement) }, /* @__PURE__ */ import_react67.default.createElement("strong", null, requirement.title), /* @__PURE__ */ import_react67.default.createElement("span", null, requirement.background?.slice(0, 70) || "\u6682\u672A\u586B\u5199\u80CC\u666F\u4FE1\u606F"), /* @__PURE__ */ import_react67.default.createElement("small", null, requirement.versions?.length ? `${requirement.versions.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "\u5C1A\u65E0\u5927\u7EB2"))), !filtered.length && /* @__PURE__ */ import_react67.default.createElement("p", { className: "wtt-list-empty" }, filter2 ? "\u6CA1\u6709\u5339\u914D\u7684\u753B\u5E03" : "\u8FD8\u6CA1\u6709\u753B\u5E03\u3002")), /* @__PURE__ */ import_react67.default.createElement(EnvironmentStatus, { dependencies: workspace.dependencies })), /* @__PURE__ */ import_react67.default.createElement("main", { className: "wtt-detail" }, !selected2 ? /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-page-empty" }, /* @__PURE__ */ import_react67.default.createElement(BookIcon, null), /* @__PURE__ */ import_react67.default.createElement("h2", null, "\u521B\u5EFA\u4E00\u5F20\u753B\u5E03"), /* @__PURE__ */ import_react67.default.createElement("p", null, "\u4F7F\u7528\u5DF2\u6709\u8D44\u6599\u7EE7\u7EED\u521B\u4F5C\u3002"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", onClick: () => setShowNew(true) }, "\u65B0\u5EFA\u753B\u5E03")) : /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-detail-heading" }, /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement("h2", null, selected2.title), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", disabled: Boolean(busy), onClick: showRename }, "\u91CD\u547D\u540D\u753B\u5E03")), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: Boolean(busy), onClick: startCourse }, busy === "prepare-course" ? "\u6B63\u5728\u51C6\u5907\u4F1A\u8BDD\u2026" : "\u751F\u6210\u8BFE\u7A0B\u5927\u7EB2")), /* @__PURE__ */ import_react67.default.createElement("p", { className: "wtt-session-hint" }, "\u6839\u636E\u753B\u5E03\u80CC\u666F\u751F\u6210\u5927\u7EB2\uFF0C\u786E\u8BA4\u6B65\u9AA4\u5728 DSH \u5BF9\u8BDD\u4E2D\u5B8C\u6210\u3002"), /* @__PURE__ */ import_react67.default.createElement(RequirementBrief, { requirement: selected2 }), /* @__PURE__ */ import_react67.default.createElement("section", { className: "wtt-outline-section", "aria-labelledby": outlineTitleId }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-outline-heading" }, /* @__PURE__ */ import_react67.default.createElement("h3", { id: outlineTitleId }, "\u8BFE\u7A0B\u5927\u7EB2"), /* @__PURE__ */ import_react67.default.createElement("span", { className: "wtt-muted" }, activeVersion ? `\u6B63\u5728\u67E5\u770B v${activeVersion.number}${dirty ? " \xB7 \u6709\u672A\u4FDD\u5B58\u4FEE\u6539" : ""}` : "\u5C1A\u672A\u4FDD\u5B58\u7248\u672C")), versions.length > 0 && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-versions", "aria-label": "\u5927\u7EB2\u7248\u672C" }, [...versions].sort((a, b2) => b2.number - a.number).map((version2) => /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", key: version2.id, className: `wtt-version ${version2.id === versionId ? "is-selected" : ""}`, "aria-pressed": version2.id === versionId, title: formatTime(version2.createdAt), disabled: Boolean(busy), onClick: () => chooseVersion(version2) }, "v", version2.number, /* @__PURE__ */ import_react67.default.createElement("span", null, formatTime(version2.createdAt))))), /* @__PURE__ */ import_react67.default.createElement("label", { className: "wtt-outline-editor" }, /* @__PURE__ */ import_react67.default.createElement("span", { className: "wtt-visually-hidden" }, "\u5927\u7EB2 Markdown \u5185\u5BB9"), /* @__PURE__ */ import_react67.default.createElement("textarea", { value: markdown, disabled: Boolean(busy), onChange: (event) => {
     setMarkdown(event.target.value);
     setError("");
     setNotice("");
-  }, spellCheck: false, placeholder: "\u7C98\u8D34\u5DF2\u6709\u5927\u7EB2\uFF0C\u6216\u901A\u8FC7\u300C\u751F\u6210\u8BFE\u7A0B\u5927\u7EB2\u300D\u8C03\u7528\u8BFE\u7A0B\u6280\u80FD\u3002\u652F\u6301 Markdown\uFF1B\u4FDD\u5B58\u65F6\u4F1A\u521B\u5EFA\u72EC\u7ACB\u7248\u672C\u3002" })), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-editor-footer" }, /* @__PURE__ */ import_react66.default.createElement("p", null, activeVersion ? `v${activeVersion.number} \xB7 ${formatTime(activeVersion.createdAt)}` : "\u4FDD\u5B58\u540E\u53EF\u4EE5\u5BFC\u51FA\u5BF9\u5E94\u7684 Word \u6587\u4EF6\u3002"), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-editor-actions" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", disabled: Boolean(busy) || !activeVersion, onClick: exportWord }, busy === "export-word" ? "\u6B63\u5728\u5BFC\u51FA\u2026" : "\u5BFC\u51FA Word"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: Boolean(busy) || !markdown.trim() || Boolean(activeVersion && !dirty), onClick: saveOutline }, busy === "save-outline" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C"))), dirty && activeVersion && /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-unsaved-hint" }, "\u7F16\u8F91\u5185\u5BB9\u5C1A\u672A\u4FDD\u5B58\uFF1B\u5BFC\u51FA Word \u4F7F\u7528\u5F53\u524D\u5DF2\u4FDD\u5B58\u7684 v", activeVersion.number, "\u3002\u4FDD\u5B58\u65B0\u7248\u672C\u540E\u518D\u5BFC\u51FA\uFF0C\u53EF\u5305\u542B\u672C\u6B21\u4FEE\u6539\u3002"), activeVersion?.wordPath && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-word-file" }, /* @__PURE__ */ import_react66.default.createElement("div", null, /* @__PURE__ */ import_react66.default.createElement("strong", null, "Word \xB7 \u5927\u7EB2 v", activeVersion.number), /* @__PURE__ */ import_react66.default.createElement("p", { title: activeVersion.wordPath }, activeVersion.wordPath)), /* @__PURE__ */ import_react66.default.createElement("a", { className: "wtt-button", href: endpoint({ download: activeVersion.id }, project.id).toString(), download: true }, "\u4E0B\u8F7D Word"))), error && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-feedback wtt-feedback-error", role: "alert" }, /* @__PURE__ */ import_react66.default.createElement(UserError, { error, announce: false })), notice && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-feedback wtt-feedback-success", role: "status" }, notice)))), showNew && /* @__PURE__ */ import_react66.default.createElement(RenameRequirementDialog, { creating: true, value: form.title, onChange: (title) => setForm({ title }), busy: busy === "create", error: formError, onClose: () => setShowNew(false), onSubmit: createRequirement }), backgroundEdit && /* @__PURE__ */ import_react66.default.createElement(BackgroundDialog, { values: backgroundEdit, setValues: setBackgroundEdit, busy: busy === "background", error: backgroundError, onClose: () => setBackgroundEdit(null), onSubmit: saveBackground }), rename && /* @__PURE__ */ import_react66.default.createElement(RenameRequirementDialog, { value: rename.title, onChange: (title) => setRename((previous) => ({ ...previous, title })), busy: busy === "rename", error: renameError, onClose: () => setRename(null), onSubmit: renameRequirement }))));
+  }, spellCheck: false, placeholder: "\u7C98\u8D34\u5DF2\u6709\u5927\u7EB2\uFF0C\u6216\u901A\u8FC7\u300C\u751F\u6210\u8BFE\u7A0B\u5927\u7EB2\u300D\u8C03\u7528\u8BFE\u7A0B\u6280\u80FD\u3002\u652F\u6301 Markdown\uFF1B\u4FDD\u5B58\u65F6\u4F1A\u521B\u5EFA\u72EC\u7ACB\u7248\u672C\u3002" })), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-editor-footer" }, /* @__PURE__ */ import_react67.default.createElement("p", null, activeVersion ? `v${activeVersion.number} \xB7 ${formatTime(activeVersion.createdAt)}` : "\u4FDD\u5B58\u540E\u53EF\u4EE5\u5BFC\u51FA\u5BF9\u5E94\u7684 Word \u6587\u4EF6\u3002"), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-editor-actions" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", disabled: Boolean(busy) || !activeVersion, onClick: exportWord }, busy === "export-word" ? "\u6B63\u5728\u5BFC\u51FA\u2026" : "\u5BFC\u51FA Word"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: Boolean(busy) || !markdown.trim() || Boolean(activeVersion && !dirty), onClick: saveOutline }, busy === "save-outline" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C"))), dirty && activeVersion && /* @__PURE__ */ import_react67.default.createElement("p", { className: "wtt-unsaved-hint" }, "\u7F16\u8F91\u5185\u5BB9\u5C1A\u672A\u4FDD\u5B58\uFF1B\u5BFC\u51FA Word \u4F7F\u7528\u5F53\u524D\u5DF2\u4FDD\u5B58\u7684 v", activeVersion.number, "\u3002\u4FDD\u5B58\u65B0\u7248\u672C\u540E\u518D\u5BFC\u51FA\uFF0C\u53EF\u5305\u542B\u672C\u6B21\u4FEE\u6539\u3002"), activeVersion?.wordPath && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-word-file" }, /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement("strong", null, "Word \xB7 \u5927\u7EB2 v", activeVersion.number), /* @__PURE__ */ import_react67.default.createElement("p", { title: activeVersion.wordPath }, activeVersion.wordPath)), /* @__PURE__ */ import_react67.default.createElement("a", { className: "wtt-button", href: endpoint({ download: activeVersion.id }, project.id).toString(), download: true }, "\u4E0B\u8F7D Word"))), error && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-feedback wtt-feedback-error", role: "alert" }, /* @__PURE__ */ import_react67.default.createElement(UserError, { error, announce: false })), notice && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-feedback wtt-feedback-success", role: "status" }, notice)))), showNew && /* @__PURE__ */ import_react67.default.createElement(RenameRequirementDialog, { creating: true, value: form.title, onChange: (title) => setForm({ title }), busy: busy === "create", error: formError, onClose: () => setShowNew(false), onSubmit: createRequirement }), backgroundEdit && /* @__PURE__ */ import_react67.default.createElement(BackgroundDialog, { values: backgroundEdit, setValues: setBackgroundEdit, busy: busy === "background", error: backgroundError, onClose: () => setBackgroundEdit(null), onSubmit: saveBackground }), rename && /* @__PURE__ */ import_react67.default.createElement(RenameRequirementDialog, { value: rename.title, onChange: (title) => setRename((previous) => ({ ...previous, title })), busy: busy === "rename", error: renameError, onClose: () => setRename(null), onSubmit: renameRequirement }), active && showWeChat && /* @__PURE__ */ import_react67.default.createElement(ProjectWeChatDialog, { projectId: project.id, canvasId: selected2?.id, request: apiRequest, onClose: () => setShowWeChat(false) }))));
 }
 function ProjectWorkbench(props) {
-  const [registry, setRegistry] = (0, import_react66.useState)(null);
-  const [opened, setOpened] = (0, import_react66.useState)([]);
-  const [loading, setLoading] = (0, import_react66.useState)(true);
-  const [error, setError] = (0, import_react66.useState)("");
-  const [pickerOpen, setPickerOpen] = (0, import_react66.useState)(false);
-  const mounted = (0, import_react66.useRef)(true);
-  const [modelCatalog, setModelCatalog] = (0, import_react66.useState)(null);
-  const [modelSelection, setModelSelection] = (0, import_react66.useState)(null);
-  const [modelLoading, setModelLoading] = (0, import_react66.useState)(true);
-  const [modelError, setModelError] = (0, import_react66.useState)("");
-  const modelLoadEpoch = (0, import_react66.useRef)(0);
-  const subscribeStatuses = (0, import_react66.useCallback)((listener) => props.nativeSessionStatus?.subscribe(listener) || (() => {
+  const [registry, setRegistry] = (0, import_react67.useState)(null);
+  const [opened, setOpened] = (0, import_react67.useState)([]);
+  const [loading, setLoading] = (0, import_react67.useState)(true);
+  const [error, setError] = (0, import_react67.useState)("");
+  const [pickerOpen, setPickerOpen] = (0, import_react67.useState)(false);
+  const mounted = (0, import_react67.useRef)(true);
+  const registryReadEpoch = (0, import_react67.useRef)(0);
+  const [modelCatalog, setModelCatalog] = (0, import_react67.useState)(null);
+  const [modelSelection, setModelSelection] = (0, import_react67.useState)(null);
+  const [modelLoading, setModelLoading] = (0, import_react67.useState)(true);
+  const [modelError, setModelError] = (0, import_react67.useState)("");
+  const modelLoadEpoch = (0, import_react67.useRef)(0);
+  const subscribeStatuses = (0, import_react67.useCallback)((listener) => props.nativeSessionStatus?.subscribe(listener) || (() => {
   }), [props.nativeSessionStatus]);
-  const readStatuses = (0, import_react66.useCallback)(() => props.nativeSessionStatus?.getSnapshot() || EMPTY_SESSION_STATUSES, [props.nativeSessionStatus]);
-  const nativeSessionStatuses = (0, import_react66.useSyncExternalStore)(subscribeStatuses, readStatuses, readStatuses);
-  const loadModels = (0, import_react66.useCallback)(async () => {
+  const readStatuses = (0, import_react67.useCallback)(() => props.nativeSessionStatus?.getSnapshot() || EMPTY_SESSION_STATUSES, [props.nativeSessionStatus]);
+  const nativeSessionStatuses = (0, import_react67.useSyncExternalStore)(subscribeStatuses, readStatuses, readStatuses);
+  const loadModels = (0, import_react67.useCallback)(async () => {
     const epoch = ++modelLoadEpoch.current;
     setModelLoading(true);
     setModelError("");
@@ -56357,7 +58144,7 @@ function ProjectWorkbench(props) {
       if (mounted.current && epoch === modelLoadEpoch.current) setModelLoading(false);
     }
   }, [props.onLoadModels]);
-  const openModelSettings = (0, import_react66.useCallback)(async () => {
+  const openModelSettings = (0, import_react67.useCallback)(async () => {
     try {
       await props.onOpenModelSettings();
       setModelError("");
@@ -56382,7 +58169,7 @@ function ProjectWorkbench(props) {
       if (mounted.current) setLoading(false);
     }
   }
-  (0, import_react66.useEffect)(() => {
+  (0, import_react67.useEffect)(() => {
     mounted.current = true;
     void loadProjects();
     void loadModels();
@@ -56395,6 +58182,7 @@ function ProjectWorkbench(props) {
     if (!mounted.current) return;
     const project2 = result.project;
     if (!project2?.id || !project2.path) throw new Error("\u670D\u52A1\u5668\u672A\u8FD4\u56DE\u6709\u6548\u9879\u76EE\uFF0C\u8BF7\u4FDD\u7559\u5F53\u524D\u5185\u5BB9\u540E\u91CD\u8BD5\u3002");
+    registryReadEpoch.current++;
     setRegistry((previous) => ({
       ...previous,
       activeProjectId: project2.id,
@@ -56404,14 +58192,25 @@ function ProjectWorkbench(props) {
     setError("");
     setPickerOpen(false);
   }
+  function chooseProject() {
+    setPickerOpen(true);
+    const epoch = ++registryReadEpoch.current;
+    void apiRequest(void 0, void 0, void 0, { projects: 1 }).then((next) => {
+      if (mounted.current && epoch === registryReadEpoch.current) {
+        setRegistry((previous) => previous ? { ...previous, projects: next.projects } : next);
+      }
+    }).catch((cause) => {
+      if (mounted.current && epoch === registryReadEpoch.current) setError(messageOf8(cause));
+    });
+  }
   const project = registry?.projects.find((item) => item.id === registry.activeProjectId);
-  return /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-project-workbench" }, !registry && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-project-boot" }, /* @__PURE__ */ import_react66.default.createElement(BookIcon, null), /* @__PURE__ */ import_react66.default.createElement("h1", null, "WTT \u521B\u4F5C\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react66.default.createElement("p", { role: error ? "alert" : "status" }, error || (loading ? "\u6B63\u5728\u6253\u5F00\u9879\u76EE\u76EE\u5F55\u2026" : "\u9009\u62E9\u9879\u76EE\u6587\u4EF6\u5939\uFF0C\u5F00\u59CB\u521B\u4F5C\u3002")), !loading && /* @__PURE__ */ import_react66.default.createElement("div", null, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", onClick: () => void loadProjects() }, "\u91CD\u65B0\u8BFB\u53D6"), /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "quiet", onClick: () => setPickerOpen(true) }, "\u9009\u62E9\u9879\u76EE\u76EE\u5F55"))), registry && error && /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-project-warning", role: "alert" }, error, /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setError(""), "aria-label": "\u5173\u95ED\u9879\u76EE\u63D0\u793A" }, "\xD7")), opened.map((item) => /* @__PURE__ */ import_react66.default.createElement("div", { key: item.id, className: "wtt-project-surface", hidden: registry?.activeProjectId !== item.id }, /* @__PURE__ */ import_react66.default.createElement(
+  return /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-workbench" }, !registry && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-boot" }, /* @__PURE__ */ import_react67.default.createElement(BookIcon, null), /* @__PURE__ */ import_react67.default.createElement("h1", null, "WTT \u521B\u4F5C\u5DE5\u4F5C\u53F0"), /* @__PURE__ */ import_react67.default.createElement("p", { role: error ? "alert" : "status" }, error || (loading ? "\u6B63\u5728\u6253\u5F00\u9879\u76EE\u76EE\u5F55\u2026" : "\u9009\u62E9\u9879\u76EE\u6587\u4EF6\u5939\uFF0C\u5F00\u59CB\u521B\u4F5C\u3002")), !loading && /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", onClick: () => void loadProjects() }, "\u91CD\u65B0\u8BFB\u53D6"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", onClick: () => setPickerOpen(true) }, "\u9009\u62E9\u9879\u76EE\u76EE\u5F55"))), registry && error && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-warning", role: "alert" }, error, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => setError(""), "aria-label": "\u5173\u95ED\u9879\u76EE\u63D0\u793A" }, "\xD7")), opened.map((item) => /* @__PURE__ */ import_react67.default.createElement("div", { key: item.id, className: "wtt-project-surface", hidden: registry?.activeProjectId !== item.id }, /* @__PURE__ */ import_react67.default.createElement(
     WorkbenchPage,
     {
       ...props,
       project: item,
       active: registry?.activeProjectId === item.id,
-      onChooseProject: () => setPickerOpen(true),
+      onChooseProject: chooseProject,
       onOpenProject: openProject,
       modelCatalog,
       modelSelection,
@@ -56422,7 +58221,7 @@ function ProjectWorkbench(props) {
       modelError,
       nativeSessionStatuses
     }
-  ))), pickerOpen && /* @__PURE__ */ import_react66.default.createElement(
+  ))), pickerOpen && /* @__PURE__ */ import_react67.default.createElement(
     ProjectPicker,
     {
       currentProject: project,
@@ -56453,13 +58252,13 @@ function apply2(ctx) {
     }
     return apiRequest(void 0, void 0, void 0, { directory: path || "" }, signal);
   };
-  ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "wtt-canvas-assets", order: 5 }, (props) => /* @__PURE__ */ import_react66.default.createElement(CanvasConversationReferenceButton, { ...props, getAttachmentService: () => ctx.conversation }))));
+  ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "wtt-canvas-assets", order: 5 }, (props) => /* @__PURE__ */ import_react67.default.createElement(CanvasConversationReferenceButton, { ...props, getAttachmentService: () => ctx.conversation }))));
   const projectInput = projectInputBridge(ctx);
   ctx.effect(() => ctx.inputTriggers.registerSource(projectInput.source));
-  ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "wtt-project-agent-input", order: 4 }, (props) => /* @__PURE__ */ import_react66.default.createElement(ProjectInputDock, { ...props, bridge: projectInput }))));
+  ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "wtt-project-agent-input", order: 4 }, (props) => /* @__PURE__ */ import_react67.default.createElement(ProjectInputDock, { ...props, bridge: projectInput }))));
   const nativeEditorBridge = createNativeEditorBridge();
   ctx.effect(() => ctx.inputTriggers.registerSource(nativeEditorBridge.source));
-  ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "wtt-course-edit-reference", order: 5 }, (props) => /* @__PURE__ */ import_react66.default.createElement(NativeEditorInputDock, { ...props, bridge: nativeEditorBridge }))));
+  ctx.effect(() => ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "wtt-course-edit-reference", order: 5 }, (props) => /* @__PURE__ */ import_react67.default.createElement(NativeEditorInputDock, { ...props, bridge: nativeEditorBridge }))));
   registerCanvasConversation(ctx);
   registerConversationFilePreview(ctx);
   const acquirePreviewSession = createPreviewSessionAcquirer(ctx);

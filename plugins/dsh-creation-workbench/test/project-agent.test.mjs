@@ -1,18 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync,readFileSync,writeFileSync,rmSync,symlinkSync } from 'node:fs';
+import { existsSync,mkdtempSync,readFileSync,writeFileSync,rmSync,symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {WorkbenchService} from '../src/service.mjs';
 import {ProjectAgent} from '../src/project-agent.mjs';
+import {ProjectCodexExecutor} from '../src/project-codex-executor.mjs';
 
 async function fixture(t,mode='plan'){
   const root=mkdtempSync(path.join(tmpdir(),'wtt-project-agent-'));
   let service=new WorkbenchService({workspaceRoot:root}),agent;
   const sent=[];
   const host={createSession:async()=>randomUUID(),prompt:async(_service,sid,prepared)=>{sent.push({sid,prepared});return {accepted:true};},
-    createTask:(svc,input,sources,settings,authorized,title)=>authorized()&&svc.createTask({...input,selectedSkills:[]},{projectInputs:{title,sources,settings}}),stop:async()=>{}};
+    createTask:(svc,input,sources,settings,authorized,title,_session,executor)=>authorized()&&svc.createTask({...input,selectedSkills:[]},{projectInputs:{title,sources,settings,...(executor==='codex'?{executor}:{})}}),stop:async()=>{}};
   agent=new ProjectAgent(service,host);
   t.after(()=>{service.close();rmSync(root,{recursive:true,force:true});});
   const a=service.store.createCanvas({title:'采访',operationId:randomUUID()}).id,b=service.store.createCanvas({title:'制作',operationId:randomUUID()}).id;
@@ -23,12 +24,190 @@ async function fixture(t,mode='plan'){
   const propose=()=>agent.tool(session,'plan',turn.id,plan);
   function restart(){service.close();service=new WorkbenchService({workspaceRoot:root});agent=new ProjectAgent(service,host);}
   async function publish(i,extra={}){
-    const {sid,prepared}=sent[i],file=prepared.deliveryDirectory+'/result'+i+(extra.primary===false?'attach':'')+'.md';
+    const {sid,prepared}=sent[i],file=prepared.deliveryDirectory+'/result'+i+'-'+randomUUID()+'.md';
     writeFileSync(path.join(root,file),'# 已保存的内容');
     return service.tasks.files.register({operationId:randomUUID(),taskId:prepared.taskId,kind:'text',title:'成果 '+i,path:file,...extra},{sessionId:sid});
   }
   return {get agent(){return agent},get service(){return service},host,sent,a,b,root,session,turn,plan,propose,restart,publish};
 }
+
+test('多成果验收持久化，暂停后恢复原会话，同卡修订再向下游冻结两版',async t=>{
+  const f=await fixture(t,'auto'), deliveries=[];
+  f.host.deliverReview=async(_service,session,id,allowed,read)=>{
+    assert.equal(session,f.session);
+    assert(allowed());
+    deliveries.push(read());
+    assert(f.agent.results.admit(session,id));
+    return 'sent';
+  };
+  f.plan.steps[0].acceptance={criteria:['脚本写出评分标准'],minCards:2};
+  f.propose();
+  await f.agent.tick();
+  await f.publish(0,{primary:true});
+  await f.publish(0,{title:'配套表'});
+  await f.publish(0,{title:'附件',primary:false,presentation:'attachment'});
+  await f.agent.control({id:f.turn.id,command:'pause'});
+  await f.agent.tick();
+  assert.equal(f.agent.plans()[0].steps[0].state,'checking');
+  assert.equal(deliveries.length,0);
+  const first=f.agent.plans()[0].steps[0], [script,table]=first.receipts;
+  f.restart();
+  await f.agent.control({id:f.turn.id,command:'resume'});
+  await f.agent.tick();await f.agent.tick();
+  assert.deepEqual(deliveries.map(item=>item.reviewId),[first.resultReviewId]);
+  const action={reviewId:first.resultReviewId,decision:'revise',reason:'脚本缺少评分标准',cardId:script.cardId,versionId:script.versionId,instruction:'补充评分标准'};
+  assert.throws(()=>f.agent.results.decide(randomUUID(),action),/本轮/);
+  assert.throws(()=>f.agent.results.decide(f.session,{...action,instruction:'/wtt-new-skill 补充评分'}),/新增 Skill/);
+  await f.agent.control({id:f.turn.id,command:'pause'});
+  assert.throws(()=>f.agent.results.decide(f.session,action),/已失效/);
+  f.agent.results.end(f.session);
+  await f.agent.control({id:f.turn.id,command:'resume'});
+  assert.throws(()=>f.agent.results.decide(f.session,action),/本轮/);
+  await f.agent.control({id:f.turn.id,command:'review-again',stepId:first.id,resultReviewId:first.resultReviewId,scopeToken:f.agent.approvalToken(f.turn.id)});
+  await f.agent.tick();
+  action.reviewId=f.agent.plans()[0].steps[0].resultReviewId;
+  f.agent.results.decide(f.session,action);
+  assert.throws(()=>f.agent.results.decide(f.session,action),/已失效/);
+  f.agent.results.end(f.session);
+  f.restart();await f.agent.tick();await f.agent.tick();
+  assert.equal(f.sent.length,2);
+  const task=f.service.tasks.get(f.sent[1].prepared.taskId);
+  assert.equal(task.outputCardId,script.cardId);
+  assert.equal(task.input.revision.versionId,script.versionId);
+  await f.publish(1,{primary:true});
+  await f.agent.tick();await f.agent.tick();
+  const final=f.agent.plans()[0].steps[0];
+  assert.equal(final.receipts[0].cardId,script.cardId);
+  assert.notEqual(final.receipts[0].versionId,script.versionId);
+  assert.deepEqual(final.receipts[1],table);
+  assert.equal(final.receipts[0].number,2);
+  f.agent.results.decide(f.session,{reviewId:final.resultReviewId,decision:'accept',reason:'评分标准和配套表已齐全'});
+  f.agent.results.end(f.session);
+  await f.agent.tick();await f.agent.tick();
+  assert.equal(f.sent.length,3);
+  assert.deepEqual(f.service.tasks.get(f.sent[2].prepared.taskId).input.sources.map(({versionId,hash})=>({versionId,hash})),
+    final.receipts.map(({versionId,hash})=>({versionId,hash})));
+});
+
+test('验收已投递冷启动、结果张数门禁、修订上限和停止',async t=>{
+  const f=await fixture(t,'auto'), history=new Set();
+  f.host.deliverReview=async(_service,session,id)=>{
+    if(history.has(id))return 'observed';
+    history.add(id);assert(f.agent.results.admit(session,id));return 'sent';
+  };
+  f.plan.steps[0].acceptance={criteria:['两份成果'],minCards:2};
+  f.propose();await f.agent.tick();
+  await f.publish(0,{primary:true});
+  await f.agent.tick();await f.agent.tick();
+  let step=f.agent.plans()[0].steps[0];
+  assert.throws(()=>f.agent.results.decide(f.session,{reviewId:step.resultReviewId,decision:'accept',reason:'检查张数'}),/张数/);
+  f.restart();await f.agent.tick();
+  step=f.agent.plans()[0].steps[0];
+  assert.equal(step.state,'review-waiting');
+  assert.equal(history.size,1);
+  const command={id:f.turn.id,stepId:step.id,resultReviewId:step.resultReviewId,scopeToken:f.agent.approvalToken(f.turn.id)};
+  await assert.rejects(f.agent.control({...command,command:'accept-result'}),/张数/);
+  await f.agent.control({...command,command:'review-again'});
+  await assert.rejects(f.agent.control({...command,command:'review-again'}),/已变化/);
+  await f.agent.tick();
+  step=f.agent.plans()[0].steps[0];
+  const review={reviewId:step.resultReviewId,reason:'补齐子项',cardId:step.receipt.cardId,versionId:step.receipt.versionId,instruction:'补充'};
+  f.agent.db.prepare('UPDATE pa_steps SET revision_count=2 WHERE id=?').run(step.id);
+  assert.throws(()=>f.agent.results.decide(f.session,{...review,decision:'revise'}),/修订次数/);
+  f.agent.results.decide(f.session,{...review,decision:'ask'});
+  await f.agent.control({id:f.turn.id,command:'stop'});
+  f.restart();await f.agent.tick();
+  assert.equal(f.sent.length,1);
+  assert.equal(f.agent.plans()[0].state,'stopped');
+});
+
+test('验收调整未派发步骤走原范围审批，Codex 在自动档仍需逐项授权',async t=>{
+  const f=await fixture(t,'auto');
+  f.host.deliverReview=async(_service,session,id)=>{assert(f.agent.results.admit(session,id));return 'sent';};
+  f.plan.steps[0].acceptance={criteria:['已有正式稿']};
+  f.propose();await f.agent.tick();await f.publish(0,{primary:true});
+  await f.agent.tick();await f.agent.tick();
+  const step=f.agent.plans()[0].steps[0];
+  f.agent.results.decide(f.session,{reviewId:step.resultReviewId,decision:'adjust',reason:'有正式稿，将下一项改为文字核验',
+    replaceFrom:2,steps:[{title:'报告',type:'text',instruction:'核验脚本',dependsOn:[1],executor:'codex'}]});
+  f.agent.results.end(f.session);
+  let p=f.agent.plans()[0];
+  assert.equal(p.steps[0].state,'done');
+  assert.equal(p.change.steps[0].executor,'codex');
+  await f.agent.tick();
+  assert.equal(f.sent.length,1);
+  await f.agent.control({id:p.id,command:'accept-change',changeId:p.change.id});
+  p=f.agent.plans()[0];
+  assert.equal(p.steps[1].authorized,false);
+  await f.agent.tick();
+  assert.equal(f.sent.length,1);
+  assert.equal(f.agent.reviews(f.session).item.kind,'step');
+});
+
+test('Codex 缺失、首次启动围栏、失败与受理不明保留单次派发',async t=>{
+  const f=await fixture(t,'auto'), executor=new ProjectCodexExecutor();
+  const binary=path.join(f.root,'fake-codex');
+  writeFileSync(binary,'#!/bin/sh\ncat >/dev/null\nexit 17\n',{mode:0o700});
+  f.plan.steps[0].executor='codex';
+  f.propose();
+  let starts=0, execution;
+  f.host.externalPreflight=async()=>{throw Error('找不到 Codex CLI');};
+  f.host.externalRunning=id=>executor.running(id);
+  f.host.runExternal=(...args)=>{starts++;execution=executor.start(...args);};
+  f.host.stopExternal=(...args)=>executor.stop(...args);
+  const {id:stepId}=f.agent.plans()[0].steps[0];
+  await f.agent.tick();assert.equal(starts,0);
+  await f.agent.control({id:f.turn.id,stepId,command:'approve-step'});
+  await f.agent.tick();
+  assert.match(f.agent.plans()[0].steps[0].error,/找不到 Codex/);
+  assert.equal(f.agent.plans()[0].steps[0].taskId,null);
+  f.host.externalPreflight=async()=>binary;
+  await f.agent.control({id:f.turn.id,stepId,command:'recheck'});
+  await f.agent.tick();
+  const {taskId}=f.agent.plans()[0].steps[0];
+  assert.throws(()=>f.service.prepareTask({taskId}),/项目助手/);
+  await execution;
+  await f.agent.tick();
+  assert.equal(starts,1);assert.equal(f.sent.length,0);
+  assert.match(f.agent.plans()[0].steps[0].error,/退出码 17/);
+  f.service.tasks.setDispatch({taskId,status:'accepted'});
+  f.agent.db.prepare("UPDATE pa_steps SET state='working' WHERE id=?").run(stepId);
+  f.restart();await f.agent.tick();await f.agent.tick();
+  assert.equal(starts,1);
+  assert.equal(f.service.tasks.get(taskId).dispatchStatus,'unknown');
+  assert.match(f.agent.plans()[0].steps[0].error,/回执不明/);
+  await assert.rejects(f.agent.control({id:f.turn.id,command:'stop'}),/没有原进程/);
+  assert.equal(f.agent.plans()[0].state,'stopping');
+});
+
+test('只停止宿主拥有的 Codex 进程并保留任务记录',async t=>{
+  const f=await fixture(t,'auto'), executor=new ProjectCodexExecutor();
+  const marker=path.join(f.root,'started');
+  const binary=path.join(f.root,'fake-codex');
+  writeFileSync(binary,`#!/usr/bin/env node
+require('node:fs').writeFileSync(${JSON.stringify(marker)},'active');
+process.stdin.resume();
+setInterval(()=>{},1000);
+`,{mode:0o700});
+  f.plan.steps[0].executor='codex';f.propose();
+  f.host.externalPreflight=async()=>binary;
+  f.host.externalRunning=id=>executor.running(id);
+  f.host.runExternal=(...args)=>executor.start(...args);
+  f.host.stopExternal=(...args)=>executor.stop(...args);
+  t.after(()=>executor.close());
+  await f.agent.control({id:f.turn.id,stepId:f.agent.plans()[0].steps[0].id,command:'approve-step'});
+  await f.agent.tick();
+  const taskId=f.agent.plans()[0].steps[0].taskId;
+  const deadline=Date.now()+3000;
+  while(!existsSync(marker)&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));
+  assert(existsSync(marker));
+  assert.equal(executor.state(f.service.tasks.get(taskId)).phase,'generating');
+  await f.agent.control({id:f.turn.id,command:'stop'});
+  assert.equal(executor.running(taskId),false);
+  assert.equal(f.agent.plans()[0].state,'stopped');
+  assert.match(f.service.tasks.get(taskId).error,/用户已停止 Codex/);
+  assert.equal(f.service.tasks.get(taskId).files.length,0);
+});
 for(const [mode,approvals] of [['auto',0],['plan',1],['step',2]])test('跨画布冻结、冷启动、实际主产物与 '+mode+' 授权',async t=>{
   const f=await fixture(t,mode);f.agent.memory.save({name:'画幅',body:'横屏'});f.propose();f.propose();
   let count=0;const approve=async(command,stepId)=>{count++;await f.agent.control({id:f.turn.id,command,stepId,scopeToken:f.agent.approvalToken(f.turn.id)});};

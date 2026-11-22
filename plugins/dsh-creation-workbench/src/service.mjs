@@ -461,6 +461,7 @@ export class WorkbenchService {
     const snapshot = { requirement: { id: requirement.id, title: requirement.title, customer: requirement.customer,
       audience: requirement.audience, background: requirement.background, objectives: requirement.objectives, origin: requirement.origin },
     ...(projectInputs ? { projectSettings: projectInputs.settings } : {}),
+    ...(projectInputs?.executor==='codex' ? {projectExecutor:'codex'} : {}),
     canvasId: requirement.id, sources, selection, instruction: input.instruction.trim(), outputType, productionPolicy: this.production.policy(),
     ...(['image', 'video'].includes(outputType) ? { generationMethod: 'skill' } : {}),
     ...(exactSkills ? { contextVersion: 1 } : {}),
@@ -571,9 +572,10 @@ export class WorkbenchService {
     return readTaskSource(task.input, selection);
   }
 
-  prepareTask({ taskId }) {
+  prepareTask({ taskId },{projectExecutor}={}) {
     const task = this.tasks.get(taskId);
     if (task.kind !== 'ai' || task.input.workflow) throw new Error('此任务请从对应的原始任务入口处理');
+    if (task.input.projectExecutor && task.input.projectExecutor!==projectExecutor) throw new Error('请在项目助手执行此 Codex 步骤');
     if (!['draft', 'failed'].includes(task.dispatchStatus || task.status) || task.cardVersionId) {
       throw new Error('此任务已提交或结果待核对，请打开原任务查看，不能重新发送');
     }

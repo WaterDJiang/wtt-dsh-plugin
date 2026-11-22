@@ -43,7 +43,8 @@ export function nativePendingState(pending, status) {
 }
 
 export function pendingRetryAllowed(taskOrPending) {
-  return ['draft', 'failed'].includes(taskOrPending?.dispatchStatus || taskOrPending?.status);
+  return !taskOrPending?.projectExecutor&&!taskOrPending?.input?.projectExecutor&&
+    ['draft', 'failed'].includes(taskOrPending?.dispatchStatus || taskOrPending?.status);
 }
 
 export function pendingContinueAllowed(pending) {
@@ -83,13 +84,14 @@ export function createPendingContext({ projectId, projectName, projectPath, requ
   if (!projectId || !requirement?.id || !card?.id || !node?.id || !task?.id
     || task.requirementId !== requirement.id || task.outputCardId !== card.id) throw new Error('待完成卡片与原任务不匹配，请重新加载。');
   const input = JSON.parse(JSON.stringify(task.input || {}));
+  const sessionId = input.projectExecutor ? null : task.sessionId || null;
   const references = (input.sources || []).map(source => ({ ...source, id: source.cardId, refId: source.refId || source.cardId?.split(':')[1],
     sourceHash: source.hash, ...(source.noteTruncated ? { referenceNote: source.noteTruncated } : {}) }));
   return {
     key: `${projectId}:${requirement.id}:pending:${card.id}:${task.id}`,
     projectId, projectName, projectPath, requirementId: requirement.id, requirementTitle: requirement.title,
     requirement: input.requirement || requirement, anchor: JSON.parse(JSON.stringify(node)), targetCard: JSON.parse(JSON.stringify(node)),
-    intent: 'pending', pendingTaskId: task.id, taskId: task.id, sessionId: task.sessionId || null,
+    intent: 'pending', pendingTaskId: task.id, taskId: task.id, sessionId,
     pendingGeneration: pendingGeneration || node.pendingGeneration,
     outputType: card.type, ...(card.type === 'pptx' ? { pptEngine: input.pptEngine || 'native' } : {}), instruction: input.instruction || task.instruction || '', references,
     selectedSkills: [...(input.selectedSkills || [])], modelSelection: input.modelSelection || null,
@@ -99,6 +101,6 @@ export function createPendingContext({ projectId, projectName, projectPath, requ
     ...(input.providerId ? { providerId: input.providerId } : {}),
     ...(input.media ? { mediaOptions: input.media } : {}),
     ...(task.mediaJob ? { mediaJob: task.mediaJob } : {}),
-    originalInput: { instruction: input.instruction || task.instruction || '', references: JSON.parse(JSON.stringify(references)), taskId: task.id, sessionId: task.sessionId || null },
+    originalInput: { instruction: input.instruction || task.instruction || '', references: JSON.parse(JSON.stringify(references)), taskId: task.id, sessionId },
   };
 }

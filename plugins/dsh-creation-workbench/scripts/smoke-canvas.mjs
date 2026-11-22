@@ -18,7 +18,7 @@ import { WorkbenchService } from '../src/service.mjs';
 const run = promisify(execFile);
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const [scenario = 'all', ...extra] = process.argv.slice(2);
-assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent','preview','first-material'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent|preview|first-material]');
+assert(!extra.length && ['all', 'delete', 'refresh', 'selection', 'send', 'references', 'reads', 'readperf', 'overview', 'stress','agent','wechat','preview','first-material'].includes(scenario), '用法：node scripts/smoke-canvas.mjs [all|delete|refresh|selection|send|references|reads|readperf|overview|stress|agent|wechat|preview|first-material]');
 const cli = process.env.WTT_SMOKE_DSH_BIN || path.join(repo, '.runtime/host/node_modules/@deepseek-ai/dsh/lib/bin.js');
 assert(existsSync(cli), '按 README 准备隔离 DSH 运行时');
 const [hostCommand,...hostArguments] = process.env.WTT_SMOKE_DSH_BIN ? [cli] : [process.execPath,cli];
@@ -578,20 +578,30 @@ try {
   const readCases = ['all', 'reads'].includes(scenario) ? await seedCanvasReads(workspace) : null;
   const readPerfCases = (scenario === 'readperf' || scenario === 'all' && process.env.WTT_READ_PERF === '1') ? seedReadPerformance(workspace) : null;
   const stressCases = scenario === 'stress' ? await seedCanvasStress(workspace, run) : null;
-  if(scenario==='agent')agentModel=await (await import('./project-agent-smoke.mjs')).projectAgentModel(fixture);
+  const loopSmoke=scenario==='agent'&&process.env.WTT_AGENT_SMOKE_LOOP==='1';
+  const loopCheck=loopSmoke?await import('./project-agent-loop-smoke.mjs'):null;
+  const codexBin=loopCheck&&await loopCheck.prepareCodexFixture(temporary);
+  const wechatSmoke=scenario==='wechat'?await import('./project-wechat-smoke.mjs'):null;
+  const wechatFixture=wechatSmoke&&await wechatSmoke.prepareWechatSmoke(temporary);
+  if(scenario==='agent'||wechatSmoke)agentModel=await (await import('./project-agent-smoke.mjs')).projectAgentModel({...fixture,workspace,wechat:Boolean(wechatSmoke)});
   const env = { ...process.env,...agentModel?.env, DSH_HOME: path.join(temporary, 'dsh'), WTT_COURSE_WORKSPACE: workspace,
-    PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`, npm_config_offline: 'true',
+    PATH: [codexBin,path.dirname(process.execPath),process.env.PATH].filter(Boolean).join(path.delimiter), npm_config_offline: 'true',
     npm_config_store_dir: path.join(repo, '.runtime/pnpm-store') };
   const candidate = process.env.WTT_SMOKE_PACKAGE || repo;
   await run(hostCommand, [...hostArguments, 'plugin', '--profile', 'web', 'add', candidate], { cwd: workspace, env, timeout: 30_000 });
-  for (const file of ['src/canvas.jsx', 'src/canvas.css', 'dist/client.js']) assert.deepEqual(
+  const checkedAssets=['src/canvas.jsx','src/canvas.css','dist/client.js',
+    ...(wechatSmoke?['src/wechat-ilink.mjs','src/project-wechat.mjs','src/project-wechat-state.mjs','src/project-wechat-dispatch.mjs','src/project-wechat-language.mjs']:[]),
+    ...(loopSmoke?['src/project-agent.mjs','src/project-agent-host.mjs','src/project-result-review.mjs','src/project-codex-executor.mjs']:[])];
+  for (const file of checkedAssets) assert.deepEqual(
     await readFile(path.join(candidate, file)), await readFile(path.join(env.DSH_HOME, 'profiles/web/node_modules/@wtt/dsh-creation-workbench', file)), `安装文件不一致：${file}`);
   const overlay = path.join(temporary, 'preview-fonts.json');
   const noNativeSkillMenu=process.env.WTT_AGENT_SMOKE_NO_NATIVE_SKILL_MENU==='1';
   const patches=[...(invalidPreviewFonts?[{id:'wtt-creation-workbench',config:{fontDirectories:[]}}]:[]),
     ...(noNativeSkillMenu?[{id:'ui-skill',disabled:true}]:[])];
   if(patches.length)await writeFile(overlay,JSON.stringify(patches));
-  host = spawn(hostCommand, [...hostArguments, 'web', ...(patches.length ? ['--patch', overlay] : []), '--port', '0', '--no-open'], { cwd: workspace, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const hostEnv=wechatSmoke?{...env,WTT_WECHAT_FIXTURE_DIR:wechatFixture.dir,
+    NODE_OPTIONS:['--import='+new URL('./project-wechat-fixture.mjs',import.meta.url).href,env.NODE_OPTIONS].filter(Boolean).join(' ')}:env;
+  host = spawn(hostCommand, [...hostArguments, 'web', ...(patches.length ? ['--patch', overlay] : []), '--port', '0', '--no-open'], { cwd: workspace, env:hostEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   const login = await loginUrl(host);
   browser = await chromium.launch({ executablePath, headless: true });
   const page = await browser.newPage({ viewport: { width: 1320, height: 940 } });
@@ -612,6 +622,7 @@ try {
   const api = new URL('/api/wtt-creation-workbench', login);
   api.searchParams.set('projectId', createHash('sha256').update(await realpath(workspace)).digest('hex'));
   try {
+    if(wechatSmoke)await wechatSmoke.checkProjectWechat(page,canvas,api,fixture,workspace,wechatFixture);
     if (scenario === 'first-material') {
       const {checkFirstMaterial} = await import('./canvas-first-material-smoke.mjs');
       await checkFirstMaterial(page, workspace, api);
@@ -626,6 +637,8 @@ try {
     } else if(scenario==='agent' && process.env.WTT_AGENT_AUDIT_IDLE==='1'){
       const { checkProjectAgentIdle }=await import('./project-agent-idle-audit.mjs');
       await checkProjectAgentIdle(page,canvas,api,agentModel);
+    } else if(loopCheck){
+      await loopCheck.checkProjectAgentLoop(page,canvas,api,fixture,agentModel);
     } else if(scenario==='agent'){
       await card.locator('.wcc-card-body').click({position:{x:30,y:24}});
       const materialComposer=canvas.locator('.wcc-card-composer:visible');
@@ -764,9 +777,13 @@ try {
         }else{
           await page.keyboard.insertText('正文技能 ');
           await page.keyboard.type('/wtt-qa-lay');
-          await skillOptions.getByRole('option',{name:/wtt-qa-layout/}).waitFor();
+          const option=skillOptions.getByRole('option',{name:/wtt-qa-layout/});
+          await option.waitFor();
+          if(await option.getAttribute('aria-selected')!=='true')await page.keyboard.press('ArrowDown');
+          await skillOptions.getByRole('option',{name:/wtt-qa-layout/,selected:true}).waitFor();
           await page.keyboard.press('Enter');
           await skillOptions.waitFor({state:'hidden'});
+          await input.filter({hasText:/正文技能\s+\/wtt-qa-layout/}).waitFor();
           assert.match(await input.innerText(),/正文技能\s+\/wtt-qa-layout/,'正文与选中的技能应保留');
           await page.keyboard.type('/wtt-qa-lay');
           await skillOptions.getByRole('option',{name:/wtt-qa-layout/}).waitFor();
@@ -1008,14 +1025,14 @@ try {
   }
 } finally {
   agentModel?.close();
-  try { await browser?.close(); }
+  let hostStopped;
+  if (host?.pid && host.exitCode === null && host.signalCode === null) {
+    const force = setTimeout(() => host.kill('SIGKILL'), 3000);
+    hostStopped = once(host, 'exit').finally(() => clearTimeout(force));
+    host.kill('SIGTERM');
+  }
+  try { await Promise.all([browser?.close(), hostStopped]); }
   finally {
-    if (host?.pid && host.exitCode === null && host.signalCode === null) {
-      const exited = once(host, 'exit');
-      host.kill('SIGTERM');
-      const force = setTimeout(() => host.kill('SIGKILL'), 3000);
-      try { await exited; } finally { clearTimeout(force); }
-    }
     await rm(temporary, { recursive: true, force: true });
   }
 }

@@ -7,11 +7,12 @@ import {ProjectInputContext} from './conversation-references.jsx';
 import {ProjectMemoryPanel} from './project-agent-memory.jsx';
 import {StepHandoff} from './project-agent-handoff.jsx';
 import {creationSource, usableCreationSource} from './creation-context.mjs';
+import {EFFORT_LABELS} from './model-selection.mjs';
 import wattterAgentLogo from './assets/wattter-agent.png';
 import './project-agent.css';
 
 const labels={auto:'全自动',plan:'先规划后执行',step:'逐项确认'};
-const statuses={done:'已完成',running:'执行中',paused:'已暂停',approval:'待授权',stopped:'已停止',stopping:'停止待核对',blocked:'待核对',working:'执行中',ready:'待执行'};
+const statuses={done:'已完成',running:'执行中',paused:'已暂停',approval:'待授权',stopped:'已停止',stopping:'停止待核对',blocked:'待核对',working:'执行中',ready:'待执行',checking:'待验收','review-waiting':'需要你'};
 const reviewLabel='授权并执行';
 const assistantName='WTT 项目助手';
 function stored(storage,key,fallback){try{return JSON.parse(storage.getItem(key))??fallback;}catch{return fallback;}}
@@ -23,9 +24,16 @@ function ModeMenu({value,onChange,label='执行方式'}){
       {Object.entries(labels).map(([id,name])=><UiButton key={id} role="menuitemradio" aria-checked={value===id} onClick={()=>{setOpen(false);onChange(id);}}>{name}{value===id?' ✓':''}</UiButton>)}</CanvasPopover>}</>;
 }
 function PlanStepDetails({step,locate}){
+  const model=step.modelSelection;
+  const executor=step.executor==='codex'?'Codex CLI':model?[model.model,model.provider,EFFORT_LABELS[model.reasoningEffort]||model.reasoningEffort].filter(Boolean).join(' · '):'DSH 默认模型';
   return <>
-    <details><summary>{step.title} · {step.target}</summary><p>{step.instruction}</p>
+    <details className="wtt-agent-step-details"><summary>{step.title} · {step.target}{step.executor==='codex'&&' · Codex'}</summary><p>{step.instruction}</p>
+      <div className="wtt-agent-step-note">执行者 · {executor}</div>
       {!!step.deps.length&&<small>依赖步骤 {step.deps.join('、')}</small>}
+      {step.acceptance&&<div className="wtt-agent-step-note">验收 · 至少 {step.acceptance.minCards} 张正式成果
+        <ul>{step.acceptance.criteria.map((criterion,index)=><li key={index}>{criterion}</li>)}</ul>
+      </div>}
+      {step.resultReview?.reason&&step.resultReview.reason!==step.error&&<div className="wtt-agent-step-note">{step.resultReview.reason}</div>}
     </details>
     {!!step.refs?.length&&<details><summary>{step.refs.length} 份引用</summary>{step.refs.map(ref=><div key={ref.cardId}>
       {ref.title}{ref.versionId&&<UiButton size="compact" onClick={()=>locate({...ref,cardId:ref.outputCardId})}>查看引用版本</UiButton>}
@@ -48,11 +56,11 @@ function ChatReview({review,act,locate,busy,onPage}){
   return <section className="wtt-agent-review" aria-label="对话授权">
     <div className="wtt-agent-review-heading">
       <strong title={plan.title}>{plan.title}</strong>
-      <small role="status">{kind==='change'?('范围变更 · 从第 '+plan.change.start+' 项起'):kind==='step'?'待确认步骤':'待授权'}</small>
+      <small role="status">{kind==='change'?('范围变更 · 从第 '+plan.change.start+' 项起'):kind==='step'?'待确认步骤':'计划已生成 · 待授权'}</small>
     </div>
     <div className="wtt-agent-review-steps" key={plan.id+':'+kind+':'+(stepId||'')}>
       {steps.map((step,index)=><div key={step.id||index}>
-        <PlanStepDetails step={step} locate={locate}/>
+        <PlanStepDetails step={step} locate={ref=>locate(ref,plan.id)}/>
         {kind==='step'&&step.error&&<small>{step.error}</small>}
       </div>)}
     </div>
@@ -66,26 +74,48 @@ function ChatReview({review,act,locate,busy,onPage}){
     </div>
   </section>;
 }
-function Plans({plans,act,locate,busy}){
+function Plans({plans,act,locate,busy,focusPlan}){
   if(!plans?.length)return null;
   return <div className="wtt-agent-plans">{plans.map((p,index)=>{
     const next=p.steps.find(s=>s.state!=='done'||s.handoff),ended=['done','stopped'].includes(p.state);
     const completed=p.steps.filter(step=>step.state==='done'&&!step.handoff).length;
     const waitingVersion=p.steps.some(s=>s.choice&&!s.handoff);
+    const target=ref=>locate(ref,p.id);
+    const stepStatus=s=>s.state==='working'&&s.revising?'修订中':statuses[s.state];
     const status=p.state==='running'&&next?.interaction?'待确认'
       :p.state==='running'&&next?.handoff?'你正在处理'
       :p.state==='running'&&waitingVersion?'待选择版本'
-      :p.state==='running'&&next?.state==='blocked'?'待核对':statuses[p.state];
-    return <details className="wtt-agent-plan" key={p.id} open={!ended&&index===0||undefined}>
+      :p.state==='running'&&next&&(['checking','review-waiting','blocked'].includes(next.state)||next.revising)?stepStatus(next):statuses[p.state];
+    return <details className="wtt-agent-plan" key={p.id} open={focusPlan===p.id||!focusPlan&&!ended&&index===0||undefined}>
       <summary><span>{p.title}</span><small>{status}</small>
         <span className="wtt-agent-plan-progress"><progress value={completed} max={p.steps.length||1} aria-label={p.title+'进度'}/><span>完成 {completed}/{p.steps.length}</span></span>
       </summary>
-      {p.steps.map(s=><div key={s.id} className="wtt-agent-step"><PlanStepDetails step={s} locate={locate}/>{s.receipt?<UiButton size="compact" onClick={()=>locate(s.receipt)}>定位 V{s.receipt.number}</UiButton>:<small>{s.error||statuses[s.state]}</small>}
-        {s.state==='blocked'&&!s.taskId&&<UiButton size="compact" onClick={()=>act(p,'recheck',{stepId:s.id})}>重新核对来源</UiButton>}
-        {s.taskId&&s.outputCardId&&(!s.receipt||s.handoff||s.choice)&&<UiButton size="compact" onClick={()=>locate({requirementId:s.requirementId,taskId:s.taskId,cardId:s.outputCardId})}>打开卡片对话</UiButton>}
-        {!ended&&p.state!=='stopping'&&<StepHandoff step={s} busy={busy} act={command=>act(p,command,{stepId:s.id,cardId:s.outputCardId,requirementId:s.requirementId,versionId:s.choice?.versionId})}/>}
-        {s.id===next?.id&&p.state==='running'&&!s.authorized&&!s.handoff&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'approve-step',{stepId:s.id})}>执行此项</UiButton>}</div>)}
-      {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>{p.change.steps.map((s,i)=><PlanStepDetails key={i} step={s} locate={locate}/>)}
+      {p.steps.map(s=>{
+        const receipts=s.receipts||[s.receipt].filter(Boolean);
+        const currentTarget=s.choice?.cardId||s.outputCardId;
+        const context=s.choice?{...s,receipt:receipts.find(card=>card.cardId===s.choice.cardId)||s.receipt}:s;
+        const canDecide=p.state==='running'&&s.id===next?.id&&s.state==='review-waiting'&&!s.handoff&&s.resultReviewId;
+        return <div key={s.id} className="wtt-agent-step">
+          <PlanStepDetails step={s} locate={target}/>
+          {s.state!=='done'&&<small role={s.id===next?.id?'status':undefined}>{s.revising&&s.state==='ready'&&s.authorized?'待修订':stepStatus(s)}</small>}
+          {s.error&&<div className="wtt-agent-step-note">{s.error}</div>}
+          {!!receipts.length&&<div className="wtt-agent-step-results" aria-label={s.title+'成果'}>
+            {receipts.map(card=><UiButton key={card.cardId} size="compact" onClick={()=>target(card)}>
+              {receipts.length>1?card.title+' · V'+card.number:'定位 V'+card.number}
+            </UiButton>)}
+          </div>}
+          {s.canRecheck&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'recheck',{stepId:s.id})}>重新核对</UiButton>}
+          {s.taskId&&s.outputCardId&&(!receipts.length||s.handoff||s.choice||canDecide)&&
+            <UiButton size="compact" onClick={()=>target({requirementId:s.requirementId,taskId:s.taskId,cardId:s.outputCardId})}>{s.executor==='codex'?'查看执行卡':'打开卡片对话'}</UiButton>}
+          {!ended&&p.state!=='stopping'&&<StepHandoff step={context} busy={busy} act={command=>act(p,command,{stepId:s.id,cardId:currentTarget,requirementId:s.choice?.requirementId||s.requirementId,versionId:s.choice?.versionId})}/>}
+          {canDecide&&<div className="wtt-agent-step-results">
+            {receipts.length>=s.acceptance?.minCards&&!s.choice&&<UiButton variant="primary" size="compact" disabled={busy} onClick={()=>act(p,'accept-result',{stepId:s.id,resultReviewId:s.resultReviewId})}>确认采用成果</UiButton>}
+            {!s.choice&&<UiButton size="compact" disabled={busy} onClick={()=>act(p,'review-again',{stepId:s.id,resultReviewId:s.resultReviewId})}>重新验收</UiButton>}
+          </div>}
+          {s.id===next?.id&&p.state==='running'&&s.state==='ready'&&!s.authorized&&!s.handoff&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'approve-step',{stepId:s.id})}>执行此项</UiButton>}
+        </div>;
+      })}
+      {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>{p.change.steps.map((s,i)=><PlanStepDetails key={i} step={s} locate={target}/>)}
         <ReviewActions kind="change" plan={p} act={act} busy={busy}/></div>}
       {!ended&&<div className="wtt-agent-actions">{p.state==='approval'&&<ReviewActions kind="plan" plan={p} act={act} busy={busy}/>}
         {['running','paused'].includes(p.state)&&<UiButton disabled={busy} onClick={()=>act(p,p.state==='paused'?'resume':'pause')}>{p.state==='paused'?'继续剩余步骤':'暂停'}</UiButton>}
@@ -106,17 +136,19 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
   const [canvas,setCanvas]=useState(null);
   const call=useCallback((action,data={})=>request('project-agent-'+action,data),[request]);
   const [page,setPage]=useState(0),[reviewPage,setReviewPage]=useState(0),[waiting,setWaiting]=useState(0);
+  const [returnPlan,setReturnPlan]=useState(()=>stored(sessionStorage,key+':return-plan',null));
+  const [focusPlan,setFocusPlan]=useState(null);
   const [starting,setStarting]=useState(false),startPending=useRef(false);
   const readEpoch=useRef(0),sendEpoch=useRef(0),sending=useRef(0);
-  const view=useRef({tab,page,reviewPage});
-  view.current={tab,page,reviewPage};
+  const view=useRef({tab,page,reviewPage,focusPlan});
+  view.current={tab,page,reviewPage,focusPlan};
   const refresh=useCallback(async(full=true)=>{
     const epoch=++readEpoch.current, sent=sendEpoch.current;
-    const {tab,page,reviewPage}=view.current;
+    const {tab,page,reviewPage,focusPlan}=view.current;
     const cardRead=cardId?canvasActions.current.cardRead():null;
-    const v=await call(full?'state':'progress',{...(full?{page,view:tab,reviewPage}:{}),...(cardId?{cardId,requirementId:requirement.id}:{})});
+    const v=await call(full?'state':'progress',{...(full?{page,view:tab,reviewPage,planId:tab==='plans'?focusPlan:undefined}:{}),...(cardId?{cardId,requirementId:requirement.id}:{})});
     if(!alive.current||epoch!==readEpoch.current)return;
-    if(full&&(view.current.tab!==tab||view.current.page!==page||view.current.reviewPage!==reviewPage))return;
+    if(full&&(view.current.tab!==tab||view.current.page!==page||view.current.reviewPage!==reviewPage||view.current.focusPlan!==focusPlan))return;
     if(full){
       setState({...v,view:tab});if(v.page!==page)setPage(v.page);
       if(v.review&&v.review.page!==reviewPage)setReviewPage(v.review.page);
@@ -155,7 +187,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
       if(live&&(open||tracking))timer=setTimeout(poll,2200);
     }
     void poll();return ()=>{live=false;readEpoch.current++;clearTimeout(timer);};
-  },[open,tracking,cardId,refresh,call,requirement.id,canvasActions,key,tab,page,reviewPage]);
+  },[open,tracking,cardId,refresh,call,requirement.id,canvasActions,key,tab,page,reviewPage,focusPlan]);
   useLayoutEffect(()=>{
     if(!open)return;
     const el=launcher.current?.closest('.wtt-course-canvas');
@@ -251,12 +283,20 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
       return ()=>{sending.current--;sendEpoch.current++;};
     }
   };
-  const locate=ref=>{toggle(false);canvasActions.current.locate(ref);};
+  const updateReturn=planId=>{setReturnPlan(planId);persist(sessionStorage,key+':return-plan',planId);};
+  const locate=(ref,planId)=>{updateReturn(planId||null);toggle(false);canvasActions.current.locate(ref);};
+  const openAssistant=()=>{
+    const target=returnPlan||stored(sessionStorage,key+':return-plan',null);
+    if(!open&&target){setTab('plans');setFocusPlan(target);updateReturn(null);}
+    toggle(!open);
+  };
+  const pageTo=value=>{setFocusPlan(null);setPage(value);};
   return <>
     <ToolButton label={'打开'+assistantName} buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
-      expanded={open} controlsId={open?panelId:undefined} description={waiting>0?waiting+' 项待确认':undefined}
-      onClick={()=>toggle(!open)}>
+      expanded={open} controlsId={open?panelId:undefined} description={[!open&&returnPlan?'返回刚才的委托':'',waiting>0?waiting+' 项待确认':''].filter(Boolean).join('。')||undefined}
+      hint={!open&&returnPlan?'返回委托':undefined} onClick={openAssistant}>
       <img src={wattterAgentLogo} alt="" draggable={false}/>
+      {!open&&returnPlan&&<span className="wtt-agent-return" aria-hidden="true">↩</span>}
       {waiting>0&&<span className="wtt-agent-badge" aria-hidden="true">{waiting}</span>}
     </ToolButton>
     {open&&canvas&&createPortal(<div className="wtt-agent-layer"><div id={panelId} className="wtt-agent-float is-open" data-picking={picking||undefined} style={{width,height,left:Math.round(clamp(position.x)*dx),top:Math.round(clamp(position.y)*dy)}}
@@ -279,11 +319,11 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     </section>
     {tab==='plans'&&<section className="wtt-agent-queue" aria-label="项目委托">
       {!state?.plans?.length&&<p className="wtt-agent-empty">{state?.view==='plans'?'暂无委托':'正在读取委托…'}</p>}
-      <Plans plans={state?.plans} act={act} locate={locate} busy={busy}/>
+      <Plans plans={state?.plans} act={act} locate={locate} busy={busy} focusPlan={focusPlan}/>
       {state?.total>20&&<div className="wtt-agent-actions" aria-label="委托分页">
-        <UiButton size="compact" disabled={page===0} onClick={()=>setPage(page-1)}>上一页</UiButton>
+        <UiButton size="compact" disabled={page===0} onClick={()=>pageTo(page-1)}>上一页</UiButton>
         <span>{page+1} / {Math.ceil(state.total/20)}</span>
-        <UiButton size="compact" disabled={(page+1)*20>=state.total} onClick={()=>setPage(page+1)}>下一页</UiButton></div>}
+        <UiButton size="compact" disabled={(page+1)*20>=state.total} onClick={()=>pageTo(page+1)}>下一页</UiButton></div>}
     </section>}
     {tab==='memory'&&<><ProjectMemoryPanel call={call} onChanged={()=>refresh().catch(e=>setError(e.message))} suggestions={state?.suggestions} onLocate={locate}/>
       {session&&<div className="wtt-agent-footer"><UiButton size="compact" disabled={starting||busy||state?.running} onClick={newConversation}>用项目记忆开新对话</UiButton></div>}</>}
