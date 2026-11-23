@@ -61,6 +61,12 @@ WTT 创作工作台（`@wtt/dsh-creation-workbench`）是 DeepSeek Harness（DSH
 
 任务开始后仍可补充参考资料：在对话输入框上方点「画布资产」，选中卡片后点「完成」，再发送消息。[追加资产与隐藏对话](plugins/dsh-creation-workbench/README.md#在任务对话中追加画布资产)
 
+## 安装时的权限提示
+
+「会用你的密钥」涉及几种不同的操作。普通文本对话由 DSH 处理认证；媒体 API 会用相应密钥向你选择的服务请求模型或生成内容；微信绑定后会用 Bot 令牌收发消息。0.59.3 中，已授权的本机 Codex 步骤也可能使用环境变量里的模型密钥。
+
+市场列出的文件读写和命令执行用于导入、保存、预览和运行任务。若看到 `schemas.openxmlformats.org` 的 HTTP 提示，工作台在解析 Office 文件时用这个名称识别文档结构，解析本身无需联网。自定义局域网 HTTP 媒体服务则会实际使用未加密连接。[查看全部提示、数据去向和关闭方式](plugins/dsh-creation-workbench/README.md#安装时的权限提示)
+
 ## 安装
 
 在 DSH 中打开 **插件 → 添加插件 → 安装第三方插件**，粘贴以下安装串：

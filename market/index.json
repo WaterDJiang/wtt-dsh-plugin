@@ -53,8 +53,8 @@
         "en": "WTT Creation Workbench"
       },
       "description": {
-        "zh": "小瓦 · WTT 项目助手是创作工作台里的 Super Agent，能跨画布拆解目标、派发任务、验收并修订成果。每步可选 DSH 模型，授权后也可让 Codex CLI 执行文本任务。扫码连接微信 Bot，可切换项目和画布、确认计划、查看结果。",
-        "en": "Xiaowa, WTT's Super Agent project assistant, plans and delegates work across canvases, reviews deliverables, and revises them before moving on. Choose a DSH model for each step or approve Codex CLI for text work. Pair the WeChat bot by QR code to switch projects or canvases, approve plans, and check progress."
+        "zh": "小瓦 · WTT 项目助手是创作工作台里的 Super Agent，能跨画布拆解目标、派发任务、验收并修订成果。每步可选 DSH 模型，授权后也可让 Codex CLI 执行文本任务。扫码连接微信 Bot，可切换项目和画布、确认计划、查看结果。 安装提示中的密钥用于媒体服务鉴权、微信 Bot 收发等功能；各项权限用途及关闭方式见插件 README「安装时的权限提示」。",
+        "en": "Xiaowa, WTT's Super Agent project assistant, plans and delegates work across canvases, reviews deliverables, and revises them before moving on. Choose a DSH model for each step or approve Codex CLI for text work. Pair the WeChat bot by QR code to switch projects or canvases, approve plans, and check progress. Media requests and paired WeChat messaging use credentials. The plugin README explains each install warning, where data goes, and how to disconnect."
       },
       "author": "Wattter (WTT)",
       "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin",
