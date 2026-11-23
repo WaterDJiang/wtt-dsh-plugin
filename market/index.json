@@ -32,8 +32,8 @@
       },
       "project-assistant": {
         "title": {
-          "zh": "Super Agent 项目助手",
-          "en": "Super Agent"
+          "zh": "小瓦 · WTT 项目助手",
+          "en": "Xiaowa · WTT Project Assistant"
         }
       },
       "wechat-bot": {
@@ -53,8 +53,8 @@
         "en": "WTT Creation Workbench"
       },
       "description": {
-        "zh": "Super Agent 项目助手在无限画布上拆解目标、派发任务、验收和修订成果，可按步骤选用 DSH 模型或授权 Codex CLI 处理文本任务，扫码连接微信 Bot 后可切换项目和画布、确认计划并查进度。",
-        "en": "The Super Agent project assistant plans, delegates, reviews, and revises work across canvases with DSH models or approved Codex CLI text steps, and the QR-paired WeChat bot lets you switch projects or canvases, approve plans, and check progress."
+        "zh": "小瓦 · WTT 项目助手是创作工作台里的 Super Agent，能跨画布拆解目标、派发任务、验收并修订成果。每步可选 DSH 模型，授权后也可让 Codex CLI 执行文本任务。扫码连接微信 Bot，可切换项目和画布、确认计划、查看结果。",
+        "en": "Xiaowa, WTT's Super Agent project assistant, plans and delegates work across canvases, reviews deliverables, and revises them before moving on. Choose a DSH model for each step or approve Codex CLI for text work. Pair the WeChat bot by QR code to switch projects or canvases, approve plans, and check progress."
       },
       "author": "Wattter (WTT)",
       "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin",
@@ -97,7 +97,9 @@
           "WeChat Bot",
           "任务验收",
           "跨画布",
-          "Codex CLI"
+          "Codex CLI",
+          "小瓦",
+          "Xiaowa"
         ],
         "labels": [
           "presentations",
@@ -108,6 +110,19 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.59.3",
+          "publishTimestamp": 1795444774,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/WaterDJiang/wtt-dsh-plugin",
+            "commit": "de0fe0ca699f13fc2d7fa6f61088af19d49774d1",
+            "path": "plugins/dsh-creation-workbench"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
+          }
+        },
         {
           "version": "0.59.2",
           "publishTimestamp": 1795364637,
