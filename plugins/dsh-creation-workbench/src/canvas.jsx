@@ -3460,6 +3460,7 @@ function CanvasContent({ fileRecycleSignal, fileOrganizationSignal, projectFileS
           <CanvasMaterialEntry busy={Boolean(busy)} onPick={() => materialPicker.current?.click()}/>}
         <CanvasChrome empty={emptyCanvas} pickingReferences={pickingReferences} tool={tool} onTool={setTool} onZoomIn={() => void flow.zoomIn({ duration: 100 })} onZoomOut={() => void flow.zoomOut({ duration: 100 })}
           projectAssistant={active && <ProjectAgentFloat notices={desktopTaskNotices} project={project} requirement={requirement} selected={agentSelection.current} cardId={assistantCardId}
+            nativeModelSeat={nativeModelSeat} modelCatalog={modelCatalog} modelLoading={modelLoading} modelError={modelError} onRefreshModels={onRefreshModels} onOpenModelSettings={onOpenModelSettings}
             request={request} renderConversation={renderEditorConversation} canvasActions={agentActions} picking={pickingReferences && Boolean(referencePick.projectAssistant)}/>}
           onZoom100={zoom100} onFitAll={fitAllCards} onFitSelected={fitSelection}
           showMap={showMap} onToggleMap={() => setShowMap(value => !value)} onAddMaterial={() => materialPicker.current?.click()}

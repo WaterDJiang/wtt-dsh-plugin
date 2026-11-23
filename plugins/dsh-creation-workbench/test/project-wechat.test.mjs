@@ -142,9 +142,11 @@ test('微信扫码、中文接续、已送达计划确认和真实成果跨项�
   assert(!JSON.stringify(wx.status()).includes('token-test-only'));
   put('foreign','新建项目 不该创建',{from_user_id:'foreign'});
   put('group','新建项目 群聊项目',{group_id:'group'});
-  put('hello','你好');
-  await until(()=>saw('现在在「甲项目 / 采访画布」。','hello'));
-  put(1,'我想换张画布');
+  put('hello','小瓦，你好');
+  await until(()=>saw('我是小瓦。现在在「甲项目 / 采访画布」。','hello'));
+  put('legacy-hello','你好');
+  await until(()=>saw('我是小瓦。','legacy-hello'));
+  put(1,'小瓦，我想换张画布');
   await until(()=>saw('想去哪张画布？',1));
   put(2,'采访画布');
   await until(()=>saw('甲项目 / 采访画布',2));
@@ -167,7 +169,7 @@ test('微信扫码、中文接续、已送达计划确认和真实成果跨项�
   put(4,'换个项目');
   await until(()=>saw('想去哪一个项目？',4));
   const number=sent.find(item=>item.token==='context-4').text.match(/(\d+)\. 乙项目/u)[1];
-  put('ordinal','第'+number+'个');
+  put('ordinal','小瓦，第'+number+'个');
   await until(()=>saw('乙项目 / 素材画布','ordinal'));
   put('stale-plan','按这个做');
   await until(()=>saw('先把计划发给你核对','stale-plan'));
@@ -191,7 +193,7 @@ test('微信扫码、中文接续、已送达计划确认和真实成果跨项�
   put(5,'可以');
   await until(()=>saw('采访交付」已确认',5));
   await until(()=>saw('这一步需要你确认',5));
-  put('approve-step','开始做吧');
+  put('approve-step','小瓦，开始做吧');
   await until(()=>saw('采访交付」这一步已确认','approve-step'));
   put('legacy','确认 '+code);
   await until(()=>saw('已经确认过了','legacy'));

@@ -37,6 +37,12 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
     if(!result.agent)throw Error('无法读取原生会话的技能范围');
     return result.agent;
   }
+  async function validateModel(selection){
+    const catalog=normalizeModelCatalog(await controller('sessionController').modelCatalog());
+    const model=catalog.groups.find(group=>group.id===selection.provider)?.models.find(option=>option.id===selection.model);
+    if(!model||(selection.reasoningEffort&&!model.reasoning?.efforts.some(effort=>effort.id===selection.reasoningEffort)))
+      throw Error('指定模型或推理等级当前不可用，请核对 DSH 模型设置后重试');
+  }
   // Standard questions and approvals live in the host waterfall while the user decides.
   const interactions=new Map();
   function forNativeSession(session){
@@ -60,6 +66,7 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
     if(runner)queueMicrotask(()=>{if(!closed)void runner.tick().catch(warn);});
   }));
   const host={
+    validateModel,
     bound(service,sessionId){owners.set(sessionId,projects.idOf(service));},
     sessionRunning(sessionId){
       const native=sessionId&&getService('agents')?.get(sessionId);
@@ -100,10 +107,7 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
       if(error)throw error;
       if(!agent||agent.session?.header?.cwd!==service.workspaceRoot)throw Error('原任务会话项目不符');
       const apply=async()=>{
-        const catalog=normalizeModelCatalog(await native.modelCatalog());
-        const option=catalog.groups.find(group=>group.id===selection.provider)?.models.find(model=>model.id===selection.model);
-        if(!option||(selection.reasoningEffort&&!option.reasoning?.efforts.some(effort=>effort.id===selection.reasoningEffort)))
-          throw Error('指定模型或推理等级当前不可用，请核对 DSH 模型设置后重试');
+        await validateModel(selection);
         const resolved=await controller('llm').resolveCallConfig(selection);
         if(resolved?.provider!==selection.provider||resolved?.model!==selection.model||
           (selection.reasoningEffort&&resolved.reasoningEffort!==selection.reasoningEffort))

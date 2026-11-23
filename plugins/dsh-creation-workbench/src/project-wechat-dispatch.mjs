@@ -1,4 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { EFFORT_LABELS } from './model-selection.mjs';
+import { projectAgentName } from './project-agent-name.mjs';
 import { wechatGivenName, wechatIntent, wechatOptionNumber } from './project-wechat-language.mjs';
 import { wechatTextLimit } from './project-wechat-state.mjs';
 
@@ -8,6 +10,7 @@ const labelOf = item=>item.title||item.name;
 const location = (project,canvas)=>'「'+project.name+(canvas?' / '+canvas.title:'')+'」';
 const status = {approval:'等你确认',running:'进行中',paused:'已暂停',done:'已完成',stopped:'已停止',stopping:'正在停止'};
 const askForPlan = '我需要先把计划发给你核对。你可以说「刚才的计划发我看看」。';
+const assistantAddress = new RegExp('^'+projectAgentName+'[，,：:\\s]+','u');
 
 function filterChoices(items,value) {
   if(!value)return items;
@@ -72,7 +75,7 @@ export class ProjectWeChatDispatch {
 
   home(account) {
     const {project,canvas}=this.selection(account);
-    return '现在在'+location(project,canvas)+'。\n直接告诉我想做什么。想换地方，说「换个项目」或「换张画布」。';
+    return '我是'+projectAgentName+'。现在在'+location(project,canvas)+'。\n直接告诉我想做什么。想换地方，说「换个项目」或「换张画布」。';
   }
 
   chooseProject(account,query) {
@@ -168,14 +171,15 @@ export class ProjectWeChatDispatch {
     if(action?.command==='accept-change')text.push('计划从第 '+plan.change.start+' 步调整。');
     if(action?.command==='approve-step')text.push('这一步需要你确认。');
     if(includeSteps||action)for(const [index,step] of steps.entries()){
-      const route=step.executor==='codex'?' · Codex':step.modelSelection?.model?' · '+step.modelSelection.model:'';
-      text.push(`${index+1}. ${step.title} → ${step.target}${route}`);
+      const effort=step.modelSelection?.reasoningEffort;
+      const route=step.executor==='codex'?['Codex']:[step.modelSelection?.model,EFFORT_LABELS[effort]||effort];
+      text.push([`${index+1}. ${step.title} → ${step.target}`,...route].filter(Boolean).join(' · '));
     }
     let dialog;
     if(action){
       const footer='同意的话，回「按这个做」。想调整就直接告诉我。';
       if(text.join('\n').length+footer.length+1>wechatTextLimit)
-        return {text:[...header,'计划较长，请在电脑的 WTT 项目助手里核对后确认。'].join('\n')};
+        return {text:[...header,'计划较长，请在电脑上打开'+projectAgentName+'核对后确认。'].join('\n')};
       text.push(footer);
       dialog={kind:'approve',code:this.approvalCode(row,plan,action)};
     }
@@ -215,7 +219,8 @@ export class ProjectWeChatDispatch {
   }
 
   async replyTo(row,account) {
-    const intent=wechatIntent(row.text);
+    const text=row.text.replace(assistantAddress,'');
+    const intent=wechatIntent(text);
     const dialog=this.state.dialog(row);
     const value=intent?.value||'';
     switch(intent?.kind){
@@ -242,15 +247,15 @@ export class ProjectWeChatDispatch {
       case 'cancel':if(dialog)return '好，先放着。';break;
     }
 
-    if(dialog?.kind==='choice')return this.continueChoice(account,dialog,row.text);
+    if(dialog?.kind==='choice')return this.continueChoice(account,dialog,text);
     if(dialog?.kind==='name'){
-      const name=wechatGivenName(row.text);
+      const name=wechatGivenName(text);
       if(!name)return;
       const current=dialog.target==='new-project'?account.parentProjectId:this.selection(account).project.id;
       if(current!==dialog.projectId)return '新建的位置变了。可以再说一次要在哪里建。';
       return this.create(account,dialog.target,name,row);
     }
-    if(/^(?:就)?第/u.test(row.text)&&wechatOptionNumber(row.text)!==null)
+    if(/^(?:就)?第/u.test(text)&&wechatOptionNumber(text)!==null)
       return '刚才的选项不在了。可以说「换个项目」或「换张画布」再看看。';
   }
 
@@ -300,10 +305,10 @@ export class ProjectWeChatDispatch {
     const outcome=await this.coordinators.inspectWechat(service,row.session_id,row.request_id);
     if(!active())return;
     if(outcome.state==='ended'){
-      const result=outcome.answer||'本轮已结束，请到原项目助手查看。';
+      const result=outcome.answer||'本轮已结束，可以在电脑上打开'+projectAgentName+'查看。';
       this.state.finish(row,result.slice(0,wechatTextLimit));
     }else if(outcome.state==='missing'&&Date.now()-row.waited_at>45000){
-      this.state.finish(row,'我暂时无法确认刚才那条消息是否送达，可以在电脑的 WTT 项目助手里查看。');
+      this.state.finish(row,'我暂时无法确认刚才那条消息是否送达，可以在电脑上打开'+projectAgentName+'查看。');
     }
   }
 }

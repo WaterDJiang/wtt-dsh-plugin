@@ -4,6 +4,7 @@ import { constants } from 'node:fs';
 import { access, lstat, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { projectAgentName } from './project-agent-name.mjs';
 
 const codexArgs = ['--disable','shell_tool','-a','never','-c','web_search="disabled"',
   'exec','--ignore-user-config','--ephemeral','--skip-git-repo-check','--sandbox','read-only','--json','-'];
@@ -107,10 +108,10 @@ export class ProjectCodexExecutor {
 
   state(task) {
     if(task.status==='output')return {phase:'idle',message:'Codex 报告已保存',settled:true};
-    if(this.running(task.id))return {phase:'generating',message:'Codex CLI 正在执行，请在项目助手查看或停止',settled:false};
-    if(task.dispatchStatus==='draft')return {phase:'draft',message:'Codex 步骤等待项目助手派发',settled:true};
+    if(this.running(task.id))return {phase:'generating',message:'Codex CLI 正在执行，可在'+projectAgentName+'查看或停止',settled:false};
+    if(task.dispatchStatus==='draft')return {phase:'draft',message:'Codex 步骤等待'+projectAgentName+'派发',settled:true};
     if(['failed','cancelled'].includes(task.dispatchStatus))return {phase:task.dispatchStatus,message:task.error,settled:true};
-    return {phase:'unknown',message:'Codex 执行回执待核对，请打开项目助手',settled:false};
+    return {phase:'unknown',message:'Codex 执行回执待核对，请打开'+projectAgentName,settled:false};
   }
 
   start(service,taskId,prepared,step,binary,revision) {

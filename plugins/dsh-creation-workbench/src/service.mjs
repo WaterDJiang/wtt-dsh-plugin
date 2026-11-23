@@ -1,4 +1,5 @@
 import { projectTaskFingerprint } from './task-store.mjs';
+import { projectAgentName } from './project-agent-name.mjs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, realpathSync, readFileSync } from 'node:fs';
@@ -575,7 +576,7 @@ export class WorkbenchService {
   prepareTask({ taskId },{projectExecutor}={}) {
     const task = this.tasks.get(taskId);
     if (task.kind !== 'ai' || task.input.workflow) throw new Error('此任务请从对应的原始任务入口处理');
-    if (task.input.projectExecutor && task.input.projectExecutor!==projectExecutor) throw new Error('请在项目助手执行此 Codex 步骤');
+    if (task.input.projectExecutor && task.input.projectExecutor!==projectExecutor) throw new Error('请在'+projectAgentName+'执行此 Codex 步骤');
     if (!['draft', 'failed'].includes(task.dispatchStatus || task.status) || task.cardVersionId) {
       throw new Error('此任务已提交或结果待核对，请打开原任务查看，不能重新发送');
     }

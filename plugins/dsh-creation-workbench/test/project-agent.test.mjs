@@ -31,6 +31,80 @@ async function fixture(t,mode='plan'){
   return {get agent(){return agent},get service(){return service},host,sent,a,b,root,session,turn,plan,propose,restart,publish};
 }
 
+test('授权前独立选模型和推理等级，重开后各任务按冻结参数派发',async t=>{
+  const f=await fixture(t), selected=[];
+  const flash={provider:'dsh-fixture',model:'flash',reasoningEffort:'low'};
+  const pro={provider:'dsh-fixture',model:'pro',reasoningEffort:'high'};
+  f.host.validateModel=async model=>{if(model.model==='missing')throw Error('指定模型当前不可用');};
+  f.host.selectModel=async(_service,sessionId,model)=>selected.push({sessionId,model});
+  f.plan.steps[1].modelSelection=flash;
+  f.propose();
+  const draft=f.agent.plans()[0];
+  const choose=(stepId,modelSelection,scopeToken=f.agent.approvalToken(draft.id))=>
+    f.agent.control({id:draft.id,command:'select-step-model',stepId,scopeToken,modelSelection});
+  const [first,second]=draft.steps;
+  assert(first.modelEditable&&second.modelEditable);
+  await assert.rejects(choose(first.id,{...flash,model:'missing'}),/模型当前不可用/);
+  await choose(first.id,flash);
+  await assert.rejects(choose(second.id,pro,draft.scopeToken),/计划已更新/);
+  await choose(second.id,null);
+  assert.equal(f.agent.reviews(f.session).item.plan.steps[1].modelSelection,null);
+  await choose(second.id,pro);
+  await f.agent.tick();
+  assert.equal(f.sent.length,0);
+  assert(f.agent.plans()[0].steps.every(step=>!step.taskId));
+  f.restart();
+  const saved=f.agent.plans()[0];
+  assert.deepEqual(saved.steps.map(step=>step.modelSelection),[flash,pro]);
+  await assert.rejects(f.agent.control({id:draft.id,command:'approve-plan',scopeToken:draft.scopeToken}),/批准范围已变化/);
+  await f.agent.control({id:saved.id,command:'approve-plan',scopeToken:saved.scopeToken});
+  await assert.rejects(choose(second.id,null),/已授权或派发/);
+  await f.agent.tick();
+  await assert.rejects(choose(first.id,null),/已授权或派发/);
+  await f.publish(0,{primary:true});
+  await f.agent.tick();
+  await f.agent.tick();
+  assert.deepEqual(selected,f.sent.map(({sid},index)=>({sessionId:sid,model:[flash,pro][index]})));
+  assert.deepEqual(f.sent.map(({prepared})=>f.service.tasks.get(prepared.taskId).input.modelSelection),[flash,pro]);
+});
+
+test('逐项审批和范围变更核对模型，审批先于模型目录响应时保留已批准的选择',async t=>{
+  const f=await fixture(t,'step');
+  const flash={provider:'dsh-fixture',model:'flash'};
+  f.host.validateModel=async()=>{};
+  f.host.selectModel=async()=>{};
+  f.propose();
+  const approve=(plan,stepId)=>f.agent.control({id:plan.id,command:'approve-step',stepId,scopeToken:plan.scopeToken});
+  const choose=(plan,props)=>f.agent.control({id:plan.id,command:'select-step-model',scopeToken:plan.scopeToken,...props});
+  const before=f.agent.plans()[0],stepId=before.steps[0].id;
+  await choose(before,{stepId,modelSelection:flash});
+  await assert.rejects(approve(before,stepId),/批准范围已变化/);
+  const after=f.agent.plans()[0];
+  const validation=Promise.withResolvers();
+  f.host.validateModel=()=>validation.promise;
+  const slow=choose(after,{stepId,modelSelection:{...flash,model:'pro'}});
+  const rejected=assert.rejects(slow,/已授权或派发/);
+  await approve(after,stepId);
+  validation.resolve();
+  await rejected;
+  await f.agent.tick();
+  assert.deepEqual(f.service.tasks.get(f.sent[0].prepared.taskId).input.modelSelection,flash);
+
+  const turn=f.agent.turn({sessionId:f.session,requirementId:f.a,mode:'plan',text:'调整剩下两步'});
+  f.agent.tool(f.session,'amend',turn.id,{planId:after.id,replaceFrom:2,steps:[
+    {title:'归档',type:'text',instruction:'整理脚本'}, {title:'报告',type:'text',instruction:'核对脚本',executor:'codex'},
+  ]});
+  const proposed=f.agent.plans()[0];
+  assert.deepEqual(proposed.change.steps.map(step=>step.modelEditable),[true,false]);
+  assert.equal(proposed.steps[1].modelEditable,false);
+  await assert.rejects(choose(proposed,{changeId:turn.id,changeIndex:1,modelSelection:flash}),/无法更换模型/);
+  await choose(proposed,{changeId:turn.id,changeIndex:0,modelSelection:flash});
+  const accept=plan=>f.agent.control({id:plan.id,command:'accept-change',changeId:turn.id,scopeToken:plan.scopeToken});
+  await assert.rejects(accept(proposed),/批准范围已变化/);
+  await accept(f.agent.plans()[0]);
+  assert.deepEqual(f.agent.plans()[0].steps[1].modelSelection,flash);
+});
+
 test('多成果验收持久化，暂停后恢复原会话，同卡修订再向下游冻结两版',async t=>{
   const f=await fixture(t,'auto'), deliveries=[];
   f.host.deliverReview=async(_service,session,id,allowed,read)=>{
@@ -136,7 +210,7 @@ test('验收调整未派发步骤走原范围审批，Codex 在自动档仍需�
   assert.equal(p.change.steps[0].executor,'codex');
   await f.agent.tick();
   assert.equal(f.sent.length,1);
-  await f.agent.control({id:p.id,command:'accept-change',changeId:p.change.id});
+  await f.agent.control({id:p.id,command:'accept-change',changeId:p.change.id,scopeToken:p.scopeToken});
   p=f.agent.plans()[0];
   assert.equal(p.steps[1].authorized,false);
   await f.agent.tick();
@@ -157,7 +231,7 @@ test('Codex 缺失、首次启动围栏、失败与受理不明保留单次派�
   f.host.stopExternal=(...args)=>executor.stop(...args);
   const {id:stepId}=f.agent.plans()[0].steps[0];
   await f.agent.tick();assert.equal(starts,0);
-  await f.agent.control({id:f.turn.id,stepId,command:'approve-step'});
+  await f.agent.control({id:f.turn.id,stepId,command:'approve-step',scopeToken:f.agent.approvalToken(f.turn.id)});
   await f.agent.tick();
   assert.match(f.agent.plans()[0].steps[0].error,/找不到 Codex/);
   assert.equal(f.agent.plans()[0].steps[0].taskId,null);
@@ -165,7 +239,7 @@ test('Codex 缺失、首次启动围栏、失败与受理不明保留单次派�
   await f.agent.control({id:f.turn.id,stepId,command:'recheck'});
   await f.agent.tick();
   const {taskId}=f.agent.plans()[0].steps[0];
-  assert.throws(()=>f.service.prepareTask({taskId}),/项目助手/);
+  assert.throws(()=>f.service.prepareTask({taskId}),/小瓦/);
   await execution;
   await f.agent.tick();
   assert.equal(starts,1);assert.equal(f.sent.length,0);
@@ -195,7 +269,7 @@ setInterval(()=>{},1000);
   f.host.runExternal=(...args)=>executor.start(...args);
   f.host.stopExternal=(...args)=>executor.stop(...args);
   t.after(()=>executor.close());
-  await f.agent.control({id:f.turn.id,stepId:f.agent.plans()[0].steps[0].id,command:'approve-step'});
+  await f.agent.control({id:f.turn.id,stepId:f.agent.plans()[0].steps[0].id,command:'approve-step',scopeToken:f.agent.approvalToken(f.turn.id)});
   await f.agent.tick();
   const taskId=f.agent.plans()[0].steps[0].taskId;
   const deadline=Date.now()+3000;
@@ -389,7 +463,7 @@ test('更改派发范围只审批变更，拒绝保留原授权，旧范围不�
   const reject=extra();amend(reject);
   await f.agent.control({id:f.turn.id,command:'reject-change',changeId:reject});
   assert.equal(f.agent.steps(f.turn.id).length,2);
-  const next=extra();amend(next);await f.agent.control({id:f.turn.id,command:'accept-change',changeId:next});
+  const next=extra();amend(next);await f.agent.control({id:f.turn.id,command:'accept-change',changeId:next,scopeToken:f.agent.approvalToken(f.turn.id)});
   await assert.rejects(f.agent.control({id:f.turn.id,command:'approve-plan',scopeToken:token}),/范围已变化/);
   assert.equal(f.agent.steps(f.turn.id).length,3);
   await f.agent.control({id:f.turn.id,command:'approve-plan',scopeToken:f.agent.approvalToken(f.turn.id)});
@@ -405,7 +479,7 @@ test('现有 Markdown 单一原文、范围变更复核与外部文件保留',as
   assert.throws(()=>m.bind({name:'危险路径',document:'../例.md'}),/项目内/);
   f.propose();writeFileSync(file,'竖屏');await f.agent.tick();
   const step=f.agent.steps(f.turn.id)[0];assert.equal(step.authorized,0);assert.match(step.error,/设定已更新/);
-  await f.agent.control({id:f.turn.id,command:'approve-step',stepId:step.id});await f.agent.tick();
+  await f.agent.control({id:f.turn.id,command:'approve-step',stepId:step.id,scopeToken:f.agent.approvalToken(f.turn.id)});await f.agent.tick();
   assert.match(f.sent[0].prepared.prompt,/竖屏/);
   const current=m.effective([])[0];m.save({...current,body:'',baseRevision:current.revision});
   assert.equal(readFileSync(file,'utf8'),'竖屏');assert.equal(m.effective([]).length,0);

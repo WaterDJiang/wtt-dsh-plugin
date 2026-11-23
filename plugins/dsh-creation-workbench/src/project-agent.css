@@ -73,7 +73,14 @@
 .wtt-agent-plan-progress progress::-moz-progress-bar { background:var(--wtt-ui-accent); border-radius:999px; }
 .wtt-agent-plan > :not(summary) { margin:var(--wtt-space-2) var(--wtt-space-3); }
 .wtt-agent-plan > .wtt-agent-step { padding-block:var(--wtt-space-1); border-top:1px solid var(--wtt-ui-line); }
-.wtt-agent-step-details { min-width:0; flex:1; }
+.wtt-agent-step-main { display:flex; align-items:flex-start; justify-content:space-between; flex:1; min-width:0; gap:var(--wtt-space-2); }
+.wtt-agent-step-main:has(.wtt-agent-step-model) { flex-basis:100%; }
+.wtt-agent-step-details { min-width:0; flex:1; padding-block:var(--wtt-space-1); }
+.wtt-agent-step-main:has(.wtt-agent-step-model) .wtt-agent-step-details:not([open]) > summary { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wtt-agent-step-model { display:flex; align-items:flex-start; gap:var(--wtt-space-1); min-width:0; max-width:60%; }
+.wtt-agent-step-model > small { padding-block:var(--wtt-space-1); white-space:nowrap; }
+.wtt-agent-step-model .wcc-native-model-selection { flex-wrap:wrap; }
+.wtt-agent-step-model .wcc-native-model-selection button[aria-haspopup="menu"] { max-width:100%; }
 .wtt-agent-step-details p { white-space:pre-wrap; }
 .wtt-agent-step-note { color:var(--wtt-ui-muted); font-size:var(--wtt-text-xs); line-height:1.5; }
 .wtt-agent-step-note ul { margin-block:var(--wtt-space-1); padding-inline-start:var(--wtt-space-4); }
@@ -94,7 +101,7 @@
 .wtt-agent-review-heading strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wtt-agent-review-heading small { color:var(--wtt-ui-muted); }
 .wtt-agent-review-steps {
-  max-height:min(80px, 14dvh); overflow:auto; overscroll-behavior:contain;
+  max-height:min(136px, 22dvh); overflow:auto; overscroll-behavior:contain;
   overflow-wrap:anywhere; font-size:var(--wtt-text-sm);
 }
 .wtt-agent-review-steps p { margin:var(--wtt-space-1) var(--wtt-space-3); white-space:pre-wrap; }

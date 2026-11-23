@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { projectAgentName } from './project-agent-name.mjs';
 
 export function createTaskControl(ctx, runtime) {
   const serviceOf = name => typeof ctx.get === 'function' ? ctx.get(name) : ctx[name];
@@ -21,7 +22,7 @@ export function createTaskControl(ctx, runtime) {
     }
     const common = { taskId: task.id, requirementId: task.requirementId, title: task.title, ...scope(service, task) };
     if (task.input?.projectExecutor==='codex') return {...common,kind:'codex',state:task.runtimeState?.phase||'unknown',canStop:false,
-      message:task.runtimeState?.message||'请在项目助手查看或停止 Codex 步骤'};
+      message:task.runtimeState?.message||'可在'+projectAgentName+'查看或停止 Codex 步骤'};
     if (task.kind === 'media') {
       const job = service.media.job(task.id);
       if (!job) throw new Error('媒体任务不存在');

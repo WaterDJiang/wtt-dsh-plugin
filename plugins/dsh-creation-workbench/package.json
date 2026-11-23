@@ -1,7 +1,7 @@
 {
   "name": "@wtt/dsh-creation-workbench",
-  "version": "0.59.2",
-  "description": "DeepSeek Harness 的 AI 创作画布。在同一个项目里整理资料、引用卡片与文件、调用本机 Skill，并管理文本、演示文稿、图片和视频的成果版本。",
+  "version": "0.59.3",
+  "description": "DeepSeek Harness 的 AI 创作画布。用小瓦拆解跨画布任务、逐步选模型和验收成果，也可扫码连接微信 Bot。",
   "keywords": [
     "dsh",
     "deepseek",
@@ -14,7 +14,10 @@
     "创作画布",
     "AI 创作",
     "项目资料",
-    "工作台"
+    "工作台",
+    "小瓦",
+    "Super Agent",
+    "微信 Bot"
   ],
   "type": "module",
   "engines": {

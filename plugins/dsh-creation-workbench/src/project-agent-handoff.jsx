@@ -1,11 +1,12 @@
 import React from 'react';
 import { UiButton } from './ui/controls.jsx';
+import { projectAgentName } from './project-agent-name.mjs';
 
 export function StepHandoff({step,act,busy,offerTakeover=false}){
   const {handoff,choice,receipt,consumers}=step;
   if(!handoff&&!choice&&!offerTakeover)return null;
   return <div className="wtt-agent-handoff">
-    <span role="status">{handoff?'你正在处理':choice?`已有 V${choice.number} · 当前使用 V${receipt.number}`:'项目助手在跟进'}</span>
+    <span role="status">{handoff?'你正在处理':choice?`已有 V${choice.number} · 当前使用 V${receipt.number}`:projectAgentName+'在跟进'}</span>
     {choice&&<UiButton size="compact" variant="primary" disabled={busy} onClick={()=>act('use-version')}>
       {handoff?`交回助手 · V${choice.number}`:`采用 V${choice.number}`}
     </UiButton>}

@@ -645,13 +645,13 @@ try {
       await materialComposer.locator('textarea').first().waitFor();
       await materialComposer.getByRole('button',{name:'关闭卡片创作框'}).click();
       const toolbar=canvas.getByRole('toolbar',{name:'白板工具'});
-      const launcher=toolbar.getByRole('button',{name:'打开WTT 项目助手'});
+      const launcher=toolbar.getByRole('button',{name:'打开小瓦'});
       const before=await launcher.boundingBox();
       const materialTool=await toolbar.getByRole('button',{name:'添加素材'}).boundingBox();
       assert.equal(before.width,materialTool.width);
       assert.equal(before.x,materialTool.x);
       assert(before.y>=materialTool.y+materialTool.height);
-      assert.equal(await canvas.getByRole('button',{name:'打开WTT 项目助手'}).count(),1);
+      assert.equal(await canvas.getByRole('button',{name:'打开小瓦'}).count(),1);
       const logo=launcher.locator('img');
       await logo.evaluate(img=>img.decode());
       assert.equal(await logo.evaluate(img=>img.naturalWidth),128);
@@ -661,7 +661,7 @@ try {
       await canvas.focus();await page.keyboard.press('Meta+a');
       await launcher.focus();await launcher.press('Enter');
       const panel=canvas.locator('.wtt-agent-float.is-open');
-      await panel.getByRole('heading',{name:'WTT 项目助手',exact:true}).waitFor();
+      await panel.getByRole('heading',{name:'小瓦',exact:true}).waitFor();
       assert.equal(await panel.evaluate(el=>getComputedStyle(el).borderColor),'rgb(0, 47, 167)');
       assert.match(await panel.evaluate(el=>getComputedStyle(el).boxShadow),/18px/,'浮窗应有克莱因蓝外光晕');
       assert.equal(await launcher.getAttribute('aria-expanded'),'true');
@@ -671,7 +671,7 @@ try {
       await page.mouse.move(titleBar.x-20,titleBar.y-16,{steps:8});await page.mouse.up();
       assert((await panel.boundingBox()).x<firstPosition.x-80);
       assert.deepEqual(await launcher.boundingBox(),before);
-      await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
+      await panel.getByRole('button',{name:'收起小瓦'}).click();
       assert.equal(await launcher.evaluate(button=>button===document.activeElement),true);
       assert.equal(await launcher.getAttribute('aria-expanded'),'false');
       assert.equal(await panel.count(),0);
@@ -697,7 +697,7 @@ try {
       const fallbackSkillMenu=page.getByRole('region',{name:'选择技能',exact:true});
       const skillOptions=noNativeSkillMenu?fallbackSkillMenu:panel.locator('[data-trigger-menu]').filter({hasText:'wtt-qa-layout'});
       async function checkSkillMenuBounds(){
-        const menu=await skillOptions.boundingBox(),button=await skillsButton.boundingBox(),nav=await panel.getByRole('navigation',{name:'WTT 项目助手视图'}).boundingBox();
+        const menu=await skillOptions.boundingBox(),button=await skillsButton.boundingBox(),nav=await panel.getByRole('navigation',{name:'小瓦视图'}).boundingBox();
         assert(menu&&button&&nav);
         const viewport=page.viewportSize();
         assert(menu.x>=0&&menu.x+menu.width<=viewport.width+1&&menu.y>=nav.y+nav.height-1&&menu.y+menu.height<=button.y+1,
@@ -737,7 +737,7 @@ try {
         await skillsButton.click();await skillOptions.waitFor();
         await page.keyboard.press('Escape');await skillOptions.waitFor({state:'hidden'});
         await skillsButton.click();await skillOptions.waitFor();
-        await panel.getByRole('heading',{name:'WTT 项目助手',exact:true}).click();await skillOptions.waitFor({state:'hidden'});
+        await panel.getByRole('heading',{name:'小瓦',exact:true}).click();await skillOptions.waitFor({state:'hidden'});
         await skillsButton.click();await skillOptions.waitFor();
         await plansTab.press('Enter');await chatTab.press('Enter');
         await skillOptions.waitFor({state:'hidden'});
@@ -759,7 +759,7 @@ try {
         },{w:oldSize.width,h:oldSize.height},{timeout:3000});
         const resized=await panel.boundingBox();
         assert(resized.width<oldSize.width-25&&resized.height<oldSize.height-25);
-        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await launcher.click();
+        await panel.getByRole('button',{name:'收起小瓦'}).click();await launcher.click();
         assert.equal((await panel.boundingBox()).width,resized.width);
         await panel.getByText('已选 2 张',{exact:true}).click();
         await panel.getByRole('button',{name:'移除引用 采访乙'}).click();
@@ -838,7 +838,7 @@ try {
         await approve.click();
         assert.equal(await chatTab.getAttribute('aria-pressed'),'true');
       }
-      await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
+      await panel.getByRole('button',{name:'收起小瓦'}).click();
       const checkHandoff=process.env.WTT_AGENT_SMOKE_HANDOFF==='1';
       assert(!checkHandoff||(mode==='plan'&&process.env.WTT_AGENT_SMOKE_QUESTION==='1'),'交接冒烟需要计划授权与原生提问');
       let adoptedVersion;
@@ -886,13 +886,13 @@ try {
         await launcher.click();await plansTab.click();await panel.getByRole('button',{name:'定位 V2',exact:true}).waitFor();
         assert.equal((await state()).plans[0].steps[1].taskId,null);
         await panel.getByRole('button',{name:'继续剩余步骤',exact:true}).click();
-        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
+        await panel.getByRole('button',{name:'收起小瓦'}).click();
       }
       if(mode==='step'){
         await launcher.click();
         await review.getByText(/分镜 · /).waitFor({timeout:25000});
         await review.getByRole('button',{name:'执行此项',exact:true}).click();
-        await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
+        await panel.getByRole('button',{name:'收起小瓦'}).click();
       }
       const deadline=Date.now()+40000;
       let live=await state();
@@ -981,7 +981,7 @@ try {
         await page.keyboard.press('Escape');await fallbackSkillMenu.waitFor({state:'hidden'});
         console.log('PASS 原生技能菜单缺失时使用同一会话目录，搜索、插入、取消和窄屏均可用');
       }
-      await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();await launcher.waitFor();
+      await panel.getByRole('button',{name:'收起小瓦'}).click();await launcher.waitFor();
       const compact=await launcher.boundingBox();
       const rail=await toolbar.boundingBox();
       assert(compact.x>=rail.x&&compact.x+compact.width<=rail.x+rail.width&&compact.y+compact.height<=680);

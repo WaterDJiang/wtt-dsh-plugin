@@ -16,7 +16,7 @@ export async function checkProjectAgentIdle(page, canvas, api, model) {
   };
   try {
     const closedBeforeUse = await observe();
-    const launcher = canvas.getByRole('button', { name: '打开WTT 项目助手' });
+    const launcher = canvas.getByRole('button', { name: '打开小瓦' });
     const panel = canvas.locator('.wtt-agent-float.is-open');
     const times = [];
     for (let i = 0; i < 8; i++) {
@@ -33,7 +33,7 @@ export async function checkProjectAgentIdle(page, canvas, api, model) {
         assert.ok(model.evidence.length, '只读工具应已返回记忆');
         assert.ok(!model.calls.some(c => c.name === 'course_save_outline'), '只读请求不应派发创作');
       }
-      await panel.getByRole('button', { name: '收起WTT 项目助手' }).click();
+      await panel.getByRole('button', { name: '收起小瓦' }).click();
     }
     const result = await page.evaluate(async url => (await fetch(url, { method: 'POST',
       body: JSON.stringify({ action: 'project-agent-state', data: {} }) })).json(), api.href);
@@ -47,7 +47,7 @@ export async function checkProjectAgentIdle(page, canvas, api, model) {
   }
 }
 export async function checkProjectAgentStop(page,canvas,api,model){
-  await canvas.getByRole('button',{name:'打开WTT 项目助手'}).click();
+  await canvas.getByRole('button',{name:'打开小瓦'}).click();
   const panel=canvas.locator('.wtt-agent-float.is-open');
   const input=panel.locator('[contenteditable=true]').last();
   await input.click();await input.press('End');await page.keyboard.insertText('从采访写脚本和分镜');await input.press('Enter');
@@ -67,7 +67,7 @@ export async function checkProjectAgentStop(page,canvas,api,model){
 }
 
 export async function checkProjectAgentPages(canvas){
-  const launcher=canvas.getByRole('button',{name:'打开WTT 项目助手'});
+  const launcher=canvas.getByRole('button',{name:'打开小瓦'});
   await launcher.click();
   const panel=canvas.locator('.wtt-agent-float.is-open');
   await panel.getByRole('button',{name:'委托',exact:true}).click();
@@ -78,7 +78,7 @@ export async function checkProjectAgentPages(canvas){
   const oldest=panel.locator('.wtt-agent-plan').filter({has:panel.page().getByText('待办 1',{exact:true})});
   await oldest.getByRole('button',{name:'停止委托'}).click();
   await oldest.getByText('已停止',{exact:true}).waitFor();
-  await panel.getByRole('button',{name:'收起WTT 项目助手'}).click();
+  await panel.getByRole('button',{name:'收起小瓦'}).click();
   const badge=launcher.getByText('100',{exact:true});
   await badge.waitFor();
   assert.equal(await launcher.getAttribute('aria-description'),'100 项待确认');

@@ -8,13 +8,14 @@ import {ProjectMemoryPanel} from './project-agent-memory.jsx';
 import {StepHandoff} from './project-agent-handoff.jsx';
 import {creationSource, usableCreationSource} from './creation-context.mjs';
 import {EFFORT_LABELS} from './model-selection.mjs';
+import {ModelSelection} from './model-selection.jsx';
+import {projectAgentName as assistantName} from './project-agent-name.mjs';
 import wattterAgentLogo from './assets/wattter-agent.png';
 import './project-agent.css';
 
 const labels={auto:'全自动',plan:'先规划后执行',step:'逐项确认'};
 const statuses={done:'已完成',running:'执行中',paused:'已暂停',approval:'待授权',stopped:'已停止',stopping:'停止待核对',blocked:'待核对',working:'执行中',ready:'待执行',checking:'待验收','review-waiting':'需要你'};
 const reviewLabel='授权并执行';
-const assistantName='WTT 项目助手';
 function stored(storage,key,fallback){try{return JSON.parse(storage.getItem(key))??fallback;}catch{return fallback;}}
 function persist(storage,key,value){try{storage.setItem(key,JSON.stringify(value));}catch{/* Position is optional in read-only browser storage. */}}
 function ModeMenu({value,onChange,label='执行方式'}){
@@ -23,18 +24,28 @@ function ModeMenu({value,onChange,label='执行方式'}){
     {open&&<CanvasPopover className="wtt-agent-mode" anchorRef={anchor} onDismiss={()=>setOpen(false)} onKeyDown={e=>{if(e.key==='Escape'){setOpen(false);anchor.current?.focus();}}} role="menu">
       {Object.entries(labels).map(([id,name])=><UiButton key={id} role="menuitemradio" aria-checked={value===id} onClick={()=>{setOpen(false);onChange(id);}}>{name}{value===id?' ✓':''}</UiButton>)}</CanvasPopover>}</>;
 }
-function PlanStepDetails({step,locate}){
+function PlanStepDetails({step,locate,plan,act,models,busy,changeIndex}){
   const model=step.modelSelection;
   const executor=step.executor==='codex'?'Codex CLI':model?[model.model,model.provider,EFFORT_LABELS[model.reasoningEffort]||model.reasoningEffort].filter(Boolean).join(' · '):'DSH 默认模型';
+  const selectModel=modelSelection=>act(plan,'select-step-model',{
+    ...(changeIndex===undefined?{stepId:step.id}:{changeId:plan.change.id,changeIndex}),modelSelection,
+  });
   return <>
-    <details className="wtt-agent-step-details"><summary>{step.title} · {step.target}{step.executor==='codex'&&' · Codex'}</summary><p>{step.instruction}</p>
-      <div className="wtt-agent-step-note">执行者 · {executor}</div>
-      {!!step.deps.length&&<small>依赖步骤 {step.deps.join('、')}</small>}
-      {step.acceptance&&<div className="wtt-agent-step-note">验收 · 至少 {step.acceptance.minCards} 张正式成果
-        <ul>{step.acceptance.criteria.map((criterion,index)=><li key={index}>{criterion}</li>)}</ul>
+    <div className="wtt-agent-step-main">
+      <details className="wtt-agent-step-details"><summary title={step.title+' · '+step.target}>{step.title} · {step.target}{step.executor==='codex'&&' · Codex'}</summary><p>{step.instruction}</p>
+        <div className="wtt-agent-step-note">执行者 · {executor}</div>
+        {step.modelEditable&&model&&<UiButton variant="ghost" size="compact" disabled={busy} onClick={()=>selectModel(null)}>恢复默认模型</UiButton>}
+        {!!step.deps.length&&<small>依赖步骤 {step.deps.join('、')}</small>}
+        {step.acceptance&&<div className="wtt-agent-step-note">验收 · 至少 {step.acceptance.minCards} 张正式成果
+          <ul>{step.acceptance.criteria.map((criterion,index)=><li key={index}>{criterion}</li>)}</ul>
+        </div>}
+        {step.resultReview?.reason&&step.resultReview.reason!==step.error&&<div className="wtt-agent-step-note">{step.resultReview.reason}</div>}
+      </details>
+      {step.modelEditable&&<div className="wtt-agent-step-model" role="group" aria-label={step.title+'的模型'}>
+        {!model&&<small className="wtt-agent-step-note">默认</small>}
+        <ModelSelection {...models} compact selection={model} onChange={busy?undefined:selectModel}/>
       </div>}
-      {step.resultReview?.reason&&step.resultReview.reason!==step.error&&<div className="wtt-agent-step-note">{step.resultReview.reason}</div>}
-    </details>
+    </div>
     {!!step.refs?.length&&<details><summary>{step.refs.length} 份引用</summary>{step.refs.map(ref=><div key={ref.cardId}>
       {ref.title}{ref.versionId&&<UiButton size="compact" onClick={()=>locate({...ref,cardId:ref.outputCardId})}>查看引用版本</UiButton>}
     </div>)}</details>}
@@ -49,7 +60,7 @@ function ReviewActions({kind,plan,stepId,act,busy}){
     {kind==='plan'?reviewLabel:'执行此项'}
   </UiButton>;
 }
-function ChatReview({review,act,locate,busy,onPage}){
+function ChatReview({review,act,locate,busy,onPage,models}){
   if(!review?.item)return null;
   const {plan,kind,stepId}=review.item;
   const steps=kind==='change'?plan.change.steps:kind==='plan'?plan.steps:plan.steps.filter(step=>step.id===stepId);
@@ -58,9 +69,10 @@ function ChatReview({review,act,locate,busy,onPage}){
       <strong title={plan.title}>{plan.title}</strong>
       <small role="status">{kind==='change'?('范围变更 · 从第 '+plan.change.start+' 项起'):kind==='step'?'待确认步骤':'计划已生成 · 待授权'}</small>
     </div>
-    <div className="wtt-agent-review-steps" key={plan.id+':'+kind+':'+(stepId||'')}>
+    <div className="wtt-agent-review-steps" key={plan.id+':'+kind+':'+(stepId||plan.change?.id||'')}>
       {steps.map((step,index)=><div key={step.id||index}>
-        <PlanStepDetails step={step} locate={ref=>locate(ref,plan.id)}/>
+        <PlanStepDetails step={step} locate={ref=>locate(ref,plan.id)} plan={plan} act={act} models={models} busy={busy}
+          changeIndex={kind==='change'?index:undefined}/>
         {kind==='step'&&step.error&&<small>{step.error}</small>}
       </div>)}
     </div>
@@ -74,7 +86,7 @@ function ChatReview({review,act,locate,busy,onPage}){
     </div>
   </section>;
 }
-function Plans({plans,act,locate,busy,focusPlan}){
+function Plans({plans,act,locate,busy,focusPlan,models}){
   if(!plans?.length)return null;
   return <div className="wtt-agent-plans">{plans.map((p,index)=>{
     const next=p.steps.find(s=>s.state!=='done'||s.handoff),ended=['done','stopped'].includes(p.state);
@@ -96,8 +108,9 @@ function Plans({plans,act,locate,busy,focusPlan}){
         const context=s.choice?{...s,receipt:receipts.find(card=>card.cardId===s.choice.cardId)||s.receipt}:s;
         const canDecide=p.state==='running'&&s.id===next?.id&&s.state==='review-waiting'&&!s.handoff&&s.resultReviewId;
         return <div key={s.id} className="wtt-agent-step">
-          <PlanStepDetails step={s} locate={target}/>
-          {s.state!=='done'&&<small role={s.id===next?.id?'status':undefined}>{s.revising&&s.state==='ready'&&s.authorized?'待修订':stepStatus(s)}</small>}
+          <PlanStepDetails step={s} locate={target} plan={p} act={act} models={models} busy={busy}/>
+          {s.state!=='done'&&!(p.state==='approval'&&s.state==='ready'&&!s.revising)&&
+            <small role={s.id===next?.id?'status':undefined}>{s.revising&&s.state==='ready'&&s.authorized?'待修订':stepStatus(s)}</small>}
           {s.error&&<div className="wtt-agent-step-note">{s.error}</div>}
           {!!receipts.length&&<div className="wtt-agent-step-results" aria-label={s.title+'成果'}>
             {receipts.map(card=><UiButton key={card.cardId} size="compact" onClick={()=>target(card)}>
@@ -115,14 +128,16 @@ function Plans({plans,act,locate,busy,focusPlan}){
           {s.id===next?.id&&p.state==='running'&&s.state==='ready'&&!s.authorized&&!s.handoff&&<UiButton disabled={busy} size="compact" onClick={()=>act(p,'approve-step',{stepId:s.id})}>执行此项</UiButton>}
         </div>;
       })}
-      {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>{p.change.steps.map((s,i)=><PlanStepDetails key={i} step={s} locate={target}/>)}
+      {!ended&&p.state!=='stopping'&&p.change&&<div><strong>范围变更 · 从第 {p.change.start} 项起</strong>
+        {p.change.steps.map((s,i)=><PlanStepDetails key={p.change.id+':'+i} step={s} locate={target} plan={p} act={act} models={models} busy={busy} changeIndex={i}/>)}
         <ReviewActions kind="change" plan={p} act={act} busy={busy}/></div>}
       {!ended&&<div className="wtt-agent-actions">{p.state==='approval'&&<ReviewActions kind="plan" plan={p} act={act} busy={busy}/>}
         {['running','paused'].includes(p.state)&&<UiButton disabled={busy} onClick={()=>act(p,p.state==='paused'?'resume':'pause')}>{p.state==='paused'?'继续剩余步骤':'暂停'}</UiButton>}
         {p.state!=='stopping'&&<ModeMenu label="委托执行方式" value={p.mode} onChange={mode=>act(p,'mode',{mode})}/>}<UiButton disabled={busy} onClick={()=>act(p,'stop')}>{p.state==='stopping'?'重试停止':'停止委托'}</UiButton></div>}</details>;
   })}</div>;
 }
-export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,project,requirement,selected,request,renderConversation,canvasActions,picking,cardId}){
+export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,project,requirement,selected,request,renderConversation,canvasActions,picking,cardId,
+  nativeModelSeat,modelCatalog,modelLoading,modelError,onRefreshModels,onOpenModelSettings}){
   const key='wtt-project-agent:'+project.id;
   const [tracking,setTracking]=useState(()=>stored(sessionStorage,key+':tracking',false));
   const [open,setOpen]=useState(()=>stored(sessionStorage,key+':open',false)),[tab,setTab]=useState('chat');
@@ -291,6 +306,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     toggle(!open);
   };
   const pageTo=value=>{setFocusPlan(null);setPage(value);};
+  const models={nativeSeat:nativeModelSeat,catalog:modelCatalog,loading:modelLoading,error:modelError,onRefresh:onRefreshModels,onOpenSettings:onOpenModelSettings};
   return <>
     <ToolButton label={'打开'+assistantName} buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
       expanded={open} controlsId={open?panelId:undefined} description={[!open&&returnPlan?'返回刚才的委托':'',waiting>0?waiting+' 项待确认':''].filter(Boolean).join('。')||undefined}
@@ -313,13 +329,13 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     </nav>
     {error&&<div className="wtt-agent-feedback" role="alert"><span>{error}</span><UiButton size="compact" onClick={()=>setError('')}>关闭提示</UiButton></div>}
     <section className="wtt-agent-chat" aria-label={assistantName+'对话'} hidden={tab!=='chat'}>
-      {tab==='chat'&&state?.sessionId===session&&<ChatReview review={state?.review} act={act} locate={locate} busy={busy||starting} onPage={setReviewPage}/>}
+      {tab==='chat'&&state?.sessionId===session&&<ChatReview review={state?.review} act={act} locate={locate} models={models} busy={busy||starting} onPage={setReviewPage}/>}
       {session?<ProjectInputContext.Provider key={session} value={owner}>{renderConversation({identity:'project-agent:'+session,sessionId:session,label:assistantName,editing:false,onSettled:()=>refresh().catch(e=>setError(e.message))})}</ProjectInputContext.Provider>
         :!error&&<p className="wtt-agent-empty" role="status">正在打开对话…</p>}
     </section>
     {tab==='plans'&&<section className="wtt-agent-queue" aria-label="项目委托">
       {!state?.plans?.length&&<p className="wtt-agent-empty">{state?.view==='plans'?'暂无委托':'正在读取委托…'}</p>}
-      <Plans plans={state?.plans} act={act} locate={locate} busy={busy} focusPlan={focusPlan}/>
+      <Plans plans={state?.plans} act={act} locate={locate} models={models} busy={busy} focusPlan={focusPlan}/>
       {state?.total>20&&<div className="wtt-agent-actions" aria-label="委托分页">
         <UiButton size="compact" disabled={page===0} onClick={()=>pageTo(page-1)}>上一页</UiButton>
         <span>{page+1} / {Math.ceil(state.total/20)}</span>

@@ -1,4 +1,5 @@
 import {projectInputBridge, ProjectInputDock} from './project-agent-input.jsx'
+import { projectAgentWeChatTitle } from './project-agent-name.mjs'
 import { createDesktopTaskNotices, desktopTaskNotificationChannel } from './desktop-task-notices.mjs'
 import { CanvasConversationReferenceButton } from './conversation-references.jsx'
 import { MediaServiceSettings } from './media-service-settings.jsx';
@@ -120,7 +121,7 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
         <UiButton variant="custom" type="button" role="menuitem" disabled={!selectedId || Boolean(busy)} onClick={() => { setMenuOpen(false); onBackground() }}>背景资料</UiButton>
         <UiButton variant="custom" type="button" role="menuitem" disabled={Boolean(busy)} onClick={() => { setMenuOpen(false); onSyncDeliverables() }}>整理成果文件夹<span>按白板名称整理全部已保存版本</span></UiButton>
         <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onModelSettings() }}>模型设置<span>连接第三方模型或自定义 API</span></UiButton>
-        <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onWeChat() }}>微信项目助手</UiButton>
+        <UiButton variant="custom" type="button" role="menuitem" onClick={() => { setMenuOpen(false); onWeChat() }}>{projectAgentWeChatTitle}</UiButton>
         {notificationChannel?.permission === 'default' && <UiButton variant="custom" type="button" role="menuitem" onClick={() => {
           setMenuOpen(false)
           void notificationChannel.requestPermission().catch(error => console.warn('DSH 桌面通知授权失败', error))
@@ -670,7 +671,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
         {!filesOpen&&<UiButton variant="ghost" onClick={()=>setFilesOpen(true)} aria-label="打开文件栏">打开文件栏</UiButton>}
       </div>
       <div className="wtt-heading-actions">
-        <UiButton variant="quiet" onClick={()=>setShowWeChat(true)}>微信项目助手</UiButton>
+        <UiButton variant="quiet" onClick={()=>setShowWeChat(true)}>{projectAgentWeChatTitle}</UiButton>
         <UiButton variant="quiet" className="wtt-button wtt-button-text" onClick={() => load()} disabled={loading || Boolean(busy)}>{loading ? '读取中…' : '刷新'}</UiButton>
         <UiButton variant="primary" className="wtt-button wtt-button-primary" disabled={!workspace || Boolean(busy)} onClick={() => { setFormError(''); setShowNew(true) }}>新建画布</UiButton>
       </div>

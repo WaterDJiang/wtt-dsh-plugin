@@ -107,7 +107,11 @@ export async function projectAgentModel(fixture){
       }
       const available=(body.tools||[]).map(t=>t.name);
       if(!available.includes(name)&&!available.includes('run_code'))name=null;
-      if(name){calls.push({name,id:input.taskId||input.turnId||input.reviewId||task?.[1],action:input.action||input.decision,model:body.model});if(!available.includes(name)&&available.includes('run_code')){input={description:'工作台验收',code:'return await tools.'+name+'('+JSON.stringify(input)+')'};name='run_code';}}
+      if(name){
+        const effort=body.thinking?.type==='disabled'?'off':body.output_config?.effort;
+        calls.push({name,id:input.taskId||input.turnId||input.reviewId||task?.[1],action:input.action||input.decision,model:body.model,effort});
+        if(!available.includes(name)&&available.includes('run_code')){input={description:'工作台验收',code:'return await tools.'+name+'('+JSON.stringify(input)+')'};name='run_code';}
+      }
       const id='msg_'+randomUUID(),model=body.model;
       const block=name?{type:'tool_use',id:'tool_'+randomUUID(),name,input}:{type:'text',text:'已核对工作台回执。'};
       const usage={input_tokens:80,output_tokens:30};

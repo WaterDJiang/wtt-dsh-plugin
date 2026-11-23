@@ -49,10 +49,10 @@ export async function checkProjectWechat(page,canvas,api,fixture,workspace,mock)
   }
   const deliveries=async()=> (await readFile(path.join(mock.dir,'sent.jsonl'),'utf8')).split('\n').filter(Boolean).map(line=>JSON.parse(line));
   const reply=predicate=>until(async()=> (await deliveries()).find(predicate));
-  const dialog=page.getByRole('dialog',{name:'微信项目助手'});
+  const dialog=page.getByRole('dialog',{name:'微信连接小瓦'});
   async function openWechat(){
     await canvas.getByRole('button',{name:'画布菜单'}).click();
-    await canvas.getByRole('menuitem',{name:'微信项目助手'}).click();
+    await canvas.getByRole('menuitem',{name:'微信连接小瓦'}).click();
   }
   await openWechat();
   const qr=dialog.getByRole('img',{name:'微信扫码绑定二维码'});
@@ -76,7 +76,7 @@ export async function checkProjectWechat(page,canvas,api,fixture,workspace,mock)
     await dialog.getByRole('button',{name:'提交校验码'}).click();
   }
   await dialog.getByText('微信已连接',{exact:true}).waitFor();
-  await dialog.getByText('在微信里打开 ClawBot，说一句「你好」。').waitFor();
+  await dialog.getByText('在微信里打开 ClawBot，说一句「小瓦，你好」。').waitFor();
   assert.equal(await dialog.getByLabel('手机微信校验码').count(),0);
   assert.equal(await dialog.getByRole('combobox').count(),0);
   if(artifacts)await dialog.screenshot({path:path.join(artifacts,'cw130-微信已连接.png')});
@@ -98,15 +98,15 @@ export async function checkProjectWechat(page,canvas,api,fixture,workspace,mock)
   await until(async()=> (await post('project-wechat-status')).parentProjectId===first);
   await dialog.getByRole('button',{name:'关闭窗口'}).click();
   await input('新建项目 不可创建','foreign',{from_user_id:'other-user'});
-  await input('你好');
-  await reply(message=>message.text.includes('现在在「workspace / 冒烟验收画布」')&&message.text.includes('直接告诉我想做什么'));
+  await input('小瓦，你好');
+  await reply(message=>message.text.includes('我是小瓦。现在在「workspace / 冒烟验收画布」')&&message.text.includes('直接告诉我想做什么'));
   await input('画布 冒烟验收画布');
   await reply(message=>message.text.includes('已切到「workspace / 冒烟验收画布」'));
-  await input('微信生成采访稿','plan-unique');
-  await input('微信生成采访稿','plan-unique');
+  await input('小瓦，微信生成采访稿','plan-unique');
+  await input('小瓦，微信生成采访稿','plan-unique');
   const plan=await reply(message=>message.text.includes('微信验收委托')&&message.text.includes('等你确认'));
   assert(plan.text.includes('按这个做')&&!/确认 [\dA-F]{7}/u.test(plan.text));
-  await input('看看有哪些项目');
+  await input('小瓦，看看有哪些项目');
   const options=await reply(message=>message.text.includes('想去哪一个项目'));
   const number=options.text.match(/(\d+)\. 乙验收项目/u)?.[1];
   assert(number);
@@ -126,7 +126,7 @@ export async function checkProjectWechat(page,canvas,api,fixture,workspace,mock)
   assert.equal((await post('project-agent-state')).plans[0].state,'approval');
   await input('刚才的计划发我看看','review-again');
   await reply(message=>message.token==='context-review-again'&&message.text.includes('微信验收委托')&&message.text.includes('按这个做'));
-  await input('就按这个做');
+  await input('小瓦，就按这个做');
   await reply(message=>message.text.includes('微信验收委托」已确认'));
   const rejected=await reply(message=>message.code===-2&&message.text.includes('V1'));
   const before=await post('project-agent-state');
@@ -147,8 +147,11 @@ export async function checkProjectWechat(page,canvas,api,fixture,workspace,mock)
   const otherView=await (await page.request.get(other.href)).json();
   assert.equal(otherView.requirements.filter(canvas=>canvas.title==='微信建画布').length,1);
   assert((await deliveries()).every(item=>item.to==='wechat-owner'));
-  await canvas.getByRole('button',{name:'打开WTT 项目助手'}).click();
+  if(!await canvas.isVisible())await page.getByRole('button',{name:'WTT 创作工作台',exact:true}).click();
+  await page.getByRole('combobox',{name:'当前画布',exact:true}).selectOption(fixture.id);
+  await canvas.getByRole('button',{name:'打开小瓦'}).click();
   const panel=canvas.locator('.wtt-agent-float.is-open');
+  await panel.getByRole('heading',{name:'小瓦',exact:true}).waitFor();
   await panel.getByRole('button',{name:'委托',exact:true}).click();
   await panel.getByText('微信验收委托',{exact:true}).click();
   await panel.getByRole('button',{name:'定位 V1',exact:true}).waitFor();

@@ -1993,6 +1993,10 @@ function CanvasPopover({ open = true, anchorRef, anchor, widthRef, initialFocusR
 var skillLabel = (skill) => (skill.label || "").trim() || skill.name;
 var skillSearchText = (skill) => `${skillLabel(skill)} ${skill.name} ${skill.description || ""}`.toLowerCase();
 
+// src/project-agent-name.mjs
+var projectAgentName = "\u5C0F\u74E6";
+var projectAgentWeChatTitle = "\u5FAE\u4FE1\u8FDE\u63A5" + projectAgentName;
+
 // src/project-agent-input.jsx
 var TOKEN = "/\u9879\u76EE";
 var noop = () => {
@@ -2068,7 +2072,7 @@ function projectInputBridge(ctx) {
     attachments: true,
     async submit(text2, _actx, attachments) {
       const owner = owners.get(id2);
-      if (!owner && !frozen) throw Error("\u8BF7\u91CD\u65B0\u6253\u5F00\u9879\u76EE\u52A9\u624B\u540E\u53D1\u9001");
+      if (!owner && !frozen) throw Error("\u8BF7\u91CD\u65B0\u6253\u5F00" + projectAgentName + "\u540E\u53D1\u9001");
       const done = owner?.current.submitting?.();
       try {
         const turn = frozen || await owner.current.freeze(id2, text2);
@@ -2114,7 +2118,7 @@ function projectInputBridge(ctx) {
     order: 3,
     showGroupTitle: false,
     async candidates({ sessionId }, { query, position }) {
-      return owners.has(sessionId) && position === "leading" && "\u9879\u76EE".includes(query) ? [{ name: "\u9879\u76EE", label: "WTT \u9879\u76EE\u52A9\u624B" }] : [];
+      return owners.has(sessionId) && position === "leading" && "\u9879\u76EE".includes(query) ? [{ name: "\u9879\u76EE", label: projectAgentName }] : [];
     },
     onPick() {
       return { text: TOKEN + " ", continue: true };
@@ -2276,7 +2280,7 @@ function ProjectInputDock({ sessionId, useInput, inputActions, bridge }) {
     }
   }
   const expanded = Boolean(visibleSkillMenu || nativeSkillsOpen(controller));
-  return /* @__PURE__ */ import_react4.default.createElement("div", { ref: tools, className: "wtt-agent-input-tools", "aria-label": "WTT \u9879\u76EE\u52A9\u624B\u8F93\u5165\u5DE5\u5177" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "wtt-agent-input-actions" }, /* @__PURE__ */ import_react4.default.createElement(
+  return /* @__PURE__ */ import_react4.default.createElement("div", { ref: tools, className: "wtt-agent-input-tools", "aria-label": projectAgentName + "\u8F93\u5165\u5DE5\u5177" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "wtt-agent-input-actions" }, /* @__PURE__ */ import_react4.default.createElement(
     UiButton,
     {
       ref: skillButton,
@@ -4033,7 +4037,7 @@ function CanvasMaterialEntry({ busy, onPick }) {
 }
 
 // src/project-agent.jsx
-var import_react19 = __toESM(require("react"), 1);
+var import_react20 = __toESM(require("react"), 1);
 var import_react_dom2 = require("react-dom");
 
 // src/canvas-chrome.jsx
@@ -13522,7 +13526,7 @@ var import_react18 = __toESM(require("react"), 1);
 function StepHandoff({ step, act, busy, offerTakeover = false }) {
   const { handoff, choice, receipt, consumers } = step;
   if (!handoff && !choice && !offerTakeover) return null;
-  return /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-handoff" }, /* @__PURE__ */ import_react18.default.createElement("span", { role: "status" }, handoff ? "\u4F60\u6B63\u5728\u5904\u7406" : choice ? `\u5DF2\u6709 V${choice.number} \xB7 \u5F53\u524D\u4F7F\u7528 V${receipt.number}` : "\u9879\u76EE\u52A9\u624B\u5728\u8DDF\u8FDB"), choice && /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", variant: "primary", disabled: busy, onClick: () => act("use-version") }, handoff ? `\u4EA4\u56DE\u52A9\u624B \xB7 V${choice.number}` : `\u91C7\u7528 V${choice.number}`), choice && !handoff && /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act("keep-version") }, "\u4FDD\u7559 V", receipt.number), !handoff && !choice && offerTakeover && /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act("take-over") }, "\u63A5\u7BA1\u8FD9\u4E00\u6B65"), handoff && choice && consumers?.length > 0 && /* @__PURE__ */ import_react18.default.createElement("small", null, "\u63A5\u4E0B\u6765 \xB7 ", consumers.join("\u3001")));
+  return /* @__PURE__ */ import_react18.default.createElement("div", { className: "wtt-agent-handoff" }, /* @__PURE__ */ import_react18.default.createElement("span", { role: "status" }, handoff ? "\u4F60\u6B63\u5728\u5904\u7406" : choice ? `\u5DF2\u6709 V${choice.number} \xB7 \u5F53\u524D\u4F7F\u7528 V${receipt.number}` : projectAgentName + "\u5728\u8DDF\u8FDB"), choice && /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", variant: "primary", disabled: busy, onClick: () => act("use-version") }, handoff ? `\u4EA4\u56DE\u52A9\u624B \xB7 V${choice.number}` : `\u91C7\u7528 V${choice.number}`), choice && !handoff && /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act("keep-version") }, "\u4FDD\u7559 V", receipt.number), !handoff && !choice && offerTakeover && /* @__PURE__ */ import_react18.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act("take-over") }, "\u63A5\u7BA1\u8FD9\u4E00\u6B65"), handoff && choice && consumers?.length > 0 && /* @__PURE__ */ import_react18.default.createElement("small", null, "\u63A5\u4E0B\u6765 \xB7 ", consumers.join("\u3001")));
 }
 
 // src/skill-commands.mjs
@@ -13735,6 +13739,131 @@ function visibleCreationPosition(anchor, cards, viewport, size3, width = OUTPUT_
   return adjacentCreationPosition(anchor, cards, width, height);
 }
 
+// src/model-selection.jsx
+var import_react19 = __toESM(require("react"), 1);
+var MODEL_SLOT = "conversation.input.model";
+var noSubscription = () => () => {
+};
+var noSnapshot = () => null;
+var renderDraftModelLabel = (_slot, _props, options) => options?.fallback ?? null;
+function createNativeModelSeat(slots, locale) {
+  if (!locale) return void 0;
+  return {
+    subscribe: (listener) => slots.subscribe(MODEL_SLOT, listener),
+    getSnapshot: () => slots.entriesOfSlot(MODEL_SLOT)[0]?.component ?? null,
+    subscribeLocale: (listener) => locale.subscribe(listener),
+    getLocale: () => locale.getSnapshot(),
+    t: locale.bind("model"),
+    resolveText: (value) => locale.resolveText(value)
+  };
+}
+function NativeModelSelection({ Component, seat, catalog, current, model, loading, failure, onChange, onRefresh, onOpenSettings }) {
+  (0, import_react19.useSyncExternalStore)(seat.subscribeLocale, seat.getLocale);
+  const snapshot = (0, import_react19.useMemo)(() => ({
+    current: current ?? null,
+    routable: loading ? null : Boolean(model),
+    groups: catalog?.groups ?? [],
+    failures: catalog?.failures ?? [],
+    status: loading ? "loading" : failure ? "error" : "ready",
+    pending: null,
+    error: failure || null
+  }), [catalog, current, model, loading, failure]);
+  const directory = (0, import_react19.useMemo)(() => ({ subscribe: noSubscription, getSnapshot: () => snapshot }), [snapshot]);
+  async function select(next) {
+    if (!onChange) return;
+    if (next.provider !== current?.provider || next.model !== current?.model) {
+      const chosen = snapshot.groups.find((group) => group.id === next.provider)?.models.find((item) => item.id === next.model);
+      if (!chosen) return;
+      const defaultEffort = chosen.reasoning?.defaultEffort;
+      if (defaultEffort && next.reasoningEffort === void 0) next = { ...next, reasoningEffort: defaultEffort };
+    }
+    onChange(next);
+    return { ok: true };
+  }
+  return /* @__PURE__ */ import_react19.default.createElement("div", { className: "wcc-native-model-selection" }, /* @__PURE__ */ import_react19.default.createElement(
+    Component,
+    {
+      locked: !onChange,
+      available: true,
+      directory,
+      load: () => {
+        if (!loading) void onRefresh?.();
+      },
+      select,
+      t: seat.t,
+      resolveText: seat.resolveText,
+      renderSlot: renderDraftModelLabel
+    }
+  ), !loading && (failure || !snapshot.groups.length) && onOpenSettings && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "quiet", size: "compact", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"));
+}
+function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false, nativeSeat, frozen = false }) {
+  const id2 = (0, import_react19.useId)();
+  const NativeComponent = (0, import_react19.useSyncExternalStore)(nativeSeat?.subscribe ?? noSubscription, nativeSeat?.getSnapshot ?? noSnapshot, noSnapshot);
+  let normalized = null;
+  let catalogError = "";
+  if (catalog) {
+    try {
+      normalized = normalizeModelCatalog(catalog);
+    } catch (cause) {
+      catalogError = cause.message;
+    }
+  }
+  const groups = normalized?.groups || [];
+  const current = selection2 || normalized?.default;
+  const provider = groups.find((group) => group.id === current?.provider);
+  const model = provider?.models.find((item) => item.id === current?.model);
+  const efforts = model?.reasoning?.efforts || [];
+  const unavailable = Boolean(current && !model);
+  const failure = error?.message || (typeof error === "string" ? error : "") || catalogError;
+  const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : "\u9ED8\u8BA4";
+  if (NativeComponent && frozen) {
+    return /* @__PURE__ */ import_react19.default.createElement("span", { className: "wcc-model-selection-state", title: "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A" }, model?.name || current?.model, " \xB7 ", effortLabel, " \xB7 \u5DF2\u9501\u5B9A");
+  }
+  if (NativeComponent) {
+    return /* @__PURE__ */ import_react19.default.createElement(
+      NativeModelSelection,
+      {
+        Component: NativeComponent,
+        seat: nativeSeat,
+        catalog: normalized,
+        current,
+        model,
+        loading,
+        failure,
+        onChange,
+        onRefresh,
+        onOpenSettings
+      }
+    );
+  }
+  const disabled = loading || !groups.length || typeof onChange !== "function";
+  function chooseModel(group, nextModel) {
+    if (!group || !nextModel) return;
+    const next = { provider: group.id, model: nextModel.id };
+    if (nextModel.reasoning?.defaultEffort) next.reasoningEffort = nextModel.reasoning.defaultEffort;
+    onChange?.(next);
+  }
+  const fields = /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("div", { className: "wcc-model-selection-heading" }, /* @__PURE__ */ import_react19.default.createElement("span", null, "\u521B\u4F5C\u6A21\u578B"), /* @__PURE__ */ import_react19.default.createElement("div", null, onRefresh && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onRefresh, disabled: loading, "aria-label": "\u5237\u65B0\u6A21\u578B\u76EE\u5F55" }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), onOpenSettings && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wcc-model-selection-fields" }, /* @__PURE__ */ import_react19.default.createElement("label", { htmlFor: `${id2}-provider` }, "\u63D0\u4F9B\u5546", /* @__PURE__ */ import_react19.default.createElement("select", { id: `${id2}-provider`, "aria-label": "\u6A21\u578B\u63D0\u4F9B\u5546", value: current?.provider || "", disabled, onChange: (event) => {
+    const next = groups.find((group) => group.id === event.target.value);
+    chooseModel(next, next?.models[0]);
+  } }, !current && /* @__PURE__ */ import_react19.default.createElement("option", { value: "" }, loading ? "\u6B63\u5728\u8BFB\u53D6\u2026" : "\u9009\u62E9\u63D0\u4F9B\u5546"), current && !provider && /* @__PURE__ */ import_react19.default.createElement("option", { value: current.provider, disabled: true }, current.provider, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), groups.map((group) => /* @__PURE__ */ import_react19.default.createElement("option", { key: group.id, value: group.id }, group.name)))), /* @__PURE__ */ import_react19.default.createElement("label", { htmlFor: `${id2}-model` }, "\u6A21\u578B", /* @__PURE__ */ import_react19.default.createElement("select", { id: `${id2}-model`, "aria-label": "\u521B\u4F5C\u6A21\u578B", value: current?.model || "", disabled: disabled || !provider, onChange: (event) => chooseModel(provider, provider?.models.find((item) => item.id === event.target.value)) }, !current && /* @__PURE__ */ import_react19.default.createElement("option", { value: "" }, "\u9009\u62E9\u6A21\u578B"), current && !model && /* @__PURE__ */ import_react19.default.createElement("option", { value: current.model, disabled: true }, current.model, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), provider?.models.map((item) => /* @__PURE__ */ import_react19.default.createElement("option", { key: item.id, value: item.id }, item.name)))), (efforts.length > 0 || current?.reasoningEffort) && /* @__PURE__ */ import_react19.default.createElement("label", { htmlFor: `${id2}-effort` }, "\u63A8\u7406\u7B49\u7EA7", /* @__PURE__ */ import_react19.default.createElement("select", { id: `${id2}-effort`, "aria-label": "\u6A21\u578B\u63A8\u7406\u7B49\u7EA7", disabled: disabled || !model, value: current?.reasoningEffort || "", onChange: (event) => {
+    const next = { provider: current.provider, model: current.model };
+    if (event.target.value) next.reasoningEffort = event.target.value;
+    onChange?.(next);
+  } }, /* @__PURE__ */ import_react19.default.createElement("option", { value: "" }, "\u6A21\u578B\u9ED8\u8BA4"), current?.reasoningEffort && !efforts.some((item) => item.id === current.reasoningEffort) && /* @__PURE__ */ import_react19.default.createElement("option", { value: current.reasoningEffort, disabled: true }, current.reasoningEffort, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), efforts.map((item) => /* @__PURE__ */ import_react19.default.createElement("option", { key: item.id, value: item.id }, EFFORT_LABELS[item.id] || item.name))))), /* @__PURE__ */ import_react19.default.createElement("p", { className: "wcc-model-selection-hint" }, "\u7528\u4E8E\u4E4B\u540E\u53D1\u8D77\u7684\u521B\u4F5C\uFF1B\u5DF2\u6709\u4EFB\u52A1\u7EE7\u7EED\u4F7F\u7528\u521B\u5EFA\u65F6\u7684\u6A21\u578B\u3002"));
+  const modelLabel = loading ? "\u8BFB\u53D6\u6A21\u578B\u2026" : model?.name || current?.model || "\u9009\u62E9\u6A21\u578B";
+  const modelState = failure ? "\u52A0\u8F7D\u5931\u8D25" : !loading && !groups.length ? "\u672A\u914D\u7F6E" : unavailable ? "\u4E0D\u53EF\u7528" : normalized?.failures.length ? "\u90E8\u5206\u4E0D\u53EF\u7528" : "";
+  const diagnostics = /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, failure && /* @__PURE__ */ import_react19.default.createElement(UserError, { className: "wcc-model-selection-error", error: failure }), !loading && !failure && !groups.length && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B\uFF0C\u8BF7\u6253\u5F00\u6A21\u578B\u8BBE\u7F6E\u6DFB\u52A0\u63D0\u4F9B\u5546\u3002"), unavailable && (groups.length > 0 || !compact) && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u8FD9\u4E2A\u6A21\u578B\u76EE\u524D\u4E0D\u53EF\u7528\u3002\u8BF7\u68C0\u67E5\u8FDE\u63A5\u8BBE\u7F6E\uFF0C\u6216\u4E3A\u65B0\u4EFB\u52A1\u9009\u62E9\u5176\u4ED6\u6A21\u578B\u3002"), normalized?.failures.map((item, index2) => /* @__PURE__ */ import_react19.default.createElement("p", { className: "wcc-model-selection-error", key: `${item.id}-${index2}`, role: "status" }, item.name, "\uFF1A", item.message)));
+  return /* @__PURE__ */ import_react19.default.createElement("section", { className: `wcc-model-selection${compact ? " is-compact" : ""}`, "aria-label": "\u521B\u4F5C\u6A21\u578B", "aria-busy": loading }, compact ? /* @__PURE__ */ import_react19.default.createElement("details", { className: "wcc-model-selection-disclosure", onKeyDown: (event) => {
+    if (event.key === "Escape" && event.currentTarget.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.open = false;
+      event.currentTarget.querySelector("summary")?.focus();
+    }
+  } }, /* @__PURE__ */ import_react19.default.createElement("summary", { "aria-label": [`\u521B\u4F5C\u6A21\u578B\uFF1A${modelLabel}`, effortLabel, modelState].filter(Boolean).join(" \xB7 "), title: [provider?.name || current?.provider, modelLabel, `\u63A8\u7406\uFF1A${effortLabel}`, !onChange && "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A"].filter(Boolean).join(" \xB7 ") }, /* @__PURE__ */ import_react19.default.createElement("span", { className: "wcc-model-selection-current" }, modelLabel), /* @__PURE__ */ import_react19.default.createElement("span", { className: "wcc-model-selection-effort" }, "\xB7 ", effortLabel), modelState && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wcc-model-selection-state" }, modelState), !onChange && current && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wcc-model-selection-state" }, "\u5DF2\u9501\u5B9A"), /* @__PURE__ */ import_react19.default.createElement("span", { className: "wcc-model-selection-chevron", "aria-hidden": "true" }, "\u2304")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wcc-model-selection-expanded" }, fields, diagnostics)) : /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, fields, diagnostics));
+}
+
 // src/assets/wattter-agent.png
 var wattter_agent_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAAOdlJREFUeAHtfQmUXlWV7rl/VSWBEAgQQCASCBkYBMEBpRlUmnZaisJSUIZEcH6i/Z4+tZe2Srfdy/Y14kQ7tBAh4BRkWooudanYg4qoCDJlBgSVMZCBJDX8933ft/c+9/xVlVQqE8Guk/z37LOHb++zz7nnjv9fKY2VsQyMZWAsA2MZGMvAWAbGMjCWgbEMjGVgLANjGRjLwFgGxjIwloH/ERmo/kf0Mi3oSgf07ZompN1Te/3kVHftlur2Tqk7jUvtVp1S1U6tem3qSytT1b0itXoeT+PTE+mO03v/0vPzlzcBDl+wR1rfOyu10hGp7j8sVa2ZGMT9Up32Sqk9OVXVBAx4d4IC6AQ+CjdtVDU21TqwV9V1eji1qvthvzS123dD95ZUtxamRWc+Qou/lPL0nwCzr5+U6jXPTlX/i1NdnYjBO6yu630xxhjhKBhXDjAGusJY2zZkYmDc2a6x9YlBRkUIfqjTz1nyZ5C3QnRjqrr+I3Wt+H26412rwX/alqfnBJh96aRUjX8RxvSUKtUn1VV9cGqNwyBhkOsBDAZrDjULhtt7CUoc2JALkauYmk0CV6YmJpL03QgscrtQ4VP3tqtULalS6/vtqro2dXX/4ul4yGCPnj7l0PnPSgNdZ2McTsUIzNIeGgOufdu6osHDEGuHBquZAGiUg9rRcw62j7EGegO6TcaqSitED+ZbH1Dr32G1WACMBWnRWcs6oHfgRtOdHTjINHv+SUjsO/F5BZb2iViOEW3bdk8fN453jFvTFTC5qudesu16rEdVYMCZ5HYYfZAOVnMx6Ia4C/OrbwUUF6SB9pfTkrm3jMrFU6CcU/MU+B7Z5YzLXoql9X3I+t8gwch4H8jYhcuBBRTHR0MyiB9eYMbOavwKFaFlQVYGUTJJFyWaGn+MPf0KmEG0wNCqsDa1uq7HPL0oLTr75sJ6hyKjKztUUGnm/BcgoA8jl6/C8Rb55R7fLN4ampxw60LDg2bRK+NTuZwAhYKQzSYwVHOq0Eyqg/SFxWH3YgbS5XSgIbzhCMGJMLC2bteXpf7WJ9Pys+4Nkx2lHtyzpzauQ6/YNw1UH8bh/C04no5PiQNfcRHPJSddHN/7stSIUl+DkY00LM3ADbIzQVYeLEW7RKaet1mhaYcFcu3gYAA8buCqs+7nFcQn0uJlX0jpAs1okz+127JHT20ksy6fi739H7DUT0v1+tiJFFMEqaHJDSfsuq4j9qxiIwosG1QOEOmatYrxQ60DZKMN2rsthltohCblvnS+QAy1qctDQxc02j+pW+n96a5zfkvxU10U+1MaxIwrp6ZW+0Ik5wzbc/zkDkExuCbNDV3Gq70OSfaxdVFYRdPapgsegA2bfFAcJACI5wNImmUQkjGxNXs2QTUNlwMLvA7bwG31VLjf9EQa6LsgLbn3c1gNeIPiKSsM/akrM+e9qmqN+1xddR3ES6khSUNkZW4pZ1YtsdxaosVgwplkTzQ7pT0eQrE0wJ2LM5EsAXY8z74KjMAmXmcx/8YzFNKaZK6Y8cgHpsXtSryfUPdfi9a706K5D7jJdq+ayLen6+d+uSetmoBjfdeH4LYHN28sNxokH8MiMhs2Y3QOIfdaM83JFeEtzSjSsC3w2NU8IOI32KEYFxuUOEIzgAQoi/wUDLZZYFiQxvDQJG+NQ/j9CzFD35IWzfkv8bbzxiPdjl5nfX0KTu6+jD3/tLrGs5ac6RiEzglg3CZrQZWBc4dlu+NskV0q9mRbDaTlbEMyTtH/AA5HLhqiV5hwlHmqyn3czEHj3GTI6QmEkgM7w7e6KkzG1XVqvzMtnHtlCbs9aKxD27HM/MqhuDa+FrdtT6rqXh8BZsXSxkiMgsh5bEsxMtaoNoGThw8HuRnoRkyqY2l2XdNw4MCnrkchO1MatBWANOV4OMUOH6YFlkrnRJXj8XjQ9Jq052v60qPXbdeVYPtNgBmXHlt1jccxr+vQlPqKdHtWUDFBEhQTwjjMJv5bpeXbxogWUTj4RsdhoZA0e1xhYiS3+HhFG+MbVdIdSkBsJgqjpqbXMuq0JNqQToeeVqq6VVU9f512P2V8euyon6Z04xB1Ymztsn0mwKx5J6dq3NW4S4bHsnqq5nsquuM5KzvGAbTkduagSLEPtiWZW5MVVoWpVgWpdjDdpfEMqYzCaN7vt5WFetDKOM3wd1o5kirqe7tQMo7hdYpxS7k17oS0x6TdMQl+uD0mwbafADPmvQy3RvGQJO2RUufJnlLIHPksYGJIF8OU00aZD4Fdx6Nhy70LIJWtZTfbiVCWh0MN20Ld7a1ChHLcgGafmgmdmNmGkcpQxhnc5LQhZS0JCxK3DjkJXoBJsFt67LofZONtRGzbCTB73knozAL0dff88Kac8sqF7e0dOfD0RJpsUpQalnhCNZNo+AxlHTNplNSG7wJDQndjle3lYUpe0A1QDKUbZoEjZHZjmVnlJMh2wOMZZTXuhWlPPO1+9LobC9FWJ7fdBJg5D/fze65Bb/bEc/qm9+x0zoCz1Waybe9nkxcHln72GRTPqkkWSJJgBM2c1uJoK2bGNdaQLUefiq6X66wowQZamQ37AqNgO3CD3yFjo8Rn9Own+06STxi7Xpx2f/Wq9Nj1v6D2tihlBFsPf/pXZ6ae7h/h9uc0LfvF5ViHE/RWAVDukbDvLLyE4mhr2E1p6GUVVVC4LOtqUtkjlE8k8il3/waJLfU2WGziSbfUyTGabSA0d6/MgnzjlQjguoHkFA1uK1I6LCaBzSw8Am2fgZtFvGm01Qvfd9q6ZfqC3VJ315W6px/H/OjtEE/MhA2WUVTwSSEJ21ZsQkQLWkpgMYEgkg74kXrLc4OvXWvI4BPDR0PwsZI0vkhRg/jlZAo/pbl8ZkFgYFI5TxXAzCt9lb6pj3gbe4p7qlb3JWn25UcG2tast/IEuKCVetZfjMu9Y3CzB8EP7twGQmdC0GnT9t6r0diTG3nRHl8kLvg21PRR2pH2NuJpJKFXImdNCjuK9moY2zW8eRQyRwv/7eTQhpU68tPRf06CGG5KLVrpyVNDNY4VG/O4B65G5qUDvzq5kW0dautOgJkHno/r/LPr9nqbxsVUHjZc5o7JUwbZWUucdVtbJTJSwyRbohu0xoq2oRlIMRCmL2nGcF20bVjQJktVJhpHoLKe+2l8+15LMy8x1NFmbfrWL/E1edDOdkEU1tCp27x07nluGtd1YYm3NejwuOVYB8/7q9Q97oeIdiKHlZO/6Abwrfuq6JVN1BGASz0OWBbqzoSyDXHcPTa+IxRYxBY8eCUuNTUnRWRUJ+CTQaPIRooWX2DIDJsmtkFAbt/htLOB/mLCyY3ZZgQ4MZpZ0y6hNvts8SAwvRzTNzctetN8BboVNgpli3H4lm6760Z8oeI5caMnMCOpbLMjTYe9x6FY1NKJvYN8RcnFyqaUcLCxRFIcSXXVAssmCwAax5IyrsAhwxZkM7QBKOKjYpSMYwyFRjJPHlNoJonruaJB0YPlw/oUg+yOAjQ3KecEbVW4oHoQO9lxacmblhrylm23ziGg3f0RvMDzHD7SHRwOGfGJTrNmviwN3FqPG2oQilCbwac0Bl90bKDnO67qoJm+GBCqsgiStbkGpaispnLmg2XcITVViMPIrKZZIJuR5gUUQy6QciN1l0YIQCnda3JywvJyutW9T2q1PlVGXsKNlt7y+wAzLj8WD3jwmlM/X4sd3n9mZ8K6iCZNLGXRaUuhNCmMD5GdLlcVsYlG1eG9F9zQcGU4pp0mAUX+KScLWVY4zB4bbYJNI/svTmlLPouqxsB8uoT+WVjFJ9qszZMp2bYN++5D0p6/XYabRLeazuZvt2wFOHzBOOxan8Q9/gmYnkUXi4Asau2BTnpGvG/DWFGPJxEdAw1m2JtJw+AeIl4odLh3nJxpa0sVm+GiJlYJRToGP0vAFL9QJFnaFqIckSac45fy3Cf3VcywbGs69IFJkKp/SgfP3zsLN5PYsgnQt24u7vOfMNzS32SHqbM9JycHRNOZwZGHxPnMmAYPNUUcMX7I5q7rclAQc1sUNvERIjcu9unSKEoBTdVQCp+oORHtQ3v2xNxz2ci4RGKDHyro08g7JpnrWYVIQEjO2hABYFCxFaPc4FBQt8Y/M3VX7y3Zm0Mz1M0r9mLHrxHzNLvP71BRMXG5Q2Syy57ADXg0U7eCOiBgZdOnSSJxUCjcWDF3Ggv6tTuFoMB3BLLVJkzwYtVhFPRQLmySeSDSVwgWRwcu7CK8Jm65o6vsS41o6VtG1IHnCMYUzIK87A+E0lI9jvcpX5Dunrsoq46S2PwVoO59h+724e6GEsPgLBc+cIzEGeiRDX3ZeZdRK9RAq/M5ASYgj5S1iOQGBSUp7WQLOUBDL09EyCjO1t6WCfhWoB0KwUJNFvX0CbkMsVFdKLtewzcF4go77GXCRkRKw0KYSRCig0GfTGr3ZDw8/IBgNnMTiKMzn3X5/gj0NwhqH0ZSGhNQx++CaQNgriQvOkxZBEEg3i3LgBpE66uUsgB6MMpNGZLhHAF6Ugs8sqUheQRoehGHoKQHPm2hKzsZGr7aQwNwdAeXkvtwmp5sfIFjUN4RNIiX1eFXcm7ADyySYElkuuSsAeP5afGcu8J+NPXmrgBvrbp6OgdfHeAChlIk3brAHkQ/jCY/htpoMoJDZdMD1UmLgY0ceUOqYJQ2oVLAhImxfIJ4FNEirpLPWKgYRg0BCgLyUVm3SbDNTRQT2iEF6JAFnnyFrpzR3BwRwVixY0RAFOBTuqBm1TMRvHeF19HWHXCbZHzI5XviGc8tuBZ9pj3mZUdpyY11wgLNKQ2uaxi/GWq3gymT4AhoCLREjcx0hunmSjAlzF4RSiiLhQ1rK5Hy8OhGNAepQXCWVTYgXN0iyII0SEJRufASrRDZ4LqKXGtDNRTzFP7kJ+MZgsmoG3b4wklKOBcYODrdfe49lIymjH4FaKcz8JIHBt8yrfjCI2PyuGIwI0zyM+36siWMC2LOS6xM2YTo8BHKUCr5hIh2cy3uwBDY0muu5CeUZcWG6dpEQlsTkLVJOG2l4ZAyA01LfYLvguBzJilV3k/BwkYzTH1kwzDkyf2RE6uHKRAxojRnem8EQHjDGucCPW+Uwig3o5sAfJ8/pfOw52c3DMUDcV7ORNYpCZsYpmP9J11+Cm2MGrtNqXWfW6OoJRRtyG1WD2dJt9GmhRXypFMI5Qn+wpZtE2OLUSNfHGsKiDyNK4iwE4NSCMorCLHIJhEl+3e/MelcHvmRWochFOgTArJrfnm2bp+Fp4X4+ZvRldFNgDU7H4c0HK37/REQk+OB2Oy2xFnwFow6oA2DBY8b2QcI9VzBTKztuGRRk2niXqEPmVHcgVfGRUN7M/Vp7B+Lzr1lPgcLOgIwc04nsljMLwkqqOXxUxolwAymsQ45a+hYAgpm6TTkLpaokIPd2fI27gtUra7D0rielxTAm0SObgK06zNx6bEBGyTGM+ZV7myzBHLxtYWedWcp24O6CRHPyG0ALPecdMpGHhRD0wA7L/CpK0TxnRvuhCMpBMEMS7czR4XU9MJKdmL59MowIHJSMnOQH/JN1uCBhUa0YzJF24RsFXZ4UITXyM4Cc1SlwRzJ7Iiv7V6tH7gNJ0FT7eTPDYCgUMr+UeTIqiDLYr4e2N8cQjrdulEX5hifUnDAZMg9n2Tsv8GGUCaD+AWoI2IcTDc0BethBh2+iEm9Ys7l+DWHYNC5vJPhTvMkI8O95z5nJVOOyUEb9Rl16dQhyyryID33YKha7x6u+3qPSMvf+mBpszEaX1zfxLJ24Hj8WgcGv3jip2jgnv3kx8lAZF8sOJf3tdNuu3WnI2ftibfG8EVpl9dtnxCtFn5PYSDd88d16YEH1uAKBz+5IjAOhq0ceW/OTojNfYQBDF+EgVgVIhsdqh54mJpDHdbYPRZn5UbT9pgocV2ubMZ1Bt6En7hLdzri4F1TD74KSDDc9JMS8Vst/E4hiKX3rUr33bcGL4BxgaUHCKkQk8R9uMQ0OsTIUNW9V+qqToTqVVTflLLpE6CVXt3skQ7tmbCg0HUGxNDIcBlYRmKvnz5tl3TtF/86HTl7Nyqja2YpNHbUM/7Qo+vS+Rf8Mn37hntTGhcJAQ7AMp6HEBX5LO7WCDDVFnawyslkw2WodM8YODodSGrFhrLwVVImN8vwxLfiDpi6U7rq8yel5x+xJ1TcOmYrgOx/XT28ord9znv/M/3gxvtSGs9z7Qhea5H3vfFMf+XcYFs2HKdRTABmd+QydcFOcHeizjaL7tvZlZlH16NLAZr5ve102sunY/B3x0sNPIhAQqFq13LePlN2qj770RemvfbCj4QMFIcLyDuX3vBiicm+gujApi/892tEqWQ5WzYdw5TIxiWlXhmBbeiU8hAS0goIrGYf/z/PScccOYWzToaMP/8jTTaC2muPCa3/deZMmLIv+HjFWvcexMjIuRWHNEnwi2mYxCekGVfuapojbzdtAkxcdzj2jOl46APE3MMchEVLPqe2dXSIa7zMct8DK8UOBLOglSXCDgl42Nlu1/vtvVN19qkHp4SJw8J8DC486nHVoCwwmVH7DkHmdJrZMmVfUuK5CD+cZDYSVjuaFgS3Jhr9xMcGpWBIj1IUKuNwd8ghk9NpL50GaE13ZM9iKiex+u78ZQ+sQec9blXhzXBNEv0NHrnulx7q1gF4QLTJbxBv2gRI1XE4ION7/L77sJMozJmVCM36nrMUcVGpp6v63s/+lO5Y/Hjdwtcg3dDNvQn4BrJObz9jdtplMpZDJCX4pWHwog4ljWWnAwuWk2l9f9pl56500AET06Ezd0vTsERPGA/UdXj9HoOmHvhksMFpgLIfOOIBTLGQmQWZ0AR755mHwBd/EYQY1LfoVReqTMfjK3vrL3x9Ic4B7B0d02yUrE0U54nBTUjoA8IWTiIqjNcmlk07B6jTiwbv/cPhe0oURxMYA0aQONdZ/djadPGVC9MX/wFfGoqOlEBQjamBfaaePX236tSXHVhfsWBJShP85SX21zJqljQo7CwG+mTxmgOLyfU3J+6fzjl1RnrhUVMSDjM6Ee3tHUgPPPRk+q9fP5TmXbU4/eo3OIHuRlriale+5LREtLRntvlRkxv4O+DAXdJZr8aimYOlwEtBioOlbP51S+rFC59IaSf8jhDkDaLZRG61wsK7zl4Cxyej2WgSHxuuRqoDYsN6R86fmNYl/ApmmpE7w6QgyhgsGtO5hcWW8u0LhrugDWLbdZee9KurX5lmH7RrxUGWshkHiFjccKX41W2P1iecfkPCOIExTLiMAyIDIpEp42KPnz59crroQ89Przn5APCoDh3sSuFWgWOzvnegvuSbd6W///Rt2COxIuCnCTdUOnwanpCFvXYgXfD+56SPvfvoqj2A5SuUh4FDH+Xread9Jy1dtgorJRdlKErXcqweYaPBR3+ji5oELuTazKObJ2lJmlAflW6bs2ZD8Qd/5EPAk61pcDTVVgA30+DTvQUTAVEafbRgvB2phreVj65NX/rWYgioqegbI4cPNk4F6ucfMSWdfPy+OBfgDFAWsg+pOwSzwog6Cpb85x09Jf14/ks5+Dj5bOO8rF23B+yojEMzji4850Abm3E9eKw251nVdy45Oe29B1aBvg3/mlunJ/QluoMwp+y7UzrvdbMYL9T4H7Ot8+gptoVbVVdctzQtXYS9X8t/ZNBq+gmOZhIYISG6AXFr84zjhAvsqWlt0mynxsbKyBOglWbXqZs/sS53g8G4/9m/RhIBR6gdgz2+K82/enFa/odVOBfwZR3IWgxoSC8NgBaa88/BOSjuG+R8lgrsumVCYosCIP0Dadq0Semqi09OB07dpRoYwKgHdPgx5WxCBWDVxz937+rSTx6fxo/DJNCKWioGzV6XBS0yMFHPPGV6eua+EyvMKeO5iP5zAY97/xM49n/+yrt98E3Kk1tC2YdbTwlIYgSO9iFJqZCnP84DMV5dXLFHLiNPgCp+lBluw3PuOiKyKOGpxVeDpMHZyGKhR+0tdPqxB9ekL39LbzEZE1ud0Qd+1MDggJz8V/umY47Gz/3zJE7DWCjIk23sOt5luNb8xPuOSgfur4FoDCIotwO8qFDQqoCRe9VJ06o34yROJ4folsyaDWyilw7ECuFNnDwuveMNsOO1bhbRMCZMw2Wnv/6dpWnx3Y9p6deAenzUio8yCL6hsI69HbTrZ1ckauxYA9XsDt4GGiNPgLqeqbmVPVlH1A041+WQDzyHX3w4U1yUMx45DwkauNHxVZxw3f+n1bwiaMZ0mM5wQHp6WtX5cw4DkKNFLdzYcCUAzQ/2wuNfuF963SumYxy4GzJR9ANSOtjQFz6aeJJTK2IlUaf3n3do2mMfLH64mycQKmiO09g4CtmxeIVx6kunpUMP3g3nN35IzoZu4sfGFm44rVrdW38OJ8U64YS/UCUVk0H4MnUqfAUcOhE62ciQpkNlxLIJEyBNzV31SRA3JopYlBZ6i2DUz+hRKSCN5fyhP65J/74A5wIcggByfR4vczoow8i95uRnplmz8TsT/Jociypu4uNMJLLCX4D54FuehW+o4+aDi1nHYFOzLFRRkQ4p3aauD5w6qXrbG/GTRuv9/IPyUPRag0UAfHpweXn+2c2Opz7khAhWVgoZ4/b17y5Pd9/5KAxxqEESTBU1aO7jxjFwctQXuULLx4KOmWv1jaoE0afaGucA+Fs7VcVXvxS4BShSGw+I/UQM0OE08GCoa1amP9gWX3RMl+Dy7s8Pr9UqIGUq0V5VY8ETtUkTe6q3nYGlVRPA/Ag5J869Ye8/8dj908txyRd7f2A2PoBdBJc9BcGOWefqd599SNpnf3zd0f16nz1CGqDnZK7vSy990dR0zLP31kkl8fXauu/xipUbmHDVW/1kX/3Z+Tj2d/E8yPxhm0sOhZwQ+MRolMw/J4pUZISNgqzxnQF8W3uEsnGF6St2ARh+28fOhCIOYnICNm6HnOOaW4uPfaaFjIxGE9fZf/rD6nTpt3GNT7QsQJNJo7NwqLquz37t9LTv1J0xGDwXgDyMZE4bwCCfH3jr4biUx94vFWxFuPogmrOXpRlYNQWNK4O03z47V+86B6tAL64IwtZV3JLW+HJUnf52zqHcE7HqQBL9YU3FaIuuqm9i77/rTjv2G5wphJrxzCzmEHPOwkok/RCPG9Fea7zwm0yHH4ZkbbxsfAK0JuJPs9S72EA3oTUU/cIpGFqCPC6PSp5LXdHqBSl8cM37pW8sTA8/ti6vAhqQ0ogdRJuH8n32nFDNOQ33y+OOXdFxqnEvfMlx+6eXncDXFe3Yr8lEWVmkDAZwY+Zll5K5glX1286YlaZOw+11nAvomFImmzQekB57zH7pxS/YF/nAyxnsI20DNGqw8PQPe39//ZnL8RIvVgLtSRaIR4gMwNYmpm2zOQRGZw5sTN+N1eYJKPiT0rp1WzgBumqsfWknRlSOm8ICj8ch8ZUozlMdA4aGCSWpKHyqebhYBe6/Z1Wa9207F1AeNN2hTR18tLaYMY3qt79hdpq8F55Nxf17MinHpoVn6v/3zYdjVfWzUlqwCKsA8WhMOGhLnzIwPlcBPpx6z1xbBWxI5BAKgdlOfzv3MJ1zxLwTBAML1XCDlC343rJ0x+089vtlMOPzQt9luIUIGn5XOft1IxlYN02kHkzA2fMWToA6TUA4WNyUXw2vueSAFqGRVGf5MEKS3G0SLKFtyxlamjkQYBXAPfD06ApfBSCyvJmljqMEQJNXBAfhmv51rzwIS7IjU5lCnKi9+LhnpJcej1cWqOjs5oSyOWBZiglqJftzyGZSZ4X6za+flQ6eiaMhVx/XkxTtZ+NR76tejHtl6LyvhG7IfoLkhxWA164bqD/HY3+x9pqNKcp32BR+gowpYIiWRvaH/zR55Et0D+5y4RJm46UIYzhF/tGGGqeoViIItuRHDFGhgfjx61bMEHLBkTQ9Gw/y2VYnAwSrwH3LV6XLr12aJUyIdcg9yojWbNfpXWcflnbaDaG1cXZuo4dnIF3p/W890vZ+qskxKoRhMZCWOTZDS+fAQe721OTBZI/J46v34rKweZvJwSA8/+zD004Tuu3Gj6ApQyGGk2rCydU/uCfd+nvs/bzJVAqpnn06kduEEli5P9DCPyWUeEx0K3XhG9sjlI1PgHqgCCGQjOX94g6vf5YO28u4I1hsnAMmoXWRi84W7rlffMVdacXj6+2+gCv70LFlBQD0d9Qhk6tXvAgXJ7w8Y9bW96aTsPf/zfH761EyHcltjh5xgA7//H1mHIvxsZqHDDroOJWlcraHU5RzXjsjHfYs3JDiLWI6wJXBwTN2Ta9/5TRay6U5yYYZgxNs7br++qJ5dxowXZpbizVHB/EGS5EReGO2o0/sH71aWwdnHBNbPBnYaBlhAuAXnXlR3VHMhcVvHSUHobGS0Lg0QpBqQIpaJNOE/6TVphpWgeVLn0h4Ikaup4WCohAZBlzdWd4z54jUxTdncC7A28TvPfcwvFbXnIE3IIU/2HPw8fpV/Z6P31S/cu736n/8/O/qFU/04od64ZhZjFKQjJfDO2mXnur9b8al6AAmAC83evvS23HXb7ddxmnvL00sEwGmXlXX/PDedMutD2Hv92N/IzbKphCdZYlPK7TJcz4qTgW1sJE6awSgGNR5nAkOMNCNl41PgKpah/VPIB2dg+twbm7DCcPCRGiyD0FEFTqszV4YAYwl/OKvLdRzcV4nW0+ILi0zdhJJqU885hnpFSdNTenR1ek1uOP3shOfqb2/nD45efQBW+7xS+5dVZ981g3p81+6LX3/xgfTxz7x6/S683+a1jw5gFerI5jCJz07m37f8OoZ6cQTp6X0yMo069A90nmv51s8MWLoV8QbUDRHPtatH6gv+ir2/hZv+hA0ChvuTyRp+zBLlkqXm4kaDcd0ZQMy82v8JeT13evDy4bqDUxFV5986s64VHkbEjNBQQ8aWMQb+VaXFD90+E+9DGl4d7b1SiaWC+Li8uixh9amqftP0itUMXiGZXABSzhOkhOet086aMbk9IG3H8m9065+BMtMwJK4HjNpnqG/6e9+mW6+GXvhRKwevAmDdw6XL35c5xQvev4z+Bs82UZhK6kcCGCB5m3pk174jDRl73Hp79/9PJ2UNmf+0XdYQldFXWtVC75/b/o3TgA8DMt9CgXUCtssZKrQo+0hEZK7l+oyGa6XURhsVePrYl2fTY9e/WQWD0OUfoeK+YeY+9f+HuneD8LoEiiLqDTGbLUFlEx+Gu1SzYWoUKwjhHNlXE/PxDH15m+/Mu02CSexHIysBAMhkQcC/zFnuEW7DV1oSi5oNNhsGDzmf/O7y+o3nn+jv3TpPqmOg9zuu45LP1/winTIwXhPgbceowTVQDV+4YOPlkO1cGcsSLiqrMeVwnFnfC/99nc8+cOkcyzGZ3ESIjMzXEnAC9GkBRLKpi+EwtxssNSlemG9fupR6Z6XrCtxBtMbPwSktBrHxRV8U9bD42gBw1qkWKwTIMQOTZsPlEqF26I0tmTSBh88j1+8cEX6xnfvYdsOcgEHjhUwyAMAB72NEcA86Rh86uXBhx7TsXJ1X/2P/3abYD0mg+MWg7Ti4SfTxz7H917QY+irsK8ko2l9Mb/+XgH18rIvo2IDHGBV1/7wPgw+/ug4VhtBRecdj8H7+BbGJWkxMS6d3kHfQ7J9kaqByZrxV9WDIw0+zTY+Ae44nVfbf2IGAl/ZCO8ehsJR0kLAAOx9dwSC/gWfwdGtVSIzsBNYlj992Z1p5Sqcf2Jg8uoQEKGf206ArySGnE5IU4zMfR5XGXfdgVuvOgELYyqRhuKE7nT1DcvTDT/9A9VNgVXgoW7SbmbyRzJ2SOjkeKkPcx77L7z0dmhRkQPImv9JNIXtYi1pBOZfFkBHjenWadp0UwA0wKvt7fa9DciGqY1PANpV6T4LlsDslUUkSIXjYYnBDeQ5EOpGtKWhKYeUGuYDFFaBRQsfT1/7znINhPiFywxnEILPA0Fh6QZNO/FbWV906R2+/NLbMAXsAVzWffhTt6TVa/r45zvUlexvGLMmL44HHe2lvnJwIvG6/7e3PAzfnZfkFjMRGmBRg2dBIVa+sLEulpYWal4GLV/Lh+nlENbIEyC1FnLmMo5ySyS7L26YTTgesQUBoRMxMEUHZTNIXTxc1vFu2Sos2zzZY4lBZq1/JU7HLuGAsDGqSlz6eYLJr1+J5xvt6KQ52Cw4Qbv11ofx4iru01MIdvgFkUvmsU9u2gg5DPgHc173X8iJh5OVUk/AMDAcXyDly1EKXxmXBPiNiNYwYpgRv5QZkLTQiZHLyBOgbt+OP+smyAg4omiCYSBwxkDyp3QeC5/xGjujuOVBJoeO+wJ34y0ZPi9X7wRPKZqA0r/otBkTAAiGFxXv9PzkF3+qv8n7C1jiGZt2zrARom8CD5Pgwq/ckRbfs5KTL7ilZjEKdGpxSUG4aPM/yjdvWJZ+9ztccfBFT8pyeE40LMmYAxb2IzQ0z7kpJjwzFZrWbxjlMHCWUPf3YtJh5o1cRp4AVboLp7p4XdW9Mha6z0F5KDkRjKT8RBCmx1aOlQ2xidjBxV5TpYvm3a5zAa0CjTmt3M7IIVtAcQnn8ffDn74l9fFVMuCZh0huJHFQPFglHsVq8dHP8jcY7eRL+BEe4tC0iP4HvwiCvvm8/8JLMAZdXPqHUSr0Iwcli6trjDm7bt23bcesNJaZUoATdgR4f+oat7zE2xA98gTYZe39GJyl+LNmFoacsEN05nVEOqSjiI4BKllmUqpIRAhnsq1CHm4MLbr78XTF9cvQKLosfbLwoUHUIkPIRlV9FS+f/vKmP/tlHwccBoBSF0CHtvxKZKsLV4urvrssfe9nD0DX3yuQkvkTKRBHCCDWFML3ldcvTXeWz/spG6TOdtEzKJi5CGxsioZj1E7mE00ZNOsBFfQXy1Pr9+mO01cHzsbqkSfAb97eh0huwu8CKKS85zN4RuRBlecD1lMoaFVwhRyFDItW0SaJj+xZY+n8zOV3phUr7RmBjAgXkNQhHbUUeMhtpT8+9GT9z1/ALYxuXncL1KTQD/Oo2adGBVyo4yXi9KFP/bY5ISx8NGuH+89A5nvFE+tx7MdNHxzKcil0jBcrEluNkG4sWtuyFZQR1HV93/FUiWXWuDvx30TdlFJEuFH1n7DTCAVuWKPAqyiPDi2jPDahKR6mVgRYphLxR9fEhVq0ZcsNVoEleF/+smvwpFDrbkA0y6Mg6dOhnaj++Yu3pQfuw07A428uWSl6YWZgM4ncs3L4GLxbcfzmo2q4NkPqSQPZkIH7bWDpvroUL7wuXbQCE8DP/HWymJFzNIKiXxiFVDXxhImNY3tV2MJKqS0lGIM2nlTV1Y2N4sapMjsb1hyofl7XfSsQHPSbYEvXNM4J1KNgcqiB3uteAO4LsK8sYndaN62GkjZXgcvuTo/orSFc3zLxnCxUc8R8+gEWT9x+eevD9bxv4W1bfZ0sFM1tJDTCIIRNPAtNrSDH9dT/+u93pKX32gmh2djgx5wgTwU2PGd88JEn7V2/YR73hiprZpFu+GGEEaVNNbZC1tBU5lySUZZTMwp+T6GuF+EhFZa+TSubNgGWnM2D4c12GGiAbS9ARAzM2MxOxEcSMpeEWXQg65EROo2teGRjT7xv2ePpU5fpqgYpDl0HRDM4HADcdq0/+MnfpHVr8KhYl5CGTx2hy95bTlPDZlTw2cYHTw4feXB1+rt//TUZ+bW1HAN1WABgUFX6l6/cnu5fjm/5cPknU/85xUJZ6haLZ4pxlVkwUGzdJMvQVqy+Va6VZNflCWBd/zDdc+5Gb/9mfBAbfxhUau512kT8TPmreEnYUdBJ9tMCkyR6qj7njpOrxwUhjv5JYJMFKiYNNLRIIpk3/+bP6eADJ6UjD9mT+edvDLgyPeDtB+z6fbhaffc/3JSuueGefNkHLZTwSU0Cmk1EHdJGDRx2irrwfefdT+A1lyq9BA+BcE6I052Ij9iYZ3wOjXLJVXfXF1x0a2rzvINFGIaurZHMg0KKpimL5TbGkbx0lenSsmDi9h98fjA9eu19gTlSvekTYI/X/hlu56JPO5fu5YAdjThCaDUlpOyjhAxWdFMq4hPSHDgtUfBbC+m7+Hr5ylXr08EHTEp77D4eKbfE9+OE7Re42/aOj/wyLcAdRHviBiP5M+fcEirwHdY5JuEWoNhGcRo71n/8/IF059KVaQZeDt1nCr555YNOddwzSB//4h3poxj8fr6ryBs/9BZQUNI/tSMC1mTYsVwibPyRmktcJSopoZFLYIGhXKQ78KWYC9Lj14/4HkBADIEMwbD17CvnYxU4B3/2Xc8/CvdSJ5it+A6LqnDAcx0WHSZscEgaWzsV5QLFJsALAL2bta437b73xPTcI/ZJz5jSjcNdOy1avjL9fvHKNLAW/dbjViZSnugPpWk0LsIBxJlJ2iaKrKSCje+xfA9x/MTudPThU+qD9t+p6ururh/485PVb25/OK18DI/e9dMuNMLHBz0Oapwo0TeD1ZZubNKpn9o0OaGM6VKdzdEyW9MWAPKOe+jtvg+lRXM+Ac4ml4yxSRaHfu1EHAl/jL9ihZUDQUTQyjYQ1EtHcmRWLs5Ro0voV+EaEhO6rRodHFcgD3YE5MuZWPHU5hdHccWgeMIMLO7Ng5dregjPQ2S0wT9OSeoYFLbRPxqTyS+JyDf2dJ7b6nhPIYtblv0zgSQigRcTw5gWUfhUi24FhxYJnf0hLvElcVTKsBLi52Lr3tZRaflZ9zaCkSmuVZte7ur5b/xO0C9xMqgYLUKYozVMfy3YiLWoRRZtBsCO8V6CgIVHSi2KjaQTsnhyx6d6vL3LM33Q2X9hEgNHVnw8rZZTMAPSXJBBCiVqEgJ3BiteWso3asahk02T2/4qhAYi4Bwiuh5azraYclJNqnilwE0xcUKMGqsyc3fdaAefEKObAOn0Abw88YXopOLi3oEdWkNX9oxseoiRafb56C+lSrTphbEfEkwkFVcTnY0zkVUaOWQmtm2DbEhsh9x8W5t03tkzIdhiY5bGKGiRnodi6I3jEahyWjOvsM8ejOdaQHIdjyfajSWOxm3e7K6/mCFGQYxyAgC5r//aOg3cyjcxI8iIMddFAHmyMGJOAtTRCc0QgIQO7a2fmAQizEPTWZ9UGV9gNOsoapsjydgmEmvTjQWYk825JhBOxNMxeDadHYlqNIgMEAX/HIqigKMGuxL7ruIo5NJjW8ahS3hKLBLpoMXCky+K5BlExTf3U31DWjT3V1IY5Wb0E8CuMT8Lz3Ts7lgH3USgPgR7UJ2TYiOejdQ56Ja3D2ga5mUyhO+pppyyxg4pd6OQmRNbYTKiJ9NU3YA4MI5By84NwDxaB5xDNLNt4jNO024oavIjTrNBm5PI9LR3kYSizlWyHiYFeGyCwn6CJ3919Uk0N6uMfgLQzZrx30ztfvzFkPJHdCzwiML7EU0liJ1W5M7NSwg7CZ7k2A62LZGpY/uF6YcsbNgWlkbfvqlk7ooBFYZxbZaYZ3F84I3GFm36I74NDlumH3FITlX/0JZW0nRo0yn8UIkFLA2w+zUNaEdH3Fcoa2WEjHKc+fNk9Ntp8ZybTD767eZNgPtPXwv3H0Vs/EEaLxF6tKEB0rjY4j8H3NOpicBO0Jw6rAXFhmgXgnaW+NwQIxeQfE8uFygz2dlIohgy9wFlYXKS8KNitGydEyDUyGrCwwb/O/y6jcRCD9wMZnBgm443PYbmiqS0A+1y5o52knLDJAz0PoEfiP544WHU5OZNALpZNOf7cH5NqvgDuFFsL2N0jDvv4RRDi3GHssnQwuBxz7KJYYpKtjYSk6kStmyQzm3ourr0bANvdBiliIfJ5p4UYt1W9EbwLMNu7M6yLDsO8E5X5FKF+tGzHB8EGSczaWHFoKEhJbTs+b4JY49Bi2f+0LkoLToXXzTc/LL5E8BC/Puq3fe4dgV2hkErcAsoSC6G0ZFyudNyFrGHPdp5hyZkgISe1zHV6M+SNsg9QbKAIGahwVfLgIwLxcJPNoNK0EbZNLVBNXtuaUo9fgJGcaPBtvF8wjUMGMBCnXVr6ofcRZGLvINQzhPwdj/eNO3+DFpbVLZkAqS08JyF6NY/Vfi2i7rg/bBUNHExZhUfzVATn7zca2hRWBRrGkLGQUo1qaDXyaO5cTIMsMNf5hX4RkKnFCoes+KwNSJDHxwNMWx4qRv61OInrKOmNgpE5sGaHVsPxqdMA0ElnYjUeEej/t9pydkrO+w2o7FlE4AO249fnOren+LvCKmH1ilLkSUgEtJEF1JyNP6NKM+F0GHdYAZXrnICQ8f8GZg0XT2sBtc2NoZehKAh5BhIAiJ6YF7BB5DxDNH4zeQQNwAysHt3XII7Rxo+5llbQiz5mgRc+o2BGid+AwMX40/I/7hR3nxqyyfAkvesr9vVu+p64FEkBat6zNume0ZR2gQqXqhoFtg+HV2lZhaTRoOygKCX+EdN6uZPEOCYvg2OBUA/jkQ9Lw3pHsBg3uk3ZiW90JYnf0Q0HItC3qVL/bABgMNJN0MT3D7CL9RDHyy3pREBUXjV1V7/Wyz9F6C1VcqWTwCGwT9aWA+8z24sOmTE7D1S3zWTrV/NCSIVLaGkZObJiX7TRRSH8CQHd1DdgDuEB1NUPhYdhuQZ3yOxYMAFEQMmRLb53+qQiRnymO1Q0aot4Mar+fI2KlvZLRzj2uR1DUYGso1vaXWdtzWWfvM0mvcBwmJDNf+U+Z6v3Qu/1HCMvqWZIzciD7FPeeMiOyzsmyeMfNuzJOncSGhITVJN3/CgLny2DNvwqMPiWl6JNcyGYlqzHqoKzlBmoWnRKz5wqWsRWx3GeJRtpLAcUDkA7TkKW7Dxj0+d2m/D1dePCLu1ytZZASKaCemDWKL+E1+BtjWXWURn2L28t4C2thlZuozmViY5/Q0/qDj+Bl5gM2ex4/uCn/0Q04pTSnDDDenGavqJUtKMWOMjoUnIKdFJRz+pwclBnj37N5sGs7AEqasm3vCp+/9fWjj3SrnZiputOwH469R9/efgcLCYlypMDktc+uV27kBnopqsNenIqk5o4KkoaLRY40MLsXId2IYVskbLAfPwxRCZhi9IDaYcwYa9Ehg3hqrD0gZCDtTGf1iZ/5i0WZ6PcR4fnvPjYc+30qTejzhnq1YbCHsLfcye/zx8jwA3itIUHA5y3zaKWkZCC7Q5hJH3bEs9IRawHK3czIRMQp0DYZMnI42OYCCKiYiNO5sonbyIJXzH4W1DDrNeRgaH/nhl1e77SWq3Tt2ax/0yjq27AgTywjm/xl8XOxPdWKn1ThmxgeHyp6Sx11EyTQKfop1J6lq23Sr2LW9S3JCioq3BV4MbtqwepG42jE9UM5HMFHzsneQ2Eo5T50qjPdoAoBfadhgMf+HB1YLttXN1Wd33CzxzecO2Gnw63DYTgMiLz/1RnXrnoDv4+296YwJMpiT2w+G6j4QVu7zSlyeM6ecEo2mXYyTKwUfbZ1gci+VRuKZIXBmpdlzSsjNpIFKqe/6Q2epMjtlkExIMAvzOFbxTVypUBZuS8GRdRosEP7zcq3u5E70uLTkPXy3edqXpybbyMXP+aXhj5gr0dmecxVqflWh3yP4iCgm4UWacqQZYSEpMmw2GCbsOUygql4Mtw7c7lA14qgWOaQOZQgGTGI4sqVqOYbLMNiKA1CkYs+39aDRDKWKWE8sD3+0b6LsptfpPSwvf/MfGZttQ224FiHgXz7kGZ7BnoYnblr4SMHPsszKIobX+KxuWL22FwAU2xAHZkc9iQIUDU0Fn5U5CyAI0VG6zN4/LJBBkghhZC/FazHTdcKmDUtpAIZZ7E5b6Zil14giMx/zeH+Md9FO2x+Azpm0/Aehl0bnX4f7lacjOg807BGWmoONNVkPTRpAi1YVpwaVSLuJjY6rc4qOBczo0YwKpTSv7MAazpSDsnSQLJcthovFjTYE2JKwMakpu6IZLM/zVT5zt934jVQOnpqVz8J3y7VOGxLZN3c64/GgsAl/DN1gPRWc9fwwBZB6ICCmn1zPNdiPTMh1Nh1DsoJvBcwzfs7N5EOQLQ0aFH4aDIaI8QFHrUBSqkNM0IHTsD3XaUC4FhyWLfJSsJmO90Yufper/l7Ro4kcT37vcjiVi2n4uZ3xlamqN/wruGL68qnuZDU9zGQpThHawcsYizCEMJTykBA1TguSBFKTv2fTqngvlBqKkNJIwDn0NoU8A6Gn5Rq2ocmiIAXa5Sb0C0/h8o6oP31+v3pMWzrmqEG83Eu80b+fy2HdWpkmnXJ266nG4V3AssoTDENPB9ERdpIqkBsDjLETiU4ZPsK1mu0l+lpU4DqeK/HKkyAwjEqJZO9NrY5c86oSt08QSduMA5vjPL3L034gf3zgjLX7Tz6j2VBSG+9QVXSG0Po1TkQNw2YM4sLAzIq6niszDiz3Pmwo45gqtxBhm44nPqefAlVgu4FTJOhbAUNRy0OkKOHFZaJOtQRBYGZRE4Yx7fXsNzon+JeFnBEbzRc5herjFrDLMLQbbLIADv3ogfkHrIuwTp9pA8FKRKeWO4zUHLUcKohxE6JmueS9pcbIu7cjxOWbqvqWAlmUx75JINFhuumYZq40cDI0HbBwOAICvt6eBn+FNyg9uyYucZZRbSg/fqy1F3Rz7mZedW7W6LsBVwgH4LQIOsmeTIZb7GNodg4qBIst9lppiSRcKhCntaMGBIVvWpKIQzdsF27BDp6kNw9olLX80qsZhp++/H+9QXpi6d/oifr6Fy90OUYru7QDxzP7Gfrj79XdI2ZvxpHpn0BgH/bCEgmMuy+HSPopBzXffinHz5PP6ygeYED485SiBVpO2gyZCObGk5RNIfOmbsXkIUIsS/kF0o+rna1uX4IMXOOc+QC87UmHUO17Rw6TqQ0jsKfxLEPg2MmLUTWCLFclXuhV9OereFQ5UM0rGzAYaOVeMqsEYbCZH2Mic6rGKhCnrPFPol19Zx8C3e/nLat/Czc/PpCVv2qSfbCshtxetFG4vZ6P2M+uKE5DO87GPn4IvQUzAXTIkGLtWOYa5ByB8lEyM9QGE6NDRUlEaR0TkhVLwHI6DK6npxJGp0TKxXtPmMb7u/yOgvo6Bn6c3pQYp7mjNob3e0SJkPDO/dhR+rO08jPxpeM9gfw1Fu49LO0jsnepF0xXbSanlhaKiaRNlMDOUm9p27EZPlOOAxtGFN1L58+/9+GGC1k3w+3X8YME1OLPHtf3To7BPT59y8Py98dXsV+DQ8HrsYcdhMky24PEVMP7me14bytHGSGEkyz1XE6bj3IAoXObtdNBaYtm8MTgocMDxAQB+jbMPaxGW9vr7ULo+LV52M/5QI3+w4GlVnl4ToEzt7PkHYcBPAOskjMaxqA/C27J4d4qFI8YJwfEgXRw02OM4FEiENgffM8ETS8wWzgaw+bsD/OUt0G38AkhKeDrXwk+I1j/GD0jhVfjxt+9IZ/QMcLTFuz1asx1M/8j5E9OT/Cvn9VEYoOdjMI/AYoC/H1fticHCj1t1tbhc+6hiSmBEOagqSAH/2yiDjz8EkBL+ykZ7BW5S/qFKXQvxx3d+B32+jn13WnQmfvj/L6f8ZUyA4cZj9qWTUj1hL4impNbAPtiN98JhYw8s45NQ2y84ctRbXesx6PhFye7HUqv9WBpID2HleCS1d34kLTsdv/c2VsYyMJaBsQyMZWAsA2MZGMvAWAbGMjCWgbEM/CVl4P8DcVGO0TX2w40AAAAASUVORK5CYII=";
 
@@ -13742,7 +13871,6 @@ var wattter_agent_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAA
 var labels = { auto: "\u5168\u81EA\u52A8", plan: "\u5148\u89C4\u5212\u540E\u6267\u884C", step: "\u9010\u9879\u786E\u8BA4" };
 var statuses = { done: "\u5DF2\u5B8C\u6210", running: "\u6267\u884C\u4E2D", paused: "\u5DF2\u6682\u505C", approval: "\u5F85\u6388\u6743", stopped: "\u5DF2\u505C\u6B62", stopping: "\u505C\u6B62\u5F85\u6838\u5BF9", blocked: "\u5F85\u6838\u5BF9", working: "\u6267\u884C\u4E2D", ready: "\u5F85\u6267\u884C", checking: "\u5F85\u9A8C\u6536", "review-waiting": "\u9700\u8981\u4F60" };
 var reviewLabel = "\u6388\u6743\u5E76\u6267\u884C";
-var assistantName = "WTT \u9879\u76EE\u52A9\u624B";
 function stored(storage, key, fallback) {
   try {
     return JSON.parse(storage.getItem(key)) ?? fallback;
@@ -13757,71 +13885,102 @@ function persist(storage, key, value) {
   }
 }
 function ModeMenu({ value, onChange, label: label2 = "\u6267\u884C\u65B9\u5F0F" }) {
-  const anchor = (0, import_react19.useRef)(null), [open, setOpen] = (0, import_react19.useState)(false);
-  return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(UiButton, { ref: anchor, size: "compact", "aria-label": label2 + " \xB7 " + labels[value], "aria-expanded": open, onClick: () => setOpen((v2) => !v2) }, labels[value], " \u2304"), open && /* @__PURE__ */ import_react19.default.createElement(CanvasPopover, { className: "wtt-agent-mode", anchorRef: anchor, onDismiss: () => setOpen(false), onKeyDown: (e) => {
+  const anchor = (0, import_react20.useRef)(null), [open, setOpen] = (0, import_react20.useState)(false);
+  return /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, /* @__PURE__ */ import_react20.default.createElement(UiButton, { ref: anchor, size: "compact", "aria-label": label2 + " \xB7 " + labels[value], "aria-expanded": open, onClick: () => setOpen((v2) => !v2) }, labels[value], " \u2304"), open && /* @__PURE__ */ import_react20.default.createElement(CanvasPopover, { className: "wtt-agent-mode", anchorRef: anchor, onDismiss: () => setOpen(false), onKeyDown: (e) => {
     if (e.key === "Escape") {
       setOpen(false);
       anchor.current?.focus();
     }
-  }, role: "menu" }, Object.entries(labels).map(([id2, name2]) => /* @__PURE__ */ import_react19.default.createElement(UiButton, { key: id2, role: "menuitemradio", "aria-checked": value === id2, onClick: () => {
+  }, role: "menu" }, Object.entries(labels).map(([id2, name2]) => /* @__PURE__ */ import_react20.default.createElement(UiButton, { key: id2, role: "menuitemradio", "aria-checked": value === id2, onClick: () => {
     setOpen(false);
     onChange(id2);
   } }, name2, value === id2 ? " \u2713" : ""))));
 }
-function PlanStepDetails({ step, locate }) {
+function PlanStepDetails({ step, locate, plan, act, models, busy, changeIndex }) {
   const model = step.modelSelection;
   const executor = step.executor === "codex" ? "Codex CLI" : model ? [model.model, model.provider, EFFORT_LABELS[model.reasoningEffort] || model.reasoningEffort].filter(Boolean).join(" \xB7 ") : "DSH \u9ED8\u8BA4\u6A21\u578B";
-  return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement("details", { className: "wtt-agent-step-details" }, /* @__PURE__ */ import_react19.default.createElement("summary", null, step.title, " \xB7 ", step.target, step.executor === "codex" && " \xB7 Codex"), /* @__PURE__ */ import_react19.default.createElement("p", null, step.instruction), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, "\u6267\u884C\u8005 \xB7 ", executor), !!step.deps.length && /* @__PURE__ */ import_react19.default.createElement("small", null, "\u4F9D\u8D56\u6B65\u9AA4 ", step.deps.join("\u3001")), step.acceptance && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, "\u9A8C\u6536 \xB7 \u81F3\u5C11 ", step.acceptance.minCards, " \u5F20\u6B63\u5F0F\u6210\u679C", /* @__PURE__ */ import_react19.default.createElement("ul", null, step.acceptance.criteria.map((criterion, index2) => /* @__PURE__ */ import_react19.default.createElement("li", { key: index2 }, criterion)))), step.resultReview?.reason && step.resultReview.reason !== step.error && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, step.resultReview.reason)), !!step.refs?.length && /* @__PURE__ */ import_react19.default.createElement("details", null, /* @__PURE__ */ import_react19.default.createElement("summary", null, step.refs.length, " \u4EFD\u5F15\u7528"), step.refs.map((ref) => /* @__PURE__ */ import_react19.default.createElement("div", { key: ref.cardId }, ref.title, ref.versionId && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => locate({ ...ref, cardId: ref.outputCardId }) }, "\u67E5\u770B\u5F15\u7528\u7248\u672C")))));
+  const selectModel = (modelSelection) => act(plan, "select-step-model", {
+    ...changeIndex === void 0 ? { stepId: step.id } : { changeId: plan.change.id, changeIndex },
+    modelSelection
+  });
+  return /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-main" }, /* @__PURE__ */ import_react20.default.createElement("details", { className: "wtt-agent-step-details" }, /* @__PURE__ */ import_react20.default.createElement("summary", { title: step.title + " \xB7 " + step.target }, step.title, " \xB7 ", step.target, step.executor === "codex" && " \xB7 Codex"), /* @__PURE__ */ import_react20.default.createElement("p", null, step.instruction), /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-note" }, "\u6267\u884C\u8005 \xB7 ", executor), step.modelEditable && model && /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: busy, onClick: () => selectModel(null) }, "\u6062\u590D\u9ED8\u8BA4\u6A21\u578B"), !!step.deps.length && /* @__PURE__ */ import_react20.default.createElement("small", null, "\u4F9D\u8D56\u6B65\u9AA4 ", step.deps.join("\u3001")), step.acceptance && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-note" }, "\u9A8C\u6536 \xB7 \u81F3\u5C11 ", step.acceptance.minCards, " \u5F20\u6B63\u5F0F\u6210\u679C", /* @__PURE__ */ import_react20.default.createElement("ul", null, step.acceptance.criteria.map((criterion, index2) => /* @__PURE__ */ import_react20.default.createElement("li", { key: index2 }, criterion)))), step.resultReview?.reason && step.resultReview.reason !== step.error && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-note" }, step.resultReview.reason)), step.modelEditable && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-model", role: "group", "aria-label": step.title + "\u7684\u6A21\u578B" }, !model && /* @__PURE__ */ import_react20.default.createElement("small", { className: "wtt-agent-step-note" }, "\u9ED8\u8BA4"), /* @__PURE__ */ import_react20.default.createElement(ModelSelection, { ...models, compact: true, selection: model, onChange: busy ? void 0 : selectModel }))), !!step.refs?.length && /* @__PURE__ */ import_react20.default.createElement("details", null, /* @__PURE__ */ import_react20.default.createElement("summary", null, step.refs.length, " \u4EFD\u5F15\u7528"), step.refs.map((ref) => /* @__PURE__ */ import_react20.default.createElement("div", { key: ref.cardId }, ref.title, ref.versionId && /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", onClick: () => locate({ ...ref, cardId: ref.outputCardId }) }, "\u67E5\u770B\u5F15\u7528\u7248\u672C")))));
 }
 function ReviewActions({ kind, plan, stepId, act, busy }) {
-  if (kind === "change") return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(plan, "accept-change", { changeId: plan.change.id }) }, "\u6279\u51C6\u53D8\u66F4"), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act(plan, "reject-change", { changeId: plan.change.id }) }, "\u4FDD\u7559\u539F\u8BA1\u5212"));
-  return /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(plan, kind === "plan" ? "approve-plan" : "approve-step", kind === "step" ? { stepId } : void 0) }, kind === "plan" ? reviewLabel : "\u6267\u884C\u6B64\u9879");
+  if (kind === "change") return /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(plan, "accept-change", { changeId: plan.change.id }) }, "\u6279\u51C6\u53D8\u66F4"), /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act(plan, "reject-change", { changeId: plan.change.id }) }, "\u4FDD\u7559\u539F\u8BA1\u5212"));
+  return /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(plan, kind === "plan" ? "approve-plan" : "approve-step", kind === "step" ? { stepId } : void 0) }, kind === "plan" ? reviewLabel : "\u6267\u884C\u6B64\u9879");
 }
-function ChatReview({ review, act, locate, busy, onPage }) {
+function ChatReview({ review, act, locate, busy, onPage, models }) {
   if (!review?.item) return null;
   const { plan, kind, stepId } = review.item;
   const steps = kind === "change" ? plan.change.steps : kind === "plan" ? plan.steps : plan.steps.filter((step) => step.id === stepId);
-  return /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-review", "aria-label": "\u5BF9\u8BDD\u6388\u6743" }, /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-heading" }, /* @__PURE__ */ import_react19.default.createElement("strong", { title: plan.title }, plan.title), /* @__PURE__ */ import_react19.default.createElement("small", { role: "status" }, kind === "change" ? "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C " + plan.change.start + " \u9879\u8D77" : kind === "step" ? "\u5F85\u786E\u8BA4\u6B65\u9AA4" : "\u8BA1\u5212\u5DF2\u751F\u6210 \xB7 \u5F85\u6388\u6743")), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-steps", key: plan.id + ":" + kind + ":" + (stepId || "") }, steps.map((step, index2) => /* @__PURE__ */ import_react19.default.createElement("div", { key: step.id || index2 }, /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { step, locate: (ref) => locate(ref, plan.id) }), kind === "step" && step.error && /* @__PURE__ */ import_react19.default.createElement("small", null, step.error)))), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions" }, /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind, plan, stepId, act, busy }), review.total > 1 && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-review-pager", "aria-label": "\u5BF9\u8BDD\u5F85\u6388\u6743\u5206\u9875" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy || review.page === 0, onClick: () => onPage(review.page - 1) }, "\u4E0A\u4E00\u9879"), /* @__PURE__ */ import_react19.default.createElement("small", null, review.page + 1, " / ", review.total), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy || review.page + 1 === review.total, onClick: () => onPage(review.page + 1) }, "\u4E0B\u4E00\u9879"))));
+  return /* @__PURE__ */ import_react20.default.createElement("section", { className: "wtt-agent-review", "aria-label": "\u5BF9\u8BDD\u6388\u6743" }, /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-review-heading" }, /* @__PURE__ */ import_react20.default.createElement("strong", { title: plan.title }, plan.title), /* @__PURE__ */ import_react20.default.createElement("small", { role: "status" }, kind === "change" ? "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C " + plan.change.start + " \u9879\u8D77" : kind === "step" ? "\u5F85\u786E\u8BA4\u6B65\u9AA4" : "\u8BA1\u5212\u5DF2\u751F\u6210 \xB7 \u5F85\u6388\u6743")), /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-review-steps", key: plan.id + ":" + kind + ":" + (stepId || plan.change?.id || "") }, steps.map((step, index2) => /* @__PURE__ */ import_react20.default.createElement("div", { key: step.id || index2 }, /* @__PURE__ */ import_react20.default.createElement(
+    PlanStepDetails,
+    {
+      step,
+      locate: (ref) => locate(ref, plan.id),
+      plan,
+      act,
+      models,
+      busy,
+      changeIndex: kind === "change" ? index2 : void 0
+    }
+  ), kind === "step" && step.error && /* @__PURE__ */ import_react20.default.createElement("small", null, step.error)))), /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-actions" }, /* @__PURE__ */ import_react20.default.createElement(ReviewActions, { kind, plan, stepId, act, busy }), review.total > 1 && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-review-pager", "aria-label": "\u5BF9\u8BDD\u5F85\u6388\u6743\u5206\u9875" }, /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: busy || review.page === 0, onClick: () => onPage(review.page - 1) }, "\u4E0A\u4E00\u9879"), /* @__PURE__ */ import_react20.default.createElement("small", null, review.page + 1, " / ", review.total), /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: busy || review.page + 1 === review.total, onClick: () => onPage(review.page + 1) }, "\u4E0B\u4E00\u9879"))));
 }
-function Plans({ plans, act, locate, busy, focusPlan }) {
+function Plans({ plans, act, locate, busy, focusPlan, models }) {
   if (!plans?.length) return null;
-  return /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-plans" }, plans.map((p, index2) => {
+  return /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-plans" }, plans.map((p, index2) => {
     const next = p.steps.find((s) => s.state !== "done" || s.handoff), ended = ["done", "stopped"].includes(p.state);
     const completed = p.steps.filter((step) => step.state === "done" && !step.handoff).length;
     const waitingVersion = p.steps.some((s) => s.choice && !s.handoff);
     const target = (ref) => locate(ref, p.id);
     const stepStatus = (s) => s.state === "working" && s.revising ? "\u4FEE\u8BA2\u4E2D" : statuses[s.state];
     const status = p.state === "running" && next?.interaction ? "\u5F85\u786E\u8BA4" : p.state === "running" && next?.handoff ? "\u4F60\u6B63\u5728\u5904\u7406" : p.state === "running" && waitingVersion ? "\u5F85\u9009\u62E9\u7248\u672C" : p.state === "running" && next && (["checking", "review-waiting", "blocked"].includes(next.state) || next.revising) ? stepStatus(next) : statuses[p.state];
-    return /* @__PURE__ */ import_react19.default.createElement("details", { className: "wtt-agent-plan", key: p.id, open: focusPlan === p.id || !focusPlan && !ended && index2 === 0 || void 0 }, /* @__PURE__ */ import_react19.default.createElement("summary", null, /* @__PURE__ */ import_react19.default.createElement("span", null, p.title), /* @__PURE__ */ import_react19.default.createElement("small", null, status), /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-plan-progress" }, /* @__PURE__ */ import_react19.default.createElement("progress", { value: completed, max: p.steps.length || 1, "aria-label": p.title + "\u8FDB\u5EA6" }), /* @__PURE__ */ import_react19.default.createElement("span", null, "\u5B8C\u6210 ", completed, "/", p.steps.length))), p.steps.map((s) => {
+    return /* @__PURE__ */ import_react20.default.createElement("details", { className: "wtt-agent-plan", key: p.id, open: focusPlan === p.id || !focusPlan && !ended && index2 === 0 || void 0 }, /* @__PURE__ */ import_react20.default.createElement("summary", null, /* @__PURE__ */ import_react20.default.createElement("span", null, p.title), /* @__PURE__ */ import_react20.default.createElement("small", null, status), /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-agent-plan-progress" }, /* @__PURE__ */ import_react20.default.createElement("progress", { value: completed, max: p.steps.length || 1, "aria-label": p.title + "\u8FDB\u5EA6" }), /* @__PURE__ */ import_react20.default.createElement("span", null, "\u5B8C\u6210 ", completed, "/", p.steps.length))), p.steps.map((s) => {
       const receipts = s.receipts || [s.receipt].filter(Boolean);
       const currentTarget = s.choice?.cardId || s.outputCardId;
       const context = s.choice ? { ...s, receipt: receipts.find((card) => card.cardId === s.choice.cardId) || s.receipt } : s;
       const canDecide = p.state === "running" && s.id === next?.id && s.state === "review-waiting" && !s.handoff && s.resultReviewId;
-      return /* @__PURE__ */ import_react19.default.createElement("div", { key: s.id, className: "wtt-agent-step" }, /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { step: s, locate: target }), s.state !== "done" && /* @__PURE__ */ import_react19.default.createElement("small", { role: s.id === next?.id ? "status" : void 0 }, s.revising && s.state === "ready" && s.authorized ? "\u5F85\u4FEE\u8BA2" : stepStatus(s)), s.error && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-note" }, s.error), !!receipts.length && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-results", "aria-label": s.title + "\u6210\u679C" }, receipts.map((card) => /* @__PURE__ */ import_react19.default.createElement(UiButton, { key: card.cardId, size: "compact", onClick: () => target(card) }, receipts.length > 1 ? card.title + " \xB7 V" + card.number : "\u5B9A\u4F4D V" + card.number))), s.canRecheck && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "recheck", { stepId: s.id }) }, "\u91CD\u65B0\u6838\u5BF9"), s.taskId && s.outputCardId && (!receipts.length || s.handoff || s.choice || canDecide) && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => target({ requirementId: s.requirementId, taskId: s.taskId, cardId: s.outputCardId }) }, s.executor === "codex" ? "\u67E5\u770B\u6267\u884C\u5361" : "\u6253\u5F00\u5361\u7247\u5BF9\u8BDD"), !ended && p.state !== "stopping" && /* @__PURE__ */ import_react19.default.createElement(StepHandoff, { step: context, busy, act: (command2) => act(p, command2, { stepId: s.id, cardId: currentTarget, requirementId: s.choice?.requirementId || s.requirementId, versionId: s.choice?.versionId }) }), canDecide && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-step-results" }, receipts.length >= s.acceptance?.minCards && !s.choice && /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(p, "accept-result", { stepId: s.id, resultReviewId: s.resultReviewId }) }, "\u786E\u8BA4\u91C7\u7528\u6210\u679C"), !s.choice && /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act(p, "review-again", { stepId: s.id, resultReviewId: s.resultReviewId }) }, "\u91CD\u65B0\u9A8C\u6536")), s.id === next?.id && p.state === "running" && s.state === "ready" && !s.authorized && !s.handoff && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "approve-step", { stepId: s.id }) }, "\u6267\u884C\u6B64\u9879"));
-    }), !ended && p.state !== "stopping" && p.change && /* @__PURE__ */ import_react19.default.createElement("div", null, /* @__PURE__ */ import_react19.default.createElement("strong", null, "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C ", p.change.start, " \u9879\u8D77"), p.change.steps.map((s, i) => /* @__PURE__ */ import_react19.default.createElement(PlanStepDetails, { key: i, step: s, locate: target })), /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind: "change", plan: p, act, busy })), !ended && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions" }, p.state === "approval" && /* @__PURE__ */ import_react19.default.createElement(ReviewActions, { kind: "plan", plan: p, act, busy }), ["running", "paused"].includes(p.state) && /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, p.state === "paused" ? "resume" : "pause") }, p.state === "paused" ? "\u7EE7\u7EED\u5269\u4F59\u6B65\u9AA4" : "\u6682\u505C"), p.state !== "stopping" && /* @__PURE__ */ import_react19.default.createElement(ModeMenu, { label: "\u59D4\u6258\u6267\u884C\u65B9\u5F0F", value: p.mode, onChange: (mode) => act(p, "mode", { mode }) }), /* @__PURE__ */ import_react19.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "stop") }, p.state === "stopping" ? "\u91CD\u8BD5\u505C\u6B62" : "\u505C\u6B62\u59D4\u6258")));
+      return /* @__PURE__ */ import_react20.default.createElement("div", { key: s.id, className: "wtt-agent-step" }, /* @__PURE__ */ import_react20.default.createElement(PlanStepDetails, { step: s, locate: target, plan: p, act, models, busy }), s.state !== "done" && !(p.state === "approval" && s.state === "ready" && !s.revising) && /* @__PURE__ */ import_react20.default.createElement("small", { role: s.id === next?.id ? "status" : void 0 }, s.revising && s.state === "ready" && s.authorized ? "\u5F85\u4FEE\u8BA2" : stepStatus(s)), s.error && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-note" }, s.error), !!receipts.length && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-results", "aria-label": s.title + "\u6210\u679C" }, receipts.map((card) => /* @__PURE__ */ import_react20.default.createElement(UiButton, { key: card.cardId, size: "compact", onClick: () => target(card) }, receipts.length > 1 ? card.title + " \xB7 V" + card.number : "\u5B9A\u4F4D V" + card.number))), s.canRecheck && /* @__PURE__ */ import_react20.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "recheck", { stepId: s.id }) }, "\u91CD\u65B0\u6838\u5BF9"), s.taskId && s.outputCardId && (!receipts.length || s.handoff || s.choice || canDecide) && /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", onClick: () => target({ requirementId: s.requirementId, taskId: s.taskId, cardId: s.outputCardId }) }, s.executor === "codex" ? "\u67E5\u770B\u6267\u884C\u5361" : "\u6253\u5F00\u5361\u7247\u5BF9\u8BDD"), !ended && p.state !== "stopping" && /* @__PURE__ */ import_react20.default.createElement(StepHandoff, { step: context, busy, act: (command2) => act(p, command2, { stepId: s.id, cardId: currentTarget, requirementId: s.choice?.requirementId || s.requirementId, versionId: s.choice?.versionId }) }), canDecide && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-step-results" }, receipts.length >= s.acceptance?.minCards && !s.choice && /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "primary", size: "compact", disabled: busy, onClick: () => act(p, "accept-result", { stepId: s.id, resultReviewId: s.resultReviewId }) }, "\u786E\u8BA4\u91C7\u7528\u6210\u679C"), !s.choice && /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: () => act(p, "review-again", { stepId: s.id, resultReviewId: s.resultReviewId }) }, "\u91CD\u65B0\u9A8C\u6536")), s.id === next?.id && p.state === "running" && s.state === "ready" && !s.authorized && !s.handoff && /* @__PURE__ */ import_react20.default.createElement(UiButton, { disabled: busy, size: "compact", onClick: () => act(p, "approve-step", { stepId: s.id }) }, "\u6267\u884C\u6B64\u9879"));
+    }), !ended && p.state !== "stopping" && p.change && /* @__PURE__ */ import_react20.default.createElement("div", null, /* @__PURE__ */ import_react20.default.createElement("strong", null, "\u8303\u56F4\u53D8\u66F4 \xB7 \u4ECE\u7B2C ", p.change.start, " \u9879\u8D77"), p.change.steps.map((s, i) => /* @__PURE__ */ import_react20.default.createElement(PlanStepDetails, { key: p.change.id + ":" + i, step: s, locate: target, plan: p, act, models, busy, changeIndex: i })), /* @__PURE__ */ import_react20.default.createElement(ReviewActions, { kind: "change", plan: p, act, busy })), !ended && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-actions" }, p.state === "approval" && /* @__PURE__ */ import_react20.default.createElement(ReviewActions, { kind: "plan", plan: p, act, busy }), ["running", "paused"].includes(p.state) && /* @__PURE__ */ import_react20.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, p.state === "paused" ? "resume" : "pause") }, p.state === "paused" ? "\u7EE7\u7EED\u5269\u4F59\u6B65\u9AA4" : "\u6682\u505C"), p.state !== "stopping" && /* @__PURE__ */ import_react20.default.createElement(ModeMenu, { label: "\u59D4\u6258\u6267\u884C\u65B9\u5F0F", value: p.mode, onChange: (mode) => act(p, "mode", { mode }) }), /* @__PURE__ */ import_react20.default.createElement(UiButton, { disabled: busy, onClick: () => act(p, "stop") }, p.state === "stopping" ? "\u91CD\u8BD5\u505C\u6B62" : "\u505C\u6B62\u59D4\u6258")));
   }));
 }
-var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2({ notices, project, requirement, selected: selected2, request, renderConversation, canvasActions, picking, cardId }) {
+var ProjectAgentFloat = import_react20.default.memo(function ProjectAgentFloat2({
+  notices,
+  project,
+  requirement,
+  selected: selected2,
+  request,
+  renderConversation,
+  canvasActions,
+  picking,
+  cardId,
+  nativeModelSeat,
+  modelCatalog,
+  modelLoading,
+  modelError,
+  onRefreshModels,
+  onOpenModelSettings
+}) {
   const key = "wtt-project-agent:" + project.id;
-  const [tracking, setTracking] = (0, import_react19.useState)(() => stored(sessionStorage, key + ":tracking", false));
-  const [open, setOpen] = (0, import_react19.useState)(() => stored(sessionStorage, key + ":open", false)), [tab, setTab] = (0, import_react19.useState)("chat");
-  const [pinned, setPinned] = (0, import_react19.useState)(() => stored(sessionStorage, key + ":references", null));
-  const [mode, setMode] = (0, import_react19.useState)(() => stored(localStorage, key + ":mode", "plan"));
-  const [position, setPosition] = (0, import_react19.useState)(() => stored(localStorage, key + ":pos", { x: 0.98, y: 0.66 }));
-  const [windowSize, setWindowSize] = (0, import_react19.useState)(() => stored(localStorage, key + ":size", { w: 540, h: 680 }));
-  const [size3, setSize] = (0, import_react19.useState)({ w: 0, h: 0 }), [session, setSession] = (0, import_react19.useState)(null), [state, setState] = (0, import_react19.useState)(null), [error, setError] = (0, import_react19.useState)(""), [busy, setBusy] = (0, import_react19.useState)(false);
-  const launcher = (0, import_react19.useRef)(null), drag = (0, import_react19.useRef)(null), resizeStart = (0, import_react19.useRef)(null), lastProgress = (0, import_react19.useRef)(""), alive = (0, import_react19.useRef)(true);
-  const panelId = (0, import_react19.useId)();
-  const [canvas, setCanvas] = (0, import_react19.useState)(null);
-  const call = (0, import_react19.useCallback)((action, data = {}) => request("project-agent-" + action, data), [request]);
-  const [page, setPage] = (0, import_react19.useState)(0), [reviewPage, setReviewPage] = (0, import_react19.useState)(0), [waiting2, setWaiting] = (0, import_react19.useState)(0);
-  const [returnPlan, setReturnPlan] = (0, import_react19.useState)(() => stored(sessionStorage, key + ":return-plan", null));
-  const [focusPlan, setFocusPlan] = (0, import_react19.useState)(null);
-  const [starting, setStarting] = (0, import_react19.useState)(false), startPending = (0, import_react19.useRef)(false);
-  const readEpoch = (0, import_react19.useRef)(0), sendEpoch = (0, import_react19.useRef)(0), sending = (0, import_react19.useRef)(0);
-  const view = (0, import_react19.useRef)({ tab, page, reviewPage, focusPlan });
+  const [tracking, setTracking] = (0, import_react20.useState)(() => stored(sessionStorage, key + ":tracking", false));
+  const [open, setOpen] = (0, import_react20.useState)(() => stored(sessionStorage, key + ":open", false)), [tab, setTab] = (0, import_react20.useState)("chat");
+  const [pinned, setPinned] = (0, import_react20.useState)(() => stored(sessionStorage, key + ":references", null));
+  const [mode, setMode] = (0, import_react20.useState)(() => stored(localStorage, key + ":mode", "plan"));
+  const [position, setPosition] = (0, import_react20.useState)(() => stored(localStorage, key + ":pos", { x: 0.98, y: 0.66 }));
+  const [windowSize, setWindowSize] = (0, import_react20.useState)(() => stored(localStorage, key + ":size", { w: 540, h: 680 }));
+  const [size3, setSize] = (0, import_react20.useState)({ w: 0, h: 0 }), [session, setSession] = (0, import_react20.useState)(null), [state, setState] = (0, import_react20.useState)(null), [error, setError] = (0, import_react20.useState)(""), [busy, setBusy] = (0, import_react20.useState)(false);
+  const launcher = (0, import_react20.useRef)(null), drag = (0, import_react20.useRef)(null), resizeStart = (0, import_react20.useRef)(null), lastProgress = (0, import_react20.useRef)(""), alive = (0, import_react20.useRef)(true);
+  const panelId = (0, import_react20.useId)();
+  const [canvas, setCanvas] = (0, import_react20.useState)(null);
+  const call = (0, import_react20.useCallback)((action, data = {}) => request("project-agent-" + action, data), [request]);
+  const [page, setPage] = (0, import_react20.useState)(0), [reviewPage, setReviewPage] = (0, import_react20.useState)(0), [waiting2, setWaiting] = (0, import_react20.useState)(0);
+  const [returnPlan, setReturnPlan] = (0, import_react20.useState)(() => stored(sessionStorage, key + ":return-plan", null));
+  const [focusPlan, setFocusPlan] = (0, import_react20.useState)(null);
+  const [starting, setStarting] = (0, import_react20.useState)(false), startPending = (0, import_react20.useRef)(false);
+  const readEpoch = (0, import_react20.useRef)(0), sendEpoch = (0, import_react20.useRef)(0), sending = (0, import_react20.useRef)(0);
+  const view = (0, import_react20.useRef)({ tab, page, reviewPage, focusPlan });
   view.current = { tab, page, reviewPage, focusPlan };
-  const refresh = (0, import_react19.useCallback)(async (full = true) => {
+  const refresh = (0, import_react20.useCallback)(async (full = true) => {
     const epoch = ++readEpoch.current, sent = sendEpoch.current;
     const { tab: tab2, page: page2, reviewPage: reviewPage2, focusPlan: focusPlan2 } = view.current;
     const cardRead = cardId ? canvasActions.current.cardRead() : null;
@@ -13844,13 +14003,13 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       persist(sessionStorage, key + ":tracking", follow);
     }
   }, [call, key, cardId, requirement.id, canvasActions]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     alive.current = true;
     return () => {
       alive.current = false;
     };
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!open) return;
     let live = true;
     call("session").then((v2) => {
@@ -13866,7 +14025,7 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       live = false;
     };
   }, [open, call]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!open && !tracking && !cardId) return;
     let live = true, timer2;
     if (!open && !tracking) {
@@ -13900,7 +14059,7 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       clearTimeout(timer2);
     };
   }, [open, tracking, cardId, refresh, call, requirement.id, canvasActions, key, tab, page, reviewPage, focusPlan]);
-  (0, import_react19.useLayoutEffect)(() => {
+  (0, import_react20.useLayoutEffect)(() => {
     if (!open) return;
     const el = launcher.current?.closest(".wtt-course-canvas");
     if (!el) return;
@@ -14088,10 +14247,11 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
     setFocusPlan(null);
     setPage(value);
   };
-  return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(
+  const models = { nativeSeat: nativeModelSeat, catalog: modelCatalog, loading: modelLoading, error: modelError, onRefresh: onRefreshModels, onOpenSettings: onOpenModelSettings };
+  return /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, /* @__PURE__ */ import_react20.default.createElement(
     ToolButton,
     {
-      label: "\u6253\u5F00" + assistantName,
+      label: "\u6253\u5F00" + projectAgentName,
       buttonRef: launcher,
       className: `wtt-agent-launch${open ? " is-active" : ""}`,
       expanded: open,
@@ -14100,10 +14260,10 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       hint: !open && returnPlan ? "\u8FD4\u56DE\u59D4\u6258" : void 0,
       onClick: openAssistant
     },
-    /* @__PURE__ */ import_react19.default.createElement("img", { src: wattter_agent_default, alt: "", draggable: false }),
-    !open && returnPlan && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-return", "aria-hidden": "true" }, "\u21A9"),
-    waiting2 > 0 && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-badge", "aria-hidden": "true" }, waiting2)
-  ), open && canvas && (0, import_react_dom2.createPortal)(/* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-layer" }, /* @__PURE__ */ import_react19.default.createElement(
+    /* @__PURE__ */ import_react20.default.createElement("img", { src: wattter_agent_default, alt: "", draggable: false }),
+    !open && returnPlan && /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-agent-return", "aria-hidden": "true" }, "\u21A9"),
+    waiting2 > 0 && /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-agent-badge", "aria-hidden": "true" }, waiting2)
+  ), open && canvas && (0, import_react_dom2.createPortal)(/* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-layer" }, /* @__PURE__ */ import_react20.default.createElement(
     "div",
     {
       id: panelId,
@@ -14116,24 +14276,24 @@ var ProjectAgentFloat = import_react19.default.memo(function ProjectAgentFloat2(
       onWheel: (e) => e.stopPropagation(),
       onKeyDown: (e) => e.stopPropagation()
     },
-    /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-grip", ...grip }, /* @__PURE__ */ import_react19.default.createElement(PanelHeader, { title: assistantName, subtitle: requirement.title, onClose: () => {
+    /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-grip", ...grip }, /* @__PURE__ */ import_react20.default.createElement(PanelHeader, { title: projectAgentName, subtitle: requirement.title, onClose: () => {
       toggle(false);
       launcher.current?.focus({ preventScroll: true });
-    }, closeLabel: "\u6536\u8D77" + assistantName })),
-    /* @__PURE__ */ import_react19.default.createElement("nav", { className: "wtt-agent-nav", "aria-label": assistantName + "\u89C6\u56FE" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "chat", onClick: () => setTab("chat") }, "\u5BF9\u8BDD"), /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "plans", "aria-label": "\u59D4\u6258", onClick: () => setTab("plans") }, "\u59D4\u6258", waiting2 > 0 && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-tab-count", title: waiting2 + " \u9879\u5F85\u786E\u8BA4" }, waiting2)), /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "memory", onClick: () => setTab("memory") }, "\u9879\u76EE\u8BB0\u5FC6", state?.suggestions.length > 0 && /* @__PURE__ */ import_react19.default.createElement("span", { className: "wtt-agent-tab-count" }, state.suggestions.length)), /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-mode-anchor" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: !session || starting || busy || state?.running, onClick: newConversation }, starting ? "\u6B63\u5728\u65B0\u5EFA\u2026" : "\u65B0\u5EFA\u5BF9\u8BDD"), tab === "chat" && /* @__PURE__ */ import_react19.default.createElement(ModeMenu, { value: mode, onChange: (v2) => {
+    }, closeLabel: "\u6536\u8D77" + projectAgentName })),
+    /* @__PURE__ */ import_react20.default.createElement("nav", { className: "wtt-agent-nav", "aria-label": projectAgentName + "\u89C6\u56FE" }, /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "chat", onClick: () => setTab("chat") }, "\u5BF9\u8BDD"), /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "plans", "aria-label": "\u59D4\u6258", onClick: () => setTab("plans") }, "\u59D4\u6258", waiting2 > 0 && /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-agent-tab-count", title: waiting2 + " \u9879\u5F85\u786E\u8BA4" }, waiting2)), /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "ghost", size: "compact", "aria-pressed": tab === "memory", onClick: () => setTab("memory") }, "\u9879\u76EE\u8BB0\u5FC6", state?.suggestions.length > 0 && /* @__PURE__ */ import_react20.default.createElement("span", { className: "wtt-agent-tab-count" }, state.suggestions.length)), /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-mode-anchor" }, /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: !session || starting || busy || state?.running, onClick: newConversation }, starting ? "\u6B63\u5728\u65B0\u5EFA\u2026" : "\u65B0\u5EFA\u5BF9\u8BDD"), tab === "chat" && /* @__PURE__ */ import_react20.default.createElement(ModeMenu, { value: mode, onChange: (v2) => {
       setMode(v2);
       persist(localStorage, key + ":mode", v2);
     } }))),
-    error && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-feedback", role: "alert" }, /* @__PURE__ */ import_react19.default.createElement("span", null, error), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", onClick: () => setError("") }, "\u5173\u95ED\u63D0\u793A")),
-    /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-chat", "aria-label": assistantName + "\u5BF9\u8BDD", hidden: tab !== "chat" }, tab === "chat" && state?.sessionId === session && /* @__PURE__ */ import_react19.default.createElement(ChatReview, { review: state?.review, act, locate, busy: busy || starting, onPage: setReviewPage }), session ? /* @__PURE__ */ import_react19.default.createElement(ProjectInputContext.Provider, { key: session, value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: assistantName, editing: false, onSettled: () => refresh().catch((e) => setError(e.message)) })) : !error && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wtt-agent-empty", role: "status" }, "\u6B63\u5728\u6253\u5F00\u5BF9\u8BDD\u2026")),
-    tab === "plans" && /* @__PURE__ */ import_react19.default.createElement("section", { className: "wtt-agent-queue", "aria-label": "\u9879\u76EE\u59D4\u6258" }, !state?.plans?.length && /* @__PURE__ */ import_react19.default.createElement("p", { className: "wtt-agent-empty" }, state?.view === "plans" ? "\u6682\u65E0\u59D4\u6258" : "\u6B63\u5728\u8BFB\u53D6\u59D4\u6258\u2026"), /* @__PURE__ */ import_react19.default.createElement(Plans, { plans: state?.plans, act, locate, busy, focusPlan }), state?.total > 20 && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => pageTo(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react19.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => pageTo(page + 1) }, "\u4E0B\u4E00\u9875"))),
-    tab === "memory" && /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, /* @__PURE__ */ import_react19.default.createElement(ProjectMemoryPanel, { call, onChanged: () => refresh().catch((e) => setError(e.message)), suggestions: state?.suggestions, onLocate: locate }), session && /* @__PURE__ */ import_react19.default.createElement("div", { className: "wtt-agent-footer" }, /* @__PURE__ */ import_react19.default.createElement(UiButton, { size: "compact", disabled: starting || busy || state?.running, onClick: newConversation }, "\u7528\u9879\u76EE\u8BB0\u5FC6\u5F00\u65B0\u5BF9\u8BDD"))),
-    /* @__PURE__ */ import_react19.default.createElement(UiButton, { variant: "custom", className: "wtt-agent-resize", "aria-label": "\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", title: "\u62D6\u52A8\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", ...resizeGrip })
+    error && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-feedback", role: "alert" }, /* @__PURE__ */ import_react20.default.createElement("span", null, error), /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", onClick: () => setError("") }, "\u5173\u95ED\u63D0\u793A")),
+    /* @__PURE__ */ import_react20.default.createElement("section", { className: "wtt-agent-chat", "aria-label": projectAgentName + "\u5BF9\u8BDD", hidden: tab !== "chat" }, tab === "chat" && state?.sessionId === session && /* @__PURE__ */ import_react20.default.createElement(ChatReview, { review: state?.review, act, locate, models, busy: busy || starting, onPage: setReviewPage }), session ? /* @__PURE__ */ import_react20.default.createElement(ProjectInputContext.Provider, { key: session, value: owner }, renderConversation({ identity: "project-agent:" + session, sessionId: session, label: projectAgentName, editing: false, onSettled: () => refresh().catch((e) => setError(e.message)) })) : !error && /* @__PURE__ */ import_react20.default.createElement("p", { className: "wtt-agent-empty", role: "status" }, "\u6B63\u5728\u6253\u5F00\u5BF9\u8BDD\u2026")),
+    tab === "plans" && /* @__PURE__ */ import_react20.default.createElement("section", { className: "wtt-agent-queue", "aria-label": "\u9879\u76EE\u59D4\u6258" }, !state?.plans?.length && /* @__PURE__ */ import_react20.default.createElement("p", { className: "wtt-agent-empty" }, state?.view === "plans" ? "\u6682\u65E0\u59D4\u6258" : "\u6B63\u5728\u8BFB\u53D6\u59D4\u6258\u2026"), /* @__PURE__ */ import_react20.default.createElement(Plans, { plans: state?.plans, act, locate, models, busy, focusPlan }), state?.total > 20 && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-actions", "aria-label": "\u59D4\u6258\u5206\u9875" }, /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: page === 0, onClick: () => pageTo(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react20.default.createElement("span", null, page + 1, " / ", Math.ceil(state.total / 20)), /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: (page + 1) * 20 >= state.total, onClick: () => pageTo(page + 1) }, "\u4E0B\u4E00\u9875"))),
+    tab === "memory" && /* @__PURE__ */ import_react20.default.createElement(import_react20.default.Fragment, null, /* @__PURE__ */ import_react20.default.createElement(ProjectMemoryPanel, { call, onChanged: () => refresh().catch((e) => setError(e.message)), suggestions: state?.suggestions, onLocate: locate }), session && /* @__PURE__ */ import_react20.default.createElement("div", { className: "wtt-agent-footer" }, /* @__PURE__ */ import_react20.default.createElement(UiButton, { size: "compact", disabled: starting || busy || state?.running, onClick: newConversation }, "\u7528\u9879\u76EE\u8BB0\u5FC6\u5F00\u65B0\u5BF9\u8BDD"))),
+    /* @__PURE__ */ import_react20.default.createElement(UiButton, { variant: "custom", className: "wtt-agent-resize", "aria-label": "\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", title: "\u62D6\u52A8\u8C03\u6574\u6D6E\u7A97\u5927\u5C0F", ...resizeGrip })
   )), canvas));
 });
 
 // src/canvas-reference-picker.jsx
-var import_react20 = __toESM(require("react"), 1);
+var import_react21 = __toESM(require("react"), 1);
 
 // src/card-capabilities.mjs
 var TEXT_FILE = /\.(md|markdown|txt)$/i;
@@ -14229,12 +14389,12 @@ function cardCapabilities(card) {
 }
 
 // src/canvas-reference-picker.jsx
-var CanvasReferencePickerContext = (0, import_react20.createContext)(null);
+var CanvasReferencePickerContext = (0, import_react21.createContext)(null);
 function ReferencePickOverlay({ nodeId }) {
-  const picker = (0, import_react20.useContext)(CanvasReferencePickerContext);
-  const control = (0, import_react20.useRef)(null);
+  const picker = (0, import_react21.useContext)(CanvasReferencePickerContext);
+  const control = (0, import_react21.useRef)(null);
   const option = picker?.options.get(nodeId);
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     if (!picker || !control.current) return;
     const siblings = [...control.current.parentElement.children].filter((element) => element !== control.current);
     const previous = siblings.map((element) => element.inert);
@@ -14249,7 +14409,7 @@ function ReferencePickOverlay({ nodeId }) {
   const title = cardDisplayTitle(option?.card) || "\u6B64\u5361\u7247";
   const reason = option?.reason || (!option ? "\u6B64\u5361\u7247\u6CA1\u6709\u53EF\u5F15\u7528\u5185\u5BB9" : "");
   const disabled = picker.busy || option?.pinned || Boolean(reason && !option?.checked);
-  return /* @__PURE__ */ import_react20.default.createElement(
+  return /* @__PURE__ */ import_react21.default.createElement(
     UiButton,
     {
       ref: control,
@@ -14271,8 +14431,8 @@ function ReferencePickOverlay({ nodeId }) {
         if (!disabled) picker.onToggle(nodeId);
       }
     },
-    /* @__PURE__ */ import_react20.default.createElement("span", { className: "wcc-reference-pick-check", "aria-hidden": "true" }, option?.pinned ? /* @__PURE__ */ import_react20.default.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /* @__PURE__ */ import_react20.default.createElement("rect", { x: "5", y: "10", width: "14", height: "11", rx: "2" }), /* @__PURE__ */ import_react20.default.createElement("path", { d: "M8 10V7a4 4 0 0 1 8 0v3" })) : option?.checked ? "\u2713" : ""),
-    (reason || option?.pinned) && /* @__PURE__ */ import_react20.default.createElement("span", { className: "wcc-reference-pick-reason" }, option?.pinned ? "\u6765\u6E90\u5361\u7247" : reason)
+    /* @__PURE__ */ import_react21.default.createElement("span", { className: "wcc-reference-pick-check", "aria-hidden": "true" }, option?.pinned ? /* @__PURE__ */ import_react21.default.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /* @__PURE__ */ import_react21.default.createElement("rect", { x: "5", y: "10", width: "14", height: "11", rx: "2" }), /* @__PURE__ */ import_react21.default.createElement("path", { d: "M8 10V7a4 4 0 0 1 8 0v3" })) : option?.checked ? "\u2713" : ""),
+    (reason || option?.pinned) && /* @__PURE__ */ import_react21.default.createElement("span", { className: "wcc-reference-pick-reason" }, option?.pinned ? "\u6765\u6E90\u5361\u7247" : reason)
   );
 }
 
@@ -14304,7 +14464,7 @@ function pinnedReference(card, context) {
 }
 function referencePickReason(card, context) {
   if (context?.projectAssistant && card?.kind === "whiteboard") return "\u8BF7\u5148\u5C06\u767D\u677F\u6587\u5B57\u4FDD\u5B58\u4E3A\u7D20\u6750";
-  if (context?.excludedReferenceIds?.has(card?.id)) return "\u5DF2\u5728\u9879\u76EE\u52A9\u624B\u7684\u5F15\u7528\u4E2D";
+  if (context?.excludedReferenceIds?.has(card?.id)) return "\u5DF2\u5728" + projectAgentName + "\u7684\u5F15\u7528\u4E2D";
   const reason = unavailableReason(card);
   if (reason) return reason;
   if (context?.conversation && ["missing", "changed", "modified", "unavailable"].includes(card?.sourceStatus)) return "\u539F\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316";
@@ -14319,7 +14479,7 @@ function addPickedReferences(references, candidates, context) {
   for (const card of candidates) {
     if (!card || next.some((reference) => sameReference(reference, card)) || referencePickReason(card, context)) continue;
     if (next.length >= (context?.maxReferences ?? 24)) {
-      error = context?.projectAssistant ? "\u9879\u76EE\u52A9\u624B\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u5F15\u7528\u3002" : context?.maxReferences !== void 0 ? `\u672C\u6B21\u6700\u591A\u53EF\u518D\u6DFB\u52A0 ${context.maxReferences} \u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9009\u62E9\u3002` : "\u4E00\u6B21\u521B\u4F5C\u6700\u591A\u5F15\u7528 24 \u4EFD\u8D44\u6599\uFF0C\u8BF7\u5148\u53D6\u6D88\u90E8\u5206\u9009\u62E9\u3002";
+      error = context?.projectAssistant ? projectAgentName + "\u6700\u591A\u5F15\u7528 24 \u5F20\u5361\u7247\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u5F15\u7528\u3002" : context?.maxReferences !== void 0 ? `\u672C\u6B21\u6700\u591A\u53EF\u518D\u6DFB\u52A0 ${context.maxReferences} \u4EFD\u9644\u4EF6\uFF0C\u8BF7\u5148\u79FB\u9664\u90E8\u5206\u9009\u62E9\u3002` : "\u4E00\u6B21\u521B\u4F5C\u6700\u591A\u5F15\u7528 24 \u4EFD\u8D44\u6599\uFF0C\u8BF7\u5148\u53D6\u6D88\u90E8\u5206\u9009\u62E9\u3002";
       break;
     }
     next.push(card);
@@ -14334,17 +14494,17 @@ function togglePickedReference(references, card, context) {
 }
 
 // src/canvas-recycle.jsx
-var import_react21 = __toESM(require("react"), 1);
+var import_react22 = __toESM(require("react"), 1);
 function RecycleContents({ items }) {
-  const [page, setPage] = (0, import_react21.useState)(0), count2 = 100, pages = Math.max(1, Math.ceil(items.length / count2)), current = Math.min(page, pages - 1);
-  return /* @__PURE__ */ import_react21.default.createElement(import_react21.default.Fragment, null, /* @__PURE__ */ import_react21.default.createElement("ul", { className: "wtt-delete-files" }, items.slice(current * count2, (current + 1) * count2).map((item, index2) => /* @__PURE__ */ import_react21.default.createElement("li", { key: item.path || index2 }, item.label && /* @__PURE__ */ import_react21.default.createElement("small", null, item.label), /* @__PURE__ */ import_react21.default.createElement("code", null, item.path), item.target && /* @__PURE__ */ import_react21.default.createElement("code", null, "\u2192 ", item.target)))), pages > 1 && /* @__PURE__ */ import_react21.default.createElement("nav", { className: "wtt-recycle-pages", "aria-label": "\u8303\u56F4\u6E05\u5355\u7FFB\u9875" }, /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", disabled: current === 0, onClick: () => setPage(current - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react21.default.createElement("span", null, current + 1, " / ", pages, " \xB7 \u5171 ", items.length, " \u9879"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { size: "compact", disabled: current === pages - 1, onClick: () => setPage(current + 1) }, "\u4E0B\u4E00\u9875")));
+  const [page, setPage] = (0, import_react22.useState)(0), count2 = 100, pages = Math.max(1, Math.ceil(items.length / count2)), current = Math.min(page, pages - 1);
+  return /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement("ul", { className: "wtt-delete-files" }, items.slice(current * count2, (current + 1) * count2).map((item, index2) => /* @__PURE__ */ import_react22.default.createElement("li", { key: item.path || index2 }, item.label && /* @__PURE__ */ import_react22.default.createElement("small", null, item.label), /* @__PURE__ */ import_react22.default.createElement("code", null, item.path), item.target && /* @__PURE__ */ import_react22.default.createElement("code", null, "\u2192 ", item.target)))), pages > 1 && /* @__PURE__ */ import_react22.default.createElement("nav", { className: "wtt-recycle-pages", "aria-label": "\u8303\u56F4\u6E05\u5355\u7FFB\u9875" }, /* @__PURE__ */ import_react22.default.createElement(UiButton, { size: "compact", disabled: current === 0, onClick: () => setPage(current - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react22.default.createElement("span", null, current + 1, " / ", pages, " \xB7 \u5171 ", items.length, " \u9879"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { size: "compact", disabled: current === pages - 1, onClick: () => setPage(current + 1) }, "\u4E0B\u4E00\u9875")));
 }
 function DeleteProjectFilesDialog({ plan, request, onClose, onDone }) {
-  const dialog = (0, import_react21.useRef)(null), [busy, setBusy] = (0, import_react21.useState)(false), [error, setError] = (0, import_react21.useState)(""), [removed, setRemoved] = (0, import_react21.useState)(false);
-  (0, import_react21.useEffect)(() => {
+  const dialog = (0, import_react22.useRef)(null), [busy, setBusy] = (0, import_react22.useState)(false), [error, setError] = (0, import_react22.useState)(""), [removed, setRemoved] = (0, import_react22.useState)(false);
+  (0, import_react22.useEffect)(() => {
     dialog.current?.showModal();
   }, []);
-  (0, import_react21.useEffect)(() => {
+  (0, import_react22.useEffect)(() => {
     if (!busy) dialog.current?.querySelector("[data-file-delete-cancel]")?.focus();
   }, [busy]);
   async function submit(e) {
@@ -14366,20 +14526,20 @@ function DeleteProjectFilesDialog({ plan, request, onClose, onDone }) {
       setBusy(false);
     }
   }
-  return /* @__PURE__ */ import_react21.default.createElement("dialog", { className: "wtt-recycle-dialog", ref: dialog, "aria-labelledby": "wtt-file-delete-title", onCancel: (e) => {
+  return /* @__PURE__ */ import_react22.default.createElement("dialog", { className: "wtt-recycle-dialog", ref: dialog, "aria-labelledby": "wtt-file-delete-title", onCancel: (e) => {
     e.preventDefault();
     if (!busy) onClose();
-  } }, /* @__PURE__ */ import_react21.default.createElement("form", { onSubmit: submit }, /* @__PURE__ */ import_react21.default.createElement(DialogHeader, { title: "\u79FB\u5230\u56DE\u6536\u7AD9", titleId: "wtt-file-delete-title", onClose, closeLabel: "\u5173\u95ED\u6587\u4EF6\u5220\u9664\u786E\u8BA4", busy }), /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react21.default.createElement("strong", null, plan.target.name), plan.target.path !== plan.target.name && /* @__PURE__ */ import_react21.default.createElement("code", null, plan.target.path), /* @__PURE__ */ import_react21.default.createElement("p", null, [plan.files.length && `${plan.files.length} \u4E2A\u6587\u4EF6`, plan.directories.length && `${plan.directories.length} \u4E2A\u6587\u4EF6\u5939`, plan.links?.length && `${plan.links.length} \u4E2A\u7B26\u53F7\u94FE\u63A5`, plan.nodes.length && `${plan.nodes.length} \u5F20\u5173\u8054\u5361\u7247`].filter(Boolean).join(" \xB7 ")), /* @__PURE__ */ import_react21.default.createElement("details", { open: true, hidden: !plan.target.directory && !plan.target.symbolicLink }, /* @__PURE__ */ import_react21.default.createElement("summary", null, "\u5305\u542B\u7684\u5185\u5BB9"), plan.files.length === 0 && !plan.links?.length && plan.directories.length === 1 && /* @__PURE__ */ import_react21.default.createElement("p", null, "\u6587\u4EF6\u5939\u4E3A\u7A7A"), /* @__PURE__ */ import_react21.default.createElement(RecycleContents, { items: [...plan.directories.filter((d) => d.path !== plan.target.path).map((d) => ({ ...d, label: "\u6587\u4EF6\u5939" })), ...plan.files, ...(plan.links || []).map((l) => ({ ...l, label: "\u7B26\u53F7\u94FE\u63A5 \xB7 \u53EA\u5220\u9664\u94FE\u63A5\uFF0C\u76EE\u6807\u4FDD\u7559" }))] })), plan.nodes.length > 0 && /* @__PURE__ */ import_react21.default.createElement("details", { open: true }, /* @__PURE__ */ import_react21.default.createElement("summary", null, "\u540C\u65F6\u79FB\u9664\u7684\u753B\u5E03\u5361\u7247"), /* @__PURE__ */ import_react21.default.createElement("ul", { className: "wtt-delete-files" }, plan.nodes.map((n) => /* @__PURE__ */ import_react21.default.createElement("li", { key: `${n.requirementId}:${n.nodeId}` }, /* @__PURE__ */ import_react21.default.createElement("strong", null, n.title), /* @__PURE__ */ import_react21.default.createElement("small", null, n.course))))), /* @__PURE__ */ import_react21.default.createElement("p", null, plan.nodes.length ? "\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u4E00\u8D77\u6062\u590D\u6587\u4EF6\u548C\u5361\u7247\u3002" : "\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u3002"), error && /* @__PURE__ */ import_react21.default.createElement(UserError, { error }), " ", removed && /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6587\u4EF6\u5DF2\u79FB\u5165\u56DE\u6536\u7AD9\u3002")), /* @__PURE__ */ import_react21.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react21.default.createElement(UiButton, { "data-file-delete-cancel": true, disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: removed ? "primary" : "danger", type: "submit", disabled: busy }, busy ? "\u6B63\u5728\u5904\u7406\u2026" : removed ? "\u5237\u65B0\u5217\u8868" : "\u79FB\u5230\u56DE\u6536\u7AD9"))));
+  } }, /* @__PURE__ */ import_react22.default.createElement("form", { onSubmit: submit }, /* @__PURE__ */ import_react22.default.createElement(DialogHeader, { title: "\u79FB\u5230\u56DE\u6536\u7AD9", titleId: "wtt-file-delete-title", onClose, closeLabel: "\u5173\u95ED\u6587\u4EF6\u5220\u9664\u786E\u8BA4", busy }), /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react22.default.createElement("strong", null, plan.target.name), plan.target.path !== plan.target.name && /* @__PURE__ */ import_react22.default.createElement("code", null, plan.target.path), /* @__PURE__ */ import_react22.default.createElement("p", null, [plan.files.length && `${plan.files.length} \u4E2A\u6587\u4EF6`, plan.directories.length && `${plan.directories.length} \u4E2A\u6587\u4EF6\u5939`, plan.links?.length && `${plan.links.length} \u4E2A\u7B26\u53F7\u94FE\u63A5`, plan.nodes.length && `${plan.nodes.length} \u5F20\u5173\u8054\u5361\u7247`].filter(Boolean).join(" \xB7 ")), /* @__PURE__ */ import_react22.default.createElement("details", { open: true, hidden: !plan.target.directory && !plan.target.symbolicLink }, /* @__PURE__ */ import_react22.default.createElement("summary", null, "\u5305\u542B\u7684\u5185\u5BB9"), plan.files.length === 0 && !plan.links?.length && plan.directories.length === 1 && /* @__PURE__ */ import_react22.default.createElement("p", null, "\u6587\u4EF6\u5939\u4E3A\u7A7A"), /* @__PURE__ */ import_react22.default.createElement(RecycleContents, { items: [...plan.directories.filter((d) => d.path !== plan.target.path).map((d) => ({ ...d, label: "\u6587\u4EF6\u5939" })), ...plan.files, ...(plan.links || []).map((l) => ({ ...l, label: "\u7B26\u53F7\u94FE\u63A5 \xB7 \u53EA\u5220\u9664\u94FE\u63A5\uFF0C\u76EE\u6807\u4FDD\u7559" }))] })), plan.nodes.length > 0 && /* @__PURE__ */ import_react22.default.createElement("details", { open: true }, /* @__PURE__ */ import_react22.default.createElement("summary", null, "\u540C\u65F6\u79FB\u9664\u7684\u753B\u5E03\u5361\u7247"), /* @__PURE__ */ import_react22.default.createElement("ul", { className: "wtt-delete-files" }, plan.nodes.map((n) => /* @__PURE__ */ import_react22.default.createElement("li", { key: `${n.requirementId}:${n.nodeId}` }, /* @__PURE__ */ import_react22.default.createElement("strong", null, n.title), /* @__PURE__ */ import_react22.default.createElement("small", null, n.course))))), /* @__PURE__ */ import_react22.default.createElement("p", null, plan.nodes.length ? "\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u4E00\u8D77\u6062\u590D\u6587\u4EF6\u548C\u5361\u7247\u3002" : "\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u3002"), error && /* @__PURE__ */ import_react22.default.createElement(UserError, { error }), " ", removed && /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, "\u6587\u4EF6\u5DF2\u79FB\u5165\u56DE\u6536\u7AD9\u3002")), /* @__PURE__ */ import_react22.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react22.default.createElement(UiButton, { "data-file-delete-cancel": true, disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { variant: removed ? "primary" : "danger", type: "submit", disabled: busy }, busy ? "\u6B63\u5728\u5904\u7406\u2026" : removed ? "\u5237\u65B0\u5217\u8868" : "\u79FB\u5230\u56DE\u6536\u7AD9"))));
 }
 function DeleteNodesDialog({ plan, request, onClose, onDone }) {
-  const dialog = (0, import_react21.useRef)(null);
-  const [deleteFiles, setDeleteFiles] = (0, import_react21.useState)(false);
-  const [busy, setBusy] = (0, import_react21.useState)(false);
-  const [error, setError] = (0, import_react21.useState)("");
+  const dialog = (0, import_react22.useRef)(null);
+  const [deleteFiles, setDeleteFiles] = (0, import_react22.useState)(false);
+  const [busy, setBusy] = (0, import_react22.useState)(false);
+  const [error, setError] = (0, import_react22.useState)("");
   const planning = Boolean(plan.loading);
   const executionWarnings = [...new Set(plan.nodes.map((node) => node.executionWarning).filter(Boolean))];
   const unavailable = plan.files.some((file) => file.error) || executionWarnings.length > 0;
-  (0, import_react21.useEffect)(() => {
+  (0, import_react22.useEffect)(() => {
     dialog.current?.showModal();
   }, []);
   async function remove2(event) {
@@ -14396,7 +14556,7 @@ function DeleteNodesDialog({ plan, request, onClose, onDone }) {
       setBusy(false);
     }
   }
-  return /* @__PURE__ */ import_react21.default.createElement(
+  return /* @__PURE__ */ import_react22.default.createElement(
     "dialog",
     {
       className: "wtt-recycle-dialog",
@@ -14408,7 +14568,7 @@ function DeleteNodesDialog({ plan, request, onClose, onDone }) {
         if (!busy) onClose();
       }
     },
-    /* @__PURE__ */ import_react21.default.createElement("form", { onSubmit: remove2 }, /* @__PURE__ */ import_react21.default.createElement(
+    /* @__PURE__ */ import_react22.default.createElement("form", { onSubmit: remove2 }, /* @__PURE__ */ import_react22.default.createElement(
       DialogHeader,
       {
         title: plan.nodes.length > 1 ? "\u5220\u9664 " + plan.nodes.length + " \u4E2A\u8282\u70B9" : "\u5220\u9664\u8282\u70B9",
@@ -14417,7 +14577,7 @@ function DeleteNodesDialog({ plan, request, onClose, onDone }) {
         closeLabel: "\u5173\u95ED\u5220\u9664\u786E\u8BA4",
         busy
       }
-    ), /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react21.default.createElement("ul", { className: "wtt-delete-names" }, plan.nodes.map((node) => /* @__PURE__ */ import_react21.default.createElement("li", { key: node.nodeId }, node.title))), planning ? /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u5220\u9664\u8303\u56F4\u2026") : /* @__PURE__ */ import_react21.default.createElement(import_react21.default.Fragment, null, executionWarnings.map((warning) => /* @__PURE__ */ import_react21.default.createElement("p", { key: warning, role: "note" }, warning, " \u4EC5\u79FB\u9664\u753B\u5E03\u5361\u7247\uFF0C\u4EFB\u52A1\u548C\u6587\u4EF6\u4FDD\u7559\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u63D0\u4EA4\u3002")), /* @__PURE__ */ import_react21.default.createElement("fieldset", null, /* @__PURE__ */ import_react21.default.createElement("legend", { className: "wtt-visually-hidden" }, "\u5220\u9664\u8303\u56F4"), /* @__PURE__ */ import_react21.default.createElement("label", null, /* @__PURE__ */ import_react21.default.createElement(
+    ), /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react22.default.createElement("ul", { className: "wtt-delete-names" }, plan.nodes.map((node) => /* @__PURE__ */ import_react22.default.createElement("li", { key: node.nodeId }, node.title))), planning ? /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u5220\u9664\u8303\u56F4\u2026") : /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, executionWarnings.map((warning) => /* @__PURE__ */ import_react22.default.createElement("p", { key: warning, role: "note" }, warning, " \u4EC5\u79FB\u9664\u753B\u5E03\u5361\u7247\uFF0C\u4EFB\u52A1\u548C\u6587\u4EF6\u4FDD\u7559\uFF0C\u4E0D\u4F1A\u91CD\u65B0\u63D0\u4EA4\u3002")), /* @__PURE__ */ import_react22.default.createElement("fieldset", null, /* @__PURE__ */ import_react22.default.createElement("legend", { className: "wtt-visually-hidden" }, "\u5220\u9664\u8303\u56F4"), /* @__PURE__ */ import_react22.default.createElement("label", null, /* @__PURE__ */ import_react22.default.createElement(
       "input",
       {
         type: "radio",
@@ -14426,7 +14586,7 @@ function DeleteNodesDialog({ plan, request, onClose, onDone }) {
         disabled: busy,
         onChange: () => setDeleteFiles(false)
       }
-    ), /* @__PURE__ */ import_react21.default.createElement("span", null, "\u53EA\u79FB\u9664\u753B\u5E03\u8282\u70B9")), plan.files.length > 0 && /* @__PURE__ */ import_react21.default.createElement("label", null, /* @__PURE__ */ import_react21.default.createElement(
+    ), /* @__PURE__ */ import_react22.default.createElement("span", null, "\u53EA\u79FB\u9664\u753B\u5E03\u8282\u70B9")), plan.files.length > 0 && /* @__PURE__ */ import_react22.default.createElement("label", null, /* @__PURE__ */ import_react22.default.createElement(
       "input",
       {
         type: "radio",
@@ -14435,7 +14595,7 @@ function DeleteNodesDialog({ plan, request, onClose, onDone }) {
         disabled: busy || unavailable,
         onChange: () => setDeleteFiles(true)
       }
-    ), /* @__PURE__ */ import_react21.default.createElement("span", null, "\u540C\u65F6\u5C06\u6E90\u6587\u4EF6\u79FB\u5230\u9879\u76EE\u56DE\u6536\u7AD9"))), /* @__PURE__ */ import_react21.default.createElement("p", null, deleteFiles ? "\u4EC5\u56DE\u6536\u4E0B\u9762\u5217\u51FA\u7684\u5F53\u524D\u6587\u4EF6\uFF0C\u5176\u4ED6\u7248\u672C\u4FDD\u7559\u3002" : "\u6587\u4EF6\u548C\u7248\u672C\u4FDD\u7559\uFF0C\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u8282\u70B9\u3002"), plan.files.length > 0 && /* @__PURE__ */ import_react21.default.createElement("details", { open: deleteFiles || unavailable }, /* @__PURE__ */ import_react21.default.createElement("summary", null, "\u6D89\u53CA\u6587\u4EF6 \xB7 ", plan.files.length), /* @__PURE__ */ import_react21.default.createElement("ul", { className: "wtt-delete-files" }, plan.files.map((file) => /* @__PURE__ */ import_react21.default.createElement("li", { key: file.path }, /* @__PURE__ */ import_react21.default.createElement("code", null, file.path), /* @__PURE__ */ import_react21.default.createElement("small", null, file.role), file.error && /* @__PURE__ */ import_react21.default.createElement("p", { role: "alert" }, file.error), file.references.length > 0 && /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-shared" }, "\u8FD8\u6709 ", file.references.length, " \u5F20\u5361\u7247\u5F15\u7528\u6B64\u6587\u4EF6", /* @__PURE__ */ import_react21.default.createElement("ul", null, file.references.map((reference) => /* @__PURE__ */ import_react21.default.createElement("li", { key: reference.requirementId + ":" + reference.nodeId }, reference.course, " \xB7 ", reference.title))))))))), error && /* @__PURE__ */ import_react21.default.createElement(UserError, { error })), /* @__PURE__ */ import_react21.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react21.default.createElement(
+    ), /* @__PURE__ */ import_react22.default.createElement("span", null, "\u540C\u65F6\u5C06\u6E90\u6587\u4EF6\u79FB\u5230\u9879\u76EE\u56DE\u6536\u7AD9"))), /* @__PURE__ */ import_react22.default.createElement("p", null, deleteFiles ? "\u4EC5\u56DE\u6536\u4E0B\u9762\u5217\u51FA\u7684\u5F53\u524D\u6587\u4EF6\uFF0C\u5176\u4ED6\u7248\u672C\u4FDD\u7559\u3002" : "\u6587\u4EF6\u548C\u7248\u672C\u4FDD\u7559\uFF0C\u53EF\u4ECE\u9879\u76EE\u56DE\u6536\u7AD9\u6062\u590D\u8282\u70B9\u3002"), plan.files.length > 0 && /* @__PURE__ */ import_react22.default.createElement("details", { open: deleteFiles || unavailable }, /* @__PURE__ */ import_react22.default.createElement("summary", null, "\u6D89\u53CA\u6587\u4EF6 \xB7 ", plan.files.length), /* @__PURE__ */ import_react22.default.createElement("ul", { className: "wtt-delete-files" }, plan.files.map((file) => /* @__PURE__ */ import_react22.default.createElement("li", { key: file.path }, /* @__PURE__ */ import_react22.default.createElement("code", null, file.path), /* @__PURE__ */ import_react22.default.createElement("small", null, file.role), file.error && /* @__PURE__ */ import_react22.default.createElement("p", { role: "alert" }, file.error), file.references.length > 0 && /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-shared" }, "\u8FD8\u6709 ", file.references.length, " \u5F20\u5361\u7247\u5F15\u7528\u6B64\u6587\u4EF6", /* @__PURE__ */ import_react22.default.createElement("ul", null, file.references.map((reference) => /* @__PURE__ */ import_react22.default.createElement("li", { key: reference.requirementId + ":" + reference.nodeId }, reference.course, " \xB7 ", reference.title))))))))), error && /* @__PURE__ */ import_react22.default.createElement(UserError, { error })), /* @__PURE__ */ import_react22.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react22.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react22.default.createElement(
       UiButton,
       {
         variant: deleteFiles ? "danger" : "primary",
@@ -14448,15 +14608,15 @@ function DeleteNodesDialog({ plan, request, onClose, onDone }) {
   );
 }
 function ProjectRecycleDialog({ request, endpoint: endpoint2, onClose, onChanged }) {
-  const dialog = (0, import_react21.useRef)(null), mounted = (0, import_react21.useRef)(false);
-  const [entries, setEntries] = (0, import_react21.useState)(null), [error, setError] = (0, import_react21.useState)(""), [busy, setBusy] = (0, import_react21.useState)(null);
-  const [plan, setPlan] = (0, import_react21.useState)(null), [confirmed, setConfirmed] = (0, import_react21.useState)(false), [notice, setNotice] = (0, import_react21.useState)("");
+  const dialog = (0, import_react22.useRef)(null), mounted = (0, import_react22.useRef)(false);
+  const [entries, setEntries] = (0, import_react22.useState)(null), [error, setError] = (0, import_react22.useState)(""), [busy, setBusy] = (0, import_react22.useState)(null);
+  const [plan, setPlan] = (0, import_react22.useState)(null), [confirmed, setConfirmed] = (0, import_react22.useState)(false), [notice, setNotice] = (0, import_react22.useState)("");
   async function load() {
     const r = await fetch(endpoint2({ recycleEntries: "1" }), { credentials: "same-origin" }), d = await r.json();
     if (!r.ok) throw new Error(d.error || "\u56DE\u6536\u7AD9\u8BFB\u53D6\u5931\u8D25");
     if (mounted.current) setEntries(d.entries);
   }
-  (0, import_react21.useEffect)(() => {
+  (0, import_react22.useEffect)(() => {
     mounted.current = true;
     dialog.current?.showModal();
     void load().catch((e) => {
@@ -14466,7 +14626,7 @@ function ProjectRecycleDialog({ request, endpoint: endpoint2, onClose, onChanged
       mounted.current = false;
     };
   }, []);
-  (0, import_react21.useEffect)(() => {
+  (0, import_react22.useEffect)(() => {
     if (plan && !busy) dialog.current?.querySelector("[data-purge-cancel]")?.focus();
   }, [plan, busy]);
   function close2() {
@@ -14534,19 +14694,19 @@ function ProjectRecycleDialog({ request, endpoint: endpoint2, onClose, onChanged
     }
   }
   const available = entries?.filter((e) => ["removed", "error", "purging"].includes(e.state)) || [];
-  return /* @__PURE__ */ import_react21.default.createElement("dialog", { className: "wtt-recycle-dialog", ref: dialog, "aria-labelledby": "wtt-recycle-heading", onCancel: (e) => {
+  return /* @__PURE__ */ import_react22.default.createElement("dialog", { className: "wtt-recycle-dialog", ref: dialog, "aria-labelledby": "wtt-recycle-heading", onCancel: (e) => {
     e.preventDefault();
     close2();
-  } }, /* @__PURE__ */ import_react21.default.createElement(DialogHeader, { title: plan ? plan.all ? "\u6E05\u7A7A\u56DE\u6536\u7AD9" : "\u6C38\u4E45\u5220\u9664" : "\u9879\u76EE\u56DE\u6536\u7AD9", titleId: "wtt-recycle-heading", onClose: close2, closeLabel: plan ? "\u5173\u95ED\u5220\u9664\u786E\u8BA4" : "\u5173\u95ED\u9879\u76EE\u56DE\u6536\u7AD9", busy: !!busy }), plan ? /* @__PURE__ */ import_react21.default.createElement("form", { onSubmit: purge }, /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react21.default.createElement("p", { className: "wtt-purge-warning", role: "note" }, "\u6C38\u4E45\u5220\u9664\u540E\u65E0\u6CD5\u6062\u590D\u3002"), /* @__PURE__ */ import_react21.default.createElement("p", null, [plan.nodeCount && `${plan.nodeCount} \u4E2A\u8282\u70B9`, plan.fileCount && `${plan.fileCount} \u4E2A\u56DE\u6536\u6587\u4EF6`, plan.linkCount && `${plan.linkCount} \u4E2A\u7B26\u53F7\u94FE\u63A5`, plan.directoryCount && `${plan.directoryCount} \u4E2A\u6587\u4EF6\u5939`].filter(Boolean).join(" \xB7 "), plan.bytes > 0 ? ` \xB7 ${(plan.bytes / 1024).toFixed(1)} KB` : ""), /* @__PURE__ */ import_react21.default.createElement("ul", { className: "wtt-purge-scope" }, plan.entries.map((entry) => /* @__PURE__ */ import_react21.default.createElement("li", { key: entry.id }, /* @__PURE__ */ import_react21.default.createElement("strong", null, entry.label || entry.target?.name || entry.nodes.map((n) => n.title).join("\u3001") || "\u56DE\u6536\u8BB0\u5F55"), entry.directoryCount > 0 && /* @__PURE__ */ import_react21.default.createElement("small", null, entry.directoryCount, " \u4E2A\u6587\u4EF6\u5939\u7684\u6062\u590D\u4FE1\u606F"), /* @__PURE__ */ import_react21.default.createElement(RecycleContents, { items: [...entry.files.map((f) => ({ path: f.originalPath, label: f.missing ? "\u539F\u4F4D\u7F6E \xB7 \u56DE\u6536\u526F\u672C\u5DF2\u7F3A\u5931" : "\u539F\u4F4D\u7F6E", target: f.path })), ...(entry.links || []).map((l) => ({ ...l, label: "\u4EC5\u6E05\u7406\u94FE\u63A5\u6062\u590D\u4FE1\u606F\uFF0C\u76EE\u6807\u4FDD\u7559" }))] }), !entry.files.length && !entry.links?.length && /* @__PURE__ */ import_react21.default.createElement("small", null, entry.directoryCount ? "\u6E05\u7406\u7A7A\u76EE\u5F55\u4E0E\u5173\u8054\u8282\u70B9\u7684\u6062\u590D\u4FE1\u606F" : "\u4EC5\u6E05\u7406\u8282\u70B9\u6062\u590D\u8BB0\u5F55\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559")))), /* @__PURE__ */ import_react21.default.createElement("p", null, "\u53EA\u5904\u7406\u4EE5\u4E0A\u56DE\u6536\u5185\u5BB9\uFF1B\u672A\u56DE\u6536\u7684\u6E90\u6587\u4EF6\u548C\u5176\u4ED6\u7248\u672C\u4FDD\u7559\u3002")), /* @__PURE__ */ import_react21.default.createElement(DialogFooter, { className: "wtt-purge-footer" }, /* @__PURE__ */ import_react21.default.createElement("label", { className: "wtt-purge-confirm" }, /* @__PURE__ */ import_react21.default.createElement("input", { type: "checkbox", checked: confirmed, disabled: !!busy, onChange: (e) => setConfirmed(e.target.checked) }), /* @__PURE__ */ import_react21.default.createElement("span", null, "\u6211\u786E\u8BA4\u6C38\u4E45\u5220\u9664\uFF0C\u65E0\u6CD5\u6062\u590D")), /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-purge-actions" }, /* @__PURE__ */ import_react21.default.createElement(UiButton, { "data-purge-cancel": true, disabled: !!busy, onClick: close2 }, "\u53D6\u6D88"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: "danger", type: "submit", disabled: !confirmed || !!busy }, busy === "purge" ? "\u6B63\u5728\u5220\u9664\u2026" : "\u786E\u8BA4\u6C38\u4E45\u5220\u9664")))) : /* @__PURE__ */ import_react21.default.createElement(import_react21.default.Fragment, null, /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-body" }, error && /* @__PURE__ */ import_react21.default.createElement(UserError, { error }), notice && /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, notice), entries === null ? /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u56DE\u6536\u7AD9\u2026") : entries.length === 0 ? /* @__PURE__ */ import_react21.default.createElement("p", null, "\u56DE\u6536\u7AD9\u4E3A\u7A7A") : entries.map((entry) => /* @__PURE__ */ import_react21.default.createElement("article", { key: entry.id }, /* @__PURE__ */ import_react21.default.createElement("div", null, /* @__PURE__ */ import_react21.default.createElement("strong", null, entry.label || entry.target?.name || entry.nodes.map((n) => n.title).join("\u3001") || "\u56DE\u6536\u8BB0\u5F55"), /* @__PURE__ */ import_react21.default.createElement("small", null, entry.target ? [entry.files.length && `${entry.files.length} \u4E2A\u6587\u4EF6`, entry.directories.length && `${entry.directories.length} \u4E2A\u6587\u4EF6\u5939`, entry.links?.length && `${entry.links.length} \u4E2A\u7B26\u53F7\u94FE\u63A5`, entry.nodes.length && `${entry.nodes.length} \u5F20\u5361\u7247`].filter(Boolean).join(" \xB7 ") : entry.deleteFiles ? `\u542B ${entry.files.length} \u4E2A\u56DE\u6536\u6587\u4EF6` : "\u4EC5\u753B\u5E03\u8282\u70B9"), entry.deleteFiles && entry.files.length > 0 && /* @__PURE__ */ import_react21.default.createElement("details", null, /* @__PURE__ */ import_react21.default.createElement("summary", null, "\u6587\u4EF6\u8DEF\u5F84"), /* @__PURE__ */ import_react21.default.createElement(RecycleContents, { items: entry.files })), entry.error ? /* @__PURE__ */ import_react21.default.createElement("p", { role: "alert" }, entry.error) : entry.state === "purging" ? /* @__PURE__ */ import_react21.default.createElement("p", null, "\u5220\u9664\u672A\u5B8C\u6210\uFF0C\u53EF\u91CD\u65B0\u6838\u5BF9\u540E\u7EE7\u7EED\u3002") : !["removed", "error"].includes(entry.state) && /* @__PURE__ */ import_react21.default.createElement("p", { role: "status" }, "\u6B63\u5728\u5904\u7406\uFF0C\u8BF7\u7A0D\u540E\u5237\u65B0\u3002")), /* @__PURE__ */ import_react21.default.createElement("div", { className: "wtt-recycle-entry-actions" }, /* @__PURE__ */ import_react21.default.createElement(UiButton, { disabled: !!busy || !["removed", "error"].includes(entry.state), onClick: () => void restore(entry.id) }, busy === entry.id ? "\u5904\u7406\u4E2D\u2026" : "\u6062\u590D"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: "ghost", disabled: !!busy || !["removed", "error", "purging"].includes(entry.state), "aria-label": `\u6C38\u4E45\u5220\u9664\uFF1A${entry.label || entry.target?.name || entry.nodes.map((n) => n.title).join("\u3001") || "\u56DE\u6536\u8BB0\u5F55"}`, onClick: () => void prepare(entry.id) }, entry.state === "purging" ? "\u7EE7\u7EED\u5220\u9664" : "\u6C38\u4E45\u5220\u9664"))))), /* @__PURE__ */ import_react21.default.createElement(DialogFooter, null, error && entries === null && /* @__PURE__ */ import_react21.default.createElement(UiButton, { disabled: !!busy, onClick: () => void load().catch((e) => setError(e.message)) }, "\u91CD\u65B0\u8BFB\u53D6"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { variant: "danger", disabled: !!busy || !available.length || available.length !== entries?.length, onClick: () => void prepare() }, busy === "all" ? "\u6B63\u5728\u6838\u5BF9\u2026" : "\u6E05\u7A7A\u56DE\u6536\u7AD9"), /* @__PURE__ */ import_react21.default.createElement(UiButton, { disabled: !!busy, onClick: close2 }, "\u5173\u95ED"))));
+  } }, /* @__PURE__ */ import_react22.default.createElement(DialogHeader, { title: plan ? plan.all ? "\u6E05\u7A7A\u56DE\u6536\u7AD9" : "\u6C38\u4E45\u5220\u9664" : "\u9879\u76EE\u56DE\u6536\u7AD9", titleId: "wtt-recycle-heading", onClose: close2, closeLabel: plan ? "\u5173\u95ED\u5220\u9664\u786E\u8BA4" : "\u5173\u95ED\u9879\u76EE\u56DE\u6536\u7AD9", busy: !!busy }), plan ? /* @__PURE__ */ import_react22.default.createElement("form", { onSubmit: purge }, /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-body" }, /* @__PURE__ */ import_react22.default.createElement("p", { className: "wtt-purge-warning", role: "note" }, "\u6C38\u4E45\u5220\u9664\u540E\u65E0\u6CD5\u6062\u590D\u3002"), /* @__PURE__ */ import_react22.default.createElement("p", null, [plan.nodeCount && `${plan.nodeCount} \u4E2A\u8282\u70B9`, plan.fileCount && `${plan.fileCount} \u4E2A\u56DE\u6536\u6587\u4EF6`, plan.linkCount && `${plan.linkCount} \u4E2A\u7B26\u53F7\u94FE\u63A5`, plan.directoryCount && `${plan.directoryCount} \u4E2A\u6587\u4EF6\u5939`].filter(Boolean).join(" \xB7 "), plan.bytes > 0 ? ` \xB7 ${(plan.bytes / 1024).toFixed(1)} KB` : ""), /* @__PURE__ */ import_react22.default.createElement("ul", { className: "wtt-purge-scope" }, plan.entries.map((entry) => /* @__PURE__ */ import_react22.default.createElement("li", { key: entry.id }, /* @__PURE__ */ import_react22.default.createElement("strong", null, entry.label || entry.target?.name || entry.nodes.map((n) => n.title).join("\u3001") || "\u56DE\u6536\u8BB0\u5F55"), entry.directoryCount > 0 && /* @__PURE__ */ import_react22.default.createElement("small", null, entry.directoryCount, " \u4E2A\u6587\u4EF6\u5939\u7684\u6062\u590D\u4FE1\u606F"), /* @__PURE__ */ import_react22.default.createElement(RecycleContents, { items: [...entry.files.map((f) => ({ path: f.originalPath, label: f.missing ? "\u539F\u4F4D\u7F6E \xB7 \u56DE\u6536\u526F\u672C\u5DF2\u7F3A\u5931" : "\u539F\u4F4D\u7F6E", target: f.path })), ...(entry.links || []).map((l) => ({ ...l, label: "\u4EC5\u6E05\u7406\u94FE\u63A5\u6062\u590D\u4FE1\u606F\uFF0C\u76EE\u6807\u4FDD\u7559" }))] }), !entry.files.length && !entry.links?.length && /* @__PURE__ */ import_react22.default.createElement("small", null, entry.directoryCount ? "\u6E05\u7406\u7A7A\u76EE\u5F55\u4E0E\u5173\u8054\u8282\u70B9\u7684\u6062\u590D\u4FE1\u606F" : "\u4EC5\u6E05\u7406\u8282\u70B9\u6062\u590D\u8BB0\u5F55\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559")))), /* @__PURE__ */ import_react22.default.createElement("p", null, "\u53EA\u5904\u7406\u4EE5\u4E0A\u56DE\u6536\u5185\u5BB9\uFF1B\u672A\u56DE\u6536\u7684\u6E90\u6587\u4EF6\u548C\u5176\u4ED6\u7248\u672C\u4FDD\u7559\u3002")), /* @__PURE__ */ import_react22.default.createElement(DialogFooter, { className: "wtt-purge-footer" }, /* @__PURE__ */ import_react22.default.createElement("label", { className: "wtt-purge-confirm" }, /* @__PURE__ */ import_react22.default.createElement("input", { type: "checkbox", checked: confirmed, disabled: !!busy, onChange: (e) => setConfirmed(e.target.checked) }), /* @__PURE__ */ import_react22.default.createElement("span", null, "\u6211\u786E\u8BA4\u6C38\u4E45\u5220\u9664\uFF0C\u65E0\u6CD5\u6062\u590D")), /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-purge-actions" }, /* @__PURE__ */ import_react22.default.createElement(UiButton, { "data-purge-cancel": true, disabled: !!busy, onClick: close2 }, "\u53D6\u6D88"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { variant: "danger", type: "submit", disabled: !confirmed || !!busy }, busy === "purge" ? "\u6B63\u5728\u5220\u9664\u2026" : "\u786E\u8BA4\u6C38\u4E45\u5220\u9664")))) : /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-body" }, error && /* @__PURE__ */ import_react22.default.createElement(UserError, { error }), notice && /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, notice), entries === null ? /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u56DE\u6536\u7AD9\u2026") : entries.length === 0 ? /* @__PURE__ */ import_react22.default.createElement("p", null, "\u56DE\u6536\u7AD9\u4E3A\u7A7A") : entries.map((entry) => /* @__PURE__ */ import_react22.default.createElement("article", { key: entry.id }, /* @__PURE__ */ import_react22.default.createElement("div", null, /* @__PURE__ */ import_react22.default.createElement("strong", null, entry.label || entry.target?.name || entry.nodes.map((n) => n.title).join("\u3001") || "\u56DE\u6536\u8BB0\u5F55"), /* @__PURE__ */ import_react22.default.createElement("small", null, entry.target ? [entry.files.length && `${entry.files.length} \u4E2A\u6587\u4EF6`, entry.directories.length && `${entry.directories.length} \u4E2A\u6587\u4EF6\u5939`, entry.links?.length && `${entry.links.length} \u4E2A\u7B26\u53F7\u94FE\u63A5`, entry.nodes.length && `${entry.nodes.length} \u5F20\u5361\u7247`].filter(Boolean).join(" \xB7 ") : entry.deleteFiles ? `\u542B ${entry.files.length} \u4E2A\u56DE\u6536\u6587\u4EF6` : "\u4EC5\u753B\u5E03\u8282\u70B9"), entry.deleteFiles && entry.files.length > 0 && /* @__PURE__ */ import_react22.default.createElement("details", null, /* @__PURE__ */ import_react22.default.createElement("summary", null, "\u6587\u4EF6\u8DEF\u5F84"), /* @__PURE__ */ import_react22.default.createElement(RecycleContents, { items: entry.files })), entry.error ? /* @__PURE__ */ import_react22.default.createElement("p", { role: "alert" }, entry.error) : entry.state === "purging" ? /* @__PURE__ */ import_react22.default.createElement("p", null, "\u5220\u9664\u672A\u5B8C\u6210\uFF0C\u53EF\u91CD\u65B0\u6838\u5BF9\u540E\u7EE7\u7EED\u3002") : !["removed", "error"].includes(entry.state) && /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, "\u6B63\u5728\u5904\u7406\uFF0C\u8BF7\u7A0D\u540E\u5237\u65B0\u3002")), /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-entry-actions" }, /* @__PURE__ */ import_react22.default.createElement(UiButton, { disabled: !!busy || !["removed", "error"].includes(entry.state), onClick: () => void restore(entry.id) }, busy === entry.id ? "\u5904\u7406\u4E2D\u2026" : "\u6062\u590D"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { variant: "ghost", disabled: !!busy || !["removed", "error", "purging"].includes(entry.state), "aria-label": `\u6C38\u4E45\u5220\u9664\uFF1A${entry.label || entry.target?.name || entry.nodes.map((n) => n.title).join("\u3001") || "\u56DE\u6536\u8BB0\u5F55"}`, onClick: () => void prepare(entry.id) }, entry.state === "purging" ? "\u7EE7\u7EED\u5220\u9664" : "\u6C38\u4E45\u5220\u9664"))))), /* @__PURE__ */ import_react22.default.createElement(DialogFooter, null, error && entries === null && /* @__PURE__ */ import_react22.default.createElement(UiButton, { disabled: !!busy, onClick: () => void load().catch((e) => setError(e.message)) }, "\u91CD\u65B0\u8BFB\u53D6"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { variant: "danger", disabled: !!busy || !available.length || available.length !== entries?.length, onClick: () => void prepare() }, busy === "all" ? "\u6B63\u5728\u6838\u5BF9\u2026" : "\u6E05\u7A7A\u56DE\u6536\u7AD9"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { disabled: !!busy, onClick: close2 }, "\u5173\u95ED"))));
 }
 
 // src/task-control.jsx
-var import_react22 = __toESM(require("react"), 1);
+var import_react23 = __toESM(require("react"), 1);
 function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged, onRemove: onRemove2 }) {
-  const dialog = (0, import_react22.useRef)(null), mounted = (0, import_react22.useRef)(false), epoch = (0, import_react22.useRef)(0);
-  const budgetFormId = (0, import_react22.useId)();
-  const [model, setModel] = (0, import_react22.useState)(null), [loading, setLoading] = (0, import_react22.useState)(true);
-  const [busy, setBusy] = (0, import_react22.useState)(false), [error, setError] = (0, import_react22.useState)("");
+  const dialog = (0, import_react23.useRef)(null), mounted = (0, import_react23.useRef)(false), epoch = (0, import_react23.useRef)(0);
+  const budgetFormId = (0, import_react23.useId)();
+  const [model, setModel] = (0, import_react23.useState)(null), [loading, setLoading] = (0, import_react23.useState)(true);
+  const [busy, setBusy] = (0, import_react23.useState)(false), [error, setError] = (0, import_react23.useState)("");
   async function inspect() {
     const read = ++epoch.current;
     setLoading(true);
@@ -14560,7 +14720,7 @@ function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged,
       if (mounted.current && epoch.current === read) setLoading(false);
     }
   }
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     mounted.current = true;
     dialog.current?.showModal();
     void inspect();
@@ -14612,7 +14772,7 @@ function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged,
   const removable = model && !model.stopping && ["unknown", "paused", "cancelled", "idle", "failed", "succeeded"].includes(model.state);
   const budgetLimits = model?.budgetLimits;
   const action = model?.canStop ? model.stopLabel : model?.job?.canResume ? "\u7EE7\u7EED\u8DDF\u8FDB" : removable && onRemove2 && !budgetLimits ? "\u79FB\u9664\u5361\u7247" : null;
-  return /* @__PURE__ */ import_react22.default.createElement(
+  return /* @__PURE__ */ import_react23.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -14625,9 +14785,9 @@ function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged,
         if (!busy) onClose();
       }
     },
-    /* @__PURE__ */ import_react22.default.createElement(DialogHeader, { title: "\u4EFB\u52A1\u63A7\u5236", titleId: "wtt-task-control-title", onClose, busy }),
-    /* @__PURE__ */ import_react22.default.createElement("div", { className: "wtt-recycle-body" }, loading && /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u4EFB\u52A1\u2026"), model && /* @__PURE__ */ import_react22.default.createElement(import_react22.default.Fragment, null, /* @__PURE__ */ import_react22.default.createElement("strong", null, model.title), /* @__PURE__ */ import_react22.default.createElement("p", { role: "status" }, model.message), budgetLimits && /* @__PURE__ */ import_react22.default.createElement("form", { id: budgetFormId, onSubmit: saveBudget }, budgetLimits.map(({ key, label: label2, used, limit, unit }) => /* @__PURE__ */ import_react22.default.createElement("div", { key }, /* @__PURE__ */ import_react22.default.createElement("p", null, label2, "\u5DF2\u7528 ", used.toLocaleString(), " / ", limit.toLocaleString(), " ", unit), /* @__PURE__ */ import_react22.default.createElement("label", { className: "wtt-field" }, label2, "\u65B0\u4E0A\u9650\uFF08", unit, "\uFF09", /* @__PURE__ */ import_react22.default.createElement("input", { name: key, type: "number", inputMode: "numeric", min: Math.floor(used) + 1, step: "1", disabled: busy || loading, required: true }))))), model.relatedCount > 1 && /* @__PURE__ */ import_react22.default.createElement("details", { open: true }, /* @__PURE__ */ import_react22.default.createElement("summary", null, "\u540C\u4E00\u5BF9\u8BDD\u5173\u8054 ", model.relatedCount, " \u9879\u4EFB\u52A1"), /* @__PURE__ */ import_react22.default.createElement("ul", null, model.relatedTasks.map((task) => /* @__PURE__ */ import_react22.default.createElement("li", { key: task.id }, task.title))), model.relatedCount > model.relatedTasks.length && /* @__PURE__ */ import_react22.default.createElement("p", null, "\u53E6\u6709 ", model.relatedCount - model.relatedTasks.length, " \u9879"))), error && /* @__PURE__ */ import_react22.default.createElement(UserError, { error })),
-    /* @__PURE__ */ import_react22.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react22.default.createElement(UiButton, { size: "compact", disabled: busy || loading, onClick: () => void inspect() }, "\u91CD\u65B0\u6838\u5BF9"), /* @__PURE__ */ import_react22.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: onClose }, "\u5173\u95ED"), budgetLimits && /* @__PURE__ */ import_react22.default.createElement(UiButton, { size: "compact", variant: "primary", type: "submit", form: budgetFormId, disabled: busy || loading }, "\u4FDD\u5B58\u65B0\u4E0A\u9650"), action && /* @__PURE__ */ import_react22.default.createElement(
+    /* @__PURE__ */ import_react23.default.createElement(DialogHeader, { title: "\u4EFB\u52A1\u63A7\u5236", titleId: "wtt-task-control-title", onClose, busy }),
+    /* @__PURE__ */ import_react23.default.createElement("div", { className: "wtt-recycle-body" }, loading && /* @__PURE__ */ import_react23.default.createElement("p", { role: "status" }, "\u6B63\u5728\u6838\u5BF9\u4EFB\u52A1\u2026"), model && /* @__PURE__ */ import_react23.default.createElement(import_react23.default.Fragment, null, /* @__PURE__ */ import_react23.default.createElement("strong", null, model.title), /* @__PURE__ */ import_react23.default.createElement("p", { role: "status" }, model.message), budgetLimits && /* @__PURE__ */ import_react23.default.createElement("form", { id: budgetFormId, onSubmit: saveBudget }, budgetLimits.map(({ key, label: label2, used, limit, unit }) => /* @__PURE__ */ import_react23.default.createElement("div", { key }, /* @__PURE__ */ import_react23.default.createElement("p", null, label2, "\u5DF2\u7528 ", used.toLocaleString(), " / ", limit.toLocaleString(), " ", unit), /* @__PURE__ */ import_react23.default.createElement("label", { className: "wtt-field" }, label2, "\u65B0\u4E0A\u9650\uFF08", unit, "\uFF09", /* @__PURE__ */ import_react23.default.createElement("input", { name: key, type: "number", inputMode: "numeric", min: Math.floor(used) + 1, step: "1", disabled: busy || loading, required: true }))))), model.relatedCount > 1 && /* @__PURE__ */ import_react23.default.createElement("details", { open: true }, /* @__PURE__ */ import_react23.default.createElement("summary", null, "\u540C\u4E00\u5BF9\u8BDD\u5173\u8054 ", model.relatedCount, " \u9879\u4EFB\u52A1"), /* @__PURE__ */ import_react23.default.createElement("ul", null, model.relatedTasks.map((task) => /* @__PURE__ */ import_react23.default.createElement("li", { key: task.id }, task.title))), model.relatedCount > model.relatedTasks.length && /* @__PURE__ */ import_react23.default.createElement("p", null, "\u53E6\u6709 ", model.relatedCount - model.relatedTasks.length, " \u9879"))), error && /* @__PURE__ */ import_react23.default.createElement(UserError, { error })),
+    /* @__PURE__ */ import_react23.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react23.default.createElement(UiButton, { size: "compact", disabled: busy || loading, onClick: () => void inspect() }, "\u91CD\u65B0\u6838\u5BF9"), /* @__PURE__ */ import_react23.default.createElement(UiButton, { size: "compact", disabled: busy, onClick: onClose }, "\u5173\u95ED"), budgetLimits && /* @__PURE__ */ import_react23.default.createElement(UiButton, { size: "compact", variant: "primary", type: "submit", form: budgetFormId, disabled: busy || loading }, "\u4FDD\u5B58\u65B0\u4E0A\u9650"), action && /* @__PURE__ */ import_react23.default.createElement(
       UiButton,
       {
         size: "compact",
@@ -14641,27 +14801,27 @@ function TaskControlDialog({ taskId, requirementId, request, onClose, onChanged,
 }
 
 // src/card-name-dialog.jsx
-var import_react23 = __toESM(require("react"), 1);
+var import_react24 = __toESM(require("react"), 1);
 function CardNameDialog({ title, busy, error, onSave, onClose }) {
-  const ref = (0, import_react23.useRef)(null), id2 = (0, import_react23.useId)();
-  const [value, setValue] = (0, import_react23.useState)(title);
-  (0, import_react23.useEffect)(() => {
+  const ref = (0, import_react24.useRef)(null), id2 = (0, import_react24.useId)();
+  const [value, setValue] = (0, import_react24.useState)(title);
+  (0, import_react24.useEffect)(() => {
     ref.current?.showModal();
   }, []);
-  return /* @__PURE__ */ import_react23.default.createElement("dialog", { ref, className: "wtt-dialog", "aria-labelledby": id2, onCancel: (event) => {
+  return /* @__PURE__ */ import_react24.default.createElement("dialog", { ref, className: "wtt-dialog", "aria-labelledby": id2, onCancel: (event) => {
     event.preventDefault();
     if (!busy) onClose();
-  } }, /* @__PURE__ */ import_react23.default.createElement("form", { onSubmit: (event) => {
+  } }, /* @__PURE__ */ import_react24.default.createElement("form", { onSubmit: (event) => {
     event.preventDefault();
     if (value.trim()) onSave(value.trim());
-  } }, /* @__PURE__ */ import_react23.default.createElement(DialogHeader, { title: "\u91CD\u547D\u540D\u5361\u7247", titleId: id2, busy, onClose }), /* @__PURE__ */ import_react23.default.createElement(DialogBody, null, /* @__PURE__ */ import_react23.default.createElement("label", null, "\u540D\u79F0", /* @__PURE__ */ import_react23.default.createElement("input", { autoFocus: true, required: true, maxLength: 200, value, disabled: busy, onChange: (event) => setValue(event.target.value) })), error && /* @__PURE__ */ import_react23.default.createElement(UserError, { error })), /* @__PURE__ */ import_react23.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "quiet", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react23.default.createElement(UiButton, { variant: "primary", type: "submit", disabled: busy || !value.trim() }, busy ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58"))));
+  } }, /* @__PURE__ */ import_react24.default.createElement(DialogHeader, { title: "\u91CD\u547D\u540D\u5361\u7247", titleId: id2, busy, onClose }), /* @__PURE__ */ import_react24.default.createElement(DialogBody, null, /* @__PURE__ */ import_react24.default.createElement("label", null, "\u540D\u79F0", /* @__PURE__ */ import_react24.default.createElement("input", { autoFocus: true, required: true, maxLength: 200, value, disabled: busy, onChange: (event) => setValue(event.target.value) })), error && /* @__PURE__ */ import_react24.default.createElement(UserError, { error })), /* @__PURE__ */ import_react24.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "quiet", disabled: busy, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react24.default.createElement(UiButton, { variant: "primary", type: "submit", disabled: busy || !value.trim() }, busy ? "\u4FDD\u5B58\u4E2D\u2026" : "\u4FDD\u5B58"))));
 }
 
 // src/project-explorer.jsx
-var import_react29 = __toESM(require("react"), 1);
+var import_react30 = __toESM(require("react"), 1);
 
 // src/project-file-navigation.jsx
-var import_react24 = require("react");
+var import_react25 = require("react");
 
 // src/project-file-paths.mjs
 var withinProjectPath = (entry, parent) => entry === parent || entry.startsWith(parent + "/");
@@ -14675,25 +14835,25 @@ function remapProjectFilePath(path, changes) {
 // src/project-file-navigation.jsx
 var projectFileParent = (path) => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
 function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequest, onLocated }) {
-  const [tree, setTree] = (0, import_react24.useState)(() => /* @__PURE__ */ new Map());
-  const [expanded, setExpanded] = (0, import_react24.useState)(() => /* @__PURE__ */ new Set([""]));
-  const [errors, setErrors] = (0, import_react24.useState)(() => /* @__PURE__ */ new Map());
-  const [searchOpen, setSearchOpen] = (0, import_react24.useState)(false);
-  const [query, setQuery] = (0, import_react24.useState)("");
-  const [composing, setComposing] = (0, import_react24.useState)(false);
-  const [search, setSearch] = (0, import_react24.useState)(null);
-  const [searchRefresh, setSearchRefresh] = (0, import_react24.useState)(0);
-  const [locating, setLocating] = (0, import_react24.useState)(false);
-  const [navigationError, setNavigationError] = (0, import_react24.useState)("");
-  const treeRef = (0, import_react24.useRef)(tree);
+  const [tree, setTree] = (0, import_react25.useState)(() => /* @__PURE__ */ new Map());
+  const [expanded, setExpanded] = (0, import_react25.useState)(() => /* @__PURE__ */ new Set([""]));
+  const [errors, setErrors] = (0, import_react25.useState)(() => /* @__PURE__ */ new Map());
+  const [searchOpen, setSearchOpen] = (0, import_react25.useState)(false);
+  const [query, setQuery] = (0, import_react25.useState)("");
+  const [composing, setComposing] = (0, import_react25.useState)(false);
+  const [search, setSearch] = (0, import_react25.useState)(null);
+  const [searchRefresh, setSearchRefresh] = (0, import_react25.useState)(0);
+  const [locating, setLocating] = (0, import_react25.useState)(false);
+  const [navigationError, setNavigationError] = (0, import_react25.useState)("");
+  const treeRef = (0, import_react25.useRef)(tree);
   treeRef.current = tree;
-  const expandedRef = (0, import_react24.useRef)(expanded);
+  const expandedRef = (0, import_react25.useRef)(expanded);
   expandedRef.current = expanded;
-  const requests = (0, import_react24.useRef)(/* @__PURE__ */ new Map());
-  const navigation = (0, import_react24.useRef)(null);
-  const searchRequest = (0, import_react24.useRef)(null);
-  const handled = (0, import_react24.useRef)(null);
-  const read = (0, import_react24.useCallback)(async (params, signal) => {
+  const requests = (0, import_react25.useRef)(/* @__PURE__ */ new Map());
+  const navigation = (0, import_react25.useRef)(null);
+  const searchRequest = (0, import_react25.useRef)(null);
+  const handled = (0, import_react25.useRef)(null);
+  const read = (0, import_react25.useCallback)(async (params, signal) => {
     const url = new URL("api/wtt-creation-workbench", document.baseURI);
     url.searchParams.set("projectId", projectId);
     for (const [name2, value] of Object.entries(params)) url.searchParams.set(name2, value);
@@ -14702,7 +14862,7 @@ function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequ
     if (!response.ok) throw Object.assign(new Error(data.error || "\u9879\u76EE\u6587\u4EF6\u8BFB\u53D6\u5931\u8D25"), { status: response.status });
     return data;
   }, [projectId]);
-  const load = (0, import_react24.useCallback)(async (path = "", { offset: offset3, around, append: append2 = false } = {}) => {
+  const load = (0, import_react25.useCallback)(async (path = "", { offset: offset3, around, append: append2 = false } = {}) => {
     requests.current.get(path)?.abort();
     const controller = new AbortController();
     requests.current.set(path, controller);
@@ -14741,7 +14901,7 @@ function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequ
       if (requests.current.get(path) === controller) requests.current.delete(path);
     }
   }, [read]);
-  (0, import_react24.useEffect)(() => {
+  (0, import_react25.useEffect)(() => {
     if (!active) return;
     setLocating(false);
     void load();
@@ -14752,7 +14912,7 @@ function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequ
       pending.clear();
     };
   }, [active, load]);
-  const refresh = (0, import_react24.useCallback)(async () => {
+  const refresh = (0, import_react25.useCallback)(async () => {
     if (navigation.current) return;
     const paths = [...expandedRef.current].filter((path) => {
       for (let parent = projectFileParent(path); parent; parent = projectFileParent(parent)) {
@@ -14769,24 +14929,24 @@ function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequ
     }
     await Promise.all(Array.from({ length: Math.min(paths.length, 4) }, worker));
   }, [load]);
-  (0, import_react24.useEffect)(() => {
+  (0, import_react25.useEffect)(() => {
     if (!active) return;
     const changed = () => void refresh();
     window.addEventListener("focus", changed);
     return () => window.removeEventListener("focus", changed);
   }, [active, refresh]);
-  (0, import_react24.useEffect)(() => {
+  (0, import_react25.useEffect)(() => {
     if (active && refreshSignal) void refresh();
   }, [refreshSignal]);
-  const showDirectory = (0, import_react24.useCallback)((path) => {
+  const showDirectory = (0, import_react25.useCallback)((path) => {
     setExpanded((current) => /* @__PURE__ */ new Set([...current, path]));
     if (!treeRef.current.has(path)) void load(path);
   }, [load]);
-  const toggleDirectory = (0, import_react24.useCallback)((path, open) => {
+  const toggleDirectory = (0, import_react25.useCallback)((path, open) => {
     if (open) showDirectory(path);
     else setExpanded((current) => new Set([...current].filter((key) => key !== path)));
   }, [showDirectory]);
-  const locate = (0, import_react24.useCallback)(async (path) => {
+  const locate = (0, import_react25.useCallback)(async (path) => {
     const intent = Symbol();
     navigation.current = intent;
     setLocating(true);
@@ -14817,13 +14977,13 @@ function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequ
       }
     }
   }, [load, onLocated]);
-  (0, import_react24.useEffect)(() => {
+  (0, import_react25.useEffect)(() => {
     if (active && revealRequest && handled.current !== revealRequest.token) {
       handled.current = revealRequest.token;
       void locate(revealRequest.path);
     }
   }, [active, revealRequest, locate]);
-  (0, import_react24.useEffect)(() => {
+  (0, import_react25.useEffect)(() => {
     if (!active || !searchOpen || !query.trim() || composing) return;
     const controller = new AbortController();
     searchRequest.current = controller;
@@ -14887,22 +15047,22 @@ function useProjectFileNavigation({ projectId, active, refreshSignal, revealRequ
 }
 
 // src/project-file-organize.jsx
-var import_react25 = __toESM(require("react"), 1);
+var import_react26 = __toESM(require("react"), 1);
 var PROJECT_TREE_DRAG = "application/x-wtt-project-tree";
 var chunkSize = 4 * 1024 * 1024;
 var parentName = (path) => path.split("/").at(-1);
 function useFileOrganizer({ projectId, active, disabled, request, clipboard, setClipboard, onChanged, onExpand, expanded, onRecovered }) {
-  const [status, setStatus] = (0, import_react25.useState)(null);
-  const [working, setWorking] = (0, import_react25.useState)("");
-  const [feedback, setFeedback] = (0, import_react25.useState)(null);
-  const [conflicts, setConflicts] = (0, import_react25.useState)(null);
-  const [dropTarget, setDropTarget] = (0, import_react25.useState)(null);
-  const mounted = (0, import_react25.useRef)(false), lock = (0, import_react25.useRef)(false), hover = (0, import_react25.useRef)(null), dragging = (0, import_react25.useRef)(null);
-  const uploadAbort = (0, import_react25.useRef)(null);
-  const activeRef = (0, import_react25.useRef)(active);
+  const [status, setStatus] = (0, import_react26.useState)(null);
+  const [working, setWorking] = (0, import_react26.useState)("");
+  const [feedback, setFeedback] = (0, import_react26.useState)(null);
+  const [conflicts, setConflicts] = (0, import_react26.useState)(null);
+  const [dropTarget, setDropTarget] = (0, import_react26.useState)(null);
+  const mounted = (0, import_react26.useRef)(false), lock = (0, import_react26.useRef)(false), hover = (0, import_react26.useRef)(null), dragging = (0, import_react26.useRef)(null);
+  const uploadAbort = (0, import_react26.useRef)(null);
+  const activeRef = (0, import_react26.useRef)(active);
   activeRef.current = active;
-  const statusVersion = (0, import_react25.useRef)(0);
-  const readStatus = (0, import_react25.useCallback)(async () => {
+  const statusVersion = (0, import_react26.useRef)(0);
+  const readStatus = (0, import_react26.useCallback)(async () => {
     const version2 = ++statusVersion.current;
     const url = new URL("api/wtt-creation-workbench", document.baseURI);
     url.searchParams.set("projectId", projectId);
@@ -14918,7 +15078,7 @@ function useFileOrganizer({ projectId, active, disabled, request, clipboard, set
       return null;
     }
   }, [projectId]);
-  (0, import_react25.useEffect)(() => {
+  (0, import_react26.useEffect)(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
@@ -14926,7 +15086,7 @@ function useFileOrganizer({ projectId, active, disabled, request, clipboard, set
       uploadAbort.current?.abort();
     };
   }, []);
-  (0, import_react25.useEffect)(() => {
+  (0, import_react26.useEffect)(() => {
     if (active) void readStatus();
     else uploadAbort.current?.abort();
   }, [active, readStatus]);
@@ -15155,19 +15315,19 @@ function useFileOrganizer({ projectId, active, disabled, request, clipboard, set
 }
 function FileOrganizeNotice({ organizer }) {
   const { working, feedback, status } = organizer;
-  if (working) return /* @__PURE__ */ import_react25.default.createElement("div", { className: "wtt-file-batch-status", role: "status" }, working);
+  if (working) return /* @__PURE__ */ import_react26.default.createElement("div", { className: "wtt-file-batch-status", role: "status" }, working);
   if (!feedback && !status?.attention.length) return null;
   const labels3 = { move: "\u5DF2\u79FB\u52A8", copy: "\u5DF2\u590D\u5236", rename: "\u5DF2\u91CD\u547D\u540D", import: "\u5DF2\u5BFC\u5165", undo: "\u5DF2\u64A4\u9500" };
   const changed = feedback?.result?.results.filter((item) => item.mode !== "unchanged") || [];
   const failed = feedback?.result?.failed || [];
-  return /* @__PURE__ */ import_react25.default.createElement("div", { className: "wtt-file-batch-status wtt-file-organize-feedback" }, feedback?.error && /* @__PURE__ */ import_react25.default.createElement(UserError, { error: feedback.error }), feedback?.message && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, feedback.message), feedback?.clipboard && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, feedback.clipboard.mode === "move" ? "\u5DF2\u526A\u5207 " : "\u5DF2\u590D\u5236 ", feedback.clipboard.count, " \u9879\uFF0C\u53EF\u7C98\u8D34\u5230\u76EE\u5F55"), feedback?.result && /* @__PURE__ */ import_react25.default.createElement("span", { role: "status" }, changed.length ? (labels3[feedback.mode] || "\u5DF2\u5B8C\u6210") + " " + changed.length + " \u9879" : failed.length ? "\u6587\u4EF6\u6574\u7406\u672A\u5B8C\u6210" : feedback.mode === "undo" ? "\u5F53\u524D\u6CA1\u6709\u5F85\u64A4\u9500\u7684\u6587\u4EF6\u64CD\u4F5C" : "\u6587\u4EF6\u5DF2\u5728\u76EE\u6807\u4F4D\u7F6E", changed.length && failed.length ? "\uFF0C" + failed.length + " \u9879\u672A\u5904\u7406" : ""), feedback?.retry && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: feedback.retry }, "\u91CD\u8BD5"), changed.length > 0 && feedback.mode !== "undo" && status?.undoBatch && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: organizer.undo }, "\u64A4\u9500"), feedback && /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", iconOnly: true, "aria-label": "\u5173\u95ED\u6574\u7406\u7ED3\u679C", onClick: () => organizer.setFeedback(null) }, /* @__PURE__ */ import_react25.default.createElement(UiIcon, { name: "close", size: 14 })), failed.length > 0 && /* @__PURE__ */ import_react25.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react25.default.createElement("summary", null, "\u67E5\u770B\u672A\u5904\u7406\u7684\u6587\u4EF6"), /* @__PURE__ */ import_react25.default.createElement("ul", null, failed.map((item, index2) => /* @__PURE__ */ import_react25.default.createElement("li", { key: index2 }, /* @__PURE__ */ import_react25.default.createElement("strong", null, item.name || parentName(item.source)), /* @__PURE__ */ import_react25.default.createElement("span", null, item.error))))), status?.attention.length > 0 && /* @__PURE__ */ import_react25.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react25.default.createElement("summary", null, "\u5F85\u6838\u5BF9\u7684\u6587\u4EF6\u64CD\u4F5C"), /* @__PURE__ */ import_react25.default.createElement("ul", null, status.attention.map((item) => /* @__PURE__ */ import_react25.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react25.default.createElement("strong", null, item.from || item.to), /* @__PURE__ */ import_react25.default.createElement("span", null, item.reason), /* @__PURE__ */ import_react25.default.createElement("code", null, item.staging), /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void organizer.recover(item.id) }, "\u91CD\u8BD5\u6062\u590D"))))));
+  return /* @__PURE__ */ import_react26.default.createElement("div", { className: "wtt-file-batch-status wtt-file-organize-feedback" }, feedback?.error && /* @__PURE__ */ import_react26.default.createElement(UserError, { error: feedback.error }), feedback?.message && /* @__PURE__ */ import_react26.default.createElement("span", { role: "status" }, feedback.message), feedback?.clipboard && /* @__PURE__ */ import_react26.default.createElement("span", { role: "status" }, feedback.clipboard.mode === "move" ? "\u5DF2\u526A\u5207 " : "\u5DF2\u590D\u5236 ", feedback.clipboard.count, " \u9879\uFF0C\u53EF\u7C98\u8D34\u5230\u76EE\u5F55"), feedback?.result && /* @__PURE__ */ import_react26.default.createElement("span", { role: "status" }, changed.length ? (labels3[feedback.mode] || "\u5DF2\u5B8C\u6210") + " " + changed.length + " \u9879" : failed.length ? "\u6587\u4EF6\u6574\u7406\u672A\u5B8C\u6210" : feedback.mode === "undo" ? "\u5F53\u524D\u6CA1\u6709\u5F85\u64A4\u9500\u7684\u6587\u4EF6\u64CD\u4F5C" : "\u6587\u4EF6\u5DF2\u5728\u76EE\u6807\u4F4D\u7F6E", changed.length && failed.length ? "\uFF0C" + failed.length + " \u9879\u672A\u5904\u7406" : ""), feedback?.retry && /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: feedback.retry }, "\u91CD\u8BD5"), changed.length > 0 && feedback.mode !== "undo" && status?.undoBatch && /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: organizer.undo }, "\u64A4\u9500"), feedback && /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "ghost", size: "compact", iconOnly: true, "aria-label": "\u5173\u95ED\u6574\u7406\u7ED3\u679C", onClick: () => organizer.setFeedback(null) }, /* @__PURE__ */ import_react26.default.createElement(UiIcon, { name: "close", size: 14 })), failed.length > 0 && /* @__PURE__ */ import_react26.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react26.default.createElement("summary", null, "\u67E5\u770B\u672A\u5904\u7406\u7684\u6587\u4EF6"), /* @__PURE__ */ import_react26.default.createElement("ul", null, failed.map((item, index2) => /* @__PURE__ */ import_react26.default.createElement("li", { key: index2 }, /* @__PURE__ */ import_react26.default.createElement("strong", null, item.name || parentName(item.source)), /* @__PURE__ */ import_react26.default.createElement("span", null, item.error))))), status?.attention.length > 0 && /* @__PURE__ */ import_react26.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react26.default.createElement("summary", null, "\u5F85\u6838\u5BF9\u7684\u6587\u4EF6\u64CD\u4F5C"), /* @__PURE__ */ import_react26.default.createElement("ul", null, status.attention.map((item) => /* @__PURE__ */ import_react26.default.createElement("li", { key: item.id }, /* @__PURE__ */ import_react26.default.createElement("strong", null, item.from || item.to), /* @__PURE__ */ import_react26.default.createElement("span", null, item.reason), /* @__PURE__ */ import_react26.default.createElement("code", null, item.staging), /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void organizer.recover(item.id) }, "\u91CD\u8BD5\u6062\u590D"))))));
 }
 function FileConflictDialog({ matches: matches3, onResolve }) {
-  const dialog = (0, import_react25.useRef)(null), title = (0, import_react25.useId)();
-  (0, import_react25.useEffect)(() => {
+  const dialog = (0, import_react26.useRef)(null), title = (0, import_react26.useId)();
+  (0, import_react26.useEffect)(() => {
     dialog.current?.showModal();
   }, []);
-  return /* @__PURE__ */ import_react25.default.createElement(
+  return /* @__PURE__ */ import_react26.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -15178,14 +15338,14 @@ function FileConflictDialog({ matches: matches3, onResolve }) {
         onResolve(null);
       }
     },
-    /* @__PURE__ */ import_react25.default.createElement(DialogHeader, { title: "\u76EE\u6807\u4F4D\u7F6E\u542B\u540C\u540D\u6587\u4EF6", titleId: title, onClose: () => onResolve(null) }),
-    /* @__PURE__ */ import_react25.default.createElement(DialogBody, null, /* @__PURE__ */ import_react25.default.createElement("ul", { className: "wtt-file-conflict-list" }, matches3.map((item) => /* @__PURE__ */ import_react25.default.createElement("li", { key: item.source }, item.targetPath || item.name || parentName(item.source)))), /* @__PURE__ */ import_react25.default.createElement("p", null, "\u4FDD\u7559\u526F\u672C\u4F1A\u4E3A\u65B0\u6587\u4EF6\u6DFB\u52A0\u526F\u672C\u540E\u7F00\u3002")),
-    /* @__PURE__ */ import_react25.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react25.default.createElement(UiButton, { autoFocus: true, variant: "ghost", onClick: () => onResolve(null) }, "\u53D6\u6D88"), /* @__PURE__ */ import_react25.default.createElement(UiButton, { onClick: () => onResolve("skip") }, "\u8DF3\u8FC7\u540C\u540D"), /* @__PURE__ */ import_react25.default.createElement(UiButton, { variant: "primary", onClick: () => onResolve("keep-both") }, "\u4FDD\u7559\u526F\u672C"))
+    /* @__PURE__ */ import_react26.default.createElement(DialogHeader, { title: "\u76EE\u6807\u4F4D\u7F6E\u542B\u540C\u540D\u6587\u4EF6", titleId: title, onClose: () => onResolve(null) }),
+    /* @__PURE__ */ import_react26.default.createElement(DialogBody, null, /* @__PURE__ */ import_react26.default.createElement("ul", { className: "wtt-file-conflict-list" }, matches3.map((item) => /* @__PURE__ */ import_react26.default.createElement("li", { key: item.source }, item.targetPath || item.name || parentName(item.source)))), /* @__PURE__ */ import_react26.default.createElement("p", null, "\u4FDD\u7559\u526F\u672C\u4F1A\u4E3A\u65B0\u6587\u4EF6\u6DFB\u52A0\u526F\u672C\u540E\u7F00\u3002")),
+    /* @__PURE__ */ import_react26.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react26.default.createElement(UiButton, { autoFocus: true, variant: "ghost", onClick: () => onResolve(null) }, "\u53D6\u6D88"), /* @__PURE__ */ import_react26.default.createElement(UiButton, { onClick: () => onResolve("skip") }, "\u8DF3\u8FC7\u540C\u540D"), /* @__PURE__ */ import_react26.default.createElement(UiButton, { variant: "primary", onClick: () => onResolve("keep-both") }, "\u4FDD\u7559\u526F\u672C"))
   );
 }
 
 // src/project-file-tree-window.jsx
-var import_react26 = require("react");
+var import_react27 = require("react");
 var overscanRows = 8;
 var windowThreshold = 120;
 function firstAt(rows, pixel) {
@@ -15219,16 +15379,16 @@ function fileTreeRows(tree, expanded, errors, createParent) {
   return { rows, entries };
 }
 function useFileTreeWindow(rows, { visible, editing, pinned }) {
-  const treeElement = (0, import_react26.useRef)(null);
-  const frame2 = (0, import_react26.useRef)(null);
-  const [viewport, setViewport] = (0, import_react26.useState)({ top: 0, height: 0, mobile: false });
-  const sync = (0, import_react26.useCallback)(() => {
+  const treeElement = (0, import_react27.useRef)(null);
+  const frame2 = (0, import_react27.useRef)(null);
+  const [viewport, setViewport] = (0, import_react27.useState)({ top: 0, height: 0, mobile: false });
+  const sync = (0, import_react27.useCallback)(() => {
     const tree = treeElement.current;
     if (!tree) return;
     const next = { top: tree.scrollTop, height: tree.clientHeight, mobile: matchMedia("(max-width:700px)").matches };
     setViewport((current) => current.top === next.top && current.height === next.height && current.mobile === next.mobile ? current : next);
   }, []);
-  (0, import_react26.useLayoutEffect)(() => {
+  (0, import_react27.useLayoutEffect)(() => {
     if (!visible) return;
     sync();
     const observer = new ResizeObserver(sync);
@@ -15247,7 +15407,7 @@ function useFileTreeWindow(rows, { visible, editing, pinned }) {
     });
   }
   const rowHeight = viewport.mobile ? 40 : 30;
-  const layout = (0, import_react26.useMemo)(() => {
+  const layout = (0, import_react27.useMemo)(() => {
     const byKey = /* @__PURE__ */ new Map();
     if (!visible) return { positioned: [], height: 0, byKey };
     let height = 0;
@@ -15261,7 +15421,7 @@ function useFileTreeWindow(rows, { visible, editing, pinned }) {
     });
     return { positioned, height, byKey };
   }, [rows, rowHeight, viewport.mobile, editing, visible]);
-  const items = (0, import_react26.useMemo)(() => {
+  const items = (0, import_react27.useMemo)(() => {
     if (!visible) return [];
     const { positioned, byKey } = layout;
     if (positioned.length <= windowThreshold) return positioned;
@@ -15275,7 +15435,7 @@ function useFileTreeWindow(rows, { visible, editing, pinned }) {
     }
     return [...shown.values()].sort((a, b2) => a.index - b2.index);
   }, [visible, layout, rowHeight, viewport.top, viewport.height, pinned]);
-  const reveal = (0, import_react26.useCallback)((key) => {
+  const reveal = (0, import_react27.useCallback)((key) => {
     const tree = treeElement.current;
     const row = layout.byKey.get(key);
     if (!tree || !row) return false;
@@ -15290,18 +15450,18 @@ function useFileTreeWindow(rows, { visible, editing, pinned }) {
 }
 
 // src/video-preview.jsx
-var import_react27 = __toESM(require("react"), 1);
+var import_react28 = __toESM(require("react"), 1);
 function VideoPreview({ src, deferDesktopSeek = false, ...props }) {
   if (src?.startsWith("dsh-app://") && new URL(src).searchParams.get("preview") === "1") {
-    return /* @__PURE__ */ import_react27.default.createElement(DesktopVideo, { key: src, src, deferSeek: deferDesktopSeek, ...props });
+    return /* @__PURE__ */ import_react28.default.createElement(DesktopVideo, { key: src, src, deferSeek: deferDesktopSeek, ...props });
   }
-  return /* @__PURE__ */ import_react27.default.createElement("video", { src, controls: true, preload: "metadata", playsInline: true, ...props });
+  return /* @__PURE__ */ import_react28.default.createElement("video", { src, controls: true, preload: "metadata", playsInline: true, ...props });
 }
 function DesktopVideo({ src, deferSeek, onPointerDown: onPointerDown2, onFocus, onPlay, onLoadedMetadata, ...props }) {
-  const player = (0, import_react27.useRef)(null);
-  const preparation = (0, import_react27.useRef)(null);
-  const [objectUrl, setObjectUrl] = (0, import_react27.useState)("");
-  const [preparing, setPreparing] = (0, import_react27.useState)(false);
+  const player = (0, import_react28.useRef)(null);
+  const preparation = (0, import_react28.useRef)(null);
+  const [objectUrl, setObjectUrl] = (0, import_react28.useState)("");
+  const [preparing, setPreparing] = (0, import_react28.useState)(false);
   function prepare() {
     if (preparation.current) return;
     const operation = { controller: new AbortController() };
@@ -15324,7 +15484,7 @@ function DesktopVideo({ src, deferSeek, onPointerDown: onPointerDown2, onFocus, 
       setPreparing(false);
     });
   }
-  (0, import_react27.useEffect)(() => {
+  (0, import_react28.useEffect)(() => {
     if (!deferSeek) prepare();
     return () => {
       const operation = preparation.current;
@@ -15346,7 +15506,7 @@ function DesktopVideo({ src, deferSeek, onPointerDown: onPointerDown2, onFocus, 
     }
     onLoadedMetadata?.(event);
   }
-  return /* @__PURE__ */ import_react27.default.createElement(
+  return /* @__PURE__ */ import_react28.default.createElement(
     "video",
     {
       ref: player,
@@ -15374,7 +15534,7 @@ function DesktopVideo({ src, deferSeek, onPointerDown: onPointerDown2, onFocus, 
 }
 
 // node_modules/@tiptap/react/dist/index.js
-var import_react28 = __toESM(require("react"), 1);
+var import_react29 = __toESM(require("react"), 1);
 
 // node_modules/orderedmap/dist/index.js
 function OrderedMap(content) {
@@ -34080,10 +34240,10 @@ function createContentComponent() {
     }
   };
 }
-var PureEditorContent = class extends import_react28.default.Component {
+var PureEditorContent = class extends import_react29.default.Component {
   constructor(props) {
     super(props);
-    this.editorContentRef = import_react28.default.createRef();
+    this.editorContentRef = import_react29.default.createRef();
   }
   componentDidMount() {
     this.init();
@@ -34135,18 +34295,18 @@ var PureEditorContent = class extends import_react28.default.Component {
     }), (editor === null || editor === void 0 ? void 0 : editor.contentComponent) && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Portals, { contentComponent: editor.contentComponent })] });
   }
 };
-var EditorContentWithKey = (0, import_react28.forwardRef)((props, ref) => {
-  const key = import_react28.default.useMemo(() => {
+var EditorContentWithKey = (0, import_react29.forwardRef)((props, ref) => {
+  const key = import_react29.default.useMemo(() => {
     return Math.floor(Math.random() * 4294967295).toString();
   }, [props.editor]);
-  return import_react28.default.createElement(PureEditorContent, {
+  return import_react29.default.createElement(PureEditorContent, {
     key,
     innerRef: ref,
     ...props
   });
 });
-var EditorContent = import_react28.default.memo(EditorContentWithKey);
-var useIsomorphicLayoutEffect2 = typeof window !== "undefined" ? import_react28.useLayoutEffect : import_react28.useEffect;
+var EditorContent = import_react29.default.memo(EditorContentWithKey);
+var useIsomorphicLayoutEffect2 = typeof window !== "undefined" ? import_react29.useLayoutEffect : import_react29.useEffect;
 var EditorStateManager = class {
   constructor(initialEditor) {
     this.transactionNumber = 0;
@@ -34217,12 +34377,12 @@ var EditorStateManager = class {
 };
 function useEditorState(options) {
   var _options$equalityFn;
-  const [editorStateManager] = (0, import_react28.useState)(() => new EditorStateManager(options.editor));
+  const [editorStateManager] = (0, import_react29.useState)(() => new EditorStateManager(options.editor));
   const selectedState = (0, import_with_selector2.useSyncExternalStoreWithSelector)(editorStateManager.subscribe, editorStateManager.getSnapshot, editorStateManager.getServerSnapshot, options.selector, (_options$equalityFn = options.equalityFn) !== null && _options$equalityFn !== void 0 ? _options$equalityFn : circularDeepEqual);
   useIsomorphicLayoutEffect2(() => {
     return editorStateManager.watch(options.editor);
   }, [options.editor, editorStateManager]);
-  (0, import_react28.useDebugValue)(selectedState);
+  (0, import_react29.useDebugValue)(selectedState);
   return selectedState;
 }
 var isDev2 = true;
@@ -34434,12 +34594,12 @@ var EditorInstanceManager = class EditorInstanceManager2 {
   }
 };
 function useEditor(options = {}, deps = []) {
-  const mostRecentOptions = (0, import_react28.useRef)(options);
+  const mostRecentOptions = (0, import_react29.useRef)(options);
   mostRecentOptions.current = options;
-  const [instanceManager] = (0, import_react28.useState)(() => new EditorInstanceManager(mostRecentOptions));
+  const [instanceManager] = (0, import_react29.useState)(() => new EditorInstanceManager(mostRecentOptions));
   const editor = (0, import_shim.useSyncExternalStore)(instanceManager.subscribe, instanceManager.getEditor, instanceManager.getServerSnapshot);
-  (0, import_react28.useDebugValue)(editor);
-  (0, import_react28.useEffect)(instanceManager.onRender(deps));
+  (0, import_react29.useDebugValue)(editor);
+  (0, import_react29.useEffect)(instanceManager.onRender(deps));
   useEditorState({
     editor,
     selector: ({ transactionNumber }) => {
@@ -34450,17 +34610,17 @@ function useEditor(options = {}, deps = []) {
   });
   return editor;
 }
-var EditorContext = (0, import_react28.createContext)({ editor: null });
+var EditorContext = (0, import_react29.createContext)({ editor: null });
 var EditorConsumer = EditorContext.Consumer;
-var ReactNodeViewContext = (0, import_react28.createContext)({
+var ReactNodeViewContext = (0, import_react29.createContext)({
   onDragStart: () => {
   },
   nodeViewContentChildren: void 0,
   nodeViewContentRef: () => {
   }
 });
-var useReactNodeView = () => (0, import_react28.useContext)(ReactNodeViewContext);
-var NodeViewWrapper = import_react28.default.forwardRef((props, ref) => {
+var useReactNodeView = () => (0, import_react29.useContext)(ReactNodeViewContext);
+var NodeViewWrapper = import_react29.default.forwardRef((props, ref) => {
   const { onDragStart } = useReactNodeView();
   const Tag = props.as || "div";
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Tag, {
@@ -34474,19 +34634,19 @@ var NodeViewWrapper = import_react28.default.forwardRef((props, ref) => {
     }
   });
 });
-var ReactMarkViewContext = import_react28.default.createContext({ markViewContentRef: () => {
+var ReactMarkViewContext = import_react29.default.createContext({ markViewContentRef: () => {
 } });
 var WIDGET_CACHE = Symbol("tiptapReactWidgetCache");
-var TiptapContext = (0, import_react28.createContext)({ get editor() {
+var TiptapContext = (0, import_react29.createContext)({ get editor() {
   throw new Error("useTiptap must be used within a <Tiptap> provider");
 } });
 TiptapContext.displayName = "TiptapContext";
-var useTiptap = () => (0, import_react28.useContext)(TiptapContext);
+var useTiptap = () => (0, import_react29.useContext)(TiptapContext);
 function TiptapWrapper({ children: children2, ...props }) {
   const resolvedEditor = "editor" in props ? props.editor : props.instance;
   if (!resolvedEditor) throw new Error("Tiptap: An editor instance is required. Pass a non-null `editor` prop.");
-  const tiptapContextValue = (0, import_react28.useMemo)(() => ({ editor: resolvedEditor }), [resolvedEditor]);
-  const legacyContextValue = (0, import_react28.useMemo)(() => ({ editor: resolvedEditor }), [resolvedEditor]);
+  const tiptapContextValue = (0, import_react29.useMemo)(() => ({ editor: resolvedEditor }), [resolvedEditor]);
+  const legacyContextValue = (0, import_react29.useMemo)(() => ({ editor: resolvedEditor }), [resolvedEditor]);
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(EditorContext.Provider, {
     value: legacyContextValue,
     children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TiptapContext.Provider, {
@@ -44464,38 +44624,38 @@ var Markdown = Extension.create({
 var PROJECT_FILE_DRAG = "application/x-wtt-project-file";
 function MarkdownView({ content }) {
   const editor = useEditor({ editable: false, extensions: [src_default, TableKit, Markdown.configure({ html: false })], content, contentType: "markdown" });
-  return /* @__PURE__ */ import_react29.default.createElement(EditorContent, { editor, className: "wtt-file-md tiptap" });
+  return /* @__PURE__ */ import_react30.default.createElement(EditorContent, { editor, className: "wtt-file-md tiptap" });
 }
 function ProjectExplorer({ project, request, active, onClose, onChooseProject, onOpenProject, onPreview, previewPath, onAdd: onAdd2, canAdd, onRecycle, refreshSignal, onChanged, revealRequest, clipboard, setClipboard, onOrganized }) {
-  const [selection2, setSelection] = (0, import_react29.useState)([]);
-  const [focused, setFocused] = (0, import_react29.useState)("");
-  const [creating, setCreating] = (0, import_react29.useState)(null);
-  const [name2, setName] = (0, import_react29.useState)("");
-  const [error, setError] = (0, import_react29.useState)("");
-  const [feedback, setFeedback] = (0, import_react29.useState)(null);
-  const [busy, setBusy] = (0, import_react29.useState)(false);
-  const [deletePlan, setDeletePlan] = (0, import_react29.useState)(null);
-  const [menu, setMenu] = (0, import_react29.useState)(null);
-  const [match, setMatch] = (0, import_react29.useState)(0);
-  const [width, setWidth] = (0, import_react29.useState)(() => {
+  const [selection2, setSelection] = (0, import_react30.useState)([]);
+  const [focused, setFocused] = (0, import_react30.useState)("");
+  const [creating, setCreating] = (0, import_react30.useState)(null);
+  const [name2, setName] = (0, import_react30.useState)("");
+  const [error, setError] = (0, import_react30.useState)("");
+  const [feedback, setFeedback] = (0, import_react30.useState)(null);
+  const [busy, setBusy] = (0, import_react30.useState)(false);
+  const [deletePlan, setDeletePlan] = (0, import_react30.useState)(null);
+  const [menu, setMenu] = (0, import_react30.useState)(null);
+  const [match, setMatch] = (0, import_react30.useState)(0);
+  const [width, setWidth] = (0, import_react30.useState)(() => {
     try {
       return Math.max(200, Math.min(480, Number(localStorage.getItem("wtt-explorer-width")) || 260));
     } catch {
       return 260;
     }
   });
-  const mounted = (0, import_react29.useRef)(false), creatingBusy = (0, import_react29.useRef)(false), drag = (0, import_react29.useRef)(null), batch = (0, import_react29.useRef)(null);
-  const rowElements = (0, import_react29.useRef)(/* @__PURE__ */ new Map()), rangeAnchor = (0, import_react29.useRef)("");
-  const searchInput = (0, import_react29.useRef)(null), searchTrigger = (0, import_react29.useRef)(null), menuFirst = (0, import_react29.useRef)(null);
-  const [located, setLocated] = (0, import_react29.useState)(null);
-  const [renaming, setRenaming] = (0, import_react29.useState)(null);
-  const [newName, setNewName] = (0, import_react29.useState)("");
-  const renameInput = (0, import_react29.useRef)(null);
-  const importInput = (0, import_react29.useRef)(null), importTarget = (0, import_react29.useRef)("");
-  const focusIntent = (0, import_react29.useRef)(null);
-  const [dragPath, setDragPath] = (0, import_react29.useState)(null);
+  const mounted = (0, import_react30.useRef)(false), creatingBusy = (0, import_react30.useRef)(false), drag = (0, import_react30.useRef)(null), batch = (0, import_react30.useRef)(null);
+  const rowElements = (0, import_react30.useRef)(/* @__PURE__ */ new Map()), rangeAnchor = (0, import_react30.useRef)("");
+  const searchInput = (0, import_react30.useRef)(null), searchTrigger = (0, import_react30.useRef)(null), menuFirst = (0, import_react30.useRef)(null);
+  const [located, setLocated] = (0, import_react30.useState)(null);
+  const [renaming, setRenaming] = (0, import_react30.useState)(null);
+  const [newName, setNewName] = (0, import_react30.useState)("");
+  const renameInput = (0, import_react30.useRef)(null);
+  const importInput = (0, import_react30.useRef)(null), importTarget = (0, import_react30.useRef)("");
+  const focusIntent = (0, import_react30.useRef)(null);
+  const [dragPath, setDragPath] = (0, import_react30.useState)(null);
   const root2 = { name: project.name, path: "", directory: true };
-  const onLocated = (0, import_react29.useCallback)((path) => {
+  const onLocated = (0, import_react30.useCallback)((path) => {
     setLocated({ path });
     focusIntent.current = path;
     setFocused(path);
@@ -44528,9 +44688,9 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       else setSelection((current) => current.map((path) => remapProjectFilePath(path, changes)).filter(Boolean));
     }
   });
-  const { rows, entries } = (0, import_react29.useMemo)(() => fileTreeRows(tree, expanded, errors, creating?.parent), [tree, expanded, errors, creating?.parent]);
-  const selectedPaths = (0, import_react29.useMemo)(() => new Set(selection2), [selection2]);
-  const selected2 = (0, import_react29.useMemo)(() => entries.filter((entry) => selectedPaths.has(entry.path)), [entries, selectedPaths]);
+  const { rows, entries } = (0, import_react30.useMemo)(() => fileTreeRows(tree, expanded, errors, creating?.parent), [tree, expanded, errors, creating?.parent]);
+  const selectedPaths = (0, import_react30.useMemo)(() => new Set(selection2), [selection2]);
+  const selected2 = (0, import_react30.useMemo)(() => entries.filter((entry) => selectedPaths.has(entry.path)), [entries, selectedPaths]);
   const primary = selected2.length === 1 ? selected2[0] : null;
   const files = selected2.filter((entry) => !entry.directory && !entry.symbolicLink);
   const eligible = selected2.filter((entry) => !entry.symbolicLink);
@@ -44539,25 +44699,25 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
   const focusPath = entries.some((entry) => entry.path === focused) ? focused : entries[0]?.path;
   const isResults = searchOpen && Boolean(query.trim());
   const matches3 = search?.entries || [];
-  const pinned = (0, import_react29.useMemo)(() => [
+  const pinned = (0, import_react30.useMemo)(() => [
     ...[focusPath, renaming?.path, menu?.entry?.path, dragPath].filter(Boolean).map((path) => "entry:" + path),
     ...creating ? ["create:" + creating.parent] : []
   ], [focusPath, renaming?.path, menu?.entry?.path, dragPath, creating]);
   const treeWindow = useFileTreeWindow(rows, { visible: active && !isResults, editing: renaming?.path, pinned });
-  const cutPaths = (0, import_react29.useMemo)(() => new Set(clipboard?.mode === "move" ? clipboard.paths : []), [clipboard]);
-  (0, import_react29.useEffect)(() => {
+  const cutPaths = (0, import_react30.useMemo)(() => new Set(clipboard?.mode === "move" ? clipboard.paths : []), [clipboard]);
+  (0, import_react30.useEffect)(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
     };
   }, []);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (organizer.working || organizer.feedback) setFeedback(null);
   }, [organizer.working, organizer.feedback]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (searchOpen) searchInput.current?.focus();
   }, [searchOpen]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (!renaming) return;
     const input = renameInput.current;
     if (!input) return;
@@ -44566,7 +44726,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
     input.focus({ preventScroll: true });
     input.setSelectionRange(0, extension > 0 ? extension : renaming.name.length);
   }, [renaming]);
-  (0, import_react29.useLayoutEffect)(() => {
+  (0, import_react30.useLayoutEffect)(() => {
     if (!active || isResults || focusIntent.current !== focused) return;
     const target = rowElements.current.get(focused);
     if (!target) return;
@@ -44574,7 +44734,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
     treeWindow.reveal("entry:" + focused);
     target.focus({ preventScroll: true });
   }, [active, focused, entries, isResults, located, treeWindow.reveal]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     const visible = new Set(entries.map((entry) => entry.path));
     setSelection((current) => current.every((path) => visible.has(path)) ? current : current.filter((path) => visible.has(path)));
   }, [entries]);
@@ -44770,7 +44930,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
     organizer.copy(items, mode);
   }
   function renameRow(entry) {
-    return /* @__PURE__ */ import_react29.default.createElement(
+    return /* @__PURE__ */ import_react30.default.createElement(
       "form",
       {
         className: "wtt-file-inline-create",
@@ -44790,9 +44950,9 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
           if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault();
         }
       },
-      /* @__PURE__ */ import_react29.default.createElement(ProjectFileIcon, { entry }),
-      /* @__PURE__ */ import_react29.default.createElement("input", { ref: renameInput, "aria-label": "\u65B0\u540D\u79F0", value: newName, maxLength: 180, readOnly: locked2, onChange: (event) => setNewName(event.target.value), required: true }),
-      /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "submit", title: "\u786E\u8BA4\u6539\u540D", "aria-label": "\u786E\u8BA4\u6539\u540D", disabled: locked2 || !newName.trim() }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "check" }))
+      /* @__PURE__ */ import_react30.default.createElement(ProjectFileIcon, { entry }),
+      /* @__PURE__ */ import_react30.default.createElement("input", { ref: renameInput, "aria-label": "\u65B0\u540D\u79F0", value: newName, maxLength: 180, readOnly: locked2, onChange: (event) => setNewName(event.target.value), required: true }),
+      /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "submit", title: "\u786E\u8BA4\u6539\u540D", "aria-label": "\u786E\u8BA4\u6539\u540D", disabled: locked2 || !newName.trim() }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "check" }))
     );
   }
   function treeKey(event) {
@@ -44850,7 +45010,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
     if (!creating || creating.parent !== parent) return null;
     const label2 = creating.kind === "file" ? "\u6587\u4EF6\u540D" : creating.kind === "project" ? "\u9879\u76EE\u6587\u4EF6\u5939\u540D" : "\u6587\u4EF6\u5939\u540D";
     const location2 = "\u65B0\u5EFA\u4F4D\u7F6E\uFF1A" + project.name + (parent ? "/" + parent : "");
-    return /* @__PURE__ */ import_react29.default.createElement(
+    return /* @__PURE__ */ import_react30.default.createElement(
       "form",
       {
         className: "wtt-file-inline-create",
@@ -44866,16 +45026,16 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
           } else if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault();
         }
       },
-      /* @__PURE__ */ import_react29.default.createElement(ProjectFileIcon, { entry: { directory: creating.kind !== "file", name: "" } }),
-      /* @__PURE__ */ import_react29.default.createElement("input", { autoFocus: true, "aria-label": label2, title: location2, required: true, maxLength: 180, disabled: busy, value: name2, onChange: (event) => setName(event.target.value), placeholder: label2 }),
-      /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "submit", title: "\u521B\u5EFA\uFF08Enter\uFF09", "aria-label": "\u786E\u8BA4\u521B\u5EFA", disabled: busy || !name2.trim() }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "check" })),
-      /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u53D6\u6D88\uFF08Esc\uFF09", "aria-label": "\u53D6\u6D88\u521B\u5EFA", disabled: busy, onClick: cancelCreate }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "close" }))
+      /* @__PURE__ */ import_react30.default.createElement(ProjectFileIcon, { entry: { directory: creating.kind !== "file", name: "" } }),
+      /* @__PURE__ */ import_react30.default.createElement("input", { autoFocus: true, "aria-label": label2, title: location2, required: true, maxLength: 180, disabled: busy, value: name2, onChange: (event) => setName(event.target.value), placeholder: label2 }),
+      /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "submit", title: "\u521B\u5EFA\uFF08Enter\uFF09", "aria-label": "\u786E\u8BA4\u521B\u5EFA", disabled: busy || !name2.trim() }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "check" })),
+      /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u53D6\u6D88\uFF08Esc\uFF09", "aria-label": "\u53D6\u6D88\u521B\u5EFA", disabled: busy, onClick: cancelCreate }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "close" }))
     );
   }
   function renderTreeRow(row) {
     const { key, kind, parent, level, entry, offset: offset3, top, height } = row;
     const slot = { top, height };
-    if (kind === "entry") return /* @__PURE__ */ import_react29.default.createElement(
+    if (kind === "entry") return /* @__PURE__ */ import_react30.default.createElement(
       "div",
       {
         key,
@@ -44889,7 +45049,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
         "aria-selected": selectedPaths.has(entry.path),
         "aria-expanded": entry.directory ? expanded.has(entry.path) : void 0
       },
-      /* @__PURE__ */ import_react29.default.createElement(
+      /* @__PURE__ */ import_react30.default.createElement(
         "div",
         {
           className: "wtt-file-row" + (selectedPaths.has(entry.path) ? " is-selected" : "") + (organizer.dropTarget?.path === entry.path ? " is-file-drop-target" : "") + (cutPaths.has(entry.path) ? " is-cut" : ""),
@@ -44899,7 +45059,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
           onDragLeave: entry.directory ? organizer.dragLeave : void 0,
           onDrop: entry.directory ? (event) => organizer.drop(event, entry.path) : void 0
         },
-        entry.directory ? /* @__PURE__ */ import_react29.default.createElement(
+        entry.directory ? /* @__PURE__ */ import_react30.default.createElement(
           UiButton,
           {
             variant: "custom",
@@ -44911,9 +45071,9 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
               expand(entry);
             }
           },
-          /* @__PURE__ */ import_react29.default.createElement(UiIcon, { size: 12, name: expanded.has(entry.path) ? "chevronDown" : "chevronRight" })
-        ) : /* @__PURE__ */ import_react29.default.createElement("span", { className: "wtt-file-chevron" }),
-        renaming?.path === entry.path ? renameRow(entry) : /* @__PURE__ */ import_react29.default.createElement(
+          /* @__PURE__ */ import_react30.default.createElement(UiIcon, { size: 12, name: expanded.has(entry.path) ? "chevronDown" : "chevronRight" })
+        ) : /* @__PURE__ */ import_react30.default.createElement("span", { className: "wtt-file-chevron" }),
+        renaming?.path === entry.path ? renameRow(entry) : /* @__PURE__ */ import_react30.default.createElement(
           UiButton,
           {
             variant: "custom",
@@ -44939,13 +45099,13 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
               else if (!entry.symbolicLink) onPreview(entry, { pinned: true });
             }
           },
-          /* @__PURE__ */ import_react29.default.createElement(ProjectFileIcon, { entry }),
-          /* @__PURE__ */ import_react29.default.createElement("span", null, entry.name)
+          /* @__PURE__ */ import_react30.default.createElement(ProjectFileIcon, { entry }),
+          /* @__PURE__ */ import_react30.default.createElement("span", null, entry.name)
         ),
-        organizer.dropTarget?.path === entry.path && /* @__PURE__ */ import_react29.default.createElement("small", { className: "wtt-file-drop-label" }, organizer.dropTarget.copy ? "\u590D\u5236\u5230\u6B64" : "\u79FB\u52A8\u5230\u6B64")
+        organizer.dropTarget?.path === entry.path && /* @__PURE__ */ import_react30.default.createElement("small", { className: "wtt-file-drop-label" }, organizer.dropTarget.copy ? "\u590D\u5236\u5230\u6B64" : "\u79FB\u52A8\u5230\u6B64")
       )
     );
-    return /* @__PURE__ */ import_react29.default.createElement("div", { key, role: "none", className: "wtt-file-tree-slot wtt-file-tree-control", style: slot }, kind === "create" && creationRow(parent, level), kind === "error" && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-branch-status" }, /* @__PURE__ */ import_react29.default.createElement("span", { role: "status", title: row.error }, row.error), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void navigation.load(parent, { offset: offset3 }) }, "\u91CD\u8BD5")), kind === "loading" && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wtt-file-empty", role: "status" }, "\u8BFB\u53D6\u4E2D\u2026"), kind === "empty" && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wtt-file-empty" }, "\u7A7A\u6587\u4EF6\u5939"), (kind === "previous" || kind === "next") && /* @__PURE__ */ import_react29.default.createElement(
+    return /* @__PURE__ */ import_react30.default.createElement("div", { key, role: "none", className: "wtt-file-tree-slot wtt-file-tree-control", style: slot }, kind === "create" && creationRow(parent, level), kind === "error" && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-branch-status" }, /* @__PURE__ */ import_react30.default.createElement("span", { role: "status", title: row.error }, row.error), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => void navigation.load(parent, { offset: offset3 }) }, "\u91CD\u8BD5")), kind === "loading" && /* @__PURE__ */ import_react30.default.createElement("p", { className: "wtt-file-empty", role: "status" }, "\u8BFB\u53D6\u4E2D\u2026"), kind === "empty" && /* @__PURE__ */ import_react30.default.createElement("p", { className: "wtt-file-empty" }, "\u7A7A\u6587\u4EF6\u5939"), (kind === "previous" || kind === "next") && /* @__PURE__ */ import_react30.default.createElement(
       UiButton,
       {
         variant: "ghost",
@@ -44966,7 +45126,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
     } catch {
     }
   }
-  const searchId = (0, import_react29.useId)();
+  const searchId = (0, import_react30.useId)();
   const rowMenuEntry = menu?.kind === "row" ? menu.entry : null;
   const menuItems = menu?.kind === "project" ? [
     ["\u6253\u5F00\u9879\u76EE\u2026", () => {
@@ -45014,11 +45174,11 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       ...rowMenuEntry.path ? [["\u5220\u9664\u2026", () => void prepareDelete(rowMenuEntry), busy || Boolean(creating)]] : []
     ] : []
   ] : [];
-  return /* @__PURE__ */ import_react29.default.createElement("aside", { className: "wtt-project-explorer", "aria-label": "\u9879\u76EE\u6587\u4EF6", style: { width } }, /* @__PURE__ */ import_react29.default.createElement("input", { type: "file", hidden: true, multiple: true, ref: importInput, onChange: (event) => {
+  return /* @__PURE__ */ import_react30.default.createElement("aside", { className: "wtt-project-explorer", "aria-label": "\u9879\u76EE\u6587\u4EF6", style: { width } }, /* @__PURE__ */ import_react30.default.createElement("input", { type: "file", hidden: true, multiple: true, ref: importInput, onChange: (event) => {
     const files2 = Array.from(event.target.files);
     event.target.value = "";
     void organizer.uploadFiles(files2, importTarget.current);
-  } }), /* @__PURE__ */ import_react29.default.createElement("header", { className: "wtt-file-header" }, /* @__PURE__ */ import_react29.default.createElement(
+  } }), /* @__PURE__ */ import_react30.default.createElement("header", { className: "wtt-file-header" }, /* @__PURE__ */ import_react30.default.createElement(
     UiButton,
     {
       variant: "ghost",
@@ -45029,9 +45189,9 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       "aria-expanded": menu?.kind === "project",
       onClick: (event) => toggleMenu(event, "project")
     },
-    /* @__PURE__ */ import_react29.default.createElement("span", null, project.name),
-    /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "chevronDown", size: 12 })
-  ), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u65B0\u5EFA\u6587\u4EF6", "aria-label": "\u65B0\u5EFA\u6587\u4EF6", disabled: busy, onClick: () => start2("file") }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "file" })), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u65B0\u5EFA\u6587\u4EF6\u5939", "aria-label": "\u65B0\u5EFA\u6587\u4EF6\u5939", disabled: busy, onClick: () => start2("folder") }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "folder" })), /* @__PURE__ */ import_react29.default.createElement(
+    /* @__PURE__ */ import_react30.default.createElement("span", null, project.name),
+    /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "chevronDown", size: 12 })
+  ), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u65B0\u5EFA\u6587\u4EF6", "aria-label": "\u65B0\u5EFA\u6587\u4EF6", disabled: busy, onClick: () => start2("file") }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "file" })), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u65B0\u5EFA\u6587\u4EF6\u5939", "aria-label": "\u65B0\u5EFA\u6587\u4EF6\u5939", disabled: busy, onClick: () => start2("folder") }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "folder" })), /* @__PURE__ */ import_react30.default.createElement(
     UiButton,
     {
       variant: "ghost",
@@ -45042,8 +45202,8 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       ref: searchTrigger,
       onClick: () => searchOpen ? closeSearch() : navigation.setSearchOpen(true)
     },
-    /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "search" })
-  ), /* @__PURE__ */ import_react29.default.createElement(
+    /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "search" })
+  ), /* @__PURE__ */ import_react30.default.createElement(
     UiButton,
     {
       variant: "ghost",
@@ -45054,8 +45214,8 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       "aria-expanded": menu?.kind === "panel",
       onClick: (event) => toggleMenu(event, "panel")
     },
-    /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "more" })
-  ), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u6536\u8D77\u6587\u4EF6\u680F", "aria-label": "\u6536\u8D77\u6587\u4EF6\u680F", onClick: onClose }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "close" }))), searchOpen && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-search" }, /* @__PURE__ */ import_react29.default.createElement(
+    /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "more" })
+  ), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", title: "\u6536\u8D77\u6587\u4EF6\u680F", "aria-label": "\u6536\u8D77\u6587\u4EF6\u680F", onClick: onClose }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "close" }))), searchOpen && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-search" }, /* @__PURE__ */ import_react30.default.createElement(
     "input",
     {
       ref: searchInput,
@@ -45077,7 +45237,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
         setMatch(0);
       }
     }
-  )), menu && /* @__PURE__ */ import_react29.default.createElement(
+  )), menu && /* @__PURE__ */ import_react30.default.createElement(
     CanvasPopover,
     {
       anchor: menu.anchor,
@@ -45105,7 +45265,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
     (menuItems.length ? menuItems : [["\u6E05\u9664\u9009\u62E9", () => {
       setSelection([]);
       closeMenu(true);
-    }]]).map(([label2, action, disabled], index2) => /* @__PURE__ */ import_react29.default.createElement(
+    }]]).map(([label2, action, disabled], index2) => /* @__PURE__ */ import_react30.default.createElement(
       UiButton,
       {
         key: label2,
@@ -45117,7 +45277,7 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       },
       label2
     ))
-  ), (error || navigation.navigationError) && /* @__PURE__ */ import_react29.default.createElement(UserError, { error: error || navigation.navigationError }), /* @__PURE__ */ import_react29.default.createElement(
+  ), (error || navigation.navigationError) && /* @__PURE__ */ import_react30.default.createElement(UserError, { error: error || navigation.navigationError }), /* @__PURE__ */ import_react30.default.createElement(
     "div",
     {
       hidden: isResults,
@@ -45133,9 +45293,9 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       onDragLeave: organizer.dragLeave,
       onDrop: (event) => organizer.drop(event, "")
     },
-    organizer.dropTarget?.path === "" && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-root-drop-label" }, /* @__PURE__ */ import_react29.default.createElement("small", { className: "wtt-file-drop-label" }, organizer.dropTarget.copy ? "\u590D\u5236\u5230\u9879\u76EE\u6839\u76EE\u5F55" : "\u79FB\u52A8\u5230\u9879\u76EE\u6839\u76EE\u5F55")),
-    /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-tree-space", role: "presentation", style: { height: active && !isResults ? treeWindow.height : 0 } }, treeWindow.items.map(renderTreeRow))
-  ), isResults && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-results" }, /* @__PURE__ */ import_react29.default.createElement("div", { id: searchId, role: "listbox", "aria-label": "\u67E5\u627E\u7ED3\u679C" }, matches3.map((entry, index2) => /* @__PURE__ */ import_react29.default.createElement(
+    organizer.dropTarget?.path === "" && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-root-drop-label" }, /* @__PURE__ */ import_react30.default.createElement("small", { className: "wtt-file-drop-label" }, organizer.dropTarget.copy ? "\u590D\u5236\u5230\u9879\u76EE\u6839\u76EE\u5F55" : "\u79FB\u52A8\u5230\u9879\u76EE\u6839\u76EE\u5F55")),
+    /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-tree-space", role: "presentation", style: { height: active && !isResults ? treeWindow.height : 0 } }, treeWindow.items.map(renderTreeRow))
+  ), isResults && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-results" }, /* @__PURE__ */ import_react30.default.createElement("div", { id: searchId, role: "listbox", "aria-label": "\u67E5\u627E\u7ED3\u679C" }, matches3.map((entry, index2) => /* @__PURE__ */ import_react30.default.createElement(
     UiButton,
     {
       key: entry.path,
@@ -45149,9 +45309,9 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       onMouseEnter: () => setMatch(index2),
       onClick: () => void navigation.locate(entry.path)
     },
-    /* @__PURE__ */ import_react29.default.createElement(ProjectFileIcon, { entry }),
-    /* @__PURE__ */ import_react29.default.createElement("span", null, /* @__PURE__ */ import_react29.default.createElement("strong", null, entry.name), /* @__PURE__ */ import_react29.default.createElement("small", null, projectFileParent(entry.path) || project.name))
-  ))), locating && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wtt-file-empty", role: "status" }, "\u5B9A\u4F4D\u4E2D\u2026"), !search && !locating && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wtt-file-empty", role: "status" }, "\u67E5\u627E\u4E2D\u2026"), search?.error && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-branch-status" }, /* @__PURE__ */ import_react29.default.createElement(UserError, { error: search.error }), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", onClick: navigation.refreshSearch }, "\u91CD\u8BD5")), search && !search.error && (!matches3.length || search.truncated) && /* @__PURE__ */ import_react29.default.createElement("p", { className: "wtt-file-empty", role: "status" }, search.truncated ? "\u8BF7\u589E\u52A0\u6587\u4EF6\u540D\u6216\u8DEF\u5F84\u6761\u4EF6\uFF0C\u67E5\u770B\u66F4\u51C6\u786E\u7684\u7ED3\u679C\u3002" : "\u6CA1\u6709\u627E\u5230\u6587\u4EF6")), !isResults && Boolean(selected2.length) && /* @__PURE__ */ import_react29.default.createElement("footer", null, selected2.length > 1 && /* @__PURE__ */ import_react29.default.createElement("span", { role: "status" }, "\u5DF2\u9009 ", selected2.length, " \u9879"), files.length > 0 && /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "quiet", disabled: !canAdd || busy, onClick: () => addEntries(files) }, "\u6DFB\u52A0\u5230\u753B\u5E03"), primary && !primary.directory && !primary.symbolicLink && /* @__PURE__ */ import_react29.default.createElement(UiButton, { className: "wtt-file-mobile-preview", onClick: () => onPreview(primary) }, "\u9884\u89C8"), primary?.directory && /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "quiet", onClick: () => switchProject(primary) }, "\u6253\u5F00\u4E3A\u9879\u76EE"), /* @__PURE__ */ import_react29.default.createElement(
+    /* @__PURE__ */ import_react30.default.createElement(ProjectFileIcon, { entry }),
+    /* @__PURE__ */ import_react30.default.createElement("span", null, /* @__PURE__ */ import_react30.default.createElement("strong", null, entry.name), /* @__PURE__ */ import_react30.default.createElement("small", null, projectFileParent(entry.path) || project.name))
+  ))), locating && /* @__PURE__ */ import_react30.default.createElement("p", { className: "wtt-file-empty", role: "status" }, "\u5B9A\u4F4D\u4E2D\u2026"), !search && !locating && /* @__PURE__ */ import_react30.default.createElement("p", { className: "wtt-file-empty", role: "status" }, "\u67E5\u627E\u4E2D\u2026"), search?.error && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-branch-status" }, /* @__PURE__ */ import_react30.default.createElement(UserError, { error: search.error }), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", onClick: navigation.refreshSearch }, "\u91CD\u8BD5")), search && !search.error && (!matches3.length || search.truncated) && /* @__PURE__ */ import_react30.default.createElement("p", { className: "wtt-file-empty", role: "status" }, search.truncated ? "\u8BF7\u589E\u52A0\u6587\u4EF6\u540D\u6216\u8DEF\u5F84\u6761\u4EF6\uFF0C\u67E5\u770B\u66F4\u51C6\u786E\u7684\u7ED3\u679C\u3002" : "\u6CA1\u6709\u627E\u5230\u6587\u4EF6")), !isResults && Boolean(selected2.length) && /* @__PURE__ */ import_react30.default.createElement("footer", null, selected2.length > 1 && /* @__PURE__ */ import_react30.default.createElement("span", { role: "status" }, "\u5DF2\u9009 ", selected2.length, " \u9879"), files.length > 0 && /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "quiet", disabled: !canAdd || busy, onClick: () => addEntries(files) }, "\u6DFB\u52A0\u5230\u753B\u5E03"), primary && !primary.directory && !primary.symbolicLink && /* @__PURE__ */ import_react30.default.createElement(UiButton, { className: "wtt-file-mobile-preview", onClick: () => onPreview(primary) }, "\u9884\u89C8"), primary?.directory && /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "quiet", onClick: () => switchProject(primary) }, "\u6253\u5F00\u4E3A\u9879\u76EE"), /* @__PURE__ */ import_react30.default.createElement(
     UiButton,
     {
       variant: "ghost",
@@ -45161,8 +45321,8 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
       disabled: busy,
       onClick: (event) => setMenu({ kind: "row", anchor: event.currentTarget, entry: primary || selected2[0] })
     },
-    /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "more" })
-  )), !isResults && feedback && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-batch-status" }, /* @__PURE__ */ import_react29.default.createElement("span", { role: "status" }, feedback.done ? "\u5DF2" + (feedback.references ? "\u5F15\u7528 " : "\u6DFB\u52A0 ") + feedback.done + " \u9879" : "", feedback.failed.length > 0 && (feedback.done ? "\uFF0C" : "") + feedback.failed.length + " \u9879\u9700\u91CD\u8BD5"), feedback.failed.length > 0 && /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => addEntries(feedback.failed, feedback.references) }, "\u91CD\u8BD5"), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "ghost", size: "compact", iconOnly: true, "aria-label": "\u5173\u95ED\u6587\u4EF6\u64CD\u4F5C\u53CD\u9988", onClick: () => setFeedback(null) }, /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: "close", size: 14 })), feedback.failed.length > 0 && /* @__PURE__ */ import_react29.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react29.default.createElement("summary", null, "\u67E5\u770B\u5931\u8D25\u6587\u4EF6"), /* @__PURE__ */ import_react29.default.createElement("ul", null, feedback.failed.map((item) => /* @__PURE__ */ import_react29.default.createElement("li", { key: item.path }, /* @__PURE__ */ import_react29.default.createElement("strong", null, item.name || item.path), /* @__PURE__ */ import_react29.default.createElement("span", null, item.error)))))), deletePlan && /* @__PURE__ */ import_react29.default.createElement(DeleteProjectFilesDialog, { plan: deletePlan, request, onClose: () => setDeletePlan(null), onDone: deleted }), /* @__PURE__ */ import_react29.default.createElement(FileOrganizeNotice, { organizer }), organizer.conflicts && /* @__PURE__ */ import_react29.default.createElement(FileConflictDialog, { matches: organizer.conflicts.matches, onResolve: organizer.resolveConflicts }), /* @__PURE__ */ import_react29.default.createElement(
+    /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "more" })
+  )), !isResults && feedback && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-batch-status" }, /* @__PURE__ */ import_react30.default.createElement("span", { role: "status" }, feedback.done ? "\u5DF2" + (feedback.references ? "\u5F15\u7528 " : "\u6DFB\u52A0 ") + feedback.done + " \u9879" : "", feedback.failed.length > 0 && (feedback.done ? "\uFF0C" : "") + feedback.failed.length + " \u9879\u9700\u91CD\u8BD5"), feedback.failed.length > 0 && /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", onClick: () => addEntries(feedback.failed, feedback.references) }, "\u91CD\u8BD5"), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "ghost", size: "compact", iconOnly: true, "aria-label": "\u5173\u95ED\u6587\u4EF6\u64CD\u4F5C\u53CD\u9988", onClick: () => setFeedback(null) }, /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: "close", size: 14 })), feedback.failed.length > 0 && /* @__PURE__ */ import_react30.default.createElement("details", { className: "wtt-file-batch-errors" }, /* @__PURE__ */ import_react30.default.createElement("summary", null, "\u67E5\u770B\u5931\u8D25\u6587\u4EF6"), /* @__PURE__ */ import_react30.default.createElement("ul", null, feedback.failed.map((item) => /* @__PURE__ */ import_react30.default.createElement("li", { key: item.path }, /* @__PURE__ */ import_react30.default.createElement("strong", null, item.name || item.path), /* @__PURE__ */ import_react30.default.createElement("span", null, item.error)))))), deletePlan && /* @__PURE__ */ import_react30.default.createElement(DeleteProjectFilesDialog, { plan: deletePlan, request, onClose: () => setDeletePlan(null), onDone: deleted }), /* @__PURE__ */ import_react30.default.createElement(FileOrganizeNotice, { organizer }), organizer.conflicts && /* @__PURE__ */ import_react30.default.createElement(FileConflictDialog, { matches: organizer.conflicts.matches, onResolve: organizer.resolveConflicts }), /* @__PURE__ */ import_react30.default.createElement(
     "div",
     {
       className: "wtt-file-resize",
@@ -45201,15 +45361,15 @@ function ProjectExplorer({ project, request, active, onClose, onChooseProject, o
 function ProjectFileIcon({ entry }) {
   const format = entry.name.split(".").at(-1).toLowerCase();
   const icon = entry.directory ? "directory" : entry.symbolicLink ? "link" : /^(png|jpe?g|gif|webp|svg|bmp|avif|heic)$/.test(format) ? "image" : /^(mp4|mov|webm|m4v|avi|mkv)$/.test(format) ? "video" : /^(pptx?|odp|key)$/.test(format) ? "slides" : /^(csv|xlsx?|numbers)$/.test(format) ? "table" : /^(mp3|wav|m4a|aac|ogg|flac)$/.test(format) ? "audio" : "document";
-  return /* @__PURE__ */ import_react29.default.createElement(UiIcon, { name: icon, className: "wtt-file-type is-" + icon, size: 15 });
+  return /* @__PURE__ */ import_react30.default.createElement(UiIcon, { name: icon, className: "wtt-file-type is-" + icon, size: 15 });
 }
 function ProjectFilePreview({ selection: selection2, endpoint: endpoint2, onClose, onAdd: onAdd2, onToggleWidth, widthExpanded, onPin, onLocate }) {
-  const [localExpanded, setLocalExpanded] = (0, import_react29.useState)(false);
+  const [localExpanded, setLocalExpanded] = (0, import_react30.useState)(false);
   const expanded = onToggleWidth ? widthExpanded : localExpanded;
-  const [data, setData] = (0, import_react29.useState)(null), [error, setError] = (0, import_react29.useState)(""), [pages, setPages] = (0, import_react29.useState)(null), [page, setPage] = (0, import_react29.useState)(1), [pageError, setPageError] = (0, import_react29.useState)("");
-  const [refreshTick, setRefreshTick] = (0, import_react29.useState)(0), [externalNotice, setExternalNotice] = (0, import_react29.useState)(""), [statInfo, setStatInfo] = (0, import_react29.useState)(null);
-  const [textView, setTextView] = (0, import_react29.useState)(null), [textPageNo, setTextPageNo] = (0, import_react29.useState)(1), [textError, setTextError] = (0, import_react29.useState)(""), [wrap2, setWrap] = (0, import_react29.useState)(false);
-  (0, import_react29.useEffect)(() => {
+  const [data, setData] = (0, import_react30.useState)(null), [error, setError] = (0, import_react30.useState)(""), [pages, setPages] = (0, import_react30.useState)(null), [page, setPage] = (0, import_react30.useState)(1), [pageError, setPageError] = (0, import_react30.useState)("");
+  const [refreshTick, setRefreshTick] = (0, import_react30.useState)(0), [externalNotice, setExternalNotice] = (0, import_react30.useState)(""), [statInfo, setStatInfo] = (0, import_react30.useState)(null);
+  const [textView, setTextView] = (0, import_react30.useState)(null), [textPageNo, setTextPageNo] = (0, import_react30.useState)(1), [textError, setTextError] = (0, import_react30.useState)(""), [wrap2, setWrap] = (0, import_react30.useState)(false);
+  (0, import_react30.useEffect)(() => {
     let live = true;
     setData(null);
     setError("");
@@ -45232,7 +45392,7 @@ function ProjectFilePreview({ selection: selection2, endpoint: endpoint2, onClos
       live = false;
     };
   }, [selection2.path, selection2.token, refreshTick]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     let live = true;
     setPages(null);
     setPage(1);
@@ -45251,11 +45411,11 @@ function ProjectFilePreview({ selection: selection2, endpoint: endpoint2, onClos
   const isMarkdown = data?.format === "md" || data?.format === "markdown";
   const bigMarkdown = isMarkdown && data?.content && data.content.length > 15e4;
   const isText2 = data?.mime === "text/plain" && data.content !== void 0 && !data.empty && !isMarkdown || Boolean(bigMarkdown);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     setPageNo(1);
     setTextView(null);
   }, [selection2.path, data?.hash, refreshTick]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (!isText2) return;
     let live = true;
     setTextError("");
@@ -45270,7 +45430,7 @@ function ProjectFilePreview({ selection: selection2, endpoint: endpoint2, onClos
       live = false;
     };
   }, [isText2, textPageNo, selection2.path, data?.hash, refreshTick]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (!statInfo) return;
     let live = true;
     const timer2 = setInterval(async () => {
@@ -45301,19 +45461,19 @@ function ProjectFilePreview({ selection: selection2, endpoint: endpoint2, onClos
     };
   }, [selection2.path, statInfo]);
   const href = data ? endpoint2({ projectFileDownload: data.path, hash: data.hash }).href : null, preview = data ? endpoint2({ projectFileDownload: data.path, hash: data.hash, preview: "1" }).href : null;
-  const textViewBar = /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-textbar" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "wtt-file-textbar-info", role: "status" }, textView ? `${textView.startLine}\u2013${textView.startLine + textView.lines.length - 1} \u884C \xB7 \u5171 ${textView.lineCount} \u884C` : "\u6B63\u5728\u8BFB\u53D6\u6587\u672C\u2026"), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "custom", type: "button", size: "compact", "aria-pressed": wrap2, title: "\u5207\u6362\u81EA\u52A8\u6362\u884C", onClick: () => setWrap((v2) => !v2) }, "\u81EA\u52A8\u6362\u884C"), /* @__PURE__ */ import_react29.default.createElement("nav", { "aria-label": "\u6587\u672C\u9875\u7801", className: "wtt-file-textnav" }, /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "custom", type: "button", size: "compact", disabled: !textView || textView.page <= 1, onClick: () => setTextPageNo(textView.page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react29.default.createElement("span", null, textView ? `${textView.page} / ${textView.pageCount}` : ""), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "custom", type: "button", size: "compact", disabled: !textView || textView.page >= textView.pageCount, onClick: () => setTextPageNo(textView.page + 1) }, "\u4E0B\u4E00\u9875")));
-  const textViewBody = textError ? /* @__PURE__ */ import_react29.default.createElement(UserError, { error: textError }) : !textView ? /* @__PURE__ */ import_react29.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6587\u672C\u2026") : /* @__PURE__ */ import_react29.default.createElement("div", { className: `wtt-file-textview${wrap2 ? " is-wrap" : ""}`, role: "document" }, textView.lines.map((line, i) => /* @__PURE__ */ import_react29.default.createElement("div", { key: i, className: "wtt-file-line" }, /* @__PURE__ */ import_react29.default.createElement("span", { className: "wtt-file-line-no", "aria-hidden": "true" }, textView.startLine + i), /* @__PURE__ */ import_react29.default.createElement("span", { className: "wtt-file-line-text" }, line || "\u200B"))));
-  return /* @__PURE__ */ import_react29.default.createElement("aside", { className: "wtt-project-file-preview", "data-expanded": expanded || void 0, "aria-label": "\u9879\u76EE\u6587\u4EF6\u9884\u89C8" }, /* @__PURE__ */ import_react29.default.createElement(PanelHeader, { title: selection2.name, subtitle: selection2.path, format: data?.format?.toUpperCase(), downloadHref: href, expanded, onToggleWidth: onToggleWidth || (() => setLocalExpanded((v2) => !v2)), onClose, closeLabel: "\u5173\u95ED\u6587\u4EF6\u9884\u89C8" }), /* @__PURE__ */ import_react29.default.createElement(PanelToolbar, null, onPin && /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "quiet", "aria-pressed": Boolean(selection2.pinned), onClick: onPin }, selection2.pinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u9884\u89C8"), onLocate && /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "quiet", onClick: onLocate }, "\u5728\u9879\u76EE\u6587\u4EF6\u4E2D\u5B9A\u4F4D"), onAdd2 && /* @__PURE__ */ import_react29.default.createElement(UiButton, { disabled: !data || data.empty || Boolean(data.error), onClick: () => onAdd2({ ...selection2, hash: data.hash }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), error && /* @__PURE__ */ import_react29.default.createElement(UserError, { error }), externalNotice && /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-notice", role: "status" }, externalNotice), /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-preview-body" }, !data && !error ? /* @__PURE__ */ import_react29.default.createElement("p", { role: "status" }, "\u6B63\u5728\u9884\u89C8\u2026") : data?.empty ? /* @__PURE__ */ import_react29.default.createElement("p", null, "\u7A7A\u6587\u4EF6") : data?.mime.startsWith("image/") && data.media?.validated ? /* @__PURE__ */ import_react29.default.createElement("img", { src: preview, alt: selection2.name }) : data?.mime.startsWith("video/") && data.media?.validated ? /* @__PURE__ */ import_react29.default.createElement(VideoPreview, { src: preview, "aria-label": selection2.name }) : data && ["pdf", "docx", "pptx"].includes(data.format) ? /* @__PURE__ */ import_react29.default.createElement(import_react29.default.Fragment, null, pages ? /* @__PURE__ */ import_react29.default.createElement(import_react29.default.Fragment, null, /* @__PURE__ */ import_react29.default.createElement("nav", { "aria-label": "\u6587\u4EF6\u9875\u7801" }, /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page <= 1, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react29.default.createElement("span", null, page, " / ", pages.pageCount), /* @__PURE__ */ import_react29.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page >= pages.pageCount, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react29.default.createElement("img", { src: endpoint2({ projectFilePage: selection2.path, hash: data.hash, page: String(page) }).href, alt: `${selection2.name} \u7B2C${page}\u9875` })) : pageError ? /* @__PURE__ */ import_react29.default.createElement(UserError, { error: pageError }) : /* @__PURE__ */ import_react29.default.createElement("p", { role: "status" }, "\u6B63\u5728\u51C6\u5907\u5B9E\u9645\u5206\u9875\u2026")) : isMarkdown && data?.content && !bigMarkdown ? /* @__PURE__ */ import_react29.default.createElement("div", { className: "wtt-file-md", key: data.hash }, /* @__PURE__ */ import_react29.default.createElement(MarkdownView, { content: data.content })) : isText2 ? /* @__PURE__ */ import_react29.default.createElement(import_react29.default.Fragment, null, " ", textViewBar, textViewBody) : data?.content ? /* @__PURE__ */ import_react29.default.createElement(import_react29.default.Fragment, null, /* @__PURE__ */ import_react29.default.createElement("small", null, ["docx", "pptx"].includes(data.format) ? "\u6B63\u6587\u9884\u89C8" : ""), /* @__PURE__ */ import_react29.default.createElement("pre", null, data.content), data.truncated && /* @__PURE__ */ import_react29.default.createElement("p", null, "\u6B63\u6587\u5DF2\u622A\u53D6\uFF0C\u4E0B\u8F7D\u67E5\u770B\u5B8C\u6574\u6587\u4EF6\u3002")) : data && /* @__PURE__ */ import_react29.default.createElement("p", null, data.error || data.extractionError || "\u6B64\u683C\u5F0F\u6682\u65E0\u9884\u89C8\uFF0C\u53EF\u4E0B\u8F7D\u67E5\u770B\u3002")));
+  const textViewBar = /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-textbar" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "wtt-file-textbar-info", role: "status" }, textView ? `${textView.startLine}\u2013${textView.startLine + textView.lines.length - 1} \u884C \xB7 \u5171 ${textView.lineCount} \u884C` : "\u6B63\u5728\u8BFB\u53D6\u6587\u672C\u2026"), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "custom", type: "button", size: "compact", "aria-pressed": wrap2, title: "\u5207\u6362\u81EA\u52A8\u6362\u884C", onClick: () => setWrap((v2) => !v2) }, "\u81EA\u52A8\u6362\u884C"), /* @__PURE__ */ import_react30.default.createElement("nav", { "aria-label": "\u6587\u672C\u9875\u7801", className: "wtt-file-textnav" }, /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "custom", type: "button", size: "compact", disabled: !textView || textView.page <= 1, onClick: () => setTextPageNo(textView.page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react30.default.createElement("span", null, textView ? `${textView.page} / ${textView.pageCount}` : ""), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "custom", type: "button", size: "compact", disabled: !textView || textView.page >= textView.pageCount, onClick: () => setTextPageNo(textView.page + 1) }, "\u4E0B\u4E00\u9875")));
+  const textViewBody = textError ? /* @__PURE__ */ import_react30.default.createElement(UserError, { error: textError }) : !textView ? /* @__PURE__ */ import_react30.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6587\u672C\u2026") : /* @__PURE__ */ import_react30.default.createElement("div", { className: `wtt-file-textview${wrap2 ? " is-wrap" : ""}`, role: "document" }, textView.lines.map((line, i) => /* @__PURE__ */ import_react30.default.createElement("div", { key: i, className: "wtt-file-line" }, /* @__PURE__ */ import_react30.default.createElement("span", { className: "wtt-file-line-no", "aria-hidden": "true" }, textView.startLine + i), /* @__PURE__ */ import_react30.default.createElement("span", { className: "wtt-file-line-text" }, line || "\u200B"))));
+  return /* @__PURE__ */ import_react30.default.createElement("aside", { className: "wtt-project-file-preview", "data-expanded": expanded || void 0, "aria-label": "\u9879\u76EE\u6587\u4EF6\u9884\u89C8" }, /* @__PURE__ */ import_react30.default.createElement(PanelHeader, { title: selection2.name, subtitle: selection2.path, format: data?.format?.toUpperCase(), downloadHref: href, expanded, onToggleWidth: onToggleWidth || (() => setLocalExpanded((v2) => !v2)), onClose, closeLabel: "\u5173\u95ED\u6587\u4EF6\u9884\u89C8" }), /* @__PURE__ */ import_react30.default.createElement(PanelToolbar, null, onPin && /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "quiet", "aria-pressed": Boolean(selection2.pinned), onClick: onPin }, selection2.pinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u9884\u89C8"), onLocate && /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "quiet", onClick: onLocate }, "\u5728\u9879\u76EE\u6587\u4EF6\u4E2D\u5B9A\u4F4D"), onAdd2 && /* @__PURE__ */ import_react30.default.createElement(UiButton, { disabled: !data || data.empty || Boolean(data.error), onClick: () => onAdd2({ ...selection2, hash: data.hash }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), error && /* @__PURE__ */ import_react30.default.createElement(UserError, { error }), externalNotice && /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-notice", role: "status" }, externalNotice), /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-preview-body" }, !data && !error ? /* @__PURE__ */ import_react30.default.createElement("p", { role: "status" }, "\u6B63\u5728\u9884\u89C8\u2026") : data?.empty ? /* @__PURE__ */ import_react30.default.createElement("p", null, "\u7A7A\u6587\u4EF6") : data?.mime.startsWith("image/") && data.media?.validated ? /* @__PURE__ */ import_react30.default.createElement("img", { src: preview, alt: selection2.name }) : data?.mime.startsWith("video/") && data.media?.validated ? /* @__PURE__ */ import_react30.default.createElement(VideoPreview, { src: preview, "aria-label": selection2.name }) : data && ["pdf", "docx", "pptx"].includes(data.format) ? /* @__PURE__ */ import_react30.default.createElement(import_react30.default.Fragment, null, pages ? /* @__PURE__ */ import_react30.default.createElement(import_react30.default.Fragment, null, /* @__PURE__ */ import_react30.default.createElement("nav", { "aria-label": "\u6587\u4EF6\u9875\u7801" }, /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page <= 1, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react30.default.createElement("span", null, page, " / ", pages.pageCount), /* @__PURE__ */ import_react30.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page >= pages.pageCount, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react30.default.createElement("img", { src: endpoint2({ projectFilePage: selection2.path, hash: data.hash, page: String(page) }).href, alt: `${selection2.name} \u7B2C${page}\u9875` })) : pageError ? /* @__PURE__ */ import_react30.default.createElement(UserError, { error: pageError }) : /* @__PURE__ */ import_react30.default.createElement("p", { role: "status" }, "\u6B63\u5728\u51C6\u5907\u5B9E\u9645\u5206\u9875\u2026")) : isMarkdown && data?.content && !bigMarkdown ? /* @__PURE__ */ import_react30.default.createElement("div", { className: "wtt-file-md", key: data.hash }, /* @__PURE__ */ import_react30.default.createElement(MarkdownView, { content: data.content })) : isText2 ? /* @__PURE__ */ import_react30.default.createElement(import_react30.default.Fragment, null, " ", textViewBar, textViewBody) : data?.content ? /* @__PURE__ */ import_react30.default.createElement(import_react30.default.Fragment, null, /* @__PURE__ */ import_react30.default.createElement("small", null, ["docx", "pptx"].includes(data.format) ? "\u6B63\u6587\u9884\u89C8" : ""), /* @__PURE__ */ import_react30.default.createElement("pre", null, data.content), data.truncated && /* @__PURE__ */ import_react30.default.createElement("p", null, "\u6B63\u6587\u5DF2\u622A\u53D6\uFF0C\u4E0B\u8F7D\u67E5\u770B\u5B8C\u6574\u6587\u4EF6\u3002")) : data && /* @__PURE__ */ import_react30.default.createElement("p", null, data.error || data.extractionError || "\u6B64\u683C\u5F0F\u6682\u65E0\u9884\u89C8\uFF0C\u53EF\u4E0B\u8F7D\u67E5\u770B\u3002")));
 }
 
 // src/svg-source-view.jsx
-var import_react35 = __toESM(require("react"), 1);
+var import_react36 = __toESM(require("react"), 1);
 
 // src/svg-inline-page.jsx
-var import_react32 = __toESM(require("react"), 1);
+var import_react33 = __toESM(require("react"), 1);
 
 // src/ppt-inline-editor.jsx
-var import_react31 = __toESM(require("react"), 1);
+var import_react32 = __toESM(require("react"), 1);
 
 // src/ppt-editor-state.mjs
 var clone = (value) => JSON.parse(JSON.stringify(value));
@@ -45444,12 +45604,12 @@ function pptInlineStyle(document2, element, { editing = false } = {}) {
 
 // src/ppt-inline-editor.jsx
 function InlineText({ document: document2, element, onChange, onFinish }) {
-  const input = (0, import_react31.useRef)(null), initial = (0, import_react31.useRef)(element.text), composing = (0, import_react31.useRef)(false), cancelled = (0, import_react31.useRef)(false);
-  (0, import_react31.useEffect)(() => {
+  const input = (0, import_react32.useRef)(null), initial = (0, import_react32.useRef)(element.text), composing = (0, import_react32.useRef)(false), cancelled = (0, import_react32.useRef)(false);
+  (0, import_react32.useEffect)(() => {
     input.current?.focus({ preventScroll: true });
     input.current?.setSelectionRange(initial.current.length, initial.current.length);
   }, []);
-  return /* @__PURE__ */ import_react31.default.createElement(
+  return /* @__PURE__ */ import_react32.default.createElement(
     "textarea",
     {
       ref: input,
@@ -45490,8 +45650,8 @@ function InlineText({ document: document2, element, onChange, onFinish }) {
   );
 }
 function PptTextLayer({ document: document2, slide, renderedSlide, selectedId, disabled, showBounds, onSelect, onEdit, onCommit, onEditingChange }) {
-  const [editingId, setEditingId] = (0, import_react31.useState)(null);
-  (0, import_react31.useEffect)(() => () => onEditingChange?.(false), []);
+  const [editingId, setEditingId] = (0, import_react32.useState)(null);
+  (0, import_react32.useEffect)(() => () => onEditingChange?.(false), []);
   function finish(result) {
     setEditingId(null);
     onEditingChange?.(false);
@@ -45504,7 +45664,7 @@ function PptTextLayer({ document: document2, slide, renderedSlide, selectedId, d
     const editable2 = element.editable !== false;
     const rendered = renderedSlide?.elements.find((item) => item.id === element.id);
     const changed = editable2 && rendered && rendered.text !== element.text;
-    if (editingId === element.id && editable2 && !disabled) return /* @__PURE__ */ import_react31.default.createElement(
+    if (editingId === element.id && editable2 && !disabled) return /* @__PURE__ */ import_react32.default.createElement(
       InlineText,
       {
         key: element.id,
@@ -45514,7 +45674,7 @@ function PptTextLayer({ document: document2, slide, renderedSlide, selectedId, d
         onFinish: finish
       }
     );
-    return /* @__PURE__ */ import_react31.default.createElement(import_react31.default.Fragment, { key: element.id }, changed && /* @__PURE__ */ import_react31.default.createElement("div", { className: "wtt-ppt-inline-draft", style: pptInlineStyle(document2, element), "aria-hidden": "true" }, element.text), /* @__PURE__ */ import_react31.default.createElement(
+    return /* @__PURE__ */ import_react32.default.createElement(import_react32.default.Fragment, { key: element.id }, changed && /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-ppt-inline-draft", style: pptInlineStyle(document2, element), "aria-hidden": "true" }, element.text), /* @__PURE__ */ import_react32.default.createElement(
       UiButton,
       {
         variant: "custom",
@@ -45539,9 +45699,9 @@ function PptTextLayer({ document: document2, slide, renderedSlide, selectedId, d
 
 // src/svg-inline-page.jsx
 function SvgInlinePage({ document: document2, slide, renderedSlide, manifest, api, selectedId, marks, plus, onPlusToggle, onSelect, onEdit, onCommit, onEditingChange, disabled, readOnly, showBounds, onError, onObjectSelect }) {
-  const host = (0, import_react32.useRef)(null), [displayed, setDisplayed] = (0, import_react32.useState)(null), [geometry, setGeometry] = (0, import_react32.useState)(null);
+  const host = (0, import_react33.useRef)(null), [displayed, setDisplayed] = (0, import_react33.useState)(null), [geometry, setGeometry] = (0, import_react33.useState)(null);
   const href = slide && manifest?.status === "ready" ? api.getPageHref({ draftId: manifest.draftId, revision: manifest.revision, page: slide.number }) : null;
-  (0, import_react32.useEffect)(() => {
+  (0, import_react33.useEffect)(() => {
     if (!href) return;
     const controller = new AbortController();
     fetch(href, { credentials: "same-origin", signal: controller.signal }).then(async (response) => {
@@ -45554,7 +45714,7 @@ function SvgInlinePage({ document: document2, slide, renderedSlide, manifest, ap
     return () => controller.abort();
   }, [href]);
   const visible = displayed?.slideId === slide?.id ? displayed : null;
-  (0, import_react32.useLayoutEffect)(() => {
+  (0, import_react33.useLayoutEffect)(() => {
     if (!visible || !host.current) return;
     const measure = () => {
       const svg = host.current?.querySelector("svg"), rect = svg?.getBoundingClientRect();
@@ -45575,7 +45735,7 @@ function SvgInlinePage({ document: document2, slide, renderedSlide, manifest, ap
     globalThis.document.fonts?.ready?.then?.(measure);
     return () => observer.disconnect();
   }, [visible?.href]);
-  (0, import_react32.useEffect)(() => {
+  (0, import_react33.useEffect)(() => {
     if (!host.current) return;
     for (const node of host.current.querySelectorAll("[data-wtt-selected]")) node.removeAttribute("data-wtt-selected");
     if (selectedId) {
@@ -45583,44 +45743,44 @@ function SvgInlinePage({ document: document2, slide, renderedSlide, manifest, ap
     }
   }, [selectedId, visible?.href]);
   const page = geometry?.slideId === slide?.id ? { ...slide, elements: slide.elements.map((e) => ({ ...geometry.elements.find((g2) => g2.id === e.id), ...e, bounds: geometry.elements.find((g2) => g2.id === e.id)?.bounds, textStyle: geometry.elements.find((g2) => g2.id === e.id)?.textStyle })) } : null;
-  return /* @__PURE__ */ import_react32.default.createElement("div", { className: `wtt-ppt-page-wrap${showBounds ? " show-object-bounds" : ""}` }, /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-ppt-page wtt-svg-page", style: { aspectRatio: `${document2.width} / ${document2.height}` }, "aria-label": `\u7B2C ${slide?.number || 1} \u9875SVG\u9884\u89C8` }, /* @__PURE__ */ import_react32.default.createElement("div", { ref: host, className: `wtt-svg-page-art${onObjectSelect ? " is-selectable" : ""}`, "aria-hidden": "true", onClick: (event) => {
+  return /* @__PURE__ */ import_react33.default.createElement("div", { className: `wtt-ppt-page-wrap${showBounds ? " show-object-bounds" : ""}` }, /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-ppt-page wtt-svg-page", style: { aspectRatio: `${document2.width} / ${document2.height}` }, "aria-label": `\u7B2C ${slide?.number || 1} \u9875SVG\u9884\u89C8` }, /* @__PURE__ */ import_react33.default.createElement("div", { ref: host, className: `wtt-svg-page-art${onObjectSelect ? " is-selectable" : ""}`, "aria-hidden": "true", onClick: (event) => {
     const target = event.target.closest?.("[data-wtt-svg-id]");
     const objectId = target?.getAttribute("data-wtt-svg-id");
     if (objectId && objectId !== "n") onObjectSelect?.(objectId);
-  }, dangerouslySetInnerHTML: { __html: visible?.markup || "" } }), !visible && /* @__PURE__ */ import_react32.default.createElement("div", { className: "wtt-ppt-page-empty", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6E90\u7A3F\u2026"), !readOnly && visible && page && marks && [...marks.entries()].map(([id2, n]) => {
+  }, dangerouslySetInnerHTML: { __html: visible?.markup || "" } }), !visible && /* @__PURE__ */ import_react33.default.createElement("div", { className: "wtt-ppt-page-empty", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6E90\u7A3F\u2026"), !readOnly && visible && page && marks && [...marks.entries()].map(([id2, n]) => {
     const el = page.elements.find((e) => e.id === id2);
     if (!el) return null;
     const base2 = pptObjectStyle(document2, el);
     if (!base2) return null;
-    return /* @__PURE__ */ import_react32.default.createElement("span", { key: id2, className: `wtt-svg-badge${selectedId === id2 ? " is-active" : ""}`, style: { left: base2.left, top: base2.top } }, n);
+    return /* @__PURE__ */ import_react33.default.createElement("span", { key: id2, className: `wtt-svg-badge${selectedId === id2 ? " is-active" : ""}`, style: { left: base2.left, top: base2.top } }, n);
   }), !readOnly && visible && page && plus && (() => {
     const el = page.elements.find((e) => e.id === plus.id);
     if (!el) return null;
     const base2 = pptObjectStyle(document2, el);
     if (!base2) return null;
     const corner = `calc(${parseFloat(base2.left) + parseFloat(base2.width)}%)`;
-    return /* @__PURE__ */ import_react32.default.createElement(UiButton, { variant: "custom", className: `wtt-svg-plus${plus.active ? " is-on" : ""}`, style: { left: corner, top: base2.top }, "aria-label": plus.active ? "\u79FB\u51FA\u5F15\u7528" : "\u52A0\u5165\u5F15\u7528", onClick: (event) => {
+    return /* @__PURE__ */ import_react33.default.createElement(UiButton, { variant: "custom", className: `wtt-svg-plus${plus.active ? " is-on" : ""}`, style: { left: corner, top: base2.top }, "aria-label": plus.active ? "\u79FB\u51FA\u5F15\u7528" : "\u52A0\u5165\u5F15\u7528", onClick: (event) => {
       event.stopPropagation();
       onPlusToggle?.(plus.id);
     } }, plus.active ? "\u2212" : "\uFF0B");
-  })(), !readOnly && visible && page && /* @__PURE__ */ import_react32.default.createElement(PptTextLayer, { key: slide.id, document: document2, slide: page, renderedSlide: visible.renderedSlide, ...{ selectedId, onSelect, onEdit, onCommit, onEditingChange, disabled } })));
+  })(), !readOnly && visible && page && /* @__PURE__ */ import_react33.default.createElement(PptTextLayer, { key: slide.id, document: document2, slide: page, renderedSlide: visible.renderedSlide, ...{ selectedId, onSelect, onEdit, onCommit, onEditingChange, disabled } })));
 }
 
 // src/svg-page-rail.jsx
-var import_react33 = __toESM(require("react"), 1);
+var import_react34 = __toESM(require("react"), 1);
 function SvgPageRail({ document: document2, pageId, pageHref, onSelect }) {
-  const rail = (0, import_react33.useRef)(null), [failed, setFailed] = import_react33.default.useState({});
-  (0, import_react33.useEffect)(() => {
+  const rail = (0, import_react34.useRef)(null), [failed, setFailed] = import_react34.default.useState({});
+  (0, import_react34.useEffect)(() => {
     rail.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [pageId]);
-  return /* @__PURE__ */ import_react33.default.createElement("nav", { ref: rail, className: "wtt-svg-page-rail", "aria-label": "\u9010\u9875\u9884\u89C8" }, document2.slides.map((page, index2) => /* @__PURE__ */ import_react33.default.createElement(UiButton, { key: page.id, variant: "custom", className: "wtt-svg-thumbnail", "aria-current": page.id === pageId ? "page" : void 0, "aria-label": `\u7B2C${index2 + 1}\u9875\uFF1A${page.title || "\u672A\u547D\u540D\u9875"}`, title: page.title, onClick: () => onSelect(page.id) }, /* @__PURE__ */ import_react33.default.createElement("span", { className: "wtt-svg-thumbnail-image", style: { aspectRatio: `${document2.width}/${document2.height}` } }, failed[pageHref(page)] ? /* @__PURE__ */ import_react33.default.createElement("span", null, "\u9884\u89C8\u6682\u4E0D\u53EF\u7528") : /* @__PURE__ */ import_react33.default.createElement("img", { src: pageHref(page), alt: "", loading: "lazy", decoding: "async", onError: () => setFailed((previous) => ({ ...previous, [pageHref(page)]: true })) })), /* @__PURE__ */ import_react33.default.createElement("span", null, index2 + 1))));
+  return /* @__PURE__ */ import_react34.default.createElement("nav", { ref: rail, className: "wtt-svg-page-rail", "aria-label": "\u9010\u9875\u9884\u89C8" }, document2.slides.map((page, index2) => /* @__PURE__ */ import_react34.default.createElement(UiButton, { key: page.id, variant: "custom", className: "wtt-svg-thumbnail", "aria-current": page.id === pageId ? "page" : void 0, "aria-label": `\u7B2C${index2 + 1}\u9875\uFF1A${page.title || "\u672A\u547D\u540D\u9875"}`, title: page.title, onClick: () => onSelect(page.id) }, /* @__PURE__ */ import_react34.default.createElement("span", { className: "wtt-svg-thumbnail-image", style: { aspectRatio: `${document2.width}/${document2.height}` } }, failed[pageHref(page)] ? /* @__PURE__ */ import_react34.default.createElement("span", null, "\u9884\u89C8\u6682\u4E0D\u53EF\u7528") : /* @__PURE__ */ import_react34.default.createElement("img", { src: pageHref(page), alt: "", loading: "lazy", decoding: "async", onError: () => setFailed((previous) => ({ ...previous, [pageHref(page)]: true })) })), /* @__PURE__ */ import_react34.default.createElement("span", null, index2 + 1))));
 }
 
 // src/editor-exit-dialog.jsx
-var import_react34 = __toESM(require("react"), 1);
+var import_react35 = __toESM(require("react"), 1);
 function EditorExitDialog({ onCancel, onKeep, onSave, canSave = true, working = false, pending = false }) {
-  const dialog = (0, import_react34.useRef)(null), heading = (0, import_react34.useId)(), [action, setAction] = (0, import_react34.useState)(""), [error, setError] = (0, import_react34.useState)("");
-  (0, import_react34.useEffect)(() => {
+  const dialog = (0, import_react35.useRef)(null), heading = (0, import_react35.useId)(), [action, setAction] = (0, import_react35.useState)(""), [error, setError] = (0, import_react35.useState)("");
+  (0, import_react35.useEffect)(() => {
     dialog.current?.showModal();
     dialog.current?.querySelector("[data-continue-editing]")?.focus();
   }, []);
@@ -45636,10 +45796,10 @@ function EditorExitDialog({ onCancel, onKeep, onSave, canSave = true, working = 
       setAction("");
     }
   }
-  return /* @__PURE__ */ import_react34.default.createElement("dialog", { ref: dialog, className: "wtt-editor-exit", "aria-labelledby": heading, onCancel: (event) => {
+  return /* @__PURE__ */ import_react35.default.createElement("dialog", { ref: dialog, className: "wtt-editor-exit", "aria-labelledby": heading, onCancel: (event) => {
     event.preventDefault();
     if (!busy) onCancel();
-  }, onKeyDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react34.default.createElement(DialogHeader, { title: "\u9000\u51FA\u7F16\u8F91\uFF1F", titleId: heading, onClose: onCancel, closeLabel: "\u7EE7\u7EED\u7F16\u8F91", busy }), /* @__PURE__ */ import_react34.default.createElement(DialogBody, null, /* @__PURE__ */ import_react34.default.createElement("p", null, working ? "\u6B63\u5728\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u8BF7\u7B49\u5F85\u5B8C\u6210\u3002" : pending ? "AI\u4EFB\u52A1\u6216\u5F85\u786E\u8BA4\u65B9\u6848\u4F1A\u4FDD\u7559\uFF0C\u53EF\u56DE\u5230\u767D\u677F\u7EE7\u7EED\u5904\u7406\u3002" : "\u53EF\u4FDD\u5B58\u4E3A\u65B0\u7248\u672C\uFF0C\u6216\u4FDD\u7559\u8349\u7A3F\u540E\u8FD4\u56DE\u767D\u677F\u3002"), error && /* @__PURE__ */ import_react34.default.createElement(UserError, { error })), /* @__PURE__ */ import_react34.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react34.default.createElement(UiButton, { "data-continue-editing": true, disabled: busy, onClick: onCancel }, "\u7EE7\u7EED\u7F16\u8F91"), /* @__PURE__ */ import_react34.default.createElement(UiButton, { disabled: busy, onClick: () => void run3("keep", onKeep) }, action === "keep" ? "\u6B63\u5728\u4FDD\u5B58\u8349\u7A3F\u2026" : "\u4FDD\u7559\u8349\u7A3F\u9000\u51FA"), /* @__PURE__ */ import_react34.default.createElement(UiButton, { variant: "primary", disabled: busy || !canSave, onClick: () => void run3("save", onSave) }, action === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C\u5E76\u9000\u51FA")));
+  }, onKeyDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react35.default.createElement(DialogHeader, { title: "\u9000\u51FA\u7F16\u8F91\uFF1F", titleId: heading, onClose: onCancel, closeLabel: "\u7EE7\u7EED\u7F16\u8F91", busy }), /* @__PURE__ */ import_react35.default.createElement(DialogBody, null, /* @__PURE__ */ import_react35.default.createElement("p", null, working ? "\u6B63\u5728\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u8BF7\u7B49\u5F85\u5B8C\u6210\u3002" : pending ? "AI\u4EFB\u52A1\u6216\u5F85\u786E\u8BA4\u65B9\u6848\u4F1A\u4FDD\u7559\uFF0C\u53EF\u56DE\u5230\u767D\u677F\u7EE7\u7EED\u5904\u7406\u3002" : "\u53EF\u4FDD\u5B58\u4E3A\u65B0\u7248\u672C\uFF0C\u6216\u4FDD\u7559\u8349\u7A3F\u540E\u8FD4\u56DE\u767D\u677F\u3002"), error && /* @__PURE__ */ import_react35.default.createElement(UserError, { error })), /* @__PURE__ */ import_react35.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react35.default.createElement(UiButton, { "data-continue-editing": true, disabled: busy, onClick: onCancel }, "\u7EE7\u7EED\u7F16\u8F91"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { disabled: busy, onClick: () => void run3("keep", onKeep) }, action === "keep" ? "\u6B63\u5728\u4FDD\u5B58\u8349\u7A3F\u2026" : "\u4FDD\u7559\u8349\u7A3F\u9000\u51FA"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { variant: "primary", disabled: busy || !canSave, onClick: () => void run3("save", onSave) }, action === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C\u5E76\u9000\u51FA")));
 }
 
 // src/svg-source-view.jsx
@@ -45651,18 +45811,18 @@ var waiting = (turn) => turn && turn.status === "submitted" && !terminal.has(tur
 var turnLabel = (turn) => turn.status === "applied" ? "\u5DF2\u5E94\u7528\u5230\u6E90\u7A3F" : turn.status === "discarded" ? "\u672A\u91C7\u7528" : turn.status === "pending" ? "\u5F85\u5E94\u7528" : turn.task.status === "failed" ? "\u4FEE\u6539\u5931\u8D25" : turn.task.status === "unknown" ? "\u53D1\u9001\u72B6\u6001\u5F85\u6838\u5BF9" : turn.task.runtimeState?.phase === "awaiting-approval" ? "\u7B49\u5F85\u6388\u6743" : turn.task.runtimeState?.phase === "awaiting-input" ? "\u7B49\u5F85\u4F60\u56DE\u7B54" : turn.task.status === "draft" || turn.task.status === "submitting" ? "\u6B63\u5728\u63D0\u4EA4\u2026" : turn.task.runtimeState?.phase === "idle" && Date.now() - Date.parse(turn.createdAt) > 1e4 ? "\u672C\u8F6E\u5DF2\u7ED3\u675F\uFF0C\u5C1A\u672A\u63D0\u4EA4\u4FEE\u6539\u65B9\u6848" : "\u6B63\u5728\u4FEE\u6539\u2026";
 function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, onClose, onToggleWidth, widthExpanded, closeRequestRef, downloadHref, renderEditorConversation, savedPreview }) {
   const identity4 = JSON.stringify([scope.projectId, scope.cardId, scope.artifactId, scope.hash]), saved = copies.get(identity4) || {};
-  const [exitOpen, setExitOpen] = (0, import_react35.useState)(false), [pagesOpen, setPagesOpen] = (0, import_react35.useState)(null), [viewMode, setViewMode] = (0, import_react35.useState)("edit"), [previewOpened, setPreviewOpened] = (0, import_react35.useState)(false), [historyOpen, setHistoryOpen] = (0, import_react35.useState)(false), [nativeDraft, setNativeDraft] = (0, import_react35.useState)("");
-  const [data, setData] = (0, import_react35.useState)(null), [localDocument, setLocalDocument] = (0, import_react35.useState)(null), [error, setError] = (0, import_react35.useState)(""), [busy, setBusy] = (0, import_react35.useState)(""), [pollError, setPollError] = (0, import_react35.useState)(""), [pollKey, setPollKey] = (0, import_react35.useState)(0);
-  const [pageScope, setPageScope] = (0, import_react35.useState)(saved.scope || "page"), [refs, setRefs] = (0, import_react35.useState)(Array.isArray(saved.refs) ? saved.refs.filter((r) => r && typeof r === "object") : []), [selectedRefs, setSelectedRefs] = (0, import_react35.useState)(saved.selectedRefs || []), [pageId, setPageId] = (0, import_react35.useState)(saved.pageId || null), [elementId, setElementId] = (0, import_react35.useState)(null);
-  const [preview, setPreview] = (0, import_react35.useState)(null), [candidate, setCandidate] = (0, import_react35.useState)(null), [mobileTab, setMobileTab] = (0, import_react35.useState)("page"), [compact, setCompact] = (0, import_react35.useState)(false), [chatWidth, setChatWidth] = (0, import_react35.useState)(() => {
+  const [exitOpen, setExitOpen] = (0, import_react36.useState)(false), [pagesOpen, setPagesOpen] = (0, import_react36.useState)(null), [viewMode, setViewMode] = (0, import_react36.useState)("edit"), [previewOpened, setPreviewOpened] = (0, import_react36.useState)(false), [historyOpen, setHistoryOpen] = (0, import_react36.useState)(false), [nativeDraft, setNativeDraft] = (0, import_react36.useState)("");
+  const [data, setData] = (0, import_react36.useState)(null), [localDocument, setLocalDocument] = (0, import_react36.useState)(null), [error, setError] = (0, import_react36.useState)(""), [busy, setBusy] = (0, import_react36.useState)(""), [pollError, setPollError] = (0, import_react36.useState)(""), [pollKey, setPollKey] = (0, import_react36.useState)(0);
+  const [pageScope, setPageScope] = (0, import_react36.useState)(saved.scope || "page"), [refs, setRefs] = (0, import_react36.useState)(Array.isArray(saved.refs) ? saved.refs.filter((r) => r && typeof r === "object") : []), [selectedRefs, setSelectedRefs] = (0, import_react36.useState)(saved.selectedRefs || []), [pageId, setPageId] = (0, import_react36.useState)(saved.pageId || null), [elementId, setElementId] = (0, import_react36.useState)(null);
+  const [preview, setPreview] = (0, import_react36.useState)(null), [candidate, setCandidate] = (0, import_react36.useState)(null), [mobileTab, setMobileTab] = (0, import_react36.useState)("page"), [compact, setCompact] = (0, import_react36.useState)(false), [chatWidth, setChatWidth] = (0, import_react36.useState)(() => {
     try {
       const stored2 = Number(localStorage.getItem("wtt-svg-chat-width")) || 0;
       return Math.max(260, Math.min(640, stored2 >= 520 ? stored2 : 560));
     } catch {
       return 560;
     }
-  }), [availableWidth, setAvailableWidth] = (0, import_react35.useState)(1e3);
-  const host = (0, import_react35.useRef)(null), mounted = (0, import_react35.useRef)(true), current = (0, import_react35.useRef)(null), documentRef = (0, import_react35.useRef)(null), saving = (0, import_react35.useRef)(null), dirtyRef = (0, import_react35.useRef)(false), lastProposal = (0, import_react35.useRef)(null), drag = (0, import_react35.useRef)(null), publish = (0, import_react35.useRef)(null);
+  }), [availableWidth, setAvailableWidth] = (0, import_react36.useState)(1e3);
+  const host = (0, import_react36.useRef)(null), mounted = (0, import_react36.useRef)(true), current = (0, import_react36.useRef)(null), documentRef = (0, import_react36.useRef)(null), saving = (0, import_react36.useRef)(null), dirtyRef = (0, import_react36.useRef)(false), lastProposal = (0, import_react36.useRef)(null), drag = (0, import_react36.useRef)(null), publish = (0, import_react36.useRef)(null);
   const accept = (value) => {
     if (!mounted.current) return;
     const reset2 = !current.current || value.revision !== current.current.revision || !dirtyRef.current;
@@ -45674,7 +45834,7 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
       setLocalDocument(value.document);
     }
   };
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     mounted.current = true;
     let live = true;
     api.open(scope).then((value) => {
@@ -45687,10 +45847,10 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
       live = false;
     };
   }, [identity4]);
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     copies.set(identity4, { scope: pageScope, refs, selectedRefs, pageId });
   }, [pageScope, refs, selectedRefs, pageId, identity4]);
-  (0, import_react35.useLayoutEffect)(() => {
+  (0, import_react36.useLayoutEffect)(() => {
     if (!host.current) return;
     const measure = () => {
       const width = host.current.getBoundingClientRect().width;
@@ -45704,7 +45864,7 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
   }, []);
   const pending = data?.turns.find((t) => t.status === "pending"), running = data?.turns.find(waiting), latest = data?.turns.at(-1), legacy = data?.legacy;
   const hasPending = Boolean(pending || running), activeTurn = running || pending || latest;
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     if (!data) return;
     let live = true, timer2;
     const query = async () => {
@@ -45724,13 +45884,13 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
       clearTimeout(timer2);
     };
   }, [data?.id, pollKey]);
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     if (!data) return;
     const timer2 = setTimeout(() => setPollKey((n) => n + 1), 8e3);
     return () => clearTimeout(timer2);
   }, [data, pollKey]);
-  const autoEnded = (0, import_react35.useRef)(/* @__PURE__ */ new Set());
-  (0, import_react35.useEffect)(() => {
+  const autoEnded = (0, import_react36.useRef)(/* @__PURE__ */ new Set());
+  (0, import_react36.useEffect)(() => {
     if (!data) return;
     const stale = data.turns.filter((t) => waiting(t) && !t.proposal && t.task.runtimeState?.phase === "idle" && Date.now() - Date.parse(t.createdAt) > 1e4 && !autoEnded.current.has(t.taskId));
     if (!stale.length) return;
@@ -45748,14 +45908,14 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
       live = false;
     };
   }, [data]);
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     if (pending && pending.proposal.id !== lastProposal.current) {
       lastProposal.current = pending.proposal.id;
       setPreview({ sourceId: pending.proposal.sourceId, id: pending.proposal.id, kind: "proposal" });
       setMobileTab("page");
     }
   }, [pending?.proposal.id]);
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     if (!preview || preview.sourceId === data?.sourceId) {
       setCandidate(null);
       return;
@@ -45938,7 +46098,7 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
     if (data?.dirty || dirtyRef.current || hasPending || busy || nativeDraft.trim() || legacy?.status === "pending") setExitOpen(true);
     else onClose?.();
   }
-  (0, import_react35.useEffect)(() => {
+  (0, import_react36.useEffect)(() => {
     if (!closeRequestRef) return;
     closeRequestRef.current = close2;
     return () => {
@@ -45953,20 +46113,20 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
     setPreview(null);
     setCandidate(null);
   };
-  return /* @__PURE__ */ import_react35.default.createElement("aside", { ref: host, className: `wtt-svg-editor nodrag nopan nowheel${compact ? " is-compact" : ""}`, "aria-label": "\u6E90\u6587\u4EF6\u7F16\u8F91\u5668", onPointerDown: (e) => e.stopPropagation(), onWheel: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react35.default.createElement(PanelHeader, { title: scope.title || "\u8BFE\u4EF6\u6E90\u6587\u4EF6", format: "\u6E90\u6587\u4EF6", downloadHref, downloadLabel: "\u4E0B\u8F7D\u5DF2\u4FDD\u5B58PPT", expanded: widthExpanded, expandLabel: "\u5168\u5C4F", restoreLabel: "\u7F29\u5C0F", onToggleWidth, onClose: () => void close2(), closeLabel: "\u5173\u95ED\u6E90\u6587\u4EF6\u7F16\u8F91\u5668" }), /* @__PURE__ */ import_react35.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react35.default.createElement("span", { className: "wtt-svg-save-state", role: "status" }, !data ? "\u6B63\u5728\u8BFB\u53D6\u6E90\u6587\u4EF6\u2026" : busy === "save" ? "\u6B63\u5728\u5BFC\u51FAPPT\uFF0C\u53EF\u7EE7\u7EED\u6D4F\u89C8" : dirtyRef.current ? "\u6709\u672A\u4FDD\u5B58\u4FEE\u6539" : data.dirty ? "\u6E90\u7A3F\u8349\u7A3F\u5DF2\u4FDD\u5B58" : "\u4E0E\u5DF2\u4FDD\u5B58\u7248\u672C\u4E00\u81F4"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", disabled: !data || data.revision === 0 || Boolean(busy) || hasPending, title: "\u64A4\u9500\u4E0A\u4E00\u6B21\u4FEE\u6539\uFF08\u6539\u5B57\u3001\u5907\u6CE8\u6216\u5DF2\u5E94\u7528\u7684AI\u65B9\u6848\uFF09\uFF0C\u53EF\u8FDE\u7EED\u64A4\u9500", onClick: () => void action("undo", async () => {
+  return /* @__PURE__ */ import_react36.default.createElement("aside", { ref: host, className: `wtt-svg-editor nodrag nopan nowheel${compact ? " is-compact" : ""}`, "aria-label": "\u6E90\u6587\u4EF6\u7F16\u8F91\u5668", onPointerDown: (e) => e.stopPropagation(), onWheel: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react36.default.createElement(PanelHeader, { title: scope.title || "\u8BFE\u4EF6\u6E90\u6587\u4EF6", format: "\u6E90\u6587\u4EF6", downloadHref, downloadLabel: "\u4E0B\u8F7D\u5DF2\u4FDD\u5B58PPT", expanded: widthExpanded, expandLabel: "\u5168\u5C4F", restoreLabel: "\u7F29\u5C0F", onToggleWidth, onClose: () => void close2(), closeLabel: "\u5173\u95ED\u6E90\u6587\u4EF6\u7F16\u8F91\u5668" }), /* @__PURE__ */ import_react36.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react36.default.createElement("span", { className: "wtt-svg-save-state", role: "status" }, !data ? "\u6B63\u5728\u8BFB\u53D6\u6E90\u6587\u4EF6\u2026" : busy === "save" ? "\u6B63\u5728\u5BFC\u51FAPPT\uFF0C\u53EF\u7EE7\u7EED\u6D4F\u89C8" : dirtyRef.current ? "\u6709\u672A\u4FDD\u5B58\u4FEE\u6539" : data.dirty ? "\u6E90\u7A3F\u8349\u7A3F\u5DF2\u4FDD\u5B58" : "\u4E0E\u5DF2\u4FDD\u5B58\u7248\u672C\u4E00\u81F4"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", disabled: !data || data.revision === 0 || Boolean(busy) || hasPending, title: "\u64A4\u9500\u4E0A\u4E00\u6B21\u4FEE\u6539\uFF08\u6539\u5B57\u3001\u5907\u6CE8\u6216\u5DF2\u5E94\u7528\u7684AI\u65B9\u6848\uFF09\uFF0C\u53EF\u8FDE\u7EED\u64A4\u9500", onClick: () => void action("undo", async () => {
     accept(await api.undo({ draftId: data.id, revision: data.revision }));
     currentView();
-  }) }, "\u64A4\u9500"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { variant: "primary", disabled: !data || Boolean(busy) || hasPending || !data.dirty && !dirtyRef.current, onClick: () => void save().catch(() => {
-  }) }, busy === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C")), error && /* @__PURE__ */ import_react35.default.createElement(UserError, { error, className: "wtt-svg-error" }), compact && /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-tabs", role: "tablist", "aria-label": "\u6E90\u6587\u4EF6\u5DE5\u4F5C\u533A" }, /* @__PURE__ */ import_react35.default.createElement(UiButton, { role: "tab", "aria-selected": mobileTab === "page", onClick: () => setMobileTab("page") }, "\u9875\u9762"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { role: "tab", "aria-selected": mobileTab === "chat", onClick: () => setMobileTab("chat") }, "\u5BF9\u8BDD", pending ? " \xB7 \u5F85\u5E94\u7528" : running ? " \xB7 \u4FEE\u6539\u4E2D" : "")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-layout", style: { gridTemplateColumns: compact ? void 0 : `${effectiveChat}px 8px minmax(0,1fr)` } }, /* @__PURE__ */ import_react35.default.createElement("section", { className: "wtt-svg-chat-pane", hidden: compact && mobileTab !== "chat", "aria-label": "\u539F\u751F\u8BFE\u4EF6\u5BF9\u8BDD" }, activeTurn?.task.sessionId && activeTurn.task.sessionId !== data?.conversationSessionId && /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-chat-header" }, /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", onClick: () => setHistoryOpen((value) => !value) }, historyOpen ? "\u8FD4\u56DE\u8BFE\u4EF6\u4FEE\u6539" : "\u67E5\u770B\u539F\u4EFB\u52A1")), data && renderEditorConversation?.({ identity: `svg:${data.id}:${historyOpen ? activeTurn?.task.sessionId : "edit"}`, sessionId: historyOpen ? activeTurn?.task.sessionId : data.conversationSessionId || void 0, onSession: historyOpen ? void 0 : (sessionId) => api.bindConversation({ draftId: data.id, sessionId }), owner: historyOpen ? void 0 : { ready: Boolean(data && !busy), autoCommand: true, uiKey: JSON.stringify([refs, elementId, selectedRefs]), label: refs.length ? `\u5DF2\u9009${refs.length}\u4E2A\u5BF9\u8C61\uFF08\u53EF\u8DE8\u9875\uFF09` : pageScope === "deck" ? "\u6574\u5957\u8BFE\u4EF6" : `\u7B2C${pageIndex + 1}\u9875 \xB7 ${page?.title || ""}`, prepare: prepareNative, submit: submitNative, onDraft: setNativeDraft, controls: /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-native-controls" }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-refs", role: "list", "aria-label": "\u5F15\u7528\u5BF9\u8C61" }, refs.map((r, i) => {
+  }) }, "\u64A4\u9500"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { variant: "primary", disabled: !data || Boolean(busy) || hasPending || !data.dirty && !dirtyRef.current, onClick: () => void save().catch(() => {
+  }) }, busy === "save" ? "\u6B63\u5728\u4FDD\u5B58\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C")), error && /* @__PURE__ */ import_react36.default.createElement(UserError, { error, className: "wtt-svg-error" }), compact && /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-tabs", role: "tablist", "aria-label": "\u6E90\u6587\u4EF6\u5DE5\u4F5C\u533A" }, /* @__PURE__ */ import_react36.default.createElement(UiButton, { role: "tab", "aria-selected": mobileTab === "page", onClick: () => setMobileTab("page") }, "\u9875\u9762"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { role: "tab", "aria-selected": mobileTab === "chat", onClick: () => setMobileTab("chat") }, "\u5BF9\u8BDD", pending ? " \xB7 \u5F85\u5E94\u7528" : running ? " \xB7 \u4FEE\u6539\u4E2D" : "")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-layout", style: { gridTemplateColumns: compact ? void 0 : `${effectiveChat}px 8px minmax(0,1fr)` } }, /* @__PURE__ */ import_react36.default.createElement("section", { className: "wtt-svg-chat-pane", hidden: compact && mobileTab !== "chat", "aria-label": "\u539F\u751F\u8BFE\u4EF6\u5BF9\u8BDD" }, activeTurn?.task.sessionId && activeTurn.task.sessionId !== data?.conversationSessionId && /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-chat-header" }, /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", onClick: () => setHistoryOpen((value) => !value) }, historyOpen ? "\u8FD4\u56DE\u8BFE\u4EF6\u4FEE\u6539" : "\u67E5\u770B\u539F\u4EFB\u52A1")), data && renderEditorConversation?.({ identity: `svg:${data.id}:${historyOpen ? activeTurn?.task.sessionId : "edit"}`, sessionId: historyOpen ? activeTurn?.task.sessionId : data.conversationSessionId || void 0, onSession: historyOpen ? void 0 : (sessionId) => api.bindConversation({ draftId: data.id, sessionId }), owner: historyOpen ? void 0 : { ready: Boolean(data && !busy), autoCommand: true, uiKey: JSON.stringify([refs, elementId, selectedRefs]), label: refs.length ? `\u5DF2\u9009${refs.length}\u4E2A\u5BF9\u8C61\uFF08\u53EF\u8DE8\u9875\uFF09` : pageScope === "deck" ? "\u6574\u5957\u8BFE\u4EF6" : `\u7B2C${pageIndex + 1}\u9875 \xB7 ${page?.title || ""}`, prepare: prepareNative, submit: submitNative, onDraft: setNativeDraft, controls: /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-native-controls" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-refs", role: "list", "aria-label": "\u5F15\u7528\u5BF9\u8C61" }, refs.map((r, i) => {
     const pageNo = viewDocument ? viewDocument.slides.findIndex((s) => s.id === r.pageId) + 1 : null, el = viewDocument?.slides.find((s) => s.id === r.pageId)?.elements.find((e) => e.id === r.elementId);
-    return /* @__PURE__ */ import_react35.default.createElement("span", { key: `${r.pageId}:${r.elementId}`, className: "wtt-svg-ref-chip", role: "listitem" }, /* @__PURE__ */ import_react35.default.createElement("b", null, i + 1), /* @__PURE__ */ import_react35.default.createElement("span", null, pageNo ? `P${pageNo}\xB7` : "", (el?.text || "").replace(/\s+/g, " ").trim().slice(0, 10) || "\u5BF9\u8C61"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { variant: "custom", className: "wtt-svg-ref-x", "aria-label": `\u79FB\u51FA\u5F15\u7528\u5BF9\u8C61${i + 1}`, onClick: () => setRefs((previous) => previous.filter((x2) => !(x2.pageId === r.pageId && x2.elementId === r.elementId))) }, "\xD7"));
-  })), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-range", role: "group", "aria-label": "AI\u4FEE\u6539\u8303\u56F4" }, /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", "aria-pressed": !refs.length && pageScope === "page", disabled: Boolean(busy), onClick: () => {
+    return /* @__PURE__ */ import_react36.default.createElement("span", { key: `${r.pageId}:${r.elementId}`, className: "wtt-svg-ref-chip", role: "listitem" }, /* @__PURE__ */ import_react36.default.createElement("b", null, i + 1), /* @__PURE__ */ import_react36.default.createElement("span", null, pageNo ? `P${pageNo}\xB7` : "", (el?.text || "").replace(/\s+/g, " ").trim().slice(0, 10) || "\u5BF9\u8C61"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { variant: "custom", className: "wtt-svg-ref-x", "aria-label": `\u79FB\u51FA\u5F15\u7528\u5BF9\u8C61${i + 1}`, onClick: () => setRefs((previous) => previous.filter((x2) => !(x2.pageId === r.pageId && x2.elementId === r.elementId))) }, "\xD7"));
+  })), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-range", role: "group", "aria-label": "AI\u4FEE\u6539\u8303\u56F4" }, /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", "aria-pressed": !refs.length && pageScope === "page", disabled: Boolean(busy), onClick: () => {
     setPageScope("page");
     setRefs([]);
-  } }, "\u5F53\u524D\u9875"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", "aria-pressed": !refs.length && pageScope === "deck", disabled: Boolean(busy), onClick: () => {
+  } }, "\u5F53\u524D\u9875"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", "aria-pressed": !refs.length && pageScope === "deck", disabled: Boolean(busy), onClick: () => {
     setPageScope("deck");
     setRefs([]);
-  } }, "\u6574\u5957\u8BFE\u4EF6")), elementId && /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", onClick: () => setElementId(null) }, "\u53D6\u6D88\u9009\u62E9"), !!referenceList.length && /* @__PURE__ */ import_react35.default.createElement("details", null, /* @__PURE__ */ import_react35.default.createElement("summary", null, "\u56FE\u7247\u53C2\u8003 \xB7 ", selectedRefs.length), referenceList.map((ref) => /* @__PURE__ */ import_react35.default.createElement("label", { key: ref.id }, /* @__PURE__ */ import_react35.default.createElement("input", { type: "checkbox", checked: selectedRefs.includes(ref.id), onChange: (event) => setSelectedRefs((previous) => event.target.checked ? [...previous, ref.id] : previous.filter((id2) => id2 !== ref.id)) }), ref.name)))) }, onSettled: () => setPollKey((n) => n + 1) })), !compact && /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-splitter", role: "separator", tabIndex: 0, "aria-label": "\u8C03\u6574\u9884\u89C8\u4E0E\u5BF9\u8BDD\u5BBD\u5EA6", "aria-orientation": "vertical", "aria-valuemin": 260, "aria-valuemax": Math.round(maxChat), "aria-valuenow": Math.round(effectiveChat), onKeyDown: resizeKey, onPointerDown: (event) => {
+  } }, "\u6574\u5957\u8BFE\u4EF6")), elementId && /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", onClick: () => setElementId(null) }, "\u53D6\u6D88\u9009\u62E9"), !!referenceList.length && /* @__PURE__ */ import_react36.default.createElement("details", null, /* @__PURE__ */ import_react36.default.createElement("summary", null, "\u56FE\u7247\u53C2\u8003 \xB7 ", selectedRefs.length), referenceList.map((ref) => /* @__PURE__ */ import_react36.default.createElement("label", { key: ref.id }, /* @__PURE__ */ import_react36.default.createElement("input", { type: "checkbox", checked: selectedRefs.includes(ref.id), onChange: (event) => setSelectedRefs((previous) => event.target.checked ? [...previous, ref.id] : previous.filter((id2) => id2 !== ref.id)) }), ref.name)))) }, onSettled: () => setPollKey((n) => n + 1) })), !compact && /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-splitter", role: "separator", tabIndex: 0, "aria-label": "\u8C03\u6574\u9884\u89C8\u4E0E\u5BF9\u8BDD\u5BBD\u5EA6", "aria-orientation": "vertical", "aria-valuemin": 260, "aria-valuemax": Math.round(maxChat), "aria-valuenow": Math.round(effectiveChat), onKeyDown: resizeKey, onPointerDown: (event) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { x: event.clientX, width: effectiveChat };
@@ -45979,52 +46139,52 @@ function SvgSourceView({ scope, api, onAiTask, onPublished, onBackgroundStatus, 
     }
   }, onPointerCancel: () => {
     drag.current = null;
-  } }), /* @__PURE__ */ import_react35.default.createElement("section", { className: "wtt-svg-preview-pane", hidden: compact && mobileTab !== "page", "aria-label": "\u6E90\u6587\u4EF6\u9875\u9762" }, pending && /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-proposal-bar", role: "status", "aria-label": "\u63D0\u6848\u5F85\u786E\u8BA4" }, /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-proposal-bar-text" }, /* @__PURE__ */ import_react35.default.createElement("strong", null, "\u63D0\u6848\u5F85\u786E\u8BA4"), /* @__PURE__ */ import_react35.default.createElement("span", { title: pending.proposal.summary }, pending.proposal.summary), pending.baseRevision !== data.revision && /* @__PURE__ */ import_react35.default.createElement("span", { className: "wtt-svg-stale" }, "\u57FA\u4E8E\u8F83\u65E9\u8349\u7A3F")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-proposal-bar-actions" }, /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", "aria-pressed": previewing, onClick: () => {
+  } }), /* @__PURE__ */ import_react36.default.createElement("section", { className: "wtt-svg-preview-pane", hidden: compact && mobileTab !== "page", "aria-label": "\u6E90\u6587\u4EF6\u9875\u9762" }, pending && /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-proposal-bar", role: "status", "aria-label": "\u63D0\u6848\u5F85\u786E\u8BA4" }, /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-proposal-bar-text" }, /* @__PURE__ */ import_react36.default.createElement("strong", null, "\u63D0\u6848\u5F85\u786E\u8BA4"), /* @__PURE__ */ import_react36.default.createElement("span", { title: pending.proposal.summary }, pending.proposal.summary), pending.baseRevision !== data.revision && /* @__PURE__ */ import_react36.default.createElement("span", { className: "wtt-svg-stale" }, "\u57FA\u4E8E\u8F83\u65E9\u8349\u7A3F")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-proposal-bar-actions" }, /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", "aria-pressed": previewing, onClick: () => {
     if (pending) setPreview({ sourceId: pending.proposal.sourceId, id: pending.proposal.id, kind: "proposal" });
     else if (legacy?.sourceId) setPreview({ sourceId: legacy.sourceId, kind: "legacy" });
-  } }, "\u4FEE\u6539\u9884\u89C8"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", variant: previewing ? "primary" : "quiet", "aria-pressed": !previewing, onClick: currentView }, "\u5F53\u524D\u8349\u7A3F"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", variant: "primary", disabled: Boolean(busy) || pending.baseRevision !== data.revision, onClick: () => void applyProposal(pending) }, "\u5E94\u7528\u5230\u6E90\u7A3F"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", disabled: Boolean(busy), onClick: () => void action("discard", async () => {
+  } }, "\u4FEE\u6539\u9884\u89C8"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", variant: previewing ? "primary" : "quiet", "aria-pressed": !previewing, onClick: currentView }, "\u5F53\u524D\u8349\u7A3F"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", variant: "primary", disabled: Boolean(busy) || pending.baseRevision !== data.revision, onClick: () => void applyProposal(pending) }, "\u5E94\u7528\u5230\u6E90\u7A3F"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", disabled: Boolean(busy), onClick: () => void action("discard", async () => {
     accept(await api.discard({ draftId: data.id, proposalId: pending.proposal.id }));
     currentView();
-  }) }, "\u4E0D\u91C7\u7528"))), /* @__PURE__ */ import_react35.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", "aria-pressed": viewMode === "preview", disabled: !scope.artifactId, onClick: () => {
+  }) }, "\u4E0D\u91C7\u7528"))), /* @__PURE__ */ import_react36.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", "aria-pressed": viewMode === "preview", disabled: !scope.artifactId, onClick: () => {
     setViewMode("preview");
     setPreviewOpened(true);
-  } }, "\u9884\u89C8"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", "aria-pressed": viewMode === "edit", onClick: () => setViewMode("edit") }, "\u7F16\u8F91"), viewMode === "preview" && /* @__PURE__ */ import_react35.default.createElement("span", null, "\u5DF2\u4FDD\u5B58PPT", data?.dirty ? " \xB7 \u6E90\u7A3F\u8349\u7A3F\u5C1A\u672A\u5BFC\u51FA" : "")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-native-file", hidden: viewMode !== "preview" }, previewOpened && savedPreview), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-source-body", hidden: viewMode !== "edit" }, legacy?.taskId && /* @__PURE__ */ import_react35.default.createElement("details", { className: "wtt-svg-legacy" }, /* @__PURE__ */ import_react35.default.createElement("summary", null, "\u65E7\u7248\u6587\u5B57\u4FEE\u6539 \xB7 \u5DF2\u4FDD\u7559"), legacy.changes?.map((change, index2) => /* @__PURE__ */ import_react35.default.createElement("p", { key: index2 }, change.before, " \u2192 ", change.after)), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", disabled: !legacy.sourceId, onClick: () => setPreview({ sourceId: legacy.sourceId, kind: "legacy" }) }, "\u9884\u89C8\u65E7\u65B9\u6848"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", disabled: Boolean(busy) || legacy.status !== "pending" || data.revision !== 0, onClick: () => void action("legacy", async () => {
+  } }, "\u9884\u89C8"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", "aria-pressed": viewMode === "edit", onClick: () => setViewMode("edit") }, "\u7F16\u8F91"), viewMode === "preview" && /* @__PURE__ */ import_react36.default.createElement("span", null, "\u5DF2\u4FDD\u5B58PPT", data?.dirty ? " \xB7 \u6E90\u7A3F\u8349\u7A3F\u5C1A\u672A\u5BFC\u51FA" : "")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-native-file", hidden: viewMode !== "preview" }, previewOpened && savedPreview), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-source-body", hidden: viewMode !== "edit" }, legacy?.taskId && /* @__PURE__ */ import_react36.default.createElement("details", { className: "wtt-svg-legacy" }, /* @__PURE__ */ import_react36.default.createElement("summary", null, "\u65E7\u7248\u6587\u5B57\u4FEE\u6539 \xB7 \u5DF2\u4FDD\u7559"), legacy.changes?.map((change, index2) => /* @__PURE__ */ import_react36.default.createElement("p", { key: index2 }, change.before, " \u2192 ", change.after)), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", disabled: !legacy.sourceId, onClick: () => setPreview({ sourceId: legacy.sourceId, kind: "legacy" }) }, "\u9884\u89C8\u65E7\u65B9\u6848"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", disabled: Boolean(busy) || legacy.status !== "pending" || data.revision !== 0, onClick: () => void action("legacy", async () => {
     accept(await api.applyLegacy({ draftId: data.id, revision: data.revision }));
     currentView();
-  }) }, "\u5E94\u7528\u5230\u6E90\u7A3F")), !!data?.turns.length && /* @__PURE__ */ import_react35.default.createElement("details", { className: "wtt-svg-proposals", open: Boolean(pending) }, /* @__PURE__ */ import_react35.default.createElement("summary", null, "\u4FEE\u6539\u65B9\u6848", pending ? " \xB7 \u5F85\u786E\u8BA4" : ""), data.turns.map((turn) => /* @__PURE__ */ import_react35.default.createElement("div", { key: turn.id }, /* @__PURE__ */ import_react35.default.createElement("span", null, turnLabel(turn), turn.status === "pending" && turn.baseRevision !== data.revision ? " \xB7 \u57FA\u4E8E\u8F83\u65E9\u8349\u7A3F" : ""), turn.proposal ? /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement("p", null, turn.proposal.summary), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", onClick: () => {
+  }) }, "\u5E94\u7528\u5230\u6E90\u7A3F")), !!data?.turns.length && /* @__PURE__ */ import_react36.default.createElement("details", { className: "wtt-svg-proposals", open: Boolean(pending) }, /* @__PURE__ */ import_react36.default.createElement("summary", null, "\u4FEE\u6539\u65B9\u6848", pending ? " \xB7 \u5F85\u786E\u8BA4" : ""), data.turns.map((turn) => /* @__PURE__ */ import_react36.default.createElement("div", { key: turn.id }, /* @__PURE__ */ import_react36.default.createElement("span", null, turnLabel(turn), turn.status === "pending" && turn.baseRevision !== data.revision ? " \xB7 \u57FA\u4E8E\u8F83\u65E9\u8349\u7A3F" : ""), turn.proposal ? /* @__PURE__ */ import_react36.default.createElement(import_react36.default.Fragment, null, /* @__PURE__ */ import_react36.default.createElement("p", null, turn.proposal.summary), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", onClick: () => {
     setPreview({ sourceId: turn.proposal.sourceId, id: turn.proposal.id, kind: "proposal" });
     setViewMode("edit");
-  } }, "\u9884\u89C8\u4FEE\u6539"), turn.status === "pending" && /* @__PURE__ */ import_react35.default.createElement(import_react35.default.Fragment, null, /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", variant: "primary", disabled: Boolean(busy) || turn.baseRevision !== data.revision, onClick: () => void applyProposal(turn) }, "\u5E94\u7528\u5230\u6E90\u7A3F"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", disabled: Boolean(busy), onClick: () => void action("discard", async () => {
+  } }, "\u9884\u89C8\u4FEE\u6539"), turn.status === "pending" && /* @__PURE__ */ import_react36.default.createElement(import_react36.default.Fragment, null, /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", variant: "primary", disabled: Boolean(busy) || turn.baseRevision !== data.revision, onClick: () => void applyProposal(turn) }, "\u5E94\u7528\u5230\u6E90\u7A3F"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", disabled: Boolean(busy), onClick: () => void action("discard", async () => {
     accept(await api.discard({ draftId: data.id, proposalId: turn.proposal.id }));
     currentView();
-  }) }, "\u4E0D\u91C7\u7528"))) : waiting(turn) && turn.task.runtimeState?.phase === "idle" && /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", onClick: () => void action("end-turn", async () => accept(await api.endTurn({ draftId: data.id, taskId: turn.taskId }))) }, "\u7ED3\u675F\u672C\u8F6E")))), pollError && /* @__PURE__ */ import_react35.default.createElement(UserError, { error: pollError }), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-page-tools" }, /* @__PURE__ */ import_react35.default.createElement(UiButton, { size: "compact", "aria-label": showPages ? "\u6536\u8D77\u9010\u9875\u9884\u89C8" : "\u663E\u793A\u9010\u9875\u9884\u89C8", "aria-expanded": showPages, onClick: () => setPagesOpen(!showPages) }, "\u9875\u9762"), /* @__PURE__ */ import_react35.default.createElement(UiButton, { iconOnly: true, "aria-label": "\u4E0A\u4E00\u9875", disabled: !viewDocument || pageIndex <= 0, onClick: () => {
+  }) }, "\u4E0D\u91C7\u7528"))) : waiting(turn) && turn.task.runtimeState?.phase === "idle" && /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", onClick: () => void action("end-turn", async () => accept(await api.endTurn({ draftId: data.id, taskId: turn.taskId }))) }, "\u7ED3\u675F\u672C\u8F6E")))), pollError && /* @__PURE__ */ import_react36.default.createElement(UserError, { error: pollError }), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-page-tools" }, /* @__PURE__ */ import_react36.default.createElement(UiButton, { size: "compact", "aria-label": showPages ? "\u6536\u8D77\u9010\u9875\u9884\u89C8" : "\u663E\u793A\u9010\u9875\u9884\u89C8", "aria-expanded": showPages, onClick: () => setPagesOpen(!showPages) }, "\u9875\u9762"), /* @__PURE__ */ import_react36.default.createElement(UiButton, { iconOnly: true, "aria-label": "\u4E0A\u4E00\u9875", disabled: !viewDocument || pageIndex <= 0, onClick: () => {
     setPageId(viewDocument.slides[pageIndex - 1].id);
     setElementId(null);
-  } }, "\u2039"), /* @__PURE__ */ import_react35.default.createElement("select", { "aria-label": "\u5F53\u524D\u9875\u9762", value: page?.id || "", onChange: (e) => {
+  } }, "\u2039"), /* @__PURE__ */ import_react36.default.createElement("select", { "aria-label": "\u5F53\u524D\u9875\u9762", value: page?.id || "", onChange: (e) => {
     setPageId(e.target.value);
     setElementId(null);
-  } }, viewDocument?.slides.map((p, i) => /* @__PURE__ */ import_react35.default.createElement("option", { key: p.id, value: p.id }, i + 1, " \xB7 ", p.title || "\u672A\u547D\u540D\u9875"))), /* @__PURE__ */ import_react35.default.createElement(UiButton, { iconOnly: true, "aria-label": "\u4E0B\u4E00\u9875", disabled: !viewDocument || pageIndex >= viewDocument.slides.length - 1, onClick: () => {
+  } }, viewDocument?.slides.map((p, i) => /* @__PURE__ */ import_react36.default.createElement("option", { key: p.id, value: p.id }, i + 1, " \xB7 ", p.title || "\u672A\u547D\u540D\u9875"))), /* @__PURE__ */ import_react36.default.createElement(UiButton, { iconOnly: true, "aria-label": "\u4E0B\u4E00\u9875", disabled: !viewDocument || pageIndex >= viewDocument.slides.length - 1, onClick: () => {
     setPageId(viewDocument.slides[pageIndex + 1].id);
     setElementId(null);
-  } }, "\u203A")), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-page-content" }, showPages && viewDocument && /* @__PURE__ */ import_react35.default.createElement(SvgPageRail, { document: viewDocument, pageId: page?.id, pageHref: (p) => api.pageHref({ draftId: data.id, sourceId, page: p.number }), onSelect: selectPage }), /* @__PURE__ */ import_react35.default.createElement("div", { className: "wtt-svg-art-space" }, viewDocument && page ? /* @__PURE__ */ import_react35.default.createElement(SvgInlinePage, { document: viewDocument, slide: page, renderedSlide: (previewing ? candidate : data.document)?.slides.find((p) => p.id === page.id), manifest: { status: "ready", draftId: data.id, revision: data.revision }, api: pageApi, selectedId: elementId, marks: !previewing && page && refs.length ? new Map(refs.map((r, i) => [r, i + 1]).filter(([r]) => r.pageId === page.id).map(([r, i]) => [r.elementId, i + 1])) : null, plus: !previewing && elementId ? { id: elementId, active: refs.some((r) => r.pageId === page.id && r.elementId === elementId) } : null, onPlusToggle: (id2) => setRefs((previous) => {
+  } }, "\u203A")), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-page-content" }, showPages && viewDocument && /* @__PURE__ */ import_react36.default.createElement(SvgPageRail, { document: viewDocument, pageId: page?.id, pageHref: (p) => api.pageHref({ draftId: data.id, sourceId, page: p.number }), onSelect: selectPage }), /* @__PURE__ */ import_react36.default.createElement("div", { className: "wtt-svg-art-space" }, viewDocument && page ? /* @__PURE__ */ import_react36.default.createElement(SvgInlinePage, { document: viewDocument, slide: page, renderedSlide: (previewing ? candidate : data.document)?.slides.find((p) => p.id === page.id), manifest: { status: "ready", draftId: data.id, revision: data.revision }, api: pageApi, selectedId: elementId, marks: !previewing && page && refs.length ? new Map(refs.map((r, i) => [r, i + 1]).filter(([r]) => r.pageId === page.id).map(([r, i]) => [r.elementId, i + 1])) : null, plus: !previewing && elementId ? { id: elementId, active: refs.some((r) => r.pageId === page.id && r.elementId === elementId) } : null, onPlusToggle: (id2) => setRefs((previous) => {
     const on = previous.some((r) => r.pageId === page.id && r.elementId === id2);
     return on ? previous.filter((r) => !(r.pageId === page.id && r.elementId === id2)) : [...previous, { pageId: page.id, elementId: id2 }];
   }), onSelect: (id2) => setElementId(id2), onObjectSelect: !previewing && !blocked ? (id2) => setElementId(id2) : void 0, onEdit: changeText, onCommit: () => void persist2().catch(() => {
-  }), disabled: blocked, readOnly: previewing, onError: setError }) : /* @__PURE__ */ import_react35.default.createElement("p", { role: "status" }, previewing ? "\u6B63\u5728\u8BFB\u53D6\u4FEE\u6539\u9884\u89C8\u2026" : "\u6B63\u5728\u8BFB\u53D6\u6E90\u6587\u4EF6\u2026"))), page && /* @__PURE__ */ import_react35.default.createElement("details", { className: "wtt-svg-notes" }, /* @__PURE__ */ import_react35.default.createElement("summary", null, "\u8BB2\u5E08\u5907\u6CE8"), /* @__PURE__ */ import_react35.default.createElement("textarea", { "aria-label": "\u8BB2\u5E08\u5907\u6CE8", value: page.notes || "", readOnly: previewing || blocked, onChange: (event) => {
+  }), disabled: blocked, readOnly: previewing, onError: setError }) : /* @__PURE__ */ import_react36.default.createElement("p", { role: "status" }, previewing ? "\u6B63\u5728\u8BFB\u53D6\u4FEE\u6539\u9884\u89C8\u2026" : "\u6B63\u5728\u8BFB\u53D6\u6E90\u6587\u4EF6\u2026"))), page && /* @__PURE__ */ import_react36.default.createElement("details", { className: "wtt-svg-notes" }, /* @__PURE__ */ import_react36.default.createElement("summary", null, "\u8BB2\u5E08\u5907\u6CE8"), /* @__PURE__ */ import_react36.default.createElement("textarea", { "aria-label": "\u8BB2\u5E08\u5907\u6CE8", value: page.notes || "", readOnly: previewing || blocked, onChange: (event) => {
     const next = patchPptText(documentRef.current, page.id, null, event.target.value);
     documentRef.current = next;
     dirtyRef.current = Boolean(pptDocumentChanges(current.current.document, next).length);
     setLocalDocument(next);
   }, onBlur: () => void persist2().catch(() => {
-  }) }))))), exitOpen && /* @__PURE__ */ import_react35.default.createElement(EditorExitDialog, { onCancel: () => setExitOpen(false), onKeep: keepAndExit, onSave: () => save({ exit: true }), canSave: Boolean(data?.dirty || dirtyRef.current) && !hasPending, working: Boolean(busy), pending: hasPending || legacy?.status === "pending" }));
+  }) }))))), exitOpen && /* @__PURE__ */ import_react36.default.createElement(EditorExitDialog, { onCancel: () => setExitOpen(false), onKeep: keepAndExit, onSave: () => save({ exit: true }), canSave: Boolean(data?.dirty || dirtyRef.current) && !hasPending, working: Boolean(busy), pending: hasPending || legacy?.status === "pending" }));
 }
 
 // src/saved-ppt-preview.jsx
-var import_react36 = __toESM(require("react"), 1);
+var import_react37 = __toESM(require("react"), 1);
 function SavedPptPreview({ scope, endpoint: endpoint2, renderNativePreview }) {
-  const [source, setSource] = (0, import_react36.useState)(null), [error, setError] = (0, import_react36.useState)("");
+  const [source, setSource] = (0, import_react37.useState)(null), [error, setError] = (0, import_react37.useState)("");
   const identity4 = JSON.stringify([scope.artifactId, scope.hash, scope.requirementId]);
-  (0, import_react36.useEffect)(() => {
+  (0, import_react37.useEffect)(() => {
     let live = true;
     setSource(null);
     setError("");
@@ -46040,18 +46200,18 @@ function SavedPptPreview({ scope, endpoint: endpoint2, renderNativePreview }) {
       live = false;
     };
   }, [identity4]);
-  return /* @__PURE__ */ import_react36.default.createElement("section", { className: "wtt-saved-ppt-preview", "aria-label": "\u5DF2\u4FDD\u5B58PPT\u9884\u89C8" }, error ? /* @__PURE__ */ import_react36.default.createElement(UserError, { error }) : source ? renderNativePreview?.(source) || /* @__PURE__ */ import_react36.default.createElement(UserError, { error: "DSH\u539F\u751F\u9884\u89C8\u672A\u8FDE\u63A5" }) : /* @__PURE__ */ import_react36.default.createElement("p", { role: "status" }, scope.artifactId ? "\u6B63\u5728\u6253\u5F00\u5DF2\u4FDD\u5B58PPT\u9884\u89C8\u2026" : "\u5C1A\u672A\u4FDD\u5B58PPT\uFF0C\u8BF7\u5148\u7F16\u8F91\u6E90\u7A3F\u5E76\u4FDD\u5B58\u65B0\u7248\u672C\u3002"));
+  return /* @__PURE__ */ import_react37.default.createElement("section", { className: "wtt-saved-ppt-preview", "aria-label": "\u5DF2\u4FDD\u5B58PPT\u9884\u89C8" }, error ? /* @__PURE__ */ import_react37.default.createElement(UserError, { error }) : source ? renderNativePreview?.(source) || /* @__PURE__ */ import_react37.default.createElement(UserError, { error: "DSH\u539F\u751F\u9884\u89C8\u672A\u8FDE\u63A5" }) : /* @__PURE__ */ import_react37.default.createElement("p", { role: "status" }, scope.artifactId ? "\u6B63\u5728\u6253\u5F00\u5DF2\u4FDD\u5B58PPT\u9884\u89C8\u2026" : "\u5C1A\u672A\u4FDD\u5B58PPT\uFF0C\u8BF7\u5148\u7F16\u8F91\u6E90\u7A3F\u5E76\u4FDD\u5B58\u65B0\u7248\u672C\u3002"));
 }
 
 // src/outcome-viewer.jsx
-var import_react39 = __toESM(require("react"), 1);
+var import_react40 = __toESM(require("react"), 1);
 
 // src/document-preview.jsx
-var import_react37 = __toESM(require("react"), 1);
+var import_react38 = __toESM(require("react"), 1);
 function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requirementId, cardId, versionId, onClose, onSaved, onToggleWidth, widthExpanded, active = true, downloadHref, outcome = false, outcomeRole, fileActions, renderNativePreview }) {
-  const [data, setData] = (0, import_react37.useState)(null), [error, setError] = (0, import_react37.useState)(""), [notice, setNotice] = (0, import_react37.useState)(""), [busy, setBusy] = (0, import_react37.useState)(""), [menu, setMenu] = (0, import_react37.useState)(false);
-  const [manifest, setManifest] = (0, import_react37.useState)(null), [page, setPage] = (0, import_react37.useState)(1), [previewBusy, setPreviewBusy] = (0, import_react37.useState)(false), [previewError, setPreviewError] = (0, import_react37.useState)(""), [retry, setRetry] = (0, import_react37.useState)(0);
-  const mounted = (0, import_react37.useRef)(true), current = (0, import_react37.useRef)(null), polling = (0, import_react37.useRef)(null), previewRequest = (0, import_react37.useRef)(0), actions = (0, import_react37.useRef)(null), attempt = (0, import_react37.useRef)(null), chosenApp = (0, import_react37.useRef)("default");
+  const [data, setData] = (0, import_react38.useState)(null), [error, setError] = (0, import_react38.useState)(""), [notice, setNotice] = (0, import_react38.useState)(""), [busy, setBusy] = (0, import_react38.useState)(""), [menu, setMenu] = (0, import_react38.useState)(false);
+  const [manifest, setManifest] = (0, import_react38.useState)(null), [page, setPage] = (0, import_react38.useState)(1), [previewBusy, setPreviewBusy] = (0, import_react38.useState)(false), [previewError, setPreviewError] = (0, import_react38.useState)(""), [retry, setRetry] = (0, import_react38.useState)(0);
+  const mounted = (0, import_react38.useRef)(true), current = (0, import_react38.useRef)(null), polling = (0, import_react38.useRef)(null), previewRequest = (0, import_react38.useRef)(0), actions = (0, import_react38.useRef)(null), attempt = (0, import_react38.useRef)(null), chosenApp = (0, import_react38.useRef)("default");
   const send = async (action, input) => {
     const response = await fetch(endpoint2({}), { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, data: input }) });
     const result = await response.json();
@@ -46080,7 +46240,7 @@ function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requireme
     polling.current = pending;
     return pending;
   }
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     mounted.current = true;
     send("document-external-open", { sourceRef, hash, requirementId, cardId, versionId, ...outcome ? { outcome: true } : {} }).then((result) => {
       if (mounted.current) accept(result);
@@ -46092,7 +46252,7 @@ function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requireme
       previewRequest.current++;
     };
   }, []);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!active || !data?.workingFile) return;
     const timer2 = setInterval(() => {
       if (!document.hidden) void refresh().catch(() => {
@@ -46106,7 +46266,7 @@ function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requireme
       window.removeEventListener("focus", focus2);
     };
   }, [active, data?.workingFile]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!menu) return;
     const close2 = (event) => {
       if (!actions.current?.contains(event.target)) setMenu(false);
@@ -46120,7 +46280,7 @@ function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requireme
       document.removeEventListener("keydown", key);
     };
   }, [menu]);
-  (0, import_react37.useEffect)(() => {
+  (0, import_react38.useEffect)(() => {
     if (!data || data.format === "csv" || renderNativePreview) return;
     const token = ++previewRequest.current, revision = data.revision;
     let cancelled = false;
@@ -46209,22 +46369,22 @@ function DocumentViewer({ sourceRef, hash, title, endpoint: endpoint2, requireme
   const status = !data ? "\u6B63\u5728\u51C6\u5907\u9884\u89C8\u2026" : data.state === "writing" ? "\u672C\u673A\u5E94\u7528\u6B63\u5728\u4FDD\u5B58\u2026" : data.state === "invalid" ? "\u5DE5\u4F5C\u526F\u672C\u672A\u80FD\u66F4\u65B0" : previewBusy ? "\u6B63\u5728\u66F4\u65B0\u9884\u89C8\u2026" : data.dirty ? "\u5DE5\u4F5C\u7A3F\u5DF2\u66F4\u65B0 \xB7 \u5C1A\u672A\u5F52\u6863" : data.workingFile ? "\u5DE5\u4F5C\u526F\u672C\u5C31\u7EEA \xB7 \u5C1A\u672A\u68C0\u6D4B\u5230\u65B0\u4FEE\u6539" : outcomeRole === "attachment" ? "\u9644\u4EF6 \xB7 \u539F\u6587\u4EF6\u4FDD\u7559" : "\u5F53\u524D\u6B63\u5F0F\u7248\u672C";
   const canSave = data?.dirty && !busy && !error && !["writing", "invalid"].includes(data.state) && (Boolean(renderNativePreview) || data.format === "csv" || !previewBusy && manifest?.revision === data.revision);
   const fileHref = data ? endpoint2({ documentDownload: data.id, revision: String(data.revision) }).href : downloadHref;
-  return /* @__PURE__ */ import_react37.default.createElement("aside", { className: "wtt-document-viewer wtt-document-external nodrag nopan nowheel", "aria-label": "\u6587\u6863\u9884\u89C8", onPointerDown: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react37.default.createElement(PanelHeader, { title, format: data?.format.toUpperCase() || "\u6587\u6863", downloadHref: fileHref, downloadLabel: data?.workingFile ? "\u4E0B\u8F7D\u5F53\u524D\u5DE5\u4F5C\u526F\u672C" : "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C", expanded: widthExpanded, onToggleWidth, onClose, closeLabel: "\u5173\u95ED\u6587\u6863\u9884\u89C8" }), /* @__PURE__ */ import_react37.default.createElement(PanelToolbar, null, fileActions?.(Boolean(busy)), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wtt-document-open", ref: actions }, /* @__PURE__ */ import_react37.default.createElement("div", { className: "wtt-document-open-split" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !data || !!busy || !data.nativeAvailable, onClick: () => void open() }, busy === "open" ? "\u6B63\u5728\u6253\u5F00\u2026" : data?.format === "pptx" ? "\u6253\u5F00 PPT" : "\u7528\u672C\u673A\u5E94\u7528\u7F16\u8F91"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", type: "button", "aria-label": "\u9009\u62E9\u6253\u5F00\u65B9\u5F0F", "aria-expanded": menu, disabled: !data || !!busy || !data.nativeAvailable, onClick: () => setMenu(!menu) }, "\u2304")), menu && /* @__PURE__ */ import_react37.default.createElement("div", { className: "wtt-document-open-menu", role: "menu", "aria-label": "\u6253\u5F00\u65B9\u5F0F" }, data.applications.map((app) => /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", key: app.id, onClick: () => void open(app.id) }, app.name)), /* @__PURE__ */ import_react37.default.createElement("hr", null), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => void reveal() }, data.workingFile ? "\u6253\u5F00\u5DE5\u4F5C\u7A3F\u6587\u4EF6\u5939" : "\u6253\u5F00\u6240\u5728\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react37.default.createElement("a", { role: "menuitem", href: fileHref, download: true, onClick: () => setMenu(false) }, "\u4E0B\u8F7D\u9884\u89C8\u6587\u4EF6"), data.state === "invalid" && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => void open("default", true) }, "\u4ECE\u5F53\u524D\u9884\u89C8\u53E6\u5EFA\u526F\u672C"))), "    "), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wtt-document-status" }, /* @__PURE__ */ import_react37.default.createElement("span", { role: "status" }, status), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", type: "button", "aria-label": "\u68C0\u67E5\u6587\u4EF6\u66F4\u65B0", disabled: !data || !!busy, onClick: () => void refresh().catch(() => {
-  }) }, "\u21BB"), data?.dirty && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !canSave, onClick: () => void save() }, busy === "save" ? "\u4FDD\u5B58\u4E2D\u2026" : outcome && !versionId ? "\u4FDD\u5B58\u4E3A\u6B63\u5F0F\u7248\u672C" : "\u4FDD\u5B58\u65B0\u7248\u672C")), (error || data?.error) && /* @__PURE__ */ import_react37.default.createElement(UserError, { error: error || data.error }), notice && /* @__PURE__ */ import_react37.default.createElement("p", { className: "wtt-document-notice", role: "status" }, notice, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "button", "aria-label": "\u5173\u95ED\u6253\u5F00\u63D0\u793A", onClick: () => setNotice("") }, "\xD7")), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wtt-document-preview-body" }, data && renderNativePreview ? renderNativePreview(data.previewSource) : data?.format === "csv" ? /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("small", null, data.rows.length, " \u884C \xD7 ", data.rows[0]?.length || 0, " \u5217"), /* @__PURE__ */ import_react37.default.createElement("div", { className: "wtt-document-csv-readonly" }, /* @__PURE__ */ import_react37.default.createElement("table", { "aria-label": "CSV \u53EA\u8BFB\u9884\u89C8" }, /* @__PURE__ */ import_react37.default.createElement("tbody", null, data.rows.map((row, r) => /* @__PURE__ */ import_react37.default.createElement("tr", { key: r }, /* @__PURE__ */ import_react37.default.createElement("th", null, r + 1), row.map((cell, c) => /* @__PURE__ */ import_react37.default.createElement("td", { key: c }, cell)))))))) : data && /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, previewError && /* @__PURE__ */ import_react37.default.createElement("div", null, /* @__PURE__ */ import_react37.default.createElement(UserError, { error: previewError }), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => setRetry((n) => n + 1) }, "\u91CD\u65B0\u9884\u89C8")), manifest ? /* @__PURE__ */ import_react37.default.createElement(import_react37.default.Fragment, null, /* @__PURE__ */ import_react37.default.createElement("nav", { "aria-label": "\u6587\u6863\u9875\u7801" }, /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page <= 1, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react37.default.createElement("span", null, "\u7B2C ", page, " / ", manifest.pageCount, " \u9875"), /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page >= manifest.pageCount, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react37.default.createElement("img", { className: "wtt-document-preview-image", src: endpoint2({ documentDraftPage: data.id, revision: String(manifest.revision), page: String(page) }).href, alt: `${title} \xB7 \u7B2C${page}\u9875\u5B9E\u9645\u9884\u89C8` })) : !previewError && /* @__PURE__ */ import_react37.default.createElement("p", { role: "status" }, "\u6B63\u5728\u51C6\u5907\u5B9E\u9645\u5206\u9875\u2026"))), data && /* @__PURE__ */ import_react37.default.createElement("footer", { className: "wtt-document-file" }, /* @__PURE__ */ import_react37.default.createElement("span", { title: data.workingFile || data.fileName }, data.fileName, data.dirty ? " \xB7 \u5DE5\u4F5C\u7A3F" : ""), data.workingFile && /* @__PURE__ */ import_react37.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => void reveal() }, "\u6587\u4EF6\u4F4D\u7F6E")));
+  return /* @__PURE__ */ import_react38.default.createElement("aside", { className: "wtt-document-viewer wtt-document-external nodrag nopan nowheel", "aria-label": "\u6587\u6863\u9884\u89C8", onPointerDown: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react38.default.createElement(PanelHeader, { title, format: data?.format.toUpperCase() || "\u6587\u6863", downloadHref: fileHref, downloadLabel: data?.workingFile ? "\u4E0B\u8F7D\u5F53\u524D\u5DE5\u4F5C\u526F\u672C" : "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C", expanded: widthExpanded, onToggleWidth, onClose, closeLabel: "\u5173\u95ED\u6587\u6863\u9884\u89C8" }), /* @__PURE__ */ import_react38.default.createElement(PanelToolbar, null, fileActions?.(Boolean(busy)), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-document-open", ref: actions }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-document-open-split" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !data || !!busy || !data.nativeAvailable, onClick: () => void open() }, busy === "open" ? "\u6B63\u5728\u6253\u5F00\u2026" : data?.format === "pptx" ? "\u6253\u5F00 PPT" : "\u7528\u672C\u673A\u5E94\u7528\u7F16\u8F91"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", "aria-label": "\u9009\u62E9\u6253\u5F00\u65B9\u5F0F", "aria-expanded": menu, disabled: !data || !!busy || !data.nativeAvailable, onClick: () => setMenu(!menu) }, "\u2304")), menu && /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-document-open-menu", role: "menu", "aria-label": "\u6253\u5F00\u65B9\u5F0F" }, data.applications.map((app) => /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", key: app.id, onClick: () => void open(app.id) }, app.name)), /* @__PURE__ */ import_react38.default.createElement("hr", null), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => void reveal() }, data.workingFile ? "\u6253\u5F00\u5DE5\u4F5C\u7A3F\u6587\u4EF6\u5939" : "\u6253\u5F00\u6240\u5728\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react38.default.createElement("a", { role: "menuitem", href: fileHref, download: true, onClick: () => setMenu(false) }, "\u4E0B\u8F7D\u9884\u89C8\u6587\u4EF6"), data.state === "invalid" && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => void open("default", true) }, "\u4ECE\u5F53\u524D\u9884\u89C8\u53E6\u5EFA\u526F\u672C"))), "    "), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-document-status" }, /* @__PURE__ */ import_react38.default.createElement("span", { role: "status" }, status), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", "aria-label": "\u68C0\u67E5\u6587\u4EF6\u66F4\u65B0", disabled: !data || !!busy, onClick: () => void refresh().catch(() => {
+  }) }, "\u21BB"), data?.dirty && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !canSave, onClick: () => void save() }, busy === "save" ? "\u4FDD\u5B58\u4E2D\u2026" : outcome && !versionId ? "\u4FDD\u5B58\u4E3A\u6B63\u5F0F\u7248\u672C" : "\u4FDD\u5B58\u65B0\u7248\u672C")), (error || data?.error) && /* @__PURE__ */ import_react38.default.createElement(UserError, { error: error || data.error }), notice && /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-document-notice", role: "status" }, notice, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "button", "aria-label": "\u5173\u95ED\u6253\u5F00\u63D0\u793A", onClick: () => setNotice("") }, "\xD7")), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-document-preview-body" }, data && renderNativePreview ? renderNativePreview(data.previewSource) : data?.format === "csv" ? /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("small", null, data.rows.length, " \u884C \xD7 ", data.rows[0]?.length || 0, " \u5217"), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-document-csv-readonly" }, /* @__PURE__ */ import_react38.default.createElement("table", { "aria-label": "CSV \u53EA\u8BFB\u9884\u89C8" }, /* @__PURE__ */ import_react38.default.createElement("tbody", null, data.rows.map((row, r) => /* @__PURE__ */ import_react38.default.createElement("tr", { key: r }, /* @__PURE__ */ import_react38.default.createElement("th", null, r + 1), row.map((cell, c) => /* @__PURE__ */ import_react38.default.createElement("td", { key: c }, cell)))))))) : data && /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, previewError && /* @__PURE__ */ import_react38.default.createElement("div", null, /* @__PURE__ */ import_react38.default.createElement(UserError, { error: previewError }), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => setRetry((n) => n + 1) }, "\u91CD\u65B0\u9884\u89C8")), manifest ? /* @__PURE__ */ import_react38.default.createElement(import_react38.default.Fragment, null, /* @__PURE__ */ import_react38.default.createElement("nav", { "aria-label": "\u6587\u6863\u9875\u7801" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page <= 1, onClick: () => setPage(page - 1) }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react38.default.createElement("span", null, "\u7B2C ", page, " / ", manifest.pageCount, " \u9875"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", disabled: page >= manifest.pageCount, onClick: () => setPage(page + 1) }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react38.default.createElement("img", { className: "wtt-document-preview-image", src: endpoint2({ documentDraftPage: data.id, revision: String(manifest.revision), page: String(page) }).href, alt: `${title} \xB7 \u7B2C${page}\u9875\u5B9E\u9645\u9884\u89C8` })) : !previewError && /* @__PURE__ */ import_react38.default.createElement("p", { role: "status" }, "\u6B63\u5728\u51C6\u5907\u5B9E\u9645\u5206\u9875\u2026"))), data && /* @__PURE__ */ import_react38.default.createElement("footer", { className: "wtt-document-file" }, /* @__PURE__ */ import_react38.default.createElement("span", { title: data.workingFile || data.fileName }, data.fileName, data.dirty ? " \xB7 \u5DE5\u4F5C\u7A3F" : ""), data.workingFile && /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => void reveal() }, "\u6587\u4EF6\u4F4D\u7F6E")));
 }
 
 // src/output-preview.jsx
-var import_react38 = __toESM(require("react"), 1);
+var import_react39 = __toESM(require("react"), 1);
 var fileBlocked = (status) => ["missing", "changed", "modified", "unavailable"].includes(status);
 var messageOf = (value) => value?.message || value?.error?.message || value?.error || String(value);
 function useDeckManifest({ artifactId, hash, loadPreview, enabled = true }) {
   const identity4 = `${artifactId || ""}:${hash || ""}`;
-  const loader = (0, import_react38.useRef)(loadPreview);
+  const loader = (0, import_react39.useRef)(loadPreview);
   loader.current = loadPreview;
-  const [attempt, setAttempt] = (0, import_react38.useState)(0);
-  const [result, setResult] = (0, import_react38.useState)(null);
+  const [attempt, setAttempt] = (0, import_react39.useState)(0);
+  const [result, setResult] = (0, import_react39.useState)(null);
   const canLoad = Boolean(enabled && artifactId && hash && loadPreview);
-  (0, import_react38.useEffect)(() => {
+  (0, import_react39.useEffect)(() => {
     if (!canLoad) return;
     let disposed = false;
     const controller = new AbortController();
@@ -46256,12 +46416,12 @@ function useDeckManifest({ artifactId, hash, loadPreview, enabled = true }) {
 }
 function PptCover({ artifactId, hash, loadPreview, getPageHref, src, title, onOpen, disabled, compact }) {
   const preview = useDeckManifest({ artifactId, hash, loadPreview, enabled: !src && !disabled });
-  const [imageError, setImageError] = (0, import_react38.useState)("");
+  const [imageError, setImageError] = (0, import_react39.useState)("");
   const page = preview.manifest?.pages.find((item) => item.number === preview.manifest.coverPage) || preview.manifest?.pages[0];
   const image = src || page && getPageHref?.({ artifactId, hash, page: page.number });
   const imageKey = `${image || ""}:${preview.attempt}`;
   const failed = imageError === imageKey;
-  return /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", className: "wtt-output-ppt-cover", disabled: disabled || !onOpen, onClick: (event) => {
+  return /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "custom", type: "button", className: "wtt-output-ppt-cover", disabled: disabled || !onOpen, onClick: (event) => {
     if (!compact || event.detail === 0) {
       event.stopPropagation();
       onOpen?.();
@@ -46269,7 +46429,7 @@ function PptCover({ artifactId, hash, loadPreview, getPageHref, src, title, onOp
   }, onDoubleClick: compact ? (event) => {
     event.stopPropagation();
     onOpen?.();
-  } : void 0, "aria-label": `${compact ? "\u53CC\u51FB\u9010\u9875\u9884\u89C8" : "\u9010\u9875\u9884\u89C8"}\uFF1A${title || "PPT"}` }, image && !failed ? /* @__PURE__ */ import_react38.default.createElement("img", { key: imageKey, src: image, alt: `${title || "PPT"}\u5C01\u9762`, loading: "lazy", draggable: false, onError: () => setImageError(imageKey) }) : /* @__PURE__ */ import_react38.default.createElement("span", { className: "wtt-output-ppt-placeholder" }, preview.loading ? "\u6B63\u5728\u751F\u6210\u5C01\u9762\u2026" : preview.error ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6253\u5F00\u8BFE\u4EF6\u67E5\u770B" : failed ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528" : "PPT \u8BFE\u4EF6"), /* @__PURE__ */ import_react38.default.createElement("span", { className: "wtt-output-ppt-caption" }, preview.manifest ? `${preview.manifest.pageCount} \u9875 \xB7 ` : "", compact ? "\u53CC\u51FB\u9010\u9875\u67E5\u770B" : "\u9010\u9875\u67E5\u770B"));
+  } : void 0, "aria-label": `${compact ? "\u53CC\u51FB\u9010\u9875\u9884\u89C8" : "\u9010\u9875\u9884\u89C8"}\uFF1A${title || "PPT"}` }, image && !failed ? /* @__PURE__ */ import_react39.default.createElement("img", { key: imageKey, src: image, alt: `${title || "PPT"}\u5C01\u9762`, loading: "lazy", draggable: false, onError: () => setImageError(imageKey) }) : /* @__PURE__ */ import_react39.default.createElement("span", { className: "wtt-output-ppt-placeholder" }, preview.loading ? "\u6B63\u5728\u751F\u6210\u5C01\u9762\u2026" : preview.error ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u6253\u5F00\u8BFE\u4EF6\u67E5\u770B" : failed ? "\u5C01\u9762\u6682\u4E0D\u53EF\u7528" : "PPT \u8BFE\u4EF6"), /* @__PURE__ */ import_react39.default.createElement("span", { className: "wtt-output-ppt-caption" }, preview.manifest ? `${preview.manifest.pageCount} \u9875 \xB7 ` : "", compact ? "\u53CC\u51FB\u9010\u9875\u67E5\u770B" : "\u9010\u9875\u67E5\u770B"));
 }
 function OutputPreview({
   type = "text",
@@ -46290,13 +46450,13 @@ function OutputPreview({
   emptyMessage,
   onOpenMedia
 }) {
-  const [mediaError, setMediaError] = (0, import_react38.useState)("");
+  const [mediaError, setMediaError] = (0, import_react39.useState)("");
   const identity4 = `${type}:${src || ""}`;
   const unavailable = fileBlocked(status);
   const failed = mediaError === identity4;
   const hasText = extracted !== false && typeof content === "string" && content.trim();
   const previewText = compact && hasText && content.length > 600 ? content.slice(0, 600).replace(/[\uD800-\uDBFF]$/, "") + "\u2026" : content;
-  return /* @__PURE__ */ import_react38.default.createElement("section", { className: `wtt-output-preview is-${type}${compact ? " is-compact" : ""}`, "aria-label": `${title || "\u6210\u679C\u6587\u4EF6"}\u9884\u89C8` }, unavailable ? /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, "\u6B64\u7248\u672C\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u65E0\u6CD5\u6CBF\u7528\u65E7\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u539F\u6587\u4EF6\u3002") : type === "pptx" ? /* @__PURE__ */ import_react38.default.createElement(PptCover, { artifactId, hash, loadPreview, getPageHref, src, title, onOpen: onOpenDeck, compact }) : type === "image" && src && !failed ? /* @__PURE__ */ import_react38.default.createElement("img", { key: identity4, className: "wtt-output-image", src, alt: title || "\u751F\u6210\u56FE\u7247", loading: "lazy", decoding: "async", draggable: false, onError: () => setMediaError(identity4) }) : type === "video" && src && !failed ? /* @__PURE__ */ import_react38.default.createElement(
+  return /* @__PURE__ */ import_react39.default.createElement("section", { className: `wtt-output-preview is-${type}${compact ? " is-compact" : ""}`, "aria-label": `${title || "\u6210\u679C\u6587\u4EF6"}\u9884\u89C8` }, unavailable ? /* @__PURE__ */ import_react39.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, "\u6B64\u7248\u672C\u6587\u4EF6\u5DF2\u7F3A\u5931\u6216\u53D8\u5316\uFF0C\u65E0\u6CD5\u6CBF\u7528\u65E7\u9884\u89C8\uFF0C\u8BF7\u6838\u5BF9\u539F\u6587\u4EF6\u3002") : type === "pptx" ? /* @__PURE__ */ import_react39.default.createElement(PptCover, { artifactId, hash, loadPreview, getPageHref, src, title, onOpen: onOpenDeck, compact }) : type === "image" && src && !failed ? /* @__PURE__ */ import_react39.default.createElement("img", { key: identity4, className: "wtt-output-image", src, alt: title || "\u751F\u6210\u56FE\u7247", loading: "lazy", decoding: "async", draggable: false, onError: () => setMediaError(identity4) }) : type === "video" && src && !failed ? /* @__PURE__ */ import_react39.default.createElement(
     VideoPreview,
     {
       key: identity4,
@@ -46317,12 +46477,12 @@ function OutputPreview({
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => event.stopPropagation()
     }
-  ) : ["image", "video"].includes(type) ? /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, failed ? type === "video" ? "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u7248\u672C\uFF0C\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002" : "\u6B64\u7248\u672C\u56FE\u7247\u672A\u80FD\u52A0\u8F7D\uFF0C\u53EF\u4E0B\u8F7D\u539F\u56FE\u67E5\u770B\u3002" : emptyMessage || "\u5C1A\u672A\u53D6\u5F97\u53EF\u9884\u89C8\u7684\u6587\u4EF6\u3002") : hasText ? /* @__PURE__ */ import_react38.default.createElement("pre", { className: `wtt-output-text${compact ? "" : " nodrag nowheel"}` }, previewText) : /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-output-preview-note" }, emptyMessage || (extracted === false ? "\u6B64\u683C\u5F0F\u5C1A\u672A\u63D0\u53D6\u53EF\u8BFB\u6B63\u6587\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002" : "\u5C1A\u65E0\u5DF2\u4FDD\u5B58\u7684\u6587\u672C\u6210\u679C\u3002")), !compact && downloadHref && /* @__PURE__ */ import_react38.default.createElement("a", { className: "wtt-output-download", href: downloadHref, download: true, onClick: (event) => event.stopPropagation() }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C"));
+  ) : ["image", "video"].includes(type) ? /* @__PURE__ */ import_react39.default.createElement("p", { className: "wtt-output-preview-note", role: "status" }, failed ? type === "video" ? "\u6D4F\u89C8\u5668\u65E0\u6CD5\u64AD\u653E\u6B64\u7248\u672C\uFF0C\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002" : "\u6B64\u7248\u672C\u56FE\u7247\u672A\u80FD\u52A0\u8F7D\uFF0C\u53EF\u4E0B\u8F7D\u539F\u56FE\u67E5\u770B\u3002" : emptyMessage || "\u5C1A\u672A\u53D6\u5F97\u53EF\u9884\u89C8\u7684\u6587\u4EF6\u3002") : hasText ? /* @__PURE__ */ import_react39.default.createElement("pre", { className: `wtt-output-text${compact ? "" : " nodrag nowheel"}` }, previewText) : /* @__PURE__ */ import_react39.default.createElement("p", { className: "wtt-output-preview-note" }, emptyMessage || (extracted === false ? "\u6B64\u683C\u5F0F\u5C1A\u672A\u63D0\u53D6\u53EF\u8BFB\u6B63\u6587\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002" : "\u5C1A\u65E0\u5DF2\u4FDD\u5B58\u7684\u6587\u672C\u6210\u679C\u3002")), !compact && downloadHref && /* @__PURE__ */ import_react39.default.createElement("a", { className: "wtt-output-download", href: downloadHref, download: true, onClick: (event) => event.stopPropagation() }, "\u4E0B\u8F7D\u5F53\u524D\u7248\u672C"));
 }
 function DeckPreview({ artifactId, hash, title = "\u8BFE\u4EF6\u9884\u89C8", loadPreview, getPageHref, downloadHref, onClose }) {
   const preview = useDeckManifest({ artifactId, hash, loadPreview });
-  const [selection2, setSelection] = (0, import_react38.useState)(null);
-  const [pageErrors, setPageErrors] = (0, import_react38.useState)(() => /* @__PURE__ */ new Set());
+  const [selection2, setSelection] = (0, import_react39.useState)(null);
+  const [pageErrors, setPageErrors] = (0, import_react39.useState)(() => /* @__PURE__ */ new Set());
   const identity4 = `${preview.identity}:${preview.attempt}`;
   const pages = preview.manifest?.pages || [];
   const selectedNumber = selection2?.identity === identity4 ? selection2.number : preview.manifest?.coverPage || pages[0]?.number;
@@ -46346,7 +46506,7 @@ function DeckPreview({ artifactId, hash, title = "\u8BFE\u4EF6\u9884\u89C8", loa
     event.preventDefault();
     choose(Math.max(0, Math.min(pages.length - 1, target)));
   }
-  return /* @__PURE__ */ import_react38.default.createElement("aside", { className: "wtt-deck-preview nodrag nopan nowheel", "aria-label": "PPT \u9010\u9875\u9884\u89C8", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown }, /* @__PURE__ */ import_react38.default.createElement(PanelHeader, { title, subtitle: "PPT \xB7 \u5B9E\u9645\u8BFE\u4EF6\u9884\u89C8", downloadHref, onClose, closeLabel: "\u5173\u95ED\u8BFE\u4EF6\u9884\u89C8" }), preview.loading ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-feedback", role: "status" }, /* @__PURE__ */ import_react38.default.createElement("span", { className: "wtt-deck-loading", "aria-hidden": "true" }), /* @__PURE__ */ import_react38.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u6B64\u7248\u672C\u7684\u5B9E\u9645\u5E7B\u706F\u7247\u2026"), /* @__PURE__ */ import_react38.default.createElement("small", null, "\u9996\u6B21\u9884\u89C8\u4F1A\u5728\u672C\u673A\u8F6C\u6362\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\u3002")) : preview.error || preview.unavailable ? /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react38.default.createElement("strong", null, "\u8BFE\u4EF6\u9884\u89C8\u6682\u4E0D\u53EF\u7528"), /* @__PURE__ */ import_react38.default.createElement("p", null, preview.error || "\u5F53\u524D\u6587\u4EF6\u7F3A\u5C11\u9884\u89C8\u4FE1\u606F\u3002"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry, disabled: preview.unavailable }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"), /* @__PURE__ */ import_react38.default.createElement("small", null, "\u6B63\u5F0F PPTX \u4FDD\u7559\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002")) : /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-body" }, /* @__PURE__ */ import_react38.default.createElement("nav", { className: "wtt-deck-thumbnails", "aria-label": "\u5E7B\u706F\u7247\u7F29\u7565\u56FE" }, pages.map((page, index2) => /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "custom", type: "button", key: `${identity4}:${page.number}`, "aria-label": `\u7B2C ${page.number} \u9875`, "aria-current": index2 === currentIndex ? "page" : void 0, onClick: () => choose(index2) }, /* @__PURE__ */ import_react38.default.createElement("span", null, page.number), /* @__PURE__ */ import_react38.default.createElement("img", { src: pageHref(page), alt: `\u7B2C ${page.number} \u9875\u7F29\u7565\u56FE`, loading: "lazy", decoding: "async", draggable: false })))), /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-stage" }, /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-page", tabIndex: 0, "aria-label": `\u7B2C ${current?.number || 1} \u9875\uFF0C\u5DE6\u53F3\u952E\u7FFB\u9875` }, current && !pageErrors.has(`${identity4}:${current.number}`) ? /* @__PURE__ */ import_react38.default.createElement("img", { key: `${identity4}:${current.number}`, src: pageHref(current), alt: `${title} \xB7 \u7B2C ${current.number} \u9875`, draggable: false, onError: () => failPage(current.number) }) : /* @__PURE__ */ import_react38.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react38.default.createElement("p", null, "\u6B64\u9875\u9884\u89C8\u52A0\u8F7D\u5931\u8D25\u3002"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"))), /* @__PURE__ */ import_react38.default.createElement("footer", { className: "wtt-deck-navigation" }, /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex - 1), disabled: currentIndex === 0 }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react38.default.createElement("span", { "aria-live": "polite" }, "\u7B2C ", current?.number || 1, " \u9875 / \u5171 ", pages.length, " \u9875"), /* @__PURE__ */ import_react38.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex + 1), disabled: currentIndex >= pages.length - 1 }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react38.default.createElement("p", { className: "wtt-deck-derived-note" }, "\u6309\u6B64\u7248\u672C PPTX \u6E32\u67D3\uFF1B\u9884\u89C8\u56FE\u4E0D\u66FF\u4EE3\u53EF\u7F16\u8F91\u8BFE\u4EF6\u3002"), !!preview.manifest?.warnings?.length && /* @__PURE__ */ import_react38.default.createElement("details", { className: "wtt-deck-render-notes" }, /* @__PURE__ */ import_react38.default.createElement("summary", null, "\u6E32\u67D3\u63D0\u793A \xB7 ", preview.manifest.warnings.length), preview.manifest.warnings.map((warning, index2) => /* @__PURE__ */ import_react38.default.createElement("p", { key: index2 }, typeof warning === "string" ? warning : [warning.source, warning.message].filter(Boolean).join("\uFF1A")))))));
+  return /* @__PURE__ */ import_react39.default.createElement("aside", { className: "wtt-deck-preview nodrag nopan nowheel", "aria-label": "PPT \u9010\u9875\u9884\u89C8", onPointerDown: (event) => event.stopPropagation(), onClick: (event) => event.stopPropagation(), onDoubleClick: (event) => event.stopPropagation(), onKeyDown }, /* @__PURE__ */ import_react39.default.createElement(PanelHeader, { title, subtitle: "PPT \xB7 \u5B9E\u9645\u8BFE\u4EF6\u9884\u89C8", downloadHref, onClose, closeLabel: "\u5173\u95ED\u8BFE\u4EF6\u9884\u89C8" }), preview.loading ? /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-deck-feedback", role: "status" }, /* @__PURE__ */ import_react39.default.createElement("span", { className: "wtt-deck-loading", "aria-hidden": "true" }), /* @__PURE__ */ import_react39.default.createElement("p", null, "\u6B63\u5728\u8BFB\u53D6\u6B64\u7248\u672C\u7684\u5B9E\u9645\u5E7B\u706F\u7247\u2026"), /* @__PURE__ */ import_react39.default.createElement("small", null, "\u9996\u6B21\u9884\u89C8\u4F1A\u5728\u672C\u673A\u8F6C\u6362\uFF0C\u4E0D\u8C03\u7528\u6A21\u578B\u3002")) : preview.error || preview.unavailable ? /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react39.default.createElement("strong", null, "\u8BFE\u4EF6\u9884\u89C8\u6682\u4E0D\u53EF\u7528"), /* @__PURE__ */ import_react39.default.createElement("p", null, preview.error || "\u5F53\u524D\u6587\u4EF6\u7F3A\u5C11\u9884\u89C8\u4FE1\u606F\u3002"), /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry, disabled: preview.unavailable }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"), /* @__PURE__ */ import_react39.default.createElement("small", null, "\u6B63\u5F0F PPTX \u4FDD\u7559\uFF0C\u53EF\u4E0B\u8F7D\u539F\u6587\u4EF6\u67E5\u770B\u3002")) : /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-deck-body" }, /* @__PURE__ */ import_react39.default.createElement("nav", { className: "wtt-deck-thumbnails", "aria-label": "\u5E7B\u706F\u7247\u7F29\u7565\u56FE" }, pages.map((page, index2) => /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "custom", type: "button", key: `${identity4}:${page.number}`, "aria-label": `\u7B2C ${page.number} \u9875`, "aria-current": index2 === currentIndex ? "page" : void 0, onClick: () => choose(index2) }, /* @__PURE__ */ import_react39.default.createElement("span", null, page.number), /* @__PURE__ */ import_react39.default.createElement("img", { src: pageHref(page), alt: `\u7B2C ${page.number} \u9875\u7F29\u7565\u56FE`, loading: "lazy", decoding: "async", draggable: false })))), /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-deck-stage" }, /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-deck-page", tabIndex: 0, "aria-label": `\u7B2C ${current?.number || 1} \u9875\uFF0C\u5DE6\u53F3\u952E\u7FFB\u9875` }, current && !pageErrors.has(`${identity4}:${current.number}`) ? /* @__PURE__ */ import_react39.default.createElement("img", { key: `${identity4}:${current.number}`, src: pageHref(current), alt: `${title} \xB7 \u7B2C ${current.number} \u9875`, draggable: false, onError: () => failPage(current.number) }) : /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-deck-feedback", role: "alert" }, /* @__PURE__ */ import_react39.default.createElement("p", null, "\u6B64\u9875\u9884\u89C8\u52A0\u8F7D\u5931\u8D25\u3002"), /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: preview.retry }, "\u91CD\u65B0\u8BFB\u53D6\u9884\u89C8"))), /* @__PURE__ */ import_react39.default.createElement("footer", { className: "wtt-deck-navigation" }, /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex - 1), disabled: currentIndex === 0 }, "\u4E0A\u4E00\u9875"), /* @__PURE__ */ import_react39.default.createElement("span", { "aria-live": "polite" }, "\u7B2C ", current?.number || 1, " \u9875 / \u5171 ", pages.length, " \u9875"), /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => choose(currentIndex + 1), disabled: currentIndex >= pages.length - 1 }, "\u4E0B\u4E00\u9875")), /* @__PURE__ */ import_react39.default.createElement("p", { className: "wtt-deck-derived-note" }, "\u6309\u6B64\u7248\u672C PPTX \u6E32\u67D3\uFF1B\u9884\u89C8\u56FE\u4E0D\u66FF\u4EE3\u53EF\u7F16\u8F91\u8BFE\u4EF6\u3002"), !!preview.manifest?.warnings?.length && /* @__PURE__ */ import_react39.default.createElement("details", { className: "wtt-deck-render-notes" }, /* @__PURE__ */ import_react39.default.createElement("summary", null, "\u6E32\u67D3\u63D0\u793A \xB7 ", preview.manifest.warnings.length), preview.manifest.warnings.map((warning, index2) => /* @__PURE__ */ import_react39.default.createElement("p", { key: index2 }, typeof warning === "string" ? warning : [warning.source, warning.message].filter(Boolean).join("\uFF1A")))))));
 }
 
 // src/outcome-viewer.jsx
@@ -46368,9 +46528,9 @@ function OutcomeViewer({
   onPinProjectFile,
   onLocateProjectFile
 }) {
-  const [manifest, setManifest] = (0, import_react39.useState)(null), [selected2, setSelected] = (0, import_react39.useState)(""), [sourceBinding, setSource] = (0, import_react39.useState)(null);
-  const [error, setError] = (0, import_react39.useState)("");
-  const [svgBinding, setSvgBinding] = (0, import_react39.useState)(null), [svgChoice, setSvgChoice] = (0, import_react39.useState)("");
+  const [manifest, setManifest] = (0, import_react40.useState)(null), [selected2, setSelected] = (0, import_react40.useState)(""), [sourceBinding, setSource] = (0, import_react40.useState)(null);
+  const [error, setError] = (0, import_react40.useState)("");
+  const [svgBinding, setSvgBinding] = (0, import_react40.useState)(null), [svgChoice, setSvgChoice] = (0, import_react40.useState)("");
   const identity4 = JSON.stringify({ ...target, title: void 0, displayTitle: void 0 });
   const read = async (query) => {
     const response = await fetch(endpoint2(query), { credentials: "same-origin" });
@@ -46378,7 +46538,7 @@ function OutcomeViewer({
     if (!response.ok) throw new Error(result.error || "\u6587\u4EF6\u8BFB\u53D6\u5931\u8D25\u3002");
     return result;
   };
-  (0, import_react39.useEffect)(() => {
+  (0, import_react40.useEffect)(() => {
     let live = true;
     setManifest(null);
     setSource(null);
@@ -46408,7 +46568,7 @@ function OutcomeViewer({
   const file = manifest?.files.find((item) => item.sourceRef === selected2);
   const selectionKey = `${identity4}:${selected2}:${file?.hash || ""}`;
   const source = sourceBinding?.key === selectionKey ? sourceBinding.value : null;
-  (0, import_react39.useEffect)(() => {
+  (0, import_react40.useEffect)(() => {
     if (!file) return;
     let live = true;
     setSource(null);
@@ -46427,7 +46587,7 @@ function OutcomeViewer({
       live = false;
     };
   }, [selectionKey, Boolean(file)]);
-  (0, import_react39.useEffect)(() => {
+  (0, import_react40.useEffect)(() => {
     if (!source || !active) return;
     const textLike = ["md", "markdown", "txt", "csv", "json", "jsonl", "yaml", "yml", "html", "css", "js", "mjs", "py", "xml", "log"].includes(source.format);
     if (target.projectPath ? !textLike : !["html", "htm", "md", "markdown"].includes(source.format)) return;
@@ -46449,7 +46609,7 @@ function OutcomeViewer({
   }, [source?.path, source?.hash, active, target.projectPath]);
   const editScope = source?.format === "pptx" && file?.artifactId && manifest?.cardId ? { requirementId: target.requirementId, cardId: manifest.cardId, versionId: manifest.versionId, artifactId: file.artifactId, hash: source.hash, outcome: true } : null;
   const svg = svgBinding?.key === selectionKey ? svgBinding.value : null;
-  (0, import_react39.useEffect)(() => {
+  (0, import_react40.useEffect)(() => {
     if (!editScope) return;
     let live = true;
     setSvgBinding(null);
@@ -46474,7 +46634,7 @@ function OutcomeViewer({
   const isImage = source && (source.mime?.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif"].includes(source.format?.toLowerCase()));
   const imageHref = isImage && target.projectPath ? endpoint2({ reviewImage: source.originalPath, hash: source.hash }).href : downloadHref;
   const otherWebProject = source?.format === "pptx" && manifest?.slideProject?.artifactId !== file?.artifactId;
-  const choices = (disabled) => /* @__PURE__ */ import_react39.default.createElement(import_react39.default.Fragment, null, manifest?.files.length > 1 && /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-outcome-picker" }, /* @__PURE__ */ import_react39.default.createElement("select", { "aria-label": "\u9009\u62E9\u6210\u679C\u6587\u4EF6", value: selected2, disabled, onChange: (e) => setSelected(e.target.value) }, manifest.files.map((item) => /* @__PURE__ */ import_react39.default.createElement("option", { key: item.sourceRef, value: item.sourceRef }, item.format?.toUpperCase(), " \xB7 ", item.name, item.role === "attachment" ? " \xB7 \u9644\u4EF6" : "")))), editScope && /* @__PURE__ */ import_react39.default.createElement(
+  const choices = (disabled) => /* @__PURE__ */ import_react40.default.createElement(import_react40.default.Fragment, null, manifest?.files.length > 1 && /* @__PURE__ */ import_react40.default.createElement("div", { className: "wtt-outcome-picker" }, /* @__PURE__ */ import_react40.default.createElement("select", { "aria-label": "\u9009\u62E9\u6210\u679C\u6587\u4EF6", value: selected2, disabled, onChange: (e) => setSelected(e.target.value) }, manifest.files.map((item) => /* @__PURE__ */ import_react40.default.createElement("option", { key: item.sourceRef, value: item.sourceRef }, item.format?.toUpperCase(), " \xB7 ", item.name, item.role === "attachment" ? " \xB7 \u9644\u4EF6" : "")))), editScope && /* @__PURE__ */ import_react40.default.createElement(
     UiButton,
     {
       variant: "quiet",
@@ -46486,8 +46646,8 @@ function OutcomeViewer({
       }
     },
     "\u7F16\u8F91\u6E90\u6587\u4EF6"
-  ), editScope && svg?.candidates?.length > 1 && /* @__PURE__ */ import_react39.default.createElement("select", { "aria-label": "\u9009\u62E9SVG\u6E90\u5DE5\u7A0B", value: svgChoice, disabled, onChange: (e) => setSvgChoice(e.target.value) }, /* @__PURE__ */ import_react39.default.createElement("option", { value: "" }, "\u9009\u62E9\u6E90\u5DE5\u7A0B\u2026"), svg.candidates.map((c) => /* @__PURE__ */ import_react39.default.createElement("option", { key: c.id, value: c.id }, c.path))), !editScope && manifest?.slideProject && /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", disabled, onClick: () => onOpenSlides?.(manifest) }, "\u7F16\u8F91\u6E90\u6587\u4EF6"));
-  if (canModify) return /* @__PURE__ */ import_react39.default.createElement(
+  ), editScope && svg?.candidates?.length > 1 && /* @__PURE__ */ import_react40.default.createElement("select", { "aria-label": "\u9009\u62E9SVG\u6E90\u5DE5\u7A0B", value: svgChoice, disabled, onChange: (e) => setSvgChoice(e.target.value) }, /* @__PURE__ */ import_react40.default.createElement("option", { value: "" }, "\u9009\u62E9\u6E90\u5DE5\u7A0B\u2026"), svg.candidates.map((c) => /* @__PURE__ */ import_react40.default.createElement("option", { key: c.id, value: c.id }, c.path))), !editScope && manifest?.slideProject && /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "quiet", disabled, onClick: () => onOpenSlides?.(manifest) }, "\u7F16\u8F91\u6E90\u6587\u4EF6"));
+  if (canModify) return /* @__PURE__ */ import_react40.default.createElement(
     DocumentViewer,
     {
       key: selectionKey,
@@ -46510,7 +46670,7 @@ function OutcomeViewer({
       widthExpanded
     }
   );
-  return /* @__PURE__ */ import_react39.default.createElement("aside", { className: "wtt-outcome-viewer nodrag nopan nowheel", "aria-label": target.reviewDraft ? "\u5F85\u5BA1\u7A3F\u9884\u89C8" : "\u6210\u679C\u6587\u4EF6\u9884\u89C8", onPointerDown: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react39.default.createElement(
+  return /* @__PURE__ */ import_react40.default.createElement("aside", { className: "wtt-outcome-viewer nodrag nopan nowheel", "aria-label": target.reviewDraft ? "\u5F85\u5BA1\u7A3F\u9884\u89C8" : "\u6210\u679C\u6587\u4EF6\u9884\u89C8", onPointerDown: (e) => e.stopPropagation(), onKeyDown: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react40.default.createElement(
     PanelHeader,
     {
       title: target.displayTitle || manifest?.displayTitle || file?.name || target.title || "\u6210\u679C\u6587\u4EF6",
@@ -46521,7 +46681,7 @@ function OutcomeViewer({
       onClose,
       closeLabel: "\u5173\u95ED\u6210\u679C\u9884\u89C8"
     }
-  ), /* @__PURE__ */ import_react39.default.createElement(PanelToolbar, null, choices(false), onPinProjectFile && /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", "aria-pressed": Boolean(projectFilePinned), onClick: onPinProjectFile }, projectFilePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u9884\u89C8"), onLocateProjectFile && /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", onClick: onLocateProjectFile }, "\u5728\u9879\u76EE\u6587\u4EF6\u4E2D\u5B9A\u4F4D"), onAdd2 && source && /* @__PURE__ */ import_react39.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react39.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react39.default.createElement(UserError, { error }) : source ? isImage ? /* @__PURE__ */ import_react39.default.createElement(OutputPreview, { type: "image", title: source.name, src: imageHref, status: source.status }) : seekableVideo ? /* @__PURE__ */ import_react39.default.createElement(
+  ), /* @__PURE__ */ import_react40.default.createElement(PanelToolbar, null, choices(false), onPinProjectFile && /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "quiet", "aria-pressed": Boolean(projectFilePinned), onClick: onPinProjectFile }, projectFilePinned ? "\u53D6\u6D88\u56FA\u5B9A" : "\u56FA\u5B9A\u9884\u89C8"), onLocateProjectFile && /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "quiet", onClick: onLocateProjectFile }, "\u5728\u9879\u76EE\u6587\u4EF6\u4E2D\u5B9A\u4F4D"), onAdd2 && source && /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "quiet", onClick: () => onAdd2({ path: target.projectPath, name: source.name, hash: source.hash, directory: false }) }, "\u6DFB\u52A0\u5230\u753B\u5E03")), file?.role === "attachment" && /* @__PURE__ */ import_react40.default.createElement("div", { className: "wtt-outcome-status", role: "status" }, "\u9644\u4EF6 \xB7 \u672A\u4F5C\u4E3A\u6B63\u5F0F\u7248\u672C\u5F52\u6863"), /* @__PURE__ */ import_react40.default.createElement("div", { className: "wtt-outcome-viewer-body" }, error ? /* @__PURE__ */ import_react40.default.createElement(UserError, { error }) : source ? isImage ? /* @__PURE__ */ import_react40.default.createElement(OutputPreview, { type: "image", title: source.name, src: imageHref, status: source.status }) : seekableVideo ? /* @__PURE__ */ import_react40.default.createElement(
     OutputPreview,
     {
       type: "video",
@@ -46530,14 +46690,14 @@ function OutcomeViewer({
       deferDesktopSeek: Boolean(target.projectPath),
       emptyMessage: source.videoError ? `${source.videoError}\u3002\u53EF\u4E0B\u8F7D\u539F\u89C6\u9891\u67E5\u770B\u3002` : void 0
     }
-  ) : source.format === "mov" ? /* @__PURE__ */ import_react39.default.createElement(VideoPreview, { key: selectionKey, src: videoHref, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react39.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react39.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
+  ) : source.format === "mov" ? /* @__PURE__ */ import_react40.default.createElement(VideoPreview, { key: selectionKey, src: videoHref, "aria-label": source.name }) : renderNativePreview?.(source) || /* @__PURE__ */ import_react40.default.createElement(UserError, { error: "DSH \u539F\u751F\u6587\u4EF6\u9884\u89C8\u5C1A\u672A\u8FDE\u63A5\u3002" }) : /* @__PURE__ */ import_react40.default.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u6210\u679C\u6587\u4EF6\u2026")));
 }
 
 // src/canvas.jsx
 var import_react64 = __toESM(require("react"), 1);
 
 // src/whiteboard-nodes.jsx
-var import_react40 = __toESM(require("react"), 1);
+var import_react41 = __toESM(require("react"), 1);
 var COLOURS = {
   cream: { label: "\u7C73\u9EC4", paper: "#fff4cb", line: "#eadba7" },
   blue: { label: "\u6D45\u84DD", paper: "#e6efff", line: "#bdcfee" },
@@ -46547,25 +46707,25 @@ var COLOURS = {
 };
 var KINDS2 = { text: "\u6587\u5B57", note: "\u4FBF\u7B7E", shape: "\u56FE\u5F62" };
 var stop = (event) => event.stopPropagation();
-var WhiteboardNode = (0, import_react40.memo)(function WhiteboardNode2({ id: id2, data, selected: selected2, isConnectable }) {
-  const [editing, setEditing] = (0, import_react40.useState)(false);
-  const [draft, setDraft] = (0, import_react40.useState)(data.text || "");
-  const editor = (0, import_react40.useRef)(null);
-  const closed = (0, import_react40.useRef)(null);
-  const autoEditStarted = (0, import_react40.useRef)(false);
-  const editingRef = (0, import_react40.useRef)(false);
+var WhiteboardNode = (0, import_react41.memo)(function WhiteboardNode2({ id: id2, data, selected: selected2, isConnectable }) {
+  const [editing, setEditing] = (0, import_react41.useState)(false);
+  const [draft, setDraft] = (0, import_react41.useState)(data.text || "");
+  const editor = (0, import_react41.useRef)(null);
+  const closed = (0, import_react41.useRef)(null);
+  const autoEditStarted = (0, import_react41.useRef)(false);
+  const editingRef = (0, import_react41.useRef)(false);
   const kind = KINDS2[data.elementKind] ? data.elementKind : "note";
   const text2 = typeof data.text === "string" ? data.text : "";
   const colour = COLOURS[data.colour] || COLOURS.cream;
   const ellipse = kind === "shape" && data.shape === "ellipse";
   const label2 = KINDS2[kind];
-  (0, import_react40.useEffect)(() => {
+  (0, import_react41.useEffect)(() => {
     if (!editing) setDraft(text2);
   }, [text2, editing]);
-  (0, import_react40.useEffect)(() => () => {
+  (0, import_react41.useEffect)(() => () => {
     if (editingRef.current) data.onEditEnd?.();
   }, []);
-  (0, import_react40.useEffect)(() => {
+  (0, import_react41.useEffect)(() => {
     if (!data.autoEdit || autoEditStarted.current) return;
     autoEditStarted.current = true;
     data.onEditStart?.();
@@ -46574,7 +46734,7 @@ var WhiteboardNode = (0, import_react40.memo)(function WhiteboardNode2({ id: id2
     setDraft(text2);
     setEditing(true);
   }, [data.autoEdit]);
-  (0, import_react40.useEffect)(() => {
+  (0, import_react41.useEffect)(() => {
     if (!editing) return;
     editor.current?.focus();
     editor.current?.setSelectionRange(draft.length, draft.length);
@@ -46609,7 +46769,7 @@ var WhiteboardNode = (0, import_react40.memo)(function WhiteboardNode2({ id: id2
       finishEdit(true);
     }
   }
-  return /* @__PURE__ */ import_react40.default.createElement(
+  return /* @__PURE__ */ import_react41.default.createElement(
     "article",
     {
       className: `wcc-element wcc-element-${kind}${ellipse ? " is-ellipse" : ""}${selected2 ? " is-selected" : ""}${editing ? " is-editing" : ""}`,
@@ -46618,8 +46778,8 @@ var WhiteboardNode = (0, import_react40.memo)(function WhiteboardNode2({ id: id2
       style: { "--wcc-element-paper": colour.paper, "--wcc-element-line": colour.line },
       onDoubleClick: beginEdit
     },
-    /* @__PURE__ */ import_react40.default.createElement(ReferencePickOverlay, { nodeId: id2 }),
-    /* @__PURE__ */ import_react40.default.createElement(
+    /* @__PURE__ */ import_react41.default.createElement(ReferencePickOverlay, { nodeId: id2 }),
+    /* @__PURE__ */ import_react41.default.createElement(
       NodeResizer,
       {
         nodeId: id2,
@@ -46635,9 +46795,9 @@ var WhiteboardNode = (0, import_react40.memo)(function WhiteboardNode2({ id: id2
         onResizeEnd: (_event, { width, height }) => data.onChange?.(id2, { width, height })
       }
     ),
-    /* @__PURE__ */ import_react40.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable: isConnectable && !editing, "aria-label": `\u8FDE\u63A5\u5230${label2}` }),
-    /* @__PURE__ */ import_react40.default.createElement("div", { className: "wcc-element-grip", "aria-label": `\u62D6\u52A8${label2}` }, /* @__PURE__ */ import_react40.default.createElement("span", { className: "wcc-element-grip-lines", "aria-hidden": "true" }), /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-element-edit nodrag nopan", "aria-label": `\u7F16\u8F91${label2}\u6587\u5B57`, onPointerDown: stop, onClick: beginEdit }, "\u7F16\u8F91")),
-    editing ? /* @__PURE__ */ import_react40.default.createElement(
+    /* @__PURE__ */ import_react41.default.createElement(Handle, { type: "target", position: Position.Left, isConnectable: isConnectable && !editing, "aria-label": `\u8FDE\u63A5\u5230${label2}` }),
+    /* @__PURE__ */ import_react41.default.createElement("div", { className: "wcc-element-grip", "aria-label": `\u62D6\u52A8${label2}` }, /* @__PURE__ */ import_react41.default.createElement("span", { className: "wcc-element-grip-lines", "aria-hidden": "true" }), /* @__PURE__ */ import_react41.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-element-edit nodrag nopan", "aria-label": `\u7F16\u8F91${label2}\u6587\u5B57`, onPointerDown: stop, onClick: beginEdit }, "\u7F16\u8F91")),
+    editing ? /* @__PURE__ */ import_react41.default.createElement(
       "textarea",
       {
         ref: editor,
@@ -46656,13 +46816,13 @@ var WhiteboardNode = (0, import_react40.memo)(function WhiteboardNode2({ id: id2
         onWheel: stop,
         spellCheck: false
       }
-    ) : /* @__PURE__ */ import_react40.default.createElement("div", { className: `wcc-element-content${text2 ? "" : " is-empty"}` }, text2 || `\u53CC\u51FB\u8F93\u5165${label2 === "\u56FE\u5F62" ? "\u6587\u5B57" : label2}`),
-    /* @__PURE__ */ import_react40.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable: isConnectable && !editing, "aria-label": `\u4ECE${label2}\u8FDE\u7EBF` })
+    ) : /* @__PURE__ */ import_react41.default.createElement("div", { className: `wcc-element-content${text2 ? "" : " is-empty"}` }, text2 || `\u53CC\u51FB\u8F93\u5165${label2 === "\u56FE\u5F62" ? "\u6587\u5B57" : label2}`),
+    /* @__PURE__ */ import_react41.default.createElement(Handle, { type: "source", position: Position.Right, isConnectable: isConnectable && !editing, "aria-label": `\u4ECE${label2}\u8FDE\u7EBF` })
   );
 });
 function WhiteboardStyleControls({ element, onChange }) {
   const kind = element.elementKind || element.kind;
-  return /* @__PURE__ */ import_react40.default.createElement("div", { className: "wcc-element-style-controls", "aria-label": "\u767D\u677F\u5143\u7D20\u6837\u5F0F" }, /* @__PURE__ */ import_react40.default.createElement("div", { className: "wcc-element-colours", role: "group", "aria-label": "\u5143\u7D20\u989C\u8272" }, Object.entries(COLOURS).map(([key, colour]) => /* @__PURE__ */ import_react40.default.createElement(
+  return /* @__PURE__ */ import_react41.default.createElement("div", { className: "wcc-element-style-controls", "aria-label": "\u767D\u677F\u5143\u7D20\u6837\u5F0F" }, /* @__PURE__ */ import_react41.default.createElement("div", { className: "wcc-element-colours", role: "group", "aria-label": "\u5143\u7D20\u989C\u8272" }, Object.entries(COLOURS).map(([key, colour]) => /* @__PURE__ */ import_react41.default.createElement(
     UiButton,
     {
       variant: "custom",
@@ -46675,8 +46835,8 @@ function WhiteboardStyleControls({ element, onChange }) {
       style: { "--wcc-swatch": colour.paper, "--wcc-swatch-line": colour.line },
       onClick: () => onChange({ colour: key })
     },
-    /* @__PURE__ */ import_react40.default.createElement("span", { "aria-hidden": "true" })
-  ))), kind === "shape" && /* @__PURE__ */ import_react40.default.createElement("div", { className: "wcc-element-shape-controls", role: "group", "aria-label": "\u56FE\u5F62\u5F62\u72B6" }, /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u77E9\u5F62", "aria-pressed": element.shape !== "ellipse", onClick: () => onChange({ shape: "rectangle" }) }, "\u77E9\u5F62"), /* @__PURE__ */ import_react40.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u692D\u5706", "aria-pressed": element.shape === "ellipse", onClick: () => onChange({ shape: "ellipse" }) }, "\u692D\u5706")));
+    /* @__PURE__ */ import_react41.default.createElement("span", { "aria-hidden": "true" })
+  ))), kind === "shape" && /* @__PURE__ */ import_react41.default.createElement("div", { className: "wcc-element-shape-controls", role: "group", "aria-label": "\u56FE\u5F62\u5F62\u72B6" }, /* @__PURE__ */ import_react41.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u77E9\u5F62", "aria-pressed": element.shape !== "ellipse", onClick: () => onChange({ shape: "rectangle" }) }, "\u77E9\u5F62"), /* @__PURE__ */ import_react41.default.createElement(UiButton, { variant: "custom", type: "button", "aria-label": "\u56FE\u5F62\u8BBE\u4E3A\u692D\u5706", "aria-pressed": element.shape === "ellipse", onClick: () => onChange({ shape: "ellipse" }) }, "\u692D\u5706")));
 }
 
 // src/canvas-history.mjs
@@ -46948,7 +47108,7 @@ function arrangeCardBlocks(blocks, fixed, relations = []) {
 }
 
 // src/outline-desk.jsx
-var import_react42 = __toESM(require("react"), 1);
+var import_react43 = __toESM(require("react"), 1);
 
 // src/text-diff.mjs
 function normalizeLineEndings(value) {
@@ -47024,20 +47184,20 @@ var versionName = (version2) => `v${String(version2?.number ?? "?").padStart(3, 
 var lineAt = (text2, offset3) => text2.slice(0, offset3).split("\n").length;
 function Difference({ result }) {
   if (!result) return null;
-  return /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-diff", "aria-label": "\u5B8C\u6574\u5927\u7EB2\u5DEE\u5F02" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-diff-summary" }, /* @__PURE__ */ import_react42.default.createElement("span", null, result.removed || result.added ? /* @__PURE__ */ import_react42.default.createElement(import_react42.default.Fragment, null, /* @__PURE__ */ import_react42.default.createElement("b", { className: "is-added" }, "+", result.added, " \u884C"), /* @__PURE__ */ import_react42.default.createElement("b", { className: "is-deleted" }, "\u2212", result.removed, " \u884C")) : "\u4E24\u4EFD\u6B63\u6587\u76F8\u540C"), /* @__PURE__ */ import_react42.default.createElement("span", null, result.mode === "blocks" ? "\u5185\u5BB9\u8F83\u957F\u6216\u5DEE\u5F02\u8F83\u591A\uFF0C\u6309\u5B8C\u6574\u533A\u5757\u5C55\u793A\uFF0C\u672A\u7701\u7565\u6B63\u6587\u3002" : "\u5DE6\u4FA7\u4E3A\u539F\u884C\u53F7\uFF0C\u53F3\u4FA7\u4E3A\u65B0\u884C\u53F7\uFF1B\u4FDD\u7559\u5168\u6587\u4E0E\u7A7A\u884C\u3002")), /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-diff-body", tabIndex: 0 }, result.blocks.map((block, index2) => result.mode === "blocks" ? /* @__PURE__ */ import_react42.default.createElement("section", { key: index2, className: `wcc-outline-diff-block is-${block.type}`, "aria-label": block.type === "equal" ? "\u672A\u4FEE\u6539\u533A\u5757" : block.type === "delete" ? "\u5220\u9664\u533A\u5757" : "\u65B0\u589E\u533A\u5757" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-block-heading" }, block.type === "equal" ? "\u672A\u4FEE\u6539" : block.type === "delete" ? "\u2212 \u5220\u9664" : "+ \u65B0\u589E", /* @__PURE__ */ import_react42.default.createElement("span", null, block.type !== "add" ? `\u539F ${block.oldStart}\u2013${block.oldStart + block.lines.length - 1} \u884C` : "", block.type === "equal" ? " \xB7 " : "", block.type !== "delete" ? `\u65B0 ${block.newStart}\u2013${block.newStart + block.lines.length - 1} \u884C` : "")), /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-block-content" }, /* @__PURE__ */ import_react42.default.createElement("pre", { className: "wcc-outline-block-gutter", "aria-hidden": "true" }, block.lines.map((_2, i) => (block.type === "add" ? block.newStart : block.oldStart) + i).join("\n")), /* @__PURE__ */ import_react42.default.createElement("pre", null, block.lines.join("\n") || "\u200B"))) : block.lines.map((line, offset3) => /* @__PURE__ */ import_react42.default.createElement("div", { key: `${index2}-${offset3}`, className: `wcc-outline-diff-line is-${block.type}` }, /* @__PURE__ */ import_react42.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "add" ? "" : block.oldStart + offset3), /* @__PURE__ */ import_react42.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "delete" ? "" : block.newStart + offset3), /* @__PURE__ */ import_react42.default.createElement("span", { className: "wcc-outline-line-mark", "aria-hidden": "true" }, block.type === "add" ? "+" : block.type === "delete" ? "\u2212" : ""), /* @__PURE__ */ import_react42.default.createElement("pre", null, line || "\u200B"))))));
+  return /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-diff", "aria-label": "\u5B8C\u6574\u5927\u7EB2\u5DEE\u5F02" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-diff-summary" }, /* @__PURE__ */ import_react43.default.createElement("span", null, result.removed || result.added ? /* @__PURE__ */ import_react43.default.createElement(import_react43.default.Fragment, null, /* @__PURE__ */ import_react43.default.createElement("b", { className: "is-added" }, "+", result.added, " \u884C"), /* @__PURE__ */ import_react43.default.createElement("b", { className: "is-deleted" }, "\u2212", result.removed, " \u884C")) : "\u4E24\u4EFD\u6B63\u6587\u76F8\u540C"), /* @__PURE__ */ import_react43.default.createElement("span", null, result.mode === "blocks" ? "\u5185\u5BB9\u8F83\u957F\u6216\u5DEE\u5F02\u8F83\u591A\uFF0C\u6309\u5B8C\u6574\u533A\u5757\u5C55\u793A\uFF0C\u672A\u7701\u7565\u6B63\u6587\u3002" : "\u5DE6\u4FA7\u4E3A\u539F\u884C\u53F7\uFF0C\u53F3\u4FA7\u4E3A\u65B0\u884C\u53F7\uFF1B\u4FDD\u7559\u5168\u6587\u4E0E\u7A7A\u884C\u3002")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-diff-body", tabIndex: 0 }, result.blocks.map((block, index2) => result.mode === "blocks" ? /* @__PURE__ */ import_react43.default.createElement("section", { key: index2, className: `wcc-outline-diff-block is-${block.type}`, "aria-label": block.type === "equal" ? "\u672A\u4FEE\u6539\u533A\u5757" : block.type === "delete" ? "\u5220\u9664\u533A\u5757" : "\u65B0\u589E\u533A\u5757" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-block-heading" }, block.type === "equal" ? "\u672A\u4FEE\u6539" : block.type === "delete" ? "\u2212 \u5220\u9664" : "+ \u65B0\u589E", /* @__PURE__ */ import_react43.default.createElement("span", null, block.type !== "add" ? `\u539F ${block.oldStart}\u2013${block.oldStart + block.lines.length - 1} \u884C` : "", block.type === "equal" ? " \xB7 " : "", block.type !== "delete" ? `\u65B0 ${block.newStart}\u2013${block.newStart + block.lines.length - 1} \u884C` : "")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-block-content" }, /* @__PURE__ */ import_react43.default.createElement("pre", { className: "wcc-outline-block-gutter", "aria-hidden": "true" }, block.lines.map((_2, i) => (block.type === "add" ? block.newStart : block.oldStart) + i).join("\n")), /* @__PURE__ */ import_react43.default.createElement("pre", null, block.lines.join("\n") || "\u200B"))) : block.lines.map((line, offset3) => /* @__PURE__ */ import_react43.default.createElement("div", { key: `${index2}-${offset3}`, className: `wcc-outline-diff-line is-${block.type}` }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "add" ? "" : block.oldStart + offset3), /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-outline-line-number", "aria-hidden": "true" }, block.type === "delete" ? "" : block.newStart + offset3), /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-outline-line-mark", "aria-hidden": "true" }, block.type === "add" ? "+" : block.type === "delete" ? "\u2212" : ""), /* @__PURE__ */ import_react43.default.createElement("pre", null, line || "\u200B"))))));
 }
 function OutlineDesk({ version: version2, versions = [], value, onChange, onClose, onSave, onExport, onPassage, downloadHref, busy = false, error }) {
-  const editor = (0, import_react42.useRef)(null);
-  const id2 = (0, import_react42.useId)();
-  const [view, setView] = (0, import_react42.useState)("edit");
-  const [comparison, setComparison] = (0, import_react42.useState)("draft");
-  const [leftId, setLeftId] = (0, import_react42.useState)("");
-  const [rightId, setRightId] = (0, import_react42.useState)("");
-  const [selection2, setSelection] = (0, import_react42.useState)(null);
+  const editor = (0, import_react43.useRef)(null);
+  const id2 = (0, import_react43.useId)();
+  const [view, setView] = (0, import_react43.useState)("edit");
+  const [comparison, setComparison] = (0, import_react43.useState)("draft");
+  const [leftId, setLeftId] = (0, import_react43.useState)("");
+  const [rightId, setRightId] = (0, import_react43.useState)("");
+  const [selection2, setSelection] = (0, import_react43.useState)(null);
   const source = normalizeLineEndings(version2?.markdown);
   const draft = normalizeLineEndings(value ?? version2?.markdown);
   const dirty = draft !== source;
-  const savedVersions = (0, import_react42.useMemo)(() => {
+  const savedVersions = (0, import_react43.useMemo)(() => {
     const unique = new Map(versions.filter((item) => item && typeof item.markdown === "string").map((item) => [item.id, item]));
     if (version2 && typeof version2.markdown === "string") unique.set(version2.id, version2);
     return [...unique.values()].sort((a, b2) => a.number - b2.number);
@@ -47046,9 +47206,9 @@ function OutlineDesk({ version: version2, versions = [], value, onChange, onClos
   const leftVersion = savedVersions.find((item) => item.id === leftId) || previousVersion || savedVersions.find((item) => item.id !== version2?.id) || version2;
   const rightVersion = savedVersions.find((item) => item.id === rightId) || version2;
   const passage = selection2 && version2 ? savedPassage(source, draft, selection2.start, selection2.end) : null;
-  const result = (0, import_react42.useMemo)(() => view === "compare" ? diffLines(comparison === "draft" ? source : leftVersion?.markdown, comparison === "draft" ? draft : rightVersion?.markdown) : null, [view, comparison, source, draft, leftVersion, rightVersion]);
+  const result = (0, import_react43.useMemo)(() => view === "compare" ? diffLines(comparison === "draft" ? source : leftVersion?.markdown, comparison === "draft" ? draft : rightVersion?.markdown) : null, [view, comparison, source, draft, leftVersion, rightVersion]);
   const selectionMessage = dirty ? "\u5F53\u524D\u6709\u672A\u4FDD\u5B58\u4FEE\u6539\uFF0C\u5148\u4FDD\u5B58\u65B0\u7248\u672C\u518D\u9009\u62E9\u7247\u6BB5\u3002" : passage ? `\u5DF2\u9009\u62E9\u7B2C ${lineAt(source, passage.start)}\u2013${lineAt(source, passage.end - 1)} \u884C \xB7 ${passage.quote.length} \u5B57\u7B26` : "\u5728\u6B63\u6587\u4E2D\u9009\u62E9\u7247\u6BB5\uFF0C\u518D\u4EA4\u7ED9 AI\u3002";
-  (0, import_react42.useEffect)(() => {
+  (0, import_react43.useEffect)(() => {
     setSelection(null);
   }, [version2?.id, source]);
   function readSelection() {
@@ -47062,17 +47222,17 @@ function OutlineDesk({ version: version2, versions = [], value, onChange, onClos
       if (dirty && draft.trim() && !busy) onSave?.();
     }
   }
-  return /* @__PURE__ */ import_react42.default.createElement("section", { className: "wcc-outline-desk", "aria-label": "\u5927\u7EB2\u4E13\u6CE8\u7F16\u8F91", onKeyDown: keyboard, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react42.default.createElement(PanelHeader, { title: `\u5927\u7EB2\u7F16\u8F91 \xB7 ${versionName(version2)}`, subtitle: dirty ? "\u672A\u4FDD\u5B58\u8349\u7A3F" : "\u5DF2\u4FDD\u5B58\u7248\u672C", downloadHref, downloadLabel: "\u4E0B\u8F7D\u5DF2\u4FDD\u5B58\u7684 Word", onClose, closeLabel: "\u5173\u95ED\u4E13\u6CE8\u7F16\u8F91" }), /* @__PURE__ */ import_react42.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react42.default.createElement(UiButton, { variant: "quiet", onClick: () => {
+  return /* @__PURE__ */ import_react43.default.createElement("section", { className: "wcc-outline-desk", "aria-label": "\u5927\u7EB2\u4E13\u6CE8\u7F16\u8F91", onKeyDown: keyboard, onPointerDown: (event) => event.stopPropagation() }, /* @__PURE__ */ import_react43.default.createElement(PanelHeader, { title: `\u5927\u7EB2\u7F16\u8F91 \xB7 ${versionName(version2)}`, subtitle: dirty ? "\u672A\u4FDD\u5B58\u8349\u7A3F" : "\u5DF2\u4FDD\u5B58\u7248\u672C", downloadHref, downloadLabel: "\u4E0B\u8F7D\u5DF2\u4FDD\u5B58\u7684 Word", onClose, closeLabel: "\u5173\u95ED\u4E13\u6CE8\u7F16\u8F91" }), /* @__PURE__ */ import_react43.default.createElement(PanelToolbar, null, /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "quiet", onClick: () => {
     setView("edit");
     if (passage && !busy) onPassage?.(passage);
-  }, disabled: !!busy || dirty || !passage || !onPassage, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u9009\u62E9\u7247\u6BB5\u4EA4\u7ED9 AI" : "\u5C06\u5DF2\u4FDD\u5B58\u7248\u672C\u7684\u6240\u9009\u7247\u6BB5\u4EA4\u7ED9 AI" }, "\u9009\u6BB5\u4EA4\u7ED9 AI \u2197"), /* @__PURE__ */ import_react42.default.createElement(UiButton, { variant: "quiet", onClick: onExport, disabled: !!busy || dirty || !version2 || !onExport, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u5BFC\u51FA Word" : `\u5BFC\u51FA ${versionName(version2)} \u5BF9\u5E94\u7684 Word` }, "\u5BFC\u51FA Word"), /* @__PURE__ */ import_react42.default.createElement(UiButton, { variant: "primary", className: "wcc-outline-save", onClick: onSave, disabled: !!busy || !dirty || !draft.trim() || !onSave }, busy ? "\u5904\u7406\u4E2D\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react42.default.createElement("nav", { className: "wcc-outline-desk-nav", "aria-label": "\u5927\u7EB2\u5DE5\u4F5C\u89C6\u56FE" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-view-switch" }, /* @__PURE__ */ import_react42.default.createElement(UiButton, { variant: "quiet", className: view === "edit" ? "is-active" : "", "aria-pressed": view === "edit", onClick: () => setView("edit") }, "\u7F16\u8F91\u5927\u7EB2"), /* @__PURE__ */ import_react42.default.createElement(UiButton, { variant: "quiet", className: view === "compare" ? "is-active" : "", "aria-pressed": view === "compare", onClick: () => setView("compare") }, "\u5168\u6587\u6BD4\u8F83")), /* @__PURE__ */ import_react42.default.createElement("span", null, draft.length.toLocaleString(), " \u5B57\u7B26 \xB7 ", draft.split("\n").length.toLocaleString(), " \u884C")), error && /* @__PURE__ */ import_react42.default.createElement(UserError, { className: "wcc-outline-desk-error", error: error instanceof Error ? error.message : String(error) }), view === "edit" ? /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-editor-area" }, /* @__PURE__ */ import_react42.default.createElement("label", { htmlFor: `${id2}-editor`, className: "wcc-outline-editor-label" }, /* @__PURE__ */ import_react42.default.createElement("span", null, versionName(version2), " \u7684\u7F16\u8F91\u8349\u7A3F"), /* @__PURE__ */ import_react42.default.createElement("span", null, "Markdown \xB7 \u2318 / Ctrl + S \u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react42.default.createElement("textarea", { ref: editor, id: `${id2}-editor`, className: "wcc-outline-desk-textarea", "aria-describedby": `${id2}-selection`, value: draft, onChange: (event) => {
+  }, disabled: !!busy || dirty || !passage || !onPassage, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u9009\u62E9\u7247\u6BB5\u4EA4\u7ED9 AI" : "\u5C06\u5DF2\u4FDD\u5B58\u7248\u672C\u7684\u6240\u9009\u7247\u6BB5\u4EA4\u7ED9 AI" }, "\u9009\u6BB5\u4EA4\u7ED9 AI \u2197"), /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "quiet", onClick: onExport, disabled: !!busy || dirty || !version2 || !onExport, title: dirty ? "\u5148\u4FDD\u5B58\u65B0\u7248\u672C\uFF0C\u518D\u5BFC\u51FA Word" : `\u5BFC\u51FA ${versionName(version2)} \u5BF9\u5E94\u7684 Word` }, "\u5BFC\u51FA Word"), /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "primary", className: "wcc-outline-save", onClick: onSave, disabled: !!busy || !dirty || !draft.trim() || !onSave }, busy ? "\u5904\u7406\u4E2D\u2026" : "\u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react43.default.createElement("nav", { className: "wcc-outline-desk-nav", "aria-label": "\u5927\u7EB2\u5DE5\u4F5C\u89C6\u56FE" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-view-switch" }, /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "quiet", className: view === "edit" ? "is-active" : "", "aria-pressed": view === "edit", onClick: () => setView("edit") }, "\u7F16\u8F91\u5927\u7EB2"), /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "quiet", className: view === "compare" ? "is-active" : "", "aria-pressed": view === "compare", onClick: () => setView("compare") }, "\u5168\u6587\u6BD4\u8F83")), /* @__PURE__ */ import_react43.default.createElement("span", null, draft.length.toLocaleString(), " \u5B57\u7B26 \xB7 ", draft.split("\n").length.toLocaleString(), " \u884C")), error && /* @__PURE__ */ import_react43.default.createElement(UserError, { className: "wcc-outline-desk-error", error: error instanceof Error ? error.message : String(error) }), view === "edit" ? /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-editor-area" }, /* @__PURE__ */ import_react43.default.createElement("label", { htmlFor: `${id2}-editor`, className: "wcc-outline-editor-label" }, /* @__PURE__ */ import_react43.default.createElement("span", null, versionName(version2), " \u7684\u7F16\u8F91\u8349\u7A3F"), /* @__PURE__ */ import_react43.default.createElement("span", null, "Markdown \xB7 \u2318 / Ctrl + S \u4FDD\u5B58\u65B0\u7248\u672C")), /* @__PURE__ */ import_react43.default.createElement("textarea", { ref: editor, id: `${id2}-editor`, className: "wcc-outline-desk-textarea", "aria-describedby": `${id2}-selection`, value: draft, onChange: (event) => {
     setSelection(null);
     onChange?.(event.target.value);
-  }, onSelect: readSelection, onKeyUp: readSelection, onMouseUp: readSelection, readOnly: !!busy, spellCheck: false, placeholder: "\u5728\u8FD9\u91CC\u7F16\u8F91\u5B8C\u6574\u8BFE\u7A0B\u5927\u7EB2" })) : /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-comparison" }, /* @__PURE__ */ import_react42.default.createElement("div", { className: "wcc-outline-compare-controls" }, /* @__PURE__ */ import_react42.default.createElement("label", null, /* @__PURE__ */ import_react42.default.createElement("span", null, "\u6BD4\u8F83\u5185\u5BB9"), /* @__PURE__ */ import_react42.default.createElement("select", { value: comparison, onChange: (event) => setComparison(event.target.value) }, /* @__PURE__ */ import_react42.default.createElement("option", { value: "draft" }, "\u5F53\u524D\u7248\u672C \u2192 \u5F53\u524D\u8349\u7A3F"), /* @__PURE__ */ import_react42.default.createElement("option", { value: "versions" }, "\u4E24\u4E2A\u5DF2\u4FDD\u5B58\u7248\u672C"))), comparison === "versions" ? /* @__PURE__ */ import_react42.default.createElement(import_react42.default.Fragment, null, /* @__PURE__ */ import_react42.default.createElement("label", null, /* @__PURE__ */ import_react42.default.createElement("span", null, "\u539F\u7248\u672C"), /* @__PURE__ */ import_react42.default.createElement("select", { value: leftVersion?.id || "", onChange: (event) => setLeftId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react42.default.createElement("option", { key: item.id, value: item.id }, versionName(item))))), /* @__PURE__ */ import_react42.default.createElement("span", { className: "wcc-outline-compare-arrow", "aria-hidden": "true" }, "\u2192"), /* @__PURE__ */ import_react42.default.createElement("label", null, /* @__PURE__ */ import_react42.default.createElement("span", null, "\u65B0\u7248\u672C"), /* @__PURE__ */ import_react42.default.createElement("select", { value: rightVersion?.id || "", onChange: (event) => setRightId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react42.default.createElement("option", { key: item.id, value: item.id }, versionName(item)))))) : /* @__PURE__ */ import_react42.default.createElement("span", { className: "wcc-outline-compare-description" }, versionName(version2), " \u2192 \u5F53\u524D\u8349\u7A3F")), /* @__PURE__ */ import_react42.default.createElement(Difference, { result })), /* @__PURE__ */ import_react42.default.createElement("footer", { className: `wcc-outline-desk-footer${dirty ? " is-dirty" : ""}`, id: `${id2}-selection` }, /* @__PURE__ */ import_react42.default.createElement("span", null, selectionMessage), /* @__PURE__ */ import_react42.default.createElement("span", null, dirty ? "\u4FEE\u6539\u53EA\u5728\u5F53\u524D\u9875\u9762\uFF1B\u70B9\u51FB\u4FDD\u5B58\u751F\u6210\u72EC\u7ACB\u7248\u672C\u3002" : "\u7248\u672C\u539F\u6587\u4FDD\u7559\uFF0C\u4FEE\u6539\u53E6\u5B58\u4E3A\u65B0\u7248\u672C\u3002")));
+  }, onSelect: readSelection, onKeyUp: readSelection, onMouseUp: readSelection, readOnly: !!busy, spellCheck: false, placeholder: "\u5728\u8FD9\u91CC\u7F16\u8F91\u5B8C\u6574\u8BFE\u7A0B\u5927\u7EB2" })) : /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-comparison" }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-outline-compare-controls" }, /* @__PURE__ */ import_react43.default.createElement("label", null, /* @__PURE__ */ import_react43.default.createElement("span", null, "\u6BD4\u8F83\u5185\u5BB9"), /* @__PURE__ */ import_react43.default.createElement("select", { value: comparison, onChange: (event) => setComparison(event.target.value) }, /* @__PURE__ */ import_react43.default.createElement("option", { value: "draft" }, "\u5F53\u524D\u7248\u672C \u2192 \u5F53\u524D\u8349\u7A3F"), /* @__PURE__ */ import_react43.default.createElement("option", { value: "versions" }, "\u4E24\u4E2A\u5DF2\u4FDD\u5B58\u7248\u672C"))), comparison === "versions" ? /* @__PURE__ */ import_react43.default.createElement(import_react43.default.Fragment, null, /* @__PURE__ */ import_react43.default.createElement("label", null, /* @__PURE__ */ import_react43.default.createElement("span", null, "\u539F\u7248\u672C"), /* @__PURE__ */ import_react43.default.createElement("select", { value: leftVersion?.id || "", onChange: (event) => setLeftId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react43.default.createElement("option", { key: item.id, value: item.id }, versionName(item))))), /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-outline-compare-arrow", "aria-hidden": "true" }, "\u2192"), /* @__PURE__ */ import_react43.default.createElement("label", null, /* @__PURE__ */ import_react43.default.createElement("span", null, "\u65B0\u7248\u672C"), /* @__PURE__ */ import_react43.default.createElement("select", { value: rightVersion?.id || "", onChange: (event) => setRightId(event.target.value) }, savedVersions.map((item) => /* @__PURE__ */ import_react43.default.createElement("option", { key: item.id, value: item.id }, versionName(item)))))) : /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-outline-compare-description" }, versionName(version2), " \u2192 \u5F53\u524D\u8349\u7A3F")), /* @__PURE__ */ import_react43.default.createElement(Difference, { result })), /* @__PURE__ */ import_react43.default.createElement("footer", { className: `wcc-outline-desk-footer${dirty ? " is-dirty" : ""}`, id: `${id2}-selection` }, /* @__PURE__ */ import_react43.default.createElement("span", null, selectionMessage), /* @__PURE__ */ import_react43.default.createElement("span", null, dirty ? "\u4FEE\u6539\u53EA\u5728\u5F53\u524D\u9875\u9762\uFF1B\u70B9\u51FB\u4FDD\u5B58\u751F\u6210\u72EC\u7ACB\u7248\u672C\u3002" : "\u7248\u672C\u539F\u6587\u4FDD\u7559\uFF0C\u4FEE\u6539\u53E6\u5B58\u4E3A\u65B0\u7248\u672C\u3002")));
 }
 
 // src/source-reader.jsx
-var import_react43 = __toESM(require("react"), 1);
+var import_react44 = __toESM(require("react"), 1);
 var SOURCE_STATES = {
   ready: "\u6765\u6E90\u53EF\u7528",
   available: "\u6765\u6E90\u53EF\u7528",
@@ -47106,20 +47266,20 @@ function describeRange(text2, start2, end) {
   return first2 === last ? `\u7B2C ${first2} \u884C` : `\u7B2C ${first2}\u2013${last} \u884C`;
 }
 function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDraftChange, busy = false, error = "" }) {
-  const id2 = (0, import_react43.useId)();
-  const readerRef = (0, import_react43.useRef)(null);
-  const identityRef = (0, import_react43.useRef)("");
-  const submittingRef = (0, import_react43.useRef)(false);
+  const id2 = (0, import_react44.useId)();
+  const readerRef = (0, import_react44.useRef)(null);
+  const identityRef = (0, import_react44.useRef)("");
+  const submittingRef = (0, import_react44.useRef)(false);
   const identity4 = `${card?.id || ""}:${card?.sourceHash || ""}`;
-  const draftRef = (0, import_react43.useRef)(draft);
+  const draftRef = (0, import_react44.useRef)(draft);
   draftRef.current = draft;
-  const [selection2, setSelection] = (0, import_react43.useState)(() => draft?.identity === identity4 ? draft.selection : null);
-  const [title, setTitle] = (0, import_react43.useState)(() => draft?.identity === identity4 ? draft.title : "");
-  const [annotation, setAnnotation] = (0, import_react43.useState)(() => draft?.identity === identity4 ? draft.annotation : "");
-  const [saving, setSaving] = (0, import_react43.useState)(false);
-  const [localError, setLocalError] = (0, import_react43.useState)("");
-  const [notice, setNotice] = (0, import_react43.useState)("");
-  const content = (0, import_react43.useMemo)(() => normalizeText(card?.content), [card?.content]);
+  const [selection2, setSelection] = (0, import_react44.useState)(() => draft?.identity === identity4 ? draft.selection : null);
+  const [title, setTitle] = (0, import_react44.useState)(() => draft?.identity === identity4 ? draft.title : "");
+  const [annotation, setAnnotation] = (0, import_react44.useState)(() => draft?.identity === identity4 ? draft.annotation : "");
+  const [saving, setSaving] = (0, import_react44.useState)(false);
+  const [localError, setLocalError] = (0, import_react44.useState)("");
+  const [notice, setNotice] = (0, import_react44.useState)("");
+  const content = (0, import_react44.useMemo)(() => normalizeText(card?.content), [card?.content]);
   identityRef.current = identity4;
   const excerpt = card?.kind === "excerpt" ? card.excerptInfo : null;
   const readable = ["material", "excerpt", "outline", "artifact"].includes(card?.kind);
@@ -47128,7 +47288,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
   const canExcerpt = textAvailable && intact && !!card?.sourceHash;
   const pending = !!busy || saving;
   const start2 = initialRange?.start, end = initialRange?.end;
-  (0, import_react43.useEffect)(() => {
+  (0, import_react44.useEffect)(() => {
     const saved = draftRef.current?.identity === identity4 ? draftRef.current : null;
     setSelection(saved?.selection || null);
     setTitle(saved?.title ?? (card?.title ? `${card.title} \xB7 \u6458\u5F55` : ""));
@@ -47141,7 +47301,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
   function rememberDraft(patch) {
     onDraftChange?.({ identity: identity4, selection: selection2, title, annotation, saved: false, ...patch });
   }
-  (0, import_react43.useEffect)(() => {
+  (0, import_react44.useEffect)(() => {
     if (!textAvailable || !validRange(content, start2, end)) return;
     const reader = readerRef.current;
     if (!reader) return;
@@ -47200,7 +47360,7 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
     }
   }
   if (!card) return null;
-  return /* @__PURE__ */ import_react43.default.createElement("section", { className: "wcc-source-reader", "aria-label": "\u539F\u6587\u9605\u8BFB\u4E0E\u6458\u5F55", "aria-busy": pending }, excerpt && /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-excerpt-origin" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-source-kicker" }, "\u6458\u5F55\u6765\u6E90"), /* @__PURE__ */ import_react43.default.createElement("strong", null, excerpt.sourceTitle || "\u6765\u6E90\u672A\u547D\u540D"), /* @__PURE__ */ import_react43.default.createElement("span", null, excerpt.rangeLabel || (Number.isInteger(excerpt.start) && Number.isInteger(excerpt.end) ? `\u539F\u6587\u8303\u56F4 ${excerpt.start}\u2013${excerpt.end}` : "\u6765\u6E90\u4F4D\u7F6E\u672A\u63D0\u4F9B")), /* @__PURE__ */ import_react43.default.createElement("p", { className: ["ready", "available"].includes(excerpt.sourceStatus) ? "" : "is-warning" }, sourceState(excerpt.sourceStatus)), onOpenSource && /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => onOpenSource(excerpt), disabled: pending || !excerpt.sourceCardId }, "\u67E5\u770B\u539F\u6587\u4F4D\u7F6E \u2192"), /* @__PURE__ */ import_react43.default.createElement("small", null, "\u6458\u5F55\u548C\u6CE8\u91CA\u5DF2\u72EC\u7ACB\u4FDD\u5B58\uFF0C\u539F\u6587\u4EE5\u540E\u4FEE\u6539\u4E5F\u4E0D\u4F1A\u5F71\u54CD\u8FD9\u4EFD\u6458\u5F55\u3002")), /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react43.default.createElement("label", { htmlFor: `${id2}-text` }, excerpt ? "\u6458\u5F55\u539F\u6587" : card.kind === "outline" ? "\u5DF2\u4FDD\u5B58\u5927\u7EB2\u539F\u6587" : "\u7D20\u6750\u539F\u6587"), textAvailable && /* @__PURE__ */ import_react43.default.createElement("span", null, content.split("\n").length, " \u884C \xB7 ", content.length, " \u5B57\u7B26")), textAvailable ? /* @__PURE__ */ import_react43.default.createElement(import_react43.default.Fragment, null, /* @__PURE__ */ import_react43.default.createElement(
+  return /* @__PURE__ */ import_react44.default.createElement("section", { className: "wcc-source-reader", "aria-label": "\u539F\u6587\u9605\u8BFB\u4E0E\u6458\u5F55", "aria-busy": pending }, excerpt && /* @__PURE__ */ import_react44.default.createElement("div", { className: "wcc-excerpt-origin" }, /* @__PURE__ */ import_react44.default.createElement("span", { className: "wcc-source-kicker" }, "\u6458\u5F55\u6765\u6E90"), /* @__PURE__ */ import_react44.default.createElement("strong", null, excerpt.sourceTitle || "\u6765\u6E90\u672A\u547D\u540D"), /* @__PURE__ */ import_react44.default.createElement("span", null, excerpt.rangeLabel || (Number.isInteger(excerpt.start) && Number.isInteger(excerpt.end) ? `\u539F\u6587\u8303\u56F4 ${excerpt.start}\u2013${excerpt.end}` : "\u6765\u6E90\u4F4D\u7F6E\u672A\u63D0\u4F9B")), /* @__PURE__ */ import_react44.default.createElement("p", { className: ["ready", "available"].includes(excerpt.sourceStatus) ? "" : "is-warning" }, sourceState(excerpt.sourceStatus)), onOpenSource && /* @__PURE__ */ import_react44.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: () => onOpenSource(excerpt), disabled: pending || !excerpt.sourceCardId }, "\u67E5\u770B\u539F\u6587\u4F4D\u7F6E \u2192"), /* @__PURE__ */ import_react44.default.createElement("small", null, "\u6458\u5F55\u548C\u6CE8\u91CA\u5DF2\u72EC\u7ACB\u4FDD\u5B58\uFF0C\u539F\u6587\u4EE5\u540E\u4FEE\u6539\u4E5F\u4E0D\u4F1A\u5F71\u54CD\u8FD9\u4EFD\u6458\u5F55\u3002")), /* @__PURE__ */ import_react44.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react44.default.createElement("label", { htmlFor: `${id2}-text` }, excerpt ? "\u6458\u5F55\u539F\u6587" : card.kind === "outline" ? "\u5DF2\u4FDD\u5B58\u5927\u7EB2\u539F\u6587" : "\u7D20\u6750\u539F\u6587"), textAvailable && /* @__PURE__ */ import_react44.default.createElement("span", null, content.split("\n").length, " \u884C \xB7 ", content.length, " \u5B57\u7B26")), textAvailable ? /* @__PURE__ */ import_react44.default.createElement(import_react44.default.Fragment, null, /* @__PURE__ */ import_react44.default.createElement(
     "textarea",
     {
       id: `${id2}-text`,
@@ -47213,20 +47373,20 @@ function SourceReader({ card, initialRange, onExcerpt, onOpenSource, draft, onDr
       onSelect: readSelection,
       "aria-describedby": `${id2}-selection`
     }
-  ), /* @__PURE__ */ import_react43.default.createElement("p", { className: "wcc-reader-selection", id: `${id2}-selection`, "aria-live": "polite" }, selection2 ? `${describeRange(content, selection2.start, selection2.end)} \xB7 \u5DF2\u9009 ${selection2.quote.length} \u5B57\u7B26` : "\u5728\u539F\u6587\u4E2D\u62D6\u9009\uFF0C\u6216\u7528 Shift + \u65B9\u5411\u952E\u9009\u62E9\u7247\u6BB5\u3002")) : /* @__PURE__ */ import_react43.default.createElement("p", { className: "wcc-inline-warning" }, card.extracted === false ? "\u8BE5\u6587\u4EF6\u5C1A\u672A\u63D0\u53D6\u6B63\u6587\uFF0C\u5F53\u524D\u4E0D\u80FD\u8BFB\u53D6\u6216\u6458\u5F55\u3002" : "\u5F53\u524D\u5361\u7247\u6CA1\u6709\u53EF\u7528\u7684\u5DF2\u4FDD\u5B58\u6B63\u6587\u3002"), excerpt && /* @__PURE__ */ import_react43.default.createElement("section", { className: "wcc-reader-annotation", "aria-label": "\u6CE8\u91CA" }, /* @__PURE__ */ import_react43.default.createElement("span", { className: "wcc-source-kicker" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react43.default.createElement("p", null, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")), textAvailable && !intact && /* @__PURE__ */ import_react43.default.createElement("p", { className: "wcc-inline-warning" }, sourceState(card.status), "\u3002\u4FDD\u7559\u7684\u6B63\u6587\u53EF\u4F9B\u6838\u5BF9\uFF1B\u6838\u5BF9\u5E76\u53E6\u5B58\u53EF\u7528\u6765\u6E90\u540E\u518D\u6458\u5F55\u3002"), textAvailable && intact && !card.sourceHash && /* @__PURE__ */ import_react43.default.createElement("p", { className: "wcc-inline-warning" }, "\u6682\u65F6\u65E0\u6CD5\u6838\u5BF9\u6765\u6E90\u3002\u8BF7\u5237\u65B0\u5185\u5BB9\u540E\u518D\u4FDD\u5B58\u6458\u5F55\u3002"), canExcerpt && /* @__PURE__ */ import_react43.default.createElement("form", { className: "wcc-excerpt-form", onSubmit: saveExcerpt }, /* @__PURE__ */ import_react43.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react43.default.createElement("strong", null, "\u53E6\u5B58\u4E3A\u6458\u5F55\u5361"), /* @__PURE__ */ import_react43.default.createElement("span", null, "\u53EF\u56DE\u5230\u539F\u6587\u4F4D\u7F6E")), selection2?.quote.trim() && /* @__PURE__ */ import_react43.default.createElement("blockquote", { className: "wcc-excerpt-selection" }, selection2.quote), /* @__PURE__ */ import_react43.default.createElement("label", { htmlFor: `${id2}-title` }, "\u6458\u5F55\u540D\u79F0", /* @__PURE__ */ import_react43.default.createElement("input", { id: `${id2}-title`, value: title, onChange: (event) => {
+  ), /* @__PURE__ */ import_react44.default.createElement("p", { className: "wcc-reader-selection", id: `${id2}-selection`, "aria-live": "polite" }, selection2 ? `${describeRange(content, selection2.start, selection2.end)} \xB7 \u5DF2\u9009 ${selection2.quote.length} \u5B57\u7B26` : "\u5728\u539F\u6587\u4E2D\u62D6\u9009\uFF0C\u6216\u7528 Shift + \u65B9\u5411\u952E\u9009\u62E9\u7247\u6BB5\u3002")) : /* @__PURE__ */ import_react44.default.createElement("p", { className: "wcc-inline-warning" }, card.extracted === false ? "\u8BE5\u6587\u4EF6\u5C1A\u672A\u63D0\u53D6\u6B63\u6587\uFF0C\u5F53\u524D\u4E0D\u80FD\u8BFB\u53D6\u6216\u6458\u5F55\u3002" : "\u5F53\u524D\u5361\u7247\u6CA1\u6709\u53EF\u7528\u7684\u5DF2\u4FDD\u5B58\u6B63\u6587\u3002"), excerpt && /* @__PURE__ */ import_react44.default.createElement("section", { className: "wcc-reader-annotation", "aria-label": "\u6CE8\u91CA" }, /* @__PURE__ */ import_react44.default.createElement("span", { className: "wcc-source-kicker" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react44.default.createElement("p", null, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")), textAvailable && !intact && /* @__PURE__ */ import_react44.default.createElement("p", { className: "wcc-inline-warning" }, sourceState(card.status), "\u3002\u4FDD\u7559\u7684\u6B63\u6587\u53EF\u4F9B\u6838\u5BF9\uFF1B\u6838\u5BF9\u5E76\u53E6\u5B58\u53EF\u7528\u6765\u6E90\u540E\u518D\u6458\u5F55\u3002"), textAvailable && intact && !card.sourceHash && /* @__PURE__ */ import_react44.default.createElement("p", { className: "wcc-inline-warning" }, "\u6682\u65F6\u65E0\u6CD5\u6838\u5BF9\u6765\u6E90\u3002\u8BF7\u5237\u65B0\u5185\u5BB9\u540E\u518D\u4FDD\u5B58\u6458\u5F55\u3002"), canExcerpt && /* @__PURE__ */ import_react44.default.createElement("form", { className: "wcc-excerpt-form", onSubmit: saveExcerpt }, /* @__PURE__ */ import_react44.default.createElement("div", { className: "wcc-reader-heading" }, /* @__PURE__ */ import_react44.default.createElement("strong", null, "\u53E6\u5B58\u4E3A\u6458\u5F55\u5361"), /* @__PURE__ */ import_react44.default.createElement("span", null, "\u53EF\u56DE\u5230\u539F\u6587\u4F4D\u7F6E")), selection2?.quote.trim() && /* @__PURE__ */ import_react44.default.createElement("blockquote", { className: "wcc-excerpt-selection" }, selection2.quote), /* @__PURE__ */ import_react44.default.createElement("label", { htmlFor: `${id2}-title` }, "\u6458\u5F55\u540D\u79F0", /* @__PURE__ */ import_react44.default.createElement("input", { id: `${id2}-title`, value: title, onChange: (event) => {
     setTitle(event.target.value);
     rememberDraft({ title: event.target.value });
-  }, disabled: pending, required: true })), /* @__PURE__ */ import_react43.default.createElement("label", { htmlFor: `${id2}-annotation` }, "\u6CE8\u91CA ", /* @__PURE__ */ import_react43.default.createElement("small", null, "\u5355\u72EC\u4FDD\u5B58\uFF0C\u4E0D\u6DF7\u5165\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react43.default.createElement("textarea", { id: `${id2}-annotation`, rows: 3, value: annotation, onChange: (event) => {
+  }, disabled: pending, required: true })), /* @__PURE__ */ import_react44.default.createElement("label", { htmlFor: `${id2}-annotation` }, "\u6CE8\u91CA ", /* @__PURE__ */ import_react44.default.createElement("small", null, "\u5355\u72EC\u4FDD\u5B58\uFF0C\u4E0D\u6DF7\u5165\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react44.default.createElement("textarea", { id: `${id2}-annotation`, rows: 3, value: annotation, onChange: (event) => {
     setAnnotation(event.target.value);
     rememberDraft({ annotation: event.target.value });
-  }, placeholder: "\u8865\u5145\u7528\u9014\u6216\u8BF4\u660E", disabled: pending })), /* @__PURE__ */ import_react43.default.createElement(UiButton, { variant: "primary", className: "wcc-primary", type: "submit", disabled: pending || !selection2?.quote.trim() || !title.trim() || !onExcerpt }, saving || busy === "excerpt" ? "\u6B63\u5728\u4FDD\u5B58\u6458\u5F55\u2026" : "\u4FDD\u5B58\u6458\u5F55\u5361")), (error || localError) && /* @__PURE__ */ import_react43.default.createElement(UserError, { className: "wcc-error", error: messageOf2(error || localError) }), notice && /* @__PURE__ */ import_react43.default.createElement("p", { className: "wcc-reader-notice", role: "status" }, notice));
+  }, placeholder: "\u8865\u5145\u7528\u9014\u6216\u8BF4\u660E", disabled: pending })), /* @__PURE__ */ import_react44.default.createElement(UiButton, { variant: "primary", className: "wcc-primary", type: "submit", disabled: pending || !selection2?.quote.trim() || !title.trim() || !onExcerpt }, saving || busy === "excerpt" ? "\u6B63\u5728\u4FDD\u5B58\u6458\u5F55\u2026" : "\u4FDD\u5B58\u6458\u5F55\u5361")), (error || localError) && /* @__PURE__ */ import_react44.default.createElement(UserError, { className: "wcc-error", error: messageOf2(error || localError) }), notice && /* @__PURE__ */ import_react44.default.createElement("p", { className: "wcc-reader-notice", role: "status" }, notice));
 }
 
 // src/course-tasks.jsx
-var import_react46 = __toESM(require("react"), 1);
+var import_react47 = __toESM(require("react"), 1);
 
 // src/reference-prompt-input.jsx
-var import_react44 = __toESM(require("react"), 1);
+var import_react45 = __toESM(require("react"), 1);
 
 // src/reference-mention.mjs
 var QUERY_CHARACTER = /[^\s@＠「」“”"'，。！？；：、,!?;()[\]{}<>]/u;
@@ -47263,13 +47423,13 @@ function ReferencePromptInput({
   popoverActive = true,
   ...props
 }) {
-  const id2 = (0, import_react44.useId)();
-  const ownInput = (0, import_react44.useRef)(null), list = (0, import_react44.useRef)(null), choosing = (0, import_react44.useRef)(false);
+  const id2 = (0, import_react45.useId)();
+  const ownInput = (0, import_react45.useRef)(null), list = (0, import_react45.useRef)(null), choosing = (0, import_react45.useRef)(false);
   const input = textareaRef || ownInput;
-  const [range, setRange2] = (0, import_react44.useState)(null);
-  const [active, setActive] = (0, import_react44.useState)(0);
-  const [files, setFiles] = (0, import_react44.useState)(null);
-  const [error, setError] = (0, import_react44.useState)("");
+  const [range, setRange2] = (0, import_react45.useState)(null);
+  const [active, setActive] = (0, import_react45.useState)(0);
+  const [files, setFiles] = (0, import_react45.useState)(null);
+  const [error, setError] = (0, import_react45.useState)("");
   const query = range?.query;
   const term = query?.normalize("NFC").toLowerCase();
   const matching = (referenceOptions || []).filter((option) => option.searchText.includes(term || ""));
@@ -47278,10 +47438,10 @@ function ReferencePromptInput({
   const candidates = [...matching.slice(0, 24), ...(projectResults?.entries || []).filter((entry) => !paths.has(entry.path) && (!acceptProjectFile || acceptProjectFile(entry))).map((entry) => ({ key: entry.path, label: entry.name, detail: entry.path, mentionLabel: entry.path, projectFile: entry.path }))];
   const selected2 = Math.min(active, candidates.length - 1);
   const open = Boolean(range && !disabled && popoverActive);
-  (0, import_react44.useEffect)(() => {
+  (0, import_react45.useEffect)(() => {
     if (!popoverActive || disabled) setRange2(null);
   }, [popoverActive, disabled]);
-  (0, import_react44.useEffect)(() => {
+  (0, import_react45.useEffect)(() => {
     if (!open || !searchReferences) return;
     const controller = new AbortController();
     const timer2 = setTimeout(async () => {
@@ -47297,10 +47457,10 @@ function ReferencePromptInput({
       controller.abort();
     };
   }, [query, searchReferences, open]);
-  (0, import_react44.useEffect)(() => {
+  (0, import_react45.useEffect)(() => {
     setActive(0);
   }, [query]);
-  (0, import_react44.useEffect)(() => {
+  (0, import_react45.useEffect)(() => {
     const panel = list.current;
     const option = panel?.children[selected2];
     if (!option) return;
@@ -47338,9 +47498,9 @@ function ReferencePromptInput({
       choosing.current = false;
     }
   }
-  return /* @__PURE__ */ import_react44.default.createElement("div", { className: "wcc-reference-prompt", onBlur: (event) => {
+  return /* @__PURE__ */ import_react45.default.createElement("div", { className: "wcc-reference-prompt", onBlur: (event) => {
     if (!event.currentTarget.contains(event.relatedTarget)) setRange2(null);
-  } }, /* @__PURE__ */ import_react44.default.createElement(
+  } }, /* @__PURE__ */ import_react45.default.createElement(
     "textarea",
     {
       ...props,
@@ -47389,7 +47549,7 @@ function ReferencePromptInput({
         }
       }
     }
-  ), open && /* @__PURE__ */ import_react44.default.createElement(
+  ), open && /* @__PURE__ */ import_react45.default.createElement(
     CanvasPopover,
     {
       className: "wcc-creation-skill-picker wcc-reference-mention",
@@ -47397,8 +47557,8 @@ function ReferencePromptInput({
       widthRef: input,
       onDismiss: () => setRange2(null)
     },
-    /* @__PURE__ */ import_react44.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, "\u5F15\u7528\u8D44\u6599"),
-    /* @__PURE__ */ import_react44.default.createElement("div", { ref: list, className: "wcc-creation-skill-options", id: `${id2}-references`, role: "listbox", "aria-label": "\u53EF\u5F15\u7528\u7684\u6587\u4EF6\u4E0E\u5361\u7247" }, candidates.map((option, index2) => /* @__PURE__ */ import_react44.default.createElement(
+    /* @__PURE__ */ import_react45.default.createElement("div", { className: "wcc-creation-skill-picker-heading" }, "\u5F15\u7528\u8D44\u6599"),
+    /* @__PURE__ */ import_react45.default.createElement("div", { ref: list, className: "wcc-creation-skill-options", id: `${id2}-references`, role: "listbox", "aria-label": "\u53EF\u5F15\u7528\u7684\u6587\u4EF6\u4E0E\u5361\u7247" }, candidates.map((option, index2) => /* @__PURE__ */ import_react45.default.createElement(
       UiButton,
       {
         variant: "custom",
@@ -47413,15 +47573,15 @@ function ReferencePromptInput({
         onMouseEnter: () => setActive(index2),
         onClick: () => void choose(option)
       },
-      /* @__PURE__ */ import_react44.default.createElement("strong", null, option.label),
-      /* @__PURE__ */ import_react44.default.createElement("span", null, option.detail)
+      /* @__PURE__ */ import_react45.default.createElement("strong", null, option.label),
+      /* @__PURE__ */ import_react45.default.createElement("span", null, option.detail)
     ))),
-    searchReferences && !projectResults ? /* @__PURE__ */ import_react44.default.createElement("small", { role: "status" }, "\u641C\u7D22\u9879\u76EE\u6587\u4EF6\u2026") : projectResults?.error ? /* @__PURE__ */ import_react44.default.createElement("small", { role: "status" }, "\u9879\u76EE\u6587\u4EF6\u641C\u7D22\u5931\u8D25\uFF0C\u53EF\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002", projectResults.error) : !candidates.length ? /* @__PURE__ */ import_react44.default.createElement("small", { role: "status" }, "\u6CA1\u6709\u5339\u914D\u8D44\u6599\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u6216\u70B9\u300C\u6DFB\u52A0\u300D\u3002") : projectResults?.truncated && /* @__PURE__ */ import_react44.default.createElement("small", null, "\u7ED3\u679C\u6709\u9650\uFF0C\u8F93\u5165\u66F4\u5177\u4F53\u7684\u540D\u79F0\uFF0C\u6216\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002")
-  ), error && /* @__PURE__ */ import_react44.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, error));
+    searchReferences && !projectResults ? /* @__PURE__ */ import_react45.default.createElement("small", { role: "status" }, "\u641C\u7D22\u9879\u76EE\u6587\u4EF6\u2026") : projectResults?.error ? /* @__PURE__ */ import_react45.default.createElement("small", { role: "status" }, "\u9879\u76EE\u6587\u4EF6\u641C\u7D22\u5931\u8D25\uFF0C\u53EF\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002", projectResults.error) : !candidates.length ? /* @__PURE__ */ import_react45.default.createElement("small", { role: "status" }, "\u6CA1\u6709\u5339\u914D\u8D44\u6599\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u6216\u70B9\u300C\u6DFB\u52A0\u300D\u3002") : projectResults?.truncated && /* @__PURE__ */ import_react45.default.createElement("small", null, "\u7ED3\u679C\u6709\u9650\uFF0C\u8F93\u5165\u66F4\u5177\u4F53\u7684\u540D\u79F0\uFF0C\u6216\u4ECE\u6587\u4EF6\u680F\u6DFB\u52A0\u3002")
+  ), error && /* @__PURE__ */ import_react45.default.createElement("p", { className: "wcc-creation-disabled-reason", role: "status" }, error));
 }
 
 // src/media-creation.jsx
-var import_react45 = __toESM(require("react"), 1);
+var import_react46 = __toESM(require("react"), 1);
 function mediaJobPending(job) {
   return ["queued", "submitting", "processing", "downloading", "registering"].includes(job?.status);
 }
@@ -47436,17 +47596,17 @@ function mediaSizeLabel(file) {
 }
 function Choice({ label: label2, value, choices, onChange, disabled }) {
   const entries = [.../* @__PURE__ */ new Set([...choices || [], ...value === void 0 ? [] : [value]])];
-  return /* @__PURE__ */ import_react45.default.createElement("label", null, label2, /* @__PURE__ */ import_react45.default.createElement("select", { "aria-label": label2, value: value ?? "", disabled, onChange: (event) => onChange(event.target.value) }, entries.map((entry) => /* @__PURE__ */ import_react45.default.createElement("option", { key: entry, value: entry }, entry))));
+  return /* @__PURE__ */ import_react46.default.createElement("label", null, label2, /* @__PURE__ */ import_react46.default.createElement("select", { "aria-label": label2, value: value ?? "", disabled, onChange: (event) => onChange(event.target.value) }, entries.map((entry) => /* @__PURE__ */ import_react46.default.createElement("option", { key: entry, value: entry }, entry))));
 }
 function ApiMediaPrompt({ type, instruction, onChange, options, onOptionsChange, providers, providerId, onProviderChange, capabilities, loading, error, onRefresh, onOpenSettings, onSubmit, disabled, mentionProps }) {
   providers = providers.filter((provider) => !provider.type || provider.type === type);
   const models = capabilities?.models?.filter((model) => model.type === type) || [];
   const selected2 = models.find((model) => model.id === options.model);
   const set3 = (key, value) => onOptionsChange?.({ ...options, [key]: value });
-  return /* @__PURE__ */ import_react45.default.createElement("div", { className: "wcc-media-creation" }, /* @__PURE__ */ import_react45.default.createElement(ReferencePromptInput, { "aria-label": "\u521B\u4F5C\u63D0\u793A\u8BCD", value: instruction, rows: 2, disabled, onValueChange: onChange, onSubmit, placeholder: "\u63CF\u8FF0\u5185\u5BB9\uFF0C@ \u5F15\u7528\u8D44\u6599", ...mentionProps }), providers.length > 0 && /* @__PURE__ */ import_react45.default.createElement("div", { className: "wcc-media-options" }, /* @__PURE__ */ import_react45.default.createElement("label", null, "API \u670D\u52A1", /* @__PURE__ */ import_react45.default.createElement("select", { "aria-label": "API \u670D\u52A1", value: providerId || "", disabled, onChange: (event) => onProviderChange?.(event.target.value) }, /* @__PURE__ */ import_react45.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u670D\u52A1"), providers.map((provider) => /* @__PURE__ */ import_react45.default.createElement("option", { key: provider.id, value: provider.id }, provider.label)))), /* @__PURE__ */ import_react45.default.createElement("label", null, "\u751F\u6210\u6A21\u578B", /* @__PURE__ */ import_react45.default.createElement("select", { "aria-label": "\u751F\u6210\u6A21\u578B", value: options.model || "", disabled: disabled || !models.length, onChange: (event) => {
+  return /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-media-creation" }, /* @__PURE__ */ import_react46.default.createElement(ReferencePromptInput, { "aria-label": "\u521B\u4F5C\u63D0\u793A\u8BCD", value: instruction, rows: 2, disabled, onValueChange: onChange, onSubmit, placeholder: "\u63CF\u8FF0\u5185\u5BB9\uFF0C@ \u5F15\u7528\u8D44\u6599", ...mentionProps }), providers.length > 0 && /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-media-options" }, /* @__PURE__ */ import_react46.default.createElement("label", null, "API \u670D\u52A1", /* @__PURE__ */ import_react46.default.createElement("select", { "aria-label": "API \u670D\u52A1", value: providerId || "", disabled, onChange: (event) => onProviderChange?.(event.target.value) }, /* @__PURE__ */ import_react46.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u670D\u52A1"), providers.map((provider) => /* @__PURE__ */ import_react46.default.createElement("option", { key: provider.id, value: provider.id }, provider.label)))), /* @__PURE__ */ import_react46.default.createElement("label", null, "\u751F\u6210\u6A21\u578B", /* @__PURE__ */ import_react46.default.createElement("select", { "aria-label": "\u751F\u6210\u6A21\u578B", value: options.model || "", disabled: disabled || !models.length, onChange: (event) => {
     const model = models.find((item) => item.id === event.target.value);
     onOptionsChange?.({ model: model.id, ...Object.fromEntries([["ratio", model.ratios], ["resolution", model.resolutions], ["size", model.sizes], ["quality", model.qualities], ["duration", model.durations]].filter(([, list]) => list?.length).map(([key, list]) => [key, list[0]])) });
-  } }, /* @__PURE__ */ import_react45.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u6A21\u578B"), models.map((model) => /* @__PURE__ */ import_react45.default.createElement("option", { key: model.id, value: model.id }, model.name || model.id)))), selected2?.sizes?.length > 0 && /* @__PURE__ */ import_react45.default.createElement(Choice, { label: "\u753B\u9762\u5C3A\u5BF8", value: options.size, choices: selected2.sizes, disabled, onChange: (value) => set3("size", value) }), selected2?.qualities?.length > 0 && /* @__PURE__ */ import_react45.default.createElement(Choice, { label: "\u751F\u6210\u8D28\u91CF", value: options.quality, choices: selected2.qualities, disabled, onChange: (value) => set3("quality", value) }), selected2?.ratios?.length > 0 && /* @__PURE__ */ import_react45.default.createElement(Choice, { label: "\u753B\u9762\u6BD4\u4F8B", value: options.ratio, choices: selected2.ratios, disabled, onChange: (value) => set3("ratio", value) }), selected2?.resolutions?.length > 0 && /* @__PURE__ */ import_react45.default.createElement(Choice, { label: "\u5206\u8FA8\u7387", value: options.resolution, choices: selected2.resolutions, disabled, onChange: (value) => set3("resolution", value) }), type === "video" && selected2?.durations?.length > 0 && /* @__PURE__ */ import_react45.default.createElement(Choice, { label: "\u89C6\u9891\u65F6\u957F\uFF08\u79D2\uFF09", value: options.duration, choices: selected2.durations, disabled, onChange: (value) => set3("duration", Number(value)) })), error && /* @__PURE__ */ import_react45.default.createElement(UserError, { className: "wcc-creation-error", error }), /* @__PURE__ */ import_react45.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: disabled || !onOpenSettings, onClick: onOpenSettings }, "API \u8BBE\u7F6E"), /* @__PURE__ */ import_react45.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: loading || disabled, onClick: () => void onRefresh?.() }, loading ? "\u68C0\u6D4B\u4E2D\u2026" : "\u5237\u65B0 API \u670D\u52A1"));
+  } }, /* @__PURE__ */ import_react46.default.createElement("option", { value: "", disabled: true }, "\u9009\u62E9\u6A21\u578B"), models.map((model) => /* @__PURE__ */ import_react46.default.createElement("option", { key: model.id, value: model.id }, model.name || model.id)))), selected2?.sizes?.length > 0 && /* @__PURE__ */ import_react46.default.createElement(Choice, { label: "\u753B\u9762\u5C3A\u5BF8", value: options.size, choices: selected2.sizes, disabled, onChange: (value) => set3("size", value) }), selected2?.qualities?.length > 0 && /* @__PURE__ */ import_react46.default.createElement(Choice, { label: "\u751F\u6210\u8D28\u91CF", value: options.quality, choices: selected2.qualities, disabled, onChange: (value) => set3("quality", value) }), selected2?.ratios?.length > 0 && /* @__PURE__ */ import_react46.default.createElement(Choice, { label: "\u753B\u9762\u6BD4\u4F8B", value: options.ratio, choices: selected2.ratios, disabled, onChange: (value) => set3("ratio", value) }), selected2?.resolutions?.length > 0 && /* @__PURE__ */ import_react46.default.createElement(Choice, { label: "\u5206\u8FA8\u7387", value: options.resolution, choices: selected2.resolutions, disabled, onChange: (value) => set3("resolution", value) }), type === "video" && selected2?.durations?.length > 0 && /* @__PURE__ */ import_react46.default.createElement(Choice, { label: "\u89C6\u9891\u65F6\u957F\uFF08\u79D2\uFF09", value: options.duration, choices: selected2.durations, disabled, onChange: (value) => set3("duration", Number(value)) })), error && /* @__PURE__ */ import_react46.default.createElement(UserError, { className: "wcc-creation-error", error }), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: disabled || !onOpenSettings, onClick: onOpenSettings }, "API \u8BBE\u7F6E"), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "ghost", size: "compact", disabled: loading || disabled, onClick: () => void onRefresh?.() }, loading ? "\u68C0\u6D4B\u4E2D\u2026" : "\u5237\u65B0 API \u670D\u52A1"));
 }
 
 // src/course-tasks.jsx
@@ -47496,13 +47656,13 @@ function timeLabel(value) {
 }
 function SourceSnapshot({ source }) {
   const excerpt = source.kind === "excerpt" ? source.excerptInfo || source : null;
-  return /* @__PURE__ */ import_react46.default.createElement("details", { className: "wcc-task-source", open: source.kind === "excerpt" }, /* @__PURE__ */ import_react46.default.createElement("summary", null, /* @__PURE__ */ import_react46.default.createElement("span", null, SOURCE_KINDS[source.kind] || "\u6765\u6E90"), source.title || source.cardId), source.noteTruncated && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-inline-warning" }, typeof source.noteTruncated === "string" ? source.noteTruncated : "\u672C\u6B21\u4EFB\u52A1\u7684\u6765\u6E90\u6B63\u6587\u4EC5\u5305\u542B\u8282\u9009\u3002"), excerpt ? /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, (excerpt.sourceTitle || excerpt.rangeLabel) && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-task-source-origin" }, excerpt.sourceTitle, excerpt.rangeLabel ? ` \xB7 ${excerpt.rangeLabel}` : ""), /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-task-field-label" }, "\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react46.default.createElement("pre", null, excerpt.quote ?? source.content ?? "\u539F\u6587\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-task-field-label" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react46.default.createElement("pre", { className: "wcc-task-annotation" }, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")) : /* @__PURE__ */ import_react46.default.createElement("pre", null, source.content || "\u8BE5\u6765\u6E90\u672A\u63D0\u4F9B\u53EF\u7528\u6B63\u6587\u3002"), (source.path || source.hash || source.sourceHash) && /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-source-meta" }, source.path && /* @__PURE__ */ import_react46.default.createElement("span", null, "\u6587\u4EF6\uFF1A", /* @__PURE__ */ import_react46.default.createElement("code", null, source.path)), (source.hash || source.sourceHash) && /* @__PURE__ */ import_react46.default.createElement("span", null, "\u6765\u6E90\u6821\u9A8C\uFF1A", /* @__PURE__ */ import_react46.default.createElement("code", null, source.hash || source.sourceHash))));
+  return /* @__PURE__ */ import_react47.default.createElement("details", { className: "wcc-task-source", open: source.kind === "excerpt" }, /* @__PURE__ */ import_react47.default.createElement("summary", null, /* @__PURE__ */ import_react47.default.createElement("span", null, SOURCE_KINDS[source.kind] || "\u6765\u6E90"), source.title || source.cardId), source.noteTruncated && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-inline-warning" }, typeof source.noteTruncated === "string" ? source.noteTruncated : "\u672C\u6B21\u4EFB\u52A1\u7684\u6765\u6E90\u6B63\u6587\u4EC5\u5305\u542B\u8282\u9009\u3002"), excerpt ? /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, null, (excerpt.sourceTitle || excerpt.rangeLabel) && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-task-source-origin" }, excerpt.sourceTitle, excerpt.rangeLabel ? ` \xB7 ${excerpt.rangeLabel}` : ""), /* @__PURE__ */ import_react47.default.createElement("span", { className: "wcc-task-field-label" }, "\u6458\u5F55\u539F\u6587"), /* @__PURE__ */ import_react47.default.createElement("pre", null, excerpt.quote ?? source.content ?? "\u539F\u6587\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react47.default.createElement("span", { className: "wcc-task-field-label" }, "\u6CE8\u91CA"), /* @__PURE__ */ import_react47.default.createElement("pre", { className: "wcc-task-annotation" }, excerpt.annotation || "\u672A\u586B\u5199\u6CE8\u91CA\u3002")) : /* @__PURE__ */ import_react47.default.createElement("pre", null, source.content || "\u8BE5\u6765\u6E90\u672A\u63D0\u4F9B\u53EF\u7528\u6B63\u6587\u3002"), (source.path || source.hash || source.sourceHash) && /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-source-meta" }, source.path && /* @__PURE__ */ import_react47.default.createElement("span", null, "\u6587\u4EF6\uFF1A", /* @__PURE__ */ import_react47.default.createElement("code", null, source.path)), (source.hash || source.sourceHash) && /* @__PURE__ */ import_react47.default.createElement("span", null, "\u6765\u6E90\u6821\u9A8C\uFF1A", /* @__PURE__ */ import_react47.default.createElement("code", null, source.hash || source.sourceHash))));
 }
 function TaskInput({ input }) {
-  if (!input) return /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD9\u6B21\u4EFB\u52A1\u6CA1\u6709\u4FDD\u5B58\u8F93\u5165\u8D44\u6599\u3002");
+  if (!input) return /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD9\u6B21\u4EFB\u52A1\u6CA1\u6709\u4FDD\u5B58\u8F93\u5165\u8D44\u6599\u3002");
   const requirement = input.requirement || {};
   const skill = input.skill;
-  return /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-input" }, /* @__PURE__ */ import_react46.default.createElement("details", { className: "wcc-task-requirement" }, /* @__PURE__ */ import_react46.default.createElement("summary", null, "\u521B\u5EFA\u4EFB\u52A1\u65F6\u7684\u80CC\u666F"), /* @__PURE__ */ import_react46.default.createElement("dl", null, Object.entries(requirement).filter(([key, value]) => value != null && value !== "" && !["id", "createdAt", "updatedAt"].includes(key)).map(([key, value]) => /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, { key }, /* @__PURE__ */ import_react46.default.createElement("dt", null, REQUIREMENT_FIELDS[key] || key), /* @__PURE__ */ import_react46.default.createElement("dd", null, textOf(value)))))), input.selection && /* @__PURE__ */ import_react46.default.createElement("section", { className: "wcc-task-selection" }, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-task-field-label" }, "\u672C\u6B21\u9009\u6BB5", input.selection.rangeLabel ? ` \xB7 ${input.selection.rangeLabel}` : ""), /* @__PURE__ */ import_react46.default.createElement("pre", null, input.selection.quote), /* @__PURE__ */ import_react46.default.createElement("small", null, "\u6765\u81EA ", input.sources?.find((source) => source.cardId === input.selection.sourceCardId)?.title || input.selection.sourceCardId)), !!input.sources?.length && /* @__PURE__ */ import_react46.default.createElement("section", { "aria-label": "\u672C\u6B21\u5F15\u7528\u7684\u8D44\u6599" }, /* @__PURE__ */ import_react46.default.createElement("h4", null, "\u5F15\u7528\u8D44\u6599 \xB7 ", input.sources.length), input.sources.map((source, index2) => /* @__PURE__ */ import_react46.default.createElement(SourceSnapshot, { key: `${source.cardId || source.id || index2}:${source.hash || ""}`, source }))), /* @__PURE__ */ import_react46.default.createElement("section", { className: "wcc-task-instruction" }, /* @__PURE__ */ import_react46.default.createElement("h4", null, "\u521B\u4F5C\u8981\u6C42"), /* @__PURE__ */ import_react46.default.createElement("pre", null, input.instruction || "\u672A\u586B\u5199\u521B\u4F5C\u8981\u6C42\u3002")), input.media && /* @__PURE__ */ import_react46.default.createElement("section", null, /* @__PURE__ */ import_react46.default.createElement("h4", null, "\u751F\u6210\u53C2\u6570"), /* @__PURE__ */ import_react46.default.createElement("dl", null, [["\u6A21\u578B", input.media.model], ["\u6BD4\u4F8B", input.media.ratio], ["\u5206\u8FA8\u7387", input.media.resolution], ["\u65F6\u957F\uFF08\u79D2\uFF09", input.media.duration]].filter(([, value]) => value != null).map(([label2, value]) => /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, { key: label2 }, /* @__PURE__ */ import_react46.default.createElement("dt", null, label2), /* @__PURE__ */ import_react46.default.createElement("dd", null, String(value)))))), input.effectivePrompt && /* @__PURE__ */ import_react46.default.createElement("details", null, /* @__PURE__ */ import_react46.default.createElement("summary", null, "\u5B9E\u9645\u53D1\u9001\u7684\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react46.default.createElement("pre", null, input.effectivePrompt)), skill && /* @__PURE__ */ import_react46.default.createElement("details", { className: "wcc-task-skill" }, /* @__PURE__ */ import_react46.default.createElement("summary", null, "\u6240\u7528\u6280\u80FD"), /* @__PURE__ */ import_react46.default.createElement("pre", null, textOf(skill))));
+  return /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-input" }, /* @__PURE__ */ import_react47.default.createElement("details", { className: "wcc-task-requirement" }, /* @__PURE__ */ import_react47.default.createElement("summary", null, "\u521B\u5EFA\u4EFB\u52A1\u65F6\u7684\u80CC\u666F"), /* @__PURE__ */ import_react47.default.createElement("dl", null, Object.entries(requirement).filter(([key, value]) => value != null && value !== "" && !["id", "createdAt", "updatedAt"].includes(key)).map(([key, value]) => /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, { key }, /* @__PURE__ */ import_react47.default.createElement("dt", null, REQUIREMENT_FIELDS[key] || key), /* @__PURE__ */ import_react47.default.createElement("dd", null, textOf(value)))))), input.selection && /* @__PURE__ */ import_react47.default.createElement("section", { className: "wcc-task-selection" }, /* @__PURE__ */ import_react47.default.createElement("span", { className: "wcc-task-field-label" }, "\u672C\u6B21\u9009\u6BB5", input.selection.rangeLabel ? ` \xB7 ${input.selection.rangeLabel}` : ""), /* @__PURE__ */ import_react47.default.createElement("pre", null, input.selection.quote), /* @__PURE__ */ import_react47.default.createElement("small", null, "\u6765\u81EA ", input.sources?.find((source) => source.cardId === input.selection.sourceCardId)?.title || input.selection.sourceCardId)), !!input.sources?.length && /* @__PURE__ */ import_react47.default.createElement("section", { "aria-label": "\u672C\u6B21\u5F15\u7528\u7684\u8D44\u6599" }, /* @__PURE__ */ import_react47.default.createElement("h4", null, "\u5F15\u7528\u8D44\u6599 \xB7 ", input.sources.length), input.sources.map((source, index2) => /* @__PURE__ */ import_react47.default.createElement(SourceSnapshot, { key: `${source.cardId || source.id || index2}:${source.hash || ""}`, source }))), /* @__PURE__ */ import_react47.default.createElement("section", { className: "wcc-task-instruction" }, /* @__PURE__ */ import_react47.default.createElement("h4", null, "\u521B\u4F5C\u8981\u6C42"), /* @__PURE__ */ import_react47.default.createElement("pre", null, input.instruction || "\u672A\u586B\u5199\u521B\u4F5C\u8981\u6C42\u3002")), input.media && /* @__PURE__ */ import_react47.default.createElement("section", null, /* @__PURE__ */ import_react47.default.createElement("h4", null, "\u751F\u6210\u53C2\u6570"), /* @__PURE__ */ import_react47.default.createElement("dl", null, [["\u6A21\u578B", input.media.model], ["\u6BD4\u4F8B", input.media.ratio], ["\u5206\u8FA8\u7387", input.media.resolution], ["\u65F6\u957F\uFF08\u79D2\uFF09", input.media.duration]].filter(([, value]) => value != null).map(([label2, value]) => /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, { key: label2 }, /* @__PURE__ */ import_react47.default.createElement("dt", null, label2), /* @__PURE__ */ import_react47.default.createElement("dd", null, String(value)))))), input.effectivePrompt && /* @__PURE__ */ import_react47.default.createElement("details", null, /* @__PURE__ */ import_react47.default.createElement("summary", null, "\u5B9E\u9645\u53D1\u9001\u7684\u63D0\u793A\u8BCD"), /* @__PURE__ */ import_react47.default.createElement("pre", null, input.effectivePrompt)), skill && /* @__PURE__ */ import_react47.default.createElement("details", { className: "wcc-task-skill" }, /* @__PURE__ */ import_react47.default.createElement("summary", null, "\u6240\u7528\u6280\u80FD"), /* @__PURE__ */ import_react47.default.createElement("pre", null, textOf(skill))));
 }
 var NO_TASK_IDS = /* @__PURE__ */ new Set();
 function CourseTasks({
@@ -47519,26 +47679,26 @@ function CourseTasks({
   getFileDownloadHref,
   busy = false
 }) {
-  const [selectedId, setSelectedId] = (0, import_react46.useState)(null);
-  const [detail, setDetail] = (0, import_react46.useState)(null);
-  const [loading, setLoading] = (0, import_react46.useState)(false);
-  const [error, setError] = (0, import_react46.useState)("");
-  const [retry, setRetry] = (0, import_react46.useState)(0);
-  const [resumes, setResumes] = (0, import_react46.useState)({});
-  const [filter2, setFilter] = (0, import_react46.useState)("all");
+  const [selectedId, setSelectedId] = (0, import_react47.useState)(null);
+  const [detail, setDetail] = (0, import_react47.useState)(null);
+  const [loading, setLoading] = (0, import_react47.useState)(false);
+  const [error, setError] = (0, import_react47.useState)("");
+  const [retry, setRetry] = (0, import_react47.useState)(0);
+  const [resumes, setResumes] = (0, import_react47.useState)({});
+  const [filter2, setFilter] = (0, import_react47.useState)("all");
   const priority = (id2) => pendingTaskIds.has(id2) ? 2 : Number(newTaskIds.has(id2));
   const visibleTasks = tasks.filter((task2) => filter2 === "all" || filter2 === "running" && task2.runtimeState?.phase === "generating" || filter2 === "pending" && pendingTaskIds.has(task2.id) || filter2 === "review" && task2.status === "output" || filter2 === "failed" && (task2.runtimeState?.phase === "failed" || ["failed", "unknown"].includes(task2.status))).sort((a, b2) => priority(b2.id) - priority(a.id));
-  const requestRef = (0, import_react46.useRef)(0);
-  const loadRef = (0, import_react46.useRef)(loadTask);
+  const requestRef = (0, import_react47.useRef)(0);
+  const loadRef = (0, import_react47.useRef)(loadTask);
   loadRef.current = loadTask;
   const selected2 = visibleTasks.find((task2) => task2.id === selectedId) || visibleTasks[0] || null;
   const activeId = selected2?.id;
   const updatedAt = selected2?.updatedAt;
   const canLoad = typeof loadTask === "function";
-  (0, import_react46.useEffect)(() => {
+  (0, import_react47.useEffect)(() => {
     if (selectedId && !tasks.some((task2) => task2.id === selectedId)) setSelectedId(null);
   }, [tasks, selectedId]);
-  (0, import_react46.useEffect)(() => {
+  (0, import_react47.useEffect)(() => {
     const request = ++requestRef.current;
     let disposed = false;
     setDetail(null);
@@ -47578,57 +47738,57 @@ function CourseTasks({
       setResumes((previous) => ({ ...previous, [id2]: { error: messageOf3(cause) } }));
     }
   }
-  return /* @__PURE__ */ import_react46.default.createElement("section", { className: "wcc-course-tasks", "aria-label": "\u521B\u4F5C\u4EFB\u52A1", "aria-busy": loading }, /* @__PURE__ */ import_react46.default.createElement("header", { className: "wcc-tasks-heading" }, /* @__PURE__ */ import_react46.default.createElement("div", null, /* @__PURE__ */ import_react46.default.createElement("h2", null, "\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react46.default.createElement("p", null, "\u5728\u8FD9\u91CC\u67E5\u770B\u751F\u6210\u8FDB\u5EA6\u3001\u56DE\u7B54 AI \u7684\u95EE\u9898\u548C\u6253\u5F00\u6210\u679C\u6587\u4EF6\u3002")), /* @__PURE__ */ import_react46.default.createElement("span", null, tasks.length)), /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-filters", role: "group", "aria-label": "\u7B5B\u9009\u521B\u4F5C\u4EFB\u52A1" }, [["all", "\u5168\u90E8"], ["running", "\u8FD0\u884C\u4E2D"], ["pending", "\u5F85\u786E\u8BA4"], ["review", "\u5F85\u5BA1\u9605"], ["failed", "\u5F02\u5E38"]].map(([value, label2]) => /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", key: value, type: "button", "aria-pressed": filter2 === value, onClick: () => setFilter(value) }, label2))), !!tasks.length && !visibleTasks.length && /* @__PURE__ */ import_react46.default.createElement("p", { role: "status" }, "\u6B64\u7B5B\u9009\u4E0B\u6CA1\u6709\u4EFB\u52A1\u3002"), !tasks.length ? /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-tasks-empty" }, /* @__PURE__ */ import_react46.default.createElement("span", { "aria-hidden": "true" }, "\u2637"), /* @__PURE__ */ import_react46.default.createElement("p", null, "\u8FD8\u6CA1\u6709\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react46.default.createElement("small", null, "\u70B9\u51FB\u5361\u7247\u586B\u5199\u8981\u6C42\uFF0C\u5373\u53EF\u5F00\u59CB\u521B\u4F5C\uFF1B\u624B\u52A8\u4FDD\u5B58\u7684\u65B0\u7248\u672C\u4E5F\u4F1A\u8BB0\u5F55\u5728\u8FD9\u91CC\u3002")) : /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-list", "aria-label": "\u9009\u62E9\u4EFB\u52A1" }, visibleTasks.map((item) => /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "custom", type: "button", key: item.id, className: `wcc-task-list-item${item.id === activeId ? " is-active" : ""}`, "aria-pressed": item.id === activeId, onClick: () => {
+  return /* @__PURE__ */ import_react47.default.createElement("section", { className: "wcc-course-tasks", "aria-label": "\u521B\u4F5C\u4EFB\u52A1", "aria-busy": loading }, /* @__PURE__ */ import_react47.default.createElement("header", { className: "wcc-tasks-heading" }, /* @__PURE__ */ import_react47.default.createElement("div", null, /* @__PURE__ */ import_react47.default.createElement("h2", null, "\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react47.default.createElement("p", null, "\u5728\u8FD9\u91CC\u67E5\u770B\u751F\u6210\u8FDB\u5EA6\u3001\u56DE\u7B54 AI \u7684\u95EE\u9898\u548C\u6253\u5F00\u6210\u679C\u6587\u4EF6\u3002")), /* @__PURE__ */ import_react47.default.createElement("span", null, tasks.length)), /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-filters", role: "group", "aria-label": "\u7B5B\u9009\u521B\u4F5C\u4EFB\u52A1" }, [["all", "\u5168\u90E8"], ["running", "\u8FD0\u884C\u4E2D"], ["pending", "\u5F85\u786E\u8BA4"], ["review", "\u5F85\u5BA1\u9605"], ["failed", "\u5F02\u5E38"]].map(([value, label2]) => /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "custom", key: value, type: "button", "aria-pressed": filter2 === value, onClick: () => setFilter(value) }, label2))), !!tasks.length && !visibleTasks.length && /* @__PURE__ */ import_react47.default.createElement("p", { role: "status" }, "\u6B64\u7B5B\u9009\u4E0B\u6CA1\u6709\u4EFB\u52A1\u3002"), !tasks.length ? /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-tasks-empty" }, /* @__PURE__ */ import_react47.default.createElement("span", { "aria-hidden": "true" }, "\u2637"), /* @__PURE__ */ import_react47.default.createElement("p", null, "\u8FD8\u6CA1\u6709\u521B\u4F5C\u4EFB\u52A1"), /* @__PURE__ */ import_react47.default.createElement("small", null, "\u70B9\u51FB\u5361\u7247\u586B\u5199\u8981\u6C42\uFF0C\u5373\u53EF\u5F00\u59CB\u521B\u4F5C\uFF1B\u624B\u52A8\u4FDD\u5B58\u7684\u65B0\u7248\u672C\u4E5F\u4F1A\u8BB0\u5F55\u5728\u8FD9\u91CC\u3002")) : /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, null, /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-list", "aria-label": "\u9009\u62E9\u4EFB\u52A1" }, visibleTasks.map((item) => /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "custom", type: "button", key: item.id, className: `wcc-task-list-item${item.id === activeId ? " is-active" : ""}`, "aria-pressed": item.id === activeId, onClick: () => {
     setSelectedId(item.id);
     onViewTask?.(item.id);
-  } }, /* @__PURE__ */ import_react46.default.createElement("span", { className: "wcc-task-list-top" }, /* @__PURE__ */ import_react46.default.createElement("span", null, item.kind === "manual" ? "\u4EBA\u5DE5\u4FEE\u8BA2" : item.kind === "media" ? "AI \u5A92\u4F53\u751F\u6210" : "AI \u521B\u4F5C"), /* @__PURE__ */ import_react46.default.createElement("time", { dateTime: item.createdAt }, timeLabel(item.createdAt))), /* @__PURE__ */ import_react46.default.createElement("strong", null, taskName(item)), /* @__PURE__ */ import_react46.default.createElement("span", { className: `wcc-task-status is-${item.status}` }, pendingTaskIds.has(item.id) ? "\u5F85\u786E\u8BA4" : newTaskIds.has(item.id) ? "\u65B0\u6210\u679C \xB7 \u5F85\u67E5\u770B" : STATUS[item.status] || item.status || "\u72B6\u6001\u672A\u63D0\u4F9B", item.artifacts?.length ? ` \xB7 ${item.artifacts.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "", item.files?.length ? ` \xB7 ${item.files.length} \u4E2A\u6587\u4EF6` : "")))), task && /* @__PURE__ */ import_react46.default.createElement("article", { className: "wcc-task-detail", "aria-label": "\u4EFB\u52A1\u8BE6\u60C5" }, /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-detail-heading" }, /* @__PURE__ */ import_react46.default.createElement("span", { className: `wcc-task-status is-${task.status}` }, STATUS[task.status] || task.status || "\u72B6\u6001\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-text-button", onClick: () => setRetry((value) => value + 1), disabled: loading || !canLoad }, "\u5237\u65B0\u8BE6\u60C5")), /* @__PURE__ */ import_react46.default.createElement("h3", null, taskName(task)), pendingTaskIds.has(task.id) && onOpenPending && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "primary", className: "wcc-task-session", disabled: busy, onClick: () => onOpenPending(task.id) }, "\u5904\u7406\u5F85\u786E\u8BA4"), task.status === "accepted" && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-task-state-note" }, "\u8BF7\u6C42\u5DF2\u63D0\u4EA4\uFF0C\u5C1A\u672A\u767B\u8BB0\u53EF\u5BA1\u9605\u7684\u6210\u679C\u6587\u4EF6\u3002"), task.status === "submitting" && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-task-state-note" }, "\u6B63\u5728\u786E\u8BA4\u662F\u5426\u63D0\u4EA4\u6210\u529F\u3002\u5148\u7B49\u5F85\u7ED3\u679C\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002"), task.status === "unknown" && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-inline-warning" }, task.kind === "media" ? "\u5373\u68A6\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5\u3002\u672C\u4EFB\u52A1\u4E0D\u4F1A\u81EA\u52A8\u91CD\u65B0\u751F\u6210\uFF0C\u8BF7\u5148\u5728\u5373\u68A6\u6838\u5BF9\u751F\u6210\u8BB0\u5F55\u3002" : "\u53D1\u9001\u7ED3\u679C\u5C1A\u672A\u6838\u5B9E\u3002\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u6838\u5BF9\u540E\u518D\u51B3\u5B9A\u4E0B\u4E00\u6B65\u3002"), task.mediaJob?.canResume && onResumeMediaTask && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-task-session", disabled: busy || resumeState.pending, onClick: () => void resumeMedia(task.id) }, resumeState.pending ? "\u67E5\u8BE2\u4E2D\u2026" : "\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0F\u91CD\u65B0\u53D6\u56DE\u6587\u4EF6"), resumeState.error && /* @__PURE__ */ import_react46.default.createElement(UserError, { className: "wcc-error", error: resumeState.error }), task.error && /* @__PURE__ */ import_react46.default.createElement(UserError, { className: "wcc-error", error: textOf(task.error) }), task.sessionId && /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", className: "wcc-task-session", type: "button", disabled: !!busy || !onOpenSession, onClick: () => onOpenSession(task.sessionId) }, "\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD \u2192"), /* @__PURE__ */ import_react46.default.createElement("section", { className: "wcc-task-artifacts", "aria-label": "\u4EFB\u52A1\u6210\u679C\u6587\u4EF6" }, /* @__PURE__ */ import_react46.default.createElement("h4", null, "\u672C\u6B21\u6210\u679C\u6587\u4EF6 \xB7 ", (task.artifacts?.length || 0) + (task.files?.length || 0)), task.artifacts?.length ? task.artifacts.map((artifact) => /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-artifact", key: artifact.versionId }, /* @__PURE__ */ import_react46.default.createElement("strong", null, "\u5927\u7EB2 ", versionLabel(artifact)), /* @__PURE__ */ import_react46.default.createElement("div", null, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !artifact.markdownPath || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "outline" }) }, "\u6253\u5F00\u5927\u7EB2"), artifact.wordPath ? getDownloadHref ? /* @__PURE__ */ import_react46.default.createElement("a", { className: "wcc-task-download", href: getDownloadHref(artifact.versionId), download: true }, "\u4E0B\u8F7D Word") : /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "word" }) }, "\u67E5\u770B Word") : /* @__PURE__ */ import_react46.default.createElement("span", null, "Word \u672A\u751F\u6210")), /* @__PURE__ */ import_react46.default.createElement("details", null, /* @__PURE__ */ import_react46.default.createElement("summary", null, "\u7248\u672C\u6587\u4EF6"), artifact.markdownPath && /* @__PURE__ */ import_react46.default.createElement("code", null, artifact.markdownPath), artifact.wordPath && /* @__PURE__ */ import_react46.default.createElement("code", null, artifact.wordPath)))) : !task.files?.length && /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD8\u6CA1\u6709\u4FDD\u5B58\u6210\u679C\u6587\u4EF6\uFF0C\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u67E5\u770B\u8FDB\u5EA6\u3002"), task.files?.map((file) => /* @__PURE__ */ import_react46.default.createElement("div", { className: "wcc-task-artifact", key: file.id }, /* @__PURE__ */ import_react46.default.createElement("strong", null, FILE_KINDS[file.kind] || "\u6210\u679C\u6587\u4EF6", " \xB7 ", file.title), /* @__PURE__ */ import_react46.default.createElement("div", null, /* @__PURE__ */ import_react46.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ artifactId: file.id, kind: "artifact" }) }, "\u5728\u753B\u5E03\u67E5\u770B"), getFileDownloadHref && /* @__PURE__ */ import_react46.default.createElement("a", { className: "wcc-task-download", href: getFileDownloadHref(file.id), download: true }, "\u4E0B\u8F7D\u6587\u4EF6")), /* @__PURE__ */ import_react46.default.createElement("details", null, /* @__PURE__ */ import_react46.default.createElement("summary", null, "\u6587\u4EF6\u4E0E\u6280\u672F\u68C0\u67E5"), /* @__PURE__ */ import_react46.default.createElement("code", null, file.path), mediaSizeLabel(file) && /* @__PURE__ */ import_react46.default.createElement("small", null, "\u5B9E\u9645\u6587\u4EF6\uFF1A", mediaSizeLabel(file)), /* @__PURE__ */ import_react46.default.createElement("small", null, file.kind === "pptx" ? "\u5DF2\u901A\u8FC7\u53EF\u7F16\u8F91\u6027\u68C0\u67E5\uFF1B\u6559\u5B66\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002" : "\u5DF2\u6838\u5BF9\u5B9E\u9645\u6587\u4EF6\u683C\u5F0F\u4E0E\u5B8C\u6574\u6027\uFF1B\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002"))))), /* @__PURE__ */ import_react46.default.createElement("section", { className: "wcc-task-input-section", "aria-label": "\u4EFB\u52A1\u8F93\u5165" }, /* @__PURE__ */ import_react46.default.createElement("h4", null, "\u4EFB\u52A1\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599"), loading ? /* @__PURE__ */ import_react46.default.createElement("p", { className: "wcc-task-muted", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599\u2026") : error ? /* @__PURE__ */ import_react46.default.createElement(UserError, { className: "wcc-error", error }) : /* @__PURE__ */ import_react46.default.createElement(TaskInput, { input: detail?.id === activeId ? detail.input : selected2.input })), /* @__PURE__ */ import_react46.default.createElement("details", { className: "wcc-task-identifiers" }, /* @__PURE__ */ import_react46.default.createElement("summary", null, "\u4EFB\u52A1\u6807\u8BC6\u4E0E\u65F6\u95F4"), /* @__PURE__ */ import_react46.default.createElement("dl", null, /* @__PURE__ */ import_react46.default.createElement("dt", null, "\u4EFB\u52A1 ID"), /* @__PURE__ */ import_react46.default.createElement("dd", null, task.id), task.requestId && /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, /* @__PURE__ */ import_react46.default.createElement("dt", null, "\u8BF7\u6C42 ID"), /* @__PURE__ */ import_react46.default.createElement("dd", null, task.requestId)), task.sessionId && /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, /* @__PURE__ */ import_react46.default.createElement("dt", null, "\u4F1A\u8BDD ID"), /* @__PURE__ */ import_react46.default.createElement("dd", null, task.sessionId)), task.createdAt && /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, /* @__PURE__ */ import_react46.default.createElement("dt", null, "\u521B\u5EFA"), /* @__PURE__ */ import_react46.default.createElement("dd", null, task.createdAt)), task.updatedAt && /* @__PURE__ */ import_react46.default.createElement(import_react46.default.Fragment, null, /* @__PURE__ */ import_react46.default.createElement("dt", null, "\u66F4\u65B0"), /* @__PURE__ */ import_react46.default.createElement("dd", null, task.updatedAt)))))));
+  } }, /* @__PURE__ */ import_react47.default.createElement("span", { className: "wcc-task-list-top" }, /* @__PURE__ */ import_react47.default.createElement("span", null, item.kind === "manual" ? "\u4EBA\u5DE5\u4FEE\u8BA2" : item.kind === "media" ? "AI \u5A92\u4F53\u751F\u6210" : "AI \u521B\u4F5C"), /* @__PURE__ */ import_react47.default.createElement("time", { dateTime: item.createdAt }, timeLabel(item.createdAt))), /* @__PURE__ */ import_react47.default.createElement("strong", null, taskName(item)), /* @__PURE__ */ import_react47.default.createElement("span", { className: `wcc-task-status is-${item.status}` }, pendingTaskIds.has(item.id) ? "\u5F85\u786E\u8BA4" : newTaskIds.has(item.id) ? "\u65B0\u6210\u679C \xB7 \u5F85\u67E5\u770B" : STATUS[item.status] || item.status || "\u72B6\u6001\u672A\u63D0\u4F9B", item.artifacts?.length ? ` \xB7 ${item.artifacts.length} \u4E2A\u5927\u7EB2\u7248\u672C` : "", item.files?.length ? ` \xB7 ${item.files.length} \u4E2A\u6587\u4EF6` : "")))), task && /* @__PURE__ */ import_react47.default.createElement("article", { className: "wcc-task-detail", "aria-label": "\u4EFB\u52A1\u8BE6\u60C5" }, /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-detail-heading" }, /* @__PURE__ */ import_react47.default.createElement("span", { className: `wcc-task-status is-${task.status}` }, STATUS[task.status] || task.status || "\u72B6\u6001\u672A\u63D0\u4F9B"), /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-text-button", onClick: () => setRetry((value) => value + 1), disabled: loading || !canLoad }, "\u5237\u65B0\u8BE6\u60C5")), /* @__PURE__ */ import_react47.default.createElement("h3", null, taskName(task)), pendingTaskIds.has(task.id) && onOpenPending && /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "primary", className: "wcc-task-session", disabled: busy, onClick: () => onOpenPending(task.id) }, "\u5904\u7406\u5F85\u786E\u8BA4"), task.status === "accepted" && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-task-state-note" }, "\u8BF7\u6C42\u5DF2\u63D0\u4EA4\uFF0C\u5C1A\u672A\u767B\u8BB0\u53EF\u5BA1\u9605\u7684\u6210\u679C\u6587\u4EF6\u3002"), task.status === "submitting" && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-task-state-note" }, "\u6B63\u5728\u786E\u8BA4\u662F\u5426\u63D0\u4EA4\u6210\u529F\u3002\u5148\u7B49\u5F85\u7ED3\u679C\uFF0C\u4E0D\u8981\u91CD\u590D\u53D1\u9001\u3002"), task.status === "unknown" && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-inline-warning" }, task.kind === "media" ? "\u5373\u68A6\u63D0\u4EA4\u7ED3\u679C\u672A\u77E5\u3002\u672C\u4EFB\u52A1\u4E0D\u4F1A\u81EA\u52A8\u91CD\u65B0\u751F\u6210\uFF0C\u8BF7\u5148\u5728\u5373\u68A6\u6838\u5BF9\u751F\u6210\u8BB0\u5F55\u3002" : "\u53D1\u9001\u7ED3\u679C\u5C1A\u672A\u6838\u5B9E\u3002\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u6838\u5BF9\u540E\u518D\u51B3\u5B9A\u4E0B\u4E00\u6B65\u3002"), task.mediaJob?.canResume && onResumeMediaTask && /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", className: "wcc-task-session", disabled: busy || resumeState.pending, onClick: () => void resumeMedia(task.id) }, resumeState.pending ? "\u67E5\u8BE2\u4E2D\u2026" : "\u67E5\u8BE2\u539F\u4EFB\u52A1\uFF0F\u91CD\u65B0\u53D6\u56DE\u6587\u4EF6"), resumeState.error && /* @__PURE__ */ import_react47.default.createElement(UserError, { className: "wcc-error", error: resumeState.error }), task.error && /* @__PURE__ */ import_react47.default.createElement(UserError, { className: "wcc-error", error: textOf(task.error) }), task.sessionId && /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", className: "wcc-task-session", type: "button", disabled: !!busy || !onOpenSession, onClick: () => onOpenSession(task.sessionId) }, "\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD \u2192"), /* @__PURE__ */ import_react47.default.createElement("section", { className: "wcc-task-artifacts", "aria-label": "\u4EFB\u52A1\u6210\u679C\u6587\u4EF6" }, /* @__PURE__ */ import_react47.default.createElement("h4", null, "\u672C\u6B21\u6210\u679C\u6587\u4EF6 \xB7 ", (task.artifacts?.length || 0) + (task.files?.length || 0)), task.artifacts?.length ? task.artifacts.map((artifact) => /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-artifact", key: artifact.versionId }, /* @__PURE__ */ import_react47.default.createElement("strong", null, "\u5927\u7EB2 ", versionLabel(artifact)), /* @__PURE__ */ import_react47.default.createElement("div", null, /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !artifact.markdownPath || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "outline" }) }, "\u6253\u5F00\u5927\u7EB2"), artifact.wordPath ? getDownloadHref ? /* @__PURE__ */ import_react47.default.createElement("a", { className: "wcc-task-download", href: getDownloadHref(artifact.versionId), download: true }, "\u4E0B\u8F7D Word") : /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ versionId: artifact.versionId, kind: "word" }) }, "\u67E5\u770B Word") : /* @__PURE__ */ import_react47.default.createElement("span", null, "Word \u672A\u751F\u6210")), /* @__PURE__ */ import_react47.default.createElement("details", null, /* @__PURE__ */ import_react47.default.createElement("summary", null, "\u7248\u672C\u6587\u4EF6"), artifact.markdownPath && /* @__PURE__ */ import_react47.default.createElement("code", null, artifact.markdownPath), artifact.wordPath && /* @__PURE__ */ import_react47.default.createElement("code", null, artifact.wordPath)))) : !task.files?.length && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-task-muted" }, "\u8FD8\u6CA1\u6709\u4FDD\u5B58\u6210\u679C\u6587\u4EF6\uFF0C\u8BF7\u6253\u5F00\u4EFB\u52A1\u5BF9\u8BDD\u67E5\u770B\u8FDB\u5EA6\u3002"), task.files?.map((file) => /* @__PURE__ */ import_react47.default.createElement("div", { className: "wcc-task-artifact", key: file.id }, /* @__PURE__ */ import_react47.default.createElement("strong", null, FILE_KINDS[file.kind] || "\u6210\u679C\u6587\u4EF6", " \xB7 ", file.title), /* @__PURE__ */ import_react47.default.createElement("div", null, /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !!busy || !onOpenArtifact, onClick: () => onOpenArtifact({ artifactId: file.id, kind: "artifact" }) }, "\u5728\u753B\u5E03\u67E5\u770B"), getFileDownloadHref && /* @__PURE__ */ import_react47.default.createElement("a", { className: "wcc-task-download", href: getFileDownloadHref(file.id), download: true }, "\u4E0B\u8F7D\u6587\u4EF6")), /* @__PURE__ */ import_react47.default.createElement("details", null, /* @__PURE__ */ import_react47.default.createElement("summary", null, "\u6587\u4EF6\u4E0E\u6280\u672F\u68C0\u67E5"), /* @__PURE__ */ import_react47.default.createElement("code", null, file.path), mediaSizeLabel(file) && /* @__PURE__ */ import_react47.default.createElement("small", null, "\u5B9E\u9645\u6587\u4EF6\uFF1A", mediaSizeLabel(file)), /* @__PURE__ */ import_react47.default.createElement("small", null, file.kind === "pptx" ? "\u5DF2\u901A\u8FC7\u53EF\u7F16\u8F91\u6027\u68C0\u67E5\uFF1B\u6559\u5B66\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002" : "\u5DF2\u6838\u5BF9\u5B9E\u9645\u6587\u4EF6\u683C\u5F0F\u4E0E\u5B8C\u6574\u6027\uFF1B\u5185\u5BB9\u4ECD\u9700\u5BA1\u9605\u3002"))))), /* @__PURE__ */ import_react47.default.createElement("section", { className: "wcc-task-input-section", "aria-label": "\u4EFB\u52A1\u8F93\u5165" }, /* @__PURE__ */ import_react47.default.createElement("h4", null, "\u4EFB\u52A1\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599"), loading ? /* @__PURE__ */ import_react47.default.createElement("p", { className: "wcc-task-muted", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u672C\u6B21\u4F7F\u7528\u7684\u8D44\u6599\u2026") : error ? /* @__PURE__ */ import_react47.default.createElement(UserError, { className: "wcc-error", error }) : /* @__PURE__ */ import_react47.default.createElement(TaskInput, { input: detail?.id === activeId ? detail.input : selected2.input })), /* @__PURE__ */ import_react47.default.createElement("details", { className: "wcc-task-identifiers" }, /* @__PURE__ */ import_react47.default.createElement("summary", null, "\u4EFB\u52A1\u6807\u8BC6\u4E0E\u65F6\u95F4"), /* @__PURE__ */ import_react47.default.createElement("dl", null, /* @__PURE__ */ import_react47.default.createElement("dt", null, "\u4EFB\u52A1 ID"), /* @__PURE__ */ import_react47.default.createElement("dd", null, task.id), task.requestId && /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, null, /* @__PURE__ */ import_react47.default.createElement("dt", null, "\u8BF7\u6C42 ID"), /* @__PURE__ */ import_react47.default.createElement("dd", null, task.requestId)), task.sessionId && /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, null, /* @__PURE__ */ import_react47.default.createElement("dt", null, "\u4F1A\u8BDD ID"), /* @__PURE__ */ import_react47.default.createElement("dd", null, task.sessionId)), task.createdAt && /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, null, /* @__PURE__ */ import_react47.default.createElement("dt", null, "\u521B\u5EFA"), /* @__PURE__ */ import_react47.default.createElement("dd", null, task.createdAt)), task.updatedAt && /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, null, /* @__PURE__ */ import_react47.default.createElement("dt", null, "\u66F4\u65B0"), /* @__PURE__ */ import_react47.default.createElement("dd", null, task.updatedAt)))))));
 }
 
 // src/card-creation.jsx
 var import_react52 = __toESM(require("react"), 1);
 
 // src/skill-settings.jsx
-var import_react48 = __toESM(require("react"), 1);
+var import_react49 = __toESM(require("react"), 1);
 
 // src/project-picker.jsx
-var import_react47 = __toESM(require("react"), 1);
+var import_react48 = __toESM(require("react"), 1);
 function messageOf4(error) {
   return error?.rpcError?.message || (error instanceof Error ? error.message : String(error));
 }
 function FolderIcon({ className = "" }) {
-  return /* @__PURE__ */ import_react47.default.createElement("svg", { className, width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /* @__PURE__ */ import_react47.default.createElement("path", { d: "M3 7.5V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" }), /* @__PURE__ */ import_react47.default.createElement("path", { d: "M3 9h18" }));
+  return /* @__PURE__ */ import_react48.default.createElement("svg", { className, width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /* @__PURE__ */ import_react48.default.createElement("path", { d: "M3 7.5V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" }), /* @__PURE__ */ import_react48.default.createElement("path", { d: "M3 9h18" }));
 }
 function projectName(project) {
   return project.name || project.path?.split(/[\\/]/).filter(Boolean).pop() || project.path;
 }
 function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenProject, onClose, busy = false, purpose = "project" }) {
   const isSkill = purpose === "skill";
-  const titleId = (0, import_react47.useId)();
-  const hintId = (0, import_react47.useId)();
-  const pathId = (0, import_react47.useId)();
-  const dialog = (0, import_react47.useRef)(null);
-  const mounted = (0, import_react47.useRef)(false);
-  const controller = (0, import_react47.useRef)(null);
-  const scan = (0, import_react47.useRef)(0);
-  const inputRevision = (0, import_react47.useRef)(0);
-  const opening = (0, import_react47.useRef)(false);
-  const browseRef = (0, import_react47.useRef)(browseDirectory);
-  const openRef = (0, import_react47.useRef)(onOpenProject);
-  const initialPath = (0, import_react47.useRef)(currentProject?.path);
-  const [path, setPath] = (0, import_react47.useState)(currentProject?.path || "");
-  const [listing, setListing] = (0, import_react47.useState)(null);
-  const [loading, setLoading] = (0, import_react47.useState)(true);
-  const [browseError, setBrowseError] = (0, import_react47.useState)("");
-  const [openError, setOpenError] = (0, import_react47.useState)("");
-  const [openingPath, setOpeningPath] = (0, import_react47.useState)("");
-  const [showHidden, setShowHidden] = (0, import_react47.useState)(false);
+  const titleId = (0, import_react48.useId)();
+  const hintId = (0, import_react48.useId)();
+  const pathId = (0, import_react48.useId)();
+  const dialog = (0, import_react48.useRef)(null);
+  const mounted = (0, import_react48.useRef)(false);
+  const controller = (0, import_react48.useRef)(null);
+  const scan = (0, import_react48.useRef)(0);
+  const inputRevision = (0, import_react48.useRef)(0);
+  const opening = (0, import_react48.useRef)(false);
+  const browseRef = (0, import_react48.useRef)(browseDirectory);
+  const openRef = (0, import_react48.useRef)(onOpenProject);
+  const initialPath = (0, import_react48.useRef)(currentProject?.path);
+  const [path, setPath] = (0, import_react48.useState)(currentProject?.path || "");
+  const [listing, setListing] = (0, import_react48.useState)(null);
+  const [loading, setLoading] = (0, import_react48.useState)(true);
+  const [browseError, setBrowseError] = (0, import_react48.useState)("");
+  const [openError, setOpenError] = (0, import_react48.useState)("");
+  const [openingPath, setOpeningPath] = (0, import_react48.useState)("");
+  const [showHidden, setShowHidden] = (0, import_react48.useState)(false);
   browseRef.current = browseDirectory;
   openRef.current = onOpenProject;
   const working = busy || Boolean(openingPath);
   const entries = (listing?.entries || []).filter((entry) => showHidden || !entry.hidden);
   const parent = listing?.crumbs?.length > 1 ? listing.crumbs[listing.crumbs.length - 2] : null;
   const chosenPath = path.trim();
-  (0, import_react47.useEffect)(() => {
+  (0, import_react48.useEffect)(() => {
     mounted.current = true;
     dialog.current?.showModal();
     void navigate(initialPath.current);
@@ -47687,7 +47847,7 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
     setPath(value);
     setOpenError("");
   }
-  return /* @__PURE__ */ import_react47.default.createElement(
+  return /* @__PURE__ */ import_react48.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -47704,8 +47864,8 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
         if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
       }
     },
-    /* @__PURE__ */ import_react47.default.createElement(DialogHeader, { title: isSkill ? "\u9009\u62E9\u6280\u80FD\u6587\u4EF6\u5939" : "\u9009\u62E9\u9879\u76EE\u6587\u4EF6\u5939", titleId, descriptionId: hintId, description: isSkill ? "\u9009\u62E9\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\uFF0C\u53EA\u5EFA\u7ACB\u5173\u8054\uFF0C\u4E0D\u590D\u5236\u6587\u4EF6\u3002" : "\u8FD9\u4E2A\u6587\u4EF6\u5939\u7528\u4E8E\u4FDD\u5B58\u9879\u76EE\u8D44\u6599\u3001\u4EFB\u52A1\u548C\u6210\u679C\u6587\u4EF6\u3002", onClose, closeLabel: isSkill ? "\u5173\u95ED\u6587\u4EF6\u5939\u9009\u62E9" : "\u5173\u95ED\u9879\u76EE\u9009\u62E9", busy: working }),
-    /* @__PURE__ */ import_react47.default.createElement("div", { className: "wtt-pp-body" }, /* @__PURE__ */ import_react47.default.createElement("aside", { hidden: isSkill, className: "wtt-pp-recent", "aria-label": "\u6700\u8FD1\u9879\u76EE" }, /* @__PURE__ */ import_react47.default.createElement("h3", null, "\u6700\u8FD1\u9879\u76EE"), projects.length ? /* @__PURE__ */ import_react47.default.createElement("ul", null, projects.map((project) => /* @__PURE__ */ import_react47.default.createElement("li", { key: project.id || project.path }, /* @__PURE__ */ import_react47.default.createElement(
+    /* @__PURE__ */ import_react48.default.createElement(DialogHeader, { title: isSkill ? "\u9009\u62E9\u6280\u80FD\u6587\u4EF6\u5939" : "\u9009\u62E9\u9879\u76EE\u6587\u4EF6\u5939", titleId, descriptionId: hintId, description: isSkill ? "\u9009\u62E9\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\uFF0C\u53EA\u5EFA\u7ACB\u5173\u8054\uFF0C\u4E0D\u590D\u5236\u6587\u4EF6\u3002" : "\u8FD9\u4E2A\u6587\u4EF6\u5939\u7528\u4E8E\u4FDD\u5B58\u9879\u76EE\u8D44\u6599\u3001\u4EFB\u52A1\u548C\u6210\u679C\u6587\u4EF6\u3002", onClose, closeLabel: isSkill ? "\u5173\u95ED\u6587\u4EF6\u5939\u9009\u62E9" : "\u5173\u95ED\u9879\u76EE\u9009\u62E9", busy: working }),
+    /* @__PURE__ */ import_react48.default.createElement("div", { className: "wtt-pp-body" }, /* @__PURE__ */ import_react48.default.createElement("aside", { hidden: isSkill, className: "wtt-pp-recent", "aria-label": "\u6700\u8FD1\u9879\u76EE" }, /* @__PURE__ */ import_react48.default.createElement("h3", null, "\u6700\u8FD1\u9879\u76EE"), projects.length ? /* @__PURE__ */ import_react48.default.createElement("ul", null, projects.map((project) => /* @__PURE__ */ import_react48.default.createElement("li", { key: project.id || project.path }, /* @__PURE__ */ import_react48.default.createElement(
       UiButton,
       {
         variant: "custom",
@@ -47716,25 +47876,25 @@ function ProjectPicker({ currentProject, projects = [], browseDirectory, onOpenP
         disabled: working,
         onClick: () => void openProject(project.path)
       },
-      /* @__PURE__ */ import_react47.default.createElement("span", { className: "wtt-pp-project-name" }, /* @__PURE__ */ import_react47.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react47.default.createElement("strong", null, projectName(project))),
-      /* @__PURE__ */ import_react47.default.createElement("span", { className: "wtt-pp-project-path" }, project.path),
-      project.id === currentProject?.id && /* @__PURE__ */ import_react47.default.createElement("span", { className: "wtt-pp-current-label" }, "\u5F53\u524D\u9879\u76EE")
-    )))) : /* @__PURE__ */ import_react47.default.createElement("p", { className: "wtt-pp-recent-empty" }, "\u6253\u5F00\u8FC7\u7684\u9879\u76EE\u4F1A\u7559\u5728\u8FD9\u91CC\uFF0C\u65B9\u4FBF\u968F\u65F6\u5207\u6362\u3002")), /* @__PURE__ */ import_react47.default.createElement("section", { className: "wtt-pp-browser", "aria-label": "\u6D4F\u89C8\u672C\u673A\u6587\u4EF6\u5939" }, /* @__PURE__ */ import_react47.default.createElement("form", { className: "wtt-pp-path-form", onSubmit: (event) => {
+      /* @__PURE__ */ import_react48.default.createElement("span", { className: "wtt-pp-project-name" }, /* @__PURE__ */ import_react48.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react48.default.createElement("strong", null, projectName(project))),
+      /* @__PURE__ */ import_react48.default.createElement("span", { className: "wtt-pp-project-path" }, project.path),
+      project.id === currentProject?.id && /* @__PURE__ */ import_react48.default.createElement("span", { className: "wtt-pp-current-label" }, "\u5F53\u524D\u9879\u76EE")
+    )))) : /* @__PURE__ */ import_react48.default.createElement("p", { className: "wtt-pp-recent-empty" }, "\u6253\u5F00\u8FC7\u7684\u9879\u76EE\u4F1A\u7559\u5728\u8FD9\u91CC\uFF0C\u65B9\u4FBF\u968F\u65F6\u5207\u6362\u3002")), /* @__PURE__ */ import_react48.default.createElement("section", { className: "wtt-pp-browser", "aria-label": "\u6D4F\u89C8\u672C\u673A\u6587\u4EF6\u5939" }, /* @__PURE__ */ import_react48.default.createElement("form", { className: "wtt-pp-path-form", onSubmit: (event) => {
       event.preventDefault();
       if (!working && chosenPath) void navigate(chosenPath);
-    } }, /* @__PURE__ */ import_react47.default.createElement("label", { htmlFor: pathId }, "\u6587\u4EF6\u5939\u8DEF\u5F84"), /* @__PURE__ */ import_react47.default.createElement("div", null, /* @__PURE__ */ import_react47.default.createElement("input", { id: pathId, autoFocus: true, value: path, disabled: working, onChange: (event) => changePath(event.target.value), spellCheck: false, autoComplete: "off", placeholder: "\u7C98\u8D34\u672C\u673A\u6587\u4EF6\u5939\u7684\u5B8C\u6574\u8DEF\u5F84" }), /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "submit", disabled: working || !chosenPath }, "\u524D\u5F80"))), /* @__PURE__ */ import_react47.default.createElement("nav", { className: "wtt-pp-navigation", "aria-label": "\u76EE\u5F55\u5BFC\u822A" }, /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !parent || working || loading, onClick: () => void navigate(parent.path), "aria-label": "\u4E0A\u4E00\u7EA7\u76EE\u5F55", title: "\u4E0A\u4E00\u7EA7\u76EE\u5F55" }, "\u2191"), /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !listing?.home || working || loading, onClick: () => void navigate(listing.home) }, "\u6211\u7684\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react47.default.createElement("div", { className: "wtt-pp-crumbs" }, (listing?.crumbs || []).map((crumb, index2) => /* @__PURE__ */ import_react47.default.createElement(import_react47.default.Fragment, { key: crumb.path }, index2 > 0 && /* @__PURE__ */ import_react47.default.createElement("span", { "aria-hidden": "true" }, "/"), /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", title: crumb.path, disabled: working || loading, "aria-current": index2 === listing.crumbs.length - 1 ? "location" : void 0, onClick: () => void navigate(crumb.path) }, crumb.name))))), browseError && /* @__PURE__ */ import_react47.default.createElement(UserError, { className: "wtt-pp-error", error: browseError }), /* @__PURE__ */ import_react47.default.createElement("div", { className: "wtt-pp-directory-list", "aria-busy": loading }, loading ? /* @__PURE__ */ import_react47.default.createElement("p", { className: "wtt-pp-directory-state", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u76EE\u5F55\u2026") : listing ? entries.length ? /* @__PURE__ */ import_react47.default.createElement("ul", { "aria-label": "\u5B50\u6587\u4EF6\u5939" }, entries.map((entry) => /* @__PURE__ */ import_react47.default.createElement("li", { key: entry.path }, /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, title: entry.path, "aria-label": `\u8FDB\u5165\u6587\u4EF6\u5939 ${entry.name}`, onClick: () => void navigate(entry.path) }, /* @__PURE__ */ import_react47.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react47.default.createElement("span", null, entry.name), /* @__PURE__ */ import_react47.default.createElement("span", { className: "wtt-pp-enter", "aria-hidden": "true" }, "\u203A"))))) : /* @__PURE__ */ import_react47.default.createElement("div", { className: "wtt-pp-directory-state" }, /* @__PURE__ */ import_react47.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react47.default.createElement("p", null, showHidden ? "\u6B64\u76EE\u5F55\u6CA1\u6709\u5B50\u6587\u4EF6\u5939\u3002" : "\u6B64\u76EE\u5F55\u6CA1\u6709\u53EF\u89C1\u7684\u5B50\u6587\u4EF6\u5939\u3002"), /* @__PURE__ */ import_react47.default.createElement("span", null, isSkill ? "\u53EF\u76F4\u63A5\u9009\u62E9\u5F53\u524D\u76EE\u5F55\u3002" : "\u53EF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u76EE\u5F55\u4F5C\u4E3A\u9879\u76EE\u3002")) : /* @__PURE__ */ import_react47.default.createElement("p", { className: "wtt-pp-directory-state" }, isSkill ? "\u8F93\u5165\u6280\u80FD\u6587\u4EF6\u5939\u8DEF\u5F84\u3002" : "\u9009\u62E9\u6700\u8FD1\u9879\u76EE\uFF0C\u6216\u8F93\u5165\u6587\u4EF6\u5939\u8DEF\u5F84\u3002")), /* @__PURE__ */ import_react47.default.createElement("div", { className: "wtt-pp-browser-footer" }, /* @__PURE__ */ import_react47.default.createElement("label", null, /* @__PURE__ */ import_react47.default.createElement("input", { type: "checkbox", checked: showHidden, disabled: working, onChange: (event) => setShowHidden(event.target.checked) }), "\u663E\u793A\u9690\u85CF\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react47.default.createElement("span", null, loading ? "" : `${entries.length} \u4E2A\u6587\u4EF6\u5939`)), listing?.truncated && /* @__PURE__ */ import_react47.default.createElement("p", { className: "wtt-pp-truncated" }, "\u6B64\u76EE\u5F55\u5185\u5BB9\u8F83\u591A\uFF0C\u5217\u8868\u53EA\u663E\u793A\u90E8\u5206\u6587\u4EF6\u5939\uFF1B\u53EF\u8F93\u5165\u5B8C\u6574\u8DEF\u5F84\u524D\u5F80\u3002"))),
-    openError && /* @__PURE__ */ import_react47.default.createElement(UserError, { className: "wtt-pp-error wtt-pp-open-error", error: openError }),
-    /* @__PURE__ */ import_react47.default.createElement(DialogFooter, { className: "wtt-pp-actions" }, /* @__PURE__ */ import_react47.default.createElement("div", { className: "wtt-pp-selection" }, /* @__PURE__ */ import_react47.default.createElement("span", null, isSkill ? "\u5C06\u6DFB\u52A0\u7684\u6280\u80FD\u6587\u4EF6\u5939" : "\u5C06\u4F7F\u7528\u7684\u9879\u76EE\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react47.default.createElement("code", null, openingPath || chosenPath || "\u8BF7\u9009\u62E9\u6587\u4EF6\u5939")), /* @__PURE__ */ import_react47.default.createElement("div", null, /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react47.default.createElement(UiButton, { variant: "primary", type: "button", className: "wtt-pp-open", disabled: working || !chosenPath, onClick: () => void openProject(chosenPath) }, working ? "\u5904\u7406\u4E2D\u2026" : isSkill ? "\u4F7F\u7528\u6B64\u6587\u4EF6\u5939" : "\u6253\u5F00\u6B64\u6587\u4EF6\u5939")))
+    } }, /* @__PURE__ */ import_react48.default.createElement("label", { htmlFor: pathId }, "\u6587\u4EF6\u5939\u8DEF\u5F84"), /* @__PURE__ */ import_react48.default.createElement("div", null, /* @__PURE__ */ import_react48.default.createElement("input", { id: pathId, autoFocus: true, value: path, disabled: working, onChange: (event) => changePath(event.target.value), spellCheck: false, autoComplete: "off", placeholder: "\u7C98\u8D34\u672C\u673A\u6587\u4EF6\u5939\u7684\u5B8C\u6574\u8DEF\u5F84" }), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "submit", disabled: working || !chosenPath }, "\u524D\u5F80"))), /* @__PURE__ */ import_react48.default.createElement("nav", { className: "wtt-pp-navigation", "aria-label": "\u76EE\u5F55\u5BFC\u822A" }, /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !parent || working || loading, onClick: () => void navigate(parent.path), "aria-label": "\u4E0A\u4E00\u7EA7\u76EE\u5F55", title: "\u4E0A\u4E00\u7EA7\u76EE\u5F55" }, "\u2191"), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: !listing?.home || working || loading, onClick: () => void navigate(listing.home) }, "\u6211\u7684\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react48.default.createElement("div", { className: "wtt-pp-crumbs" }, (listing?.crumbs || []).map((crumb, index2) => /* @__PURE__ */ import_react48.default.createElement(import_react48.default.Fragment, { key: crumb.path }, index2 > 0 && /* @__PURE__ */ import_react48.default.createElement("span", { "aria-hidden": "true" }, "/"), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", title: crumb.path, disabled: working || loading, "aria-current": index2 === listing.crumbs.length - 1 ? "location" : void 0, onClick: () => void navigate(crumb.path) }, crumb.name))))), browseError && /* @__PURE__ */ import_react48.default.createElement(UserError, { className: "wtt-pp-error", error: browseError }), /* @__PURE__ */ import_react48.default.createElement("div", { className: "wtt-pp-directory-list", "aria-busy": loading }, loading ? /* @__PURE__ */ import_react48.default.createElement("p", { className: "wtt-pp-directory-state", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u76EE\u5F55\u2026") : listing ? entries.length ? /* @__PURE__ */ import_react48.default.createElement("ul", { "aria-label": "\u5B50\u6587\u4EF6\u5939" }, entries.map((entry) => /* @__PURE__ */ import_react48.default.createElement("li", { key: entry.path }, /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, title: entry.path, "aria-label": `\u8FDB\u5165\u6587\u4EF6\u5939 ${entry.name}`, onClick: () => void navigate(entry.path) }, /* @__PURE__ */ import_react48.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react48.default.createElement("span", null, entry.name), /* @__PURE__ */ import_react48.default.createElement("span", { className: "wtt-pp-enter", "aria-hidden": "true" }, "\u203A"))))) : /* @__PURE__ */ import_react48.default.createElement("div", { className: "wtt-pp-directory-state" }, /* @__PURE__ */ import_react48.default.createElement(FolderIcon, null), /* @__PURE__ */ import_react48.default.createElement("p", null, showHidden ? "\u6B64\u76EE\u5F55\u6CA1\u6709\u5B50\u6587\u4EF6\u5939\u3002" : "\u6B64\u76EE\u5F55\u6CA1\u6709\u53EF\u89C1\u7684\u5B50\u6587\u4EF6\u5939\u3002"), /* @__PURE__ */ import_react48.default.createElement("span", null, isSkill ? "\u53EF\u76F4\u63A5\u9009\u62E9\u5F53\u524D\u76EE\u5F55\u3002" : "\u53EF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u76EE\u5F55\u4F5C\u4E3A\u9879\u76EE\u3002")) : /* @__PURE__ */ import_react48.default.createElement("p", { className: "wtt-pp-directory-state" }, isSkill ? "\u8F93\u5165\u6280\u80FD\u6587\u4EF6\u5939\u8DEF\u5F84\u3002" : "\u9009\u62E9\u6700\u8FD1\u9879\u76EE\uFF0C\u6216\u8F93\u5165\u6587\u4EF6\u5939\u8DEF\u5F84\u3002")), /* @__PURE__ */ import_react48.default.createElement("div", { className: "wtt-pp-browser-footer" }, /* @__PURE__ */ import_react48.default.createElement("label", null, /* @__PURE__ */ import_react48.default.createElement("input", { type: "checkbox", checked: showHidden, disabled: working, onChange: (event) => setShowHidden(event.target.checked) }), "\u663E\u793A\u9690\u85CF\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react48.default.createElement("span", null, loading ? "" : `${entries.length} \u4E2A\u6587\u4EF6\u5939`)), listing?.truncated && /* @__PURE__ */ import_react48.default.createElement("p", { className: "wtt-pp-truncated" }, "\u6B64\u76EE\u5F55\u5185\u5BB9\u8F83\u591A\uFF0C\u5217\u8868\u53EA\u663E\u793A\u90E8\u5206\u6587\u4EF6\u5939\uFF1B\u53EF\u8F93\u5165\u5B8C\u6574\u8DEF\u5F84\u524D\u5F80\u3002"))),
+    openError && /* @__PURE__ */ import_react48.default.createElement(UserError, { className: "wtt-pp-error wtt-pp-open-error", error: openError }),
+    /* @__PURE__ */ import_react48.default.createElement(DialogFooter, { className: "wtt-pp-actions" }, /* @__PURE__ */ import_react48.default.createElement("div", { className: "wtt-pp-selection" }, /* @__PURE__ */ import_react48.default.createElement("span", null, isSkill ? "\u5C06\u6DFB\u52A0\u7684\u6280\u80FD\u6587\u4EF6\u5939" : "\u5C06\u4F7F\u7528\u7684\u9879\u76EE\u6587\u4EF6\u5939"), /* @__PURE__ */ import_react48.default.createElement("code", null, openingPath || chosenPath || "\u8BF7\u9009\u62E9\u6587\u4EF6\u5939")), /* @__PURE__ */ import_react48.default.createElement("div", null, /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: working, onClick: onClose }, "\u53D6\u6D88"), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "primary", type: "button", className: "wtt-pp-open", disabled: working || !chosenPath, onClick: () => void openProject(chosenPath) }, working ? "\u5904\u7406\u4E2D\u2026" : isSkill ? "\u4F7F\u7528\u6B64\u6587\u4EF6\u5939" : "\u6253\u5F00\u6B64\u6587\u4EF6\u5939")))
   );
 }
 
 // src/skill-settings.jsx
 var messageOf5 = (error) => error?.rpcError?.message || error?.message || String(error);
 function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSave, onPreference, onClose }) {
-  const id2 = (0, import_react48.useId)(), dialog = (0, import_react48.useRef)(null), searchRef = (0, import_react48.useRef)(null), locked2 = (0, import_react48.useRef)(false);
-  const [search, setSearch] = (0, import_react48.useState)(""), [saving, setSaving] = (0, import_react48.useState)(false), [localError, setLocalError] = (0, import_react48.useState)("");
-  const [folderOpen, setFolderOpen] = (0, import_react48.useState)(false), [notice, setNotice] = (0, import_react48.useState)("");
-  (0, import_react48.useEffect)(() => {
+  const id2 = (0, import_react49.useId)(), dialog = (0, import_react49.useRef)(null), searchRef = (0, import_react49.useRef)(null), locked2 = (0, import_react49.useRef)(false);
+  const [search, setSearch] = (0, import_react49.useState)(""), [saving, setSaving] = (0, import_react49.useState)(false), [localError, setLocalError] = (0, import_react49.useState)("");
+  const [folderOpen, setFolderOpen] = (0, import_react49.useState)(false), [notice, setNotice] = (0, import_react49.useState)("");
+  (0, import_react49.useEffect)(() => {
     if (open && !dialog.current.open) {
       dialog.current.showModal();
       setSearch("");
@@ -47787,7 +47947,7 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
       setFolderOpen(false);
     }, "\u6280\u80FD\u6587\u4EF6\u5939\u5DF2\u6DFB\u52A0\uFF0C\u5217\u8868\u5DF2\u66F4\u65B0\u3002");
   }
-  return /* @__PURE__ */ import_react48.default.createElement(import_react48.default.Fragment, null, /* @__PURE__ */ import_react48.default.createElement(
+  return /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, /* @__PURE__ */ import_react49.default.createElement(
     "dialog",
     {
       ref: dialog,
@@ -47802,9 +47962,9 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
       onDoubleClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => event.stopPropagation()
     },
-    /* @__PURE__ */ import_react48.default.createElement(DialogHeader, { title: "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", titleId: `${id2}-title`, description: "\u70B9\u661F\u6807\u5373\u53EF\u4FDD\u5B58\uFF0C\u6240\u6709\u9879\u76EE\u5171\u7528\u3002\u5E38\u7528\u6309\u94AE\u53EF\u81EA\u5B9A\u4E49\u540D\u79F0\u3002", onClose, closeLabel: "\u5173\u95ED\u6280\u80FD\u8BBE\u7F6E", busy: saving }),
-    /* @__PURE__ */ import_react48.default.createElement("div", { className: "wcc-skill-settings-body" }, /* @__PURE__ */ import_react48.default.createElement("div", { className: "wcc-skill-search-row" }, /* @__PURE__ */ import_react48.default.createElement("input", { ref: searchRef, "aria-label": "\u641C\u7D22\u672C\u673A\u6280\u80FD", type: "search", value: search, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u4E2D\u6587\u5FEB\u6377\u540D\u6216\u8BF4\u660E" }), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => void change(onRefresh, "\u6280\u80FD\u5217\u8868\u5DF2\u5237\u65B0\u3002").catch(() => {
-    }) }, "\u5237\u65B0")), /* @__PURE__ */ import_react48.default.createElement("p", { className: "wcc-skill-count" }, skills.length, " \u4E2A\u53EF\u7528\u6280\u80FD \xB7 ", favorites.size, " \u4E2A\u5E38\u7528", saving ? " \xB7 \u4FDD\u5B58\u4E2D\u2026" : ""), /* @__PURE__ */ import_react48.default.createElement("div", { className: "wcc-skill-quick-list", "aria-label": "\u672C\u673A\u6280\u80FD\u5217\u8868" }, entries.map((skill) => /* @__PURE__ */ import_react48.default.createElement("div", { className: "wcc-skill-quick-item", key: skill.name }, /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-skill-star", "aria-label": `${favorites.has(skill.name) ? "\u53D6\u6D88\u5E38\u7528" : "\u8BBE\u4E3A\u5E38\u7528"}\uFF1A${skillLabel(skill)}`, "aria-pressed": favorites.has(skill.name), disabled: busy || skill.unavailable && !favorites.has(skill.name), onClick: () => void preference({ name: skill.name, favorite: !favorites.has(skill.name) }, favorites.has(skill.name) ? "\u5DF2\u53D6\u6D88\u5E38\u7528\u3002" : "\u5DF2\u8BBE\u4E3A\u5E38\u7528\uFF0C\u56DE\u5230\u8F93\u5165\u6846\u5373\u53EF\u4F7F\u7528\u3002") }, favorites.has(skill.name) ? "\u2605" : "\u2606"), /* @__PURE__ */ import_react48.default.createElement("div", { className: "wcc-skill-quick-copy" }, /* @__PURE__ */ import_react48.default.createElement("strong", null, skillLabel(skill)), /* @__PURE__ */ import_react48.default.createElement("span", null, skill.unavailable ? "\u672C\u673A\u6682\u672A\u627E\u5230\uFF0C\u53EF\u53D6\u6D88\u5E38\u7528\u6216\u68C0\u67E5\u6587\u4EF6\u5939\u3002" : skill.description || "\u6682\u65E0\u8BF4\u660E"), favorites.has(skill.name) && /* @__PURE__ */ import_react48.default.createElement("label", { className: "wcc-skill-alias" }, "\u5FEB\u6377\u540D\u79F0", /* @__PURE__ */ import_react48.default.createElement(
+    /* @__PURE__ */ import_react49.default.createElement(DialogHeader, { title: "\u8BBE\u7F6E\u5E38\u7528\u6280\u80FD", titleId: `${id2}-title`, description: "\u70B9\u661F\u6807\u5373\u53EF\u4FDD\u5B58\uFF0C\u6240\u6709\u9879\u76EE\u5171\u7528\u3002\u5E38\u7528\u6309\u94AE\u53EF\u81EA\u5B9A\u4E49\u540D\u79F0\u3002", onClose, closeLabel: "\u5173\u95ED\u6280\u80FD\u8BBE\u7F6E", busy: saving }),
+    /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-settings-body" }, /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-search-row" }, /* @__PURE__ */ import_react49.default.createElement("input", { ref: searchRef, "aria-label": "\u641C\u7D22\u672C\u673A\u6280\u80FD", type: "search", value: search, onChange: (event) => setSearch(event.target.value), placeholder: "\u641C\u7D22\u540D\u79F0\u3001\u4E2D\u6587\u5FEB\u6377\u540D\u6216\u8BF4\u660E" }), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => void change(onRefresh, "\u6280\u80FD\u5217\u8868\u5DF2\u5237\u65B0\u3002").catch(() => {
+    }) }, "\u5237\u65B0")), /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-skill-count" }, skills.length, " \u4E2A\u53EF\u7528\u6280\u80FD \xB7 ", favorites.size, " \u4E2A\u5E38\u7528", saving ? " \xB7 \u4FDD\u5B58\u4E2D\u2026" : ""), /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-quick-list", "aria-label": "\u672C\u673A\u6280\u80FD\u5217\u8868" }, entries.map((skill) => /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-quick-item", key: skill.name }, /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "custom", type: "button", className: "wcc-skill-star", "aria-label": `${favorites.has(skill.name) ? "\u53D6\u6D88\u5E38\u7528" : "\u8BBE\u4E3A\u5E38\u7528"}\uFF1A${skillLabel(skill)}`, "aria-pressed": favorites.has(skill.name), disabled: busy || skill.unavailable && !favorites.has(skill.name), onClick: () => void preference({ name: skill.name, favorite: !favorites.has(skill.name) }, favorites.has(skill.name) ? "\u5DF2\u53D6\u6D88\u5E38\u7528\u3002" : "\u5DF2\u8BBE\u4E3A\u5E38\u7528\uFF0C\u56DE\u5230\u8F93\u5165\u6846\u5373\u53EF\u4F7F\u7528\u3002") }, favorites.has(skill.name) ? "\u2605" : "\u2606"), /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-skill-quick-copy" }, /* @__PURE__ */ import_react49.default.createElement("strong", null, skillLabel(skill)), /* @__PURE__ */ import_react49.default.createElement("span", null, skill.unavailable ? "\u672C\u673A\u6682\u672A\u627E\u5230\uFF0C\u53EF\u53D6\u6D88\u5E38\u7528\u6216\u68C0\u67E5\u6587\u4EF6\u5939\u3002" : skill.description || "\u6682\u65E0\u8BF4\u660E"), favorites.has(skill.name) && /* @__PURE__ */ import_react49.default.createElement("label", { className: "wcc-skill-alias" }, "\u5FEB\u6377\u540D\u79F0", /* @__PURE__ */ import_react49.default.createElement(
       "input",
       {
         key: `${skill.name}:${skill.label || ""}`,
@@ -47827,135 +47987,10 @@ function SkillSettings({ open, catalog, loading = false, error, onRefresh, onSav
           if (label2 !== (skill.label || "")) void preference({ name: skill.name, label: label2 }, "\u5FEB\u6377\u540D\u79F0\u5DF2\u4FDD\u5B58\u3002");
         }
       }
-    )), /* @__PURE__ */ import_react48.default.createElement("details", null, /* @__PURE__ */ import_react48.default.createElement("summary", null, "\u67E5\u770B\u540D\u79F0\u4E0E\u6765\u6E90"), /* @__PURE__ */ import_react48.default.createElement("code", null, "/", skill.name), skill.path && /* @__PURE__ */ import_react48.default.createElement("code", null, skill.path), /* @__PURE__ */ import_react48.default.createElement("small", null, skill.origin || "\u672C\u673A\u6682\u672A\u627E\u5230"))))), !entries.length && /* @__PURE__ */ import_react48.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u672C\u673A\u6280\u80FD\u2026" : search ? "\u6CA1\u627E\u5230\u76F8\u5173\u6280\u80FD\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\u3002" : "\u8FD8\u6CA1\u6709\u53EF\u7528\u6280\u80FD\u3002\u6DFB\u52A0\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\u540E\u518D\u8BD5\u3002")), /* @__PURE__ */ import_react48.default.createElement("details", { className: "wcc-skill-folders" }, /* @__PURE__ */ import_react48.default.createElement("summary", null, "\u6280\u80FD\u6587\u4EF6\u5939 \xB7 \u81EA\u52A8\u53D1\u73B0\u4E0E\u81EA\u5B9A\u4E49"), /* @__PURE__ */ import_react48.default.createElement("p", null, "\u81EA\u52A8\u8BFB\u53D6\u5DF2\u5B58\u5728\u7684\u5E38\u89C1\u76EE\u5F55\uFF0C\u5E76\u4FDD\u7559 DSH \u7684\u9879\u76EE\u6280\u80FD\u6765\u6E90\u3002"), (catalog?.automaticDirectories || []).map((directory) => /* @__PURE__ */ import_react48.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react48.default.createElement("code", null, directory), /* @__PURE__ */ import_react48.default.createElement("small", null, "\u81EA\u52A8\u53D1\u73B0"))), settings.directories.map((directory) => /* @__PURE__ */ import_react48.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react48.default.createElement("code", null, directory), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, "aria-label": `\u79FB\u9664\u6280\u80FD\u76EE\u5F55 ${directory}`, onClick: () => void change(() => onSave({ ...settings, directories: settings.directories.filter((item) => item !== directory) }), "\u5DF2\u79FB\u9664\u5173\u8054\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559\u3002").catch(() => {
-    }) }, "\u79FB\u9664\u5173\u8054"))), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => setFolderOpen(true) }, "\u6DFB\u52A0\u6280\u80FD\u6587\u4EF6\u5939")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react48.default.createElement("details", { className: "wcc-skill-settings-warnings" }, /* @__PURE__ */ import_react48.default.createElement("summary", null, "\u6765\u6E90\u63D0\u793A \xB7 ", catalog.warnings.length, " \u9879"), /* @__PURE__ */ import_react48.default.createElement("ul", null, catalog.warnings.map((warning, index2) => /* @__PURE__ */ import_react48.default.createElement("li", { key: index2 }, warning)))), (localError || error) && /* @__PURE__ */ import_react48.default.createElement(UserError, { className: "wcc-skill-settings-error", error: localError || error })),
-    /* @__PURE__ */ import_react48.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react48.default.createElement("span", { role: "status" }, notice || "\u66F4\u6539\u81EA\u52A8\u4FDD\u5B58"), /* @__PURE__ */ import_react48.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: saving, onClick: onClose }, "\u5B8C\u6210"))
-  ), open && folderOpen && /* @__PURE__ */ import_react48.default.createElement(ProjectPicker, { purpose: "skill", currentProject: { path: settings.directories[0] || catalog?.automaticDirectories?.[0] }, browseDirectory, onOpenProject: addDirectory, onClose: () => setFolderOpen(false), busy: saving }));
-}
-
-// src/model-selection.jsx
-var import_react49 = __toESM(require("react"), 1);
-var MODEL_SLOT = "conversation.input.model";
-var noSubscription = () => () => {
-};
-var noSnapshot = () => null;
-var renderDraftModelLabel = (_slot, _props, options) => options?.fallback ?? null;
-function createNativeModelSeat(slots, locale) {
-  if (!locale) return void 0;
-  return {
-    subscribe: (listener) => slots.subscribe(MODEL_SLOT, listener),
-    getSnapshot: () => slots.entriesOfSlot(MODEL_SLOT)[0]?.component ?? null,
-    subscribeLocale: (listener) => locale.subscribe(listener),
-    getLocale: () => locale.getSnapshot(),
-    t: locale.bind("model"),
-    resolveText: (value) => locale.resolveText(value)
-  };
-}
-function NativeModelSelection({ Component, seat, catalog, current, model, loading, failure, onChange, onRefresh, onOpenSettings }) {
-  (0, import_react49.useSyncExternalStore)(seat.subscribeLocale, seat.getLocale);
-  const snapshot = (0, import_react49.useMemo)(() => ({
-    current: current ?? null,
-    routable: loading ? null : Boolean(model),
-    groups: catalog?.groups ?? [],
-    failures: catalog?.failures ?? [],
-    status: loading ? "loading" : failure ? "error" : "ready",
-    pending: null,
-    error: failure || null
-  }), [catalog, current, model, loading, failure]);
-  const directory = (0, import_react49.useMemo)(() => ({ subscribe: noSubscription, getSnapshot: () => snapshot }), [snapshot]);
-  async function select(next) {
-    if (!onChange) return;
-    if (next.provider !== current?.provider || next.model !== current?.model) {
-      const chosen = snapshot.groups.find((group) => group.id === next.provider)?.models.find((item) => item.id === next.model);
-      if (!chosen) return;
-      const defaultEffort = chosen.reasoning?.defaultEffort;
-      if (defaultEffort && next.reasoningEffort === void 0) next = { ...next, reasoningEffort: defaultEffort };
-    }
-    onChange(next);
-    return { ok: true };
-  }
-  return /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-native-model-selection" }, /* @__PURE__ */ import_react49.default.createElement(
-    Component,
-    {
-      locked: !onChange,
-      available: true,
-      directory,
-      load: () => {
-        if (!loading) void onRefresh?.();
-      },
-      select,
-      t: seat.t,
-      resolveText: seat.resolveText,
-      renderSlot: renderDraftModelLabel
-    }
-  ), !loading && (failure || !snapshot.groups.length) && onOpenSettings && /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", size: "compact", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"));
-}
-function ModelSelection({ catalog, selection: selection2, onChange, onRefresh, onOpenSettings, loading = false, error, compact = false, nativeSeat, frozen = false }) {
-  const id2 = (0, import_react49.useId)();
-  const NativeComponent = (0, import_react49.useSyncExternalStore)(nativeSeat?.subscribe ?? noSubscription, nativeSeat?.getSnapshot ?? noSnapshot, noSnapshot);
-  let normalized = null;
-  let catalogError = "";
-  if (catalog) {
-    try {
-      normalized = normalizeModelCatalog(catalog);
-    } catch (cause) {
-      catalogError = cause.message;
-    }
-  }
-  const groups = normalized?.groups || [];
-  const current = selection2 || normalized?.default;
-  const provider = groups.find((group) => group.id === current?.provider);
-  const model = provider?.models.find((item) => item.id === current?.model);
-  const efforts = model?.reasoning?.efforts || [];
-  const unavailable = Boolean(current && !model);
-  const failure = error?.message || (typeof error === "string" ? error : "") || catalogError;
-  const effortLabel = current?.reasoningEffort ? EFFORT_LABELS[current.reasoningEffort] || current.reasoningEffort : "\u9ED8\u8BA4";
-  if (NativeComponent && frozen) {
-    return /* @__PURE__ */ import_react49.default.createElement("span", { className: "wcc-model-selection-state", title: "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A" }, model?.name || current?.model, " \xB7 ", effortLabel, " \xB7 \u5DF2\u9501\u5B9A");
-  }
-  if (NativeComponent) {
-    return /* @__PURE__ */ import_react49.default.createElement(
-      NativeModelSelection,
-      {
-        Component: NativeComponent,
-        seat: nativeSeat,
-        catalog: normalized,
-        current,
-        model,
-        loading,
-        failure,
-        onChange,
-        onRefresh,
-        onOpenSettings
-      }
-    );
-  }
-  const disabled = loading || !groups.length || typeof onChange !== "function";
-  function chooseModel(group, nextModel) {
-    if (!group || !nextModel) return;
-    const next = { provider: group.id, model: nextModel.id };
-    if (nextModel.reasoning?.defaultEffort) next.reasoningEffort = nextModel.reasoning.defaultEffort;
-    onChange?.(next);
-  }
-  const fields = /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-model-selection-heading" }, /* @__PURE__ */ import_react49.default.createElement("span", null, "\u521B\u4F5C\u6A21\u578B"), /* @__PURE__ */ import_react49.default.createElement("div", null, onRefresh && /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onRefresh, disabled: loading, "aria-label": "\u5237\u65B0\u6A21\u578B\u76EE\u5F55" }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), onOpenSettings && /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", onClick: onOpenSettings }, "\u6A21\u578B\u8BBE\u7F6E"))), /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-model-selection-fields" }, /* @__PURE__ */ import_react49.default.createElement("label", { htmlFor: `${id2}-provider` }, "\u63D0\u4F9B\u5546", /* @__PURE__ */ import_react49.default.createElement("select", { id: `${id2}-provider`, "aria-label": "\u6A21\u578B\u63D0\u4F9B\u5546", value: current?.provider || "", disabled, onChange: (event) => {
-    const next = groups.find((group) => group.id === event.target.value);
-    chooseModel(next, next?.models[0]);
-  } }, !current && /* @__PURE__ */ import_react49.default.createElement("option", { value: "" }, loading ? "\u6B63\u5728\u8BFB\u53D6\u2026" : "\u9009\u62E9\u63D0\u4F9B\u5546"), current && !provider && /* @__PURE__ */ import_react49.default.createElement("option", { value: current.provider, disabled: true }, current.provider, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), groups.map((group) => /* @__PURE__ */ import_react49.default.createElement("option", { key: group.id, value: group.id }, group.name)))), /* @__PURE__ */ import_react49.default.createElement("label", { htmlFor: `${id2}-model` }, "\u6A21\u578B", /* @__PURE__ */ import_react49.default.createElement("select", { id: `${id2}-model`, "aria-label": "\u521B\u4F5C\u6A21\u578B", value: current?.model || "", disabled: disabled || !provider, onChange: (event) => chooseModel(provider, provider?.models.find((item) => item.id === event.target.value)) }, !current && /* @__PURE__ */ import_react49.default.createElement("option", { value: "" }, "\u9009\u62E9\u6A21\u578B"), current && !model && /* @__PURE__ */ import_react49.default.createElement("option", { value: current.model, disabled: true }, current.model, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), provider?.models.map((item) => /* @__PURE__ */ import_react49.default.createElement("option", { key: item.id, value: item.id }, item.name)))), (efforts.length > 0 || current?.reasoningEffort) && /* @__PURE__ */ import_react49.default.createElement("label", { htmlFor: `${id2}-effort` }, "\u63A8\u7406\u7B49\u7EA7", /* @__PURE__ */ import_react49.default.createElement("select", { id: `${id2}-effort`, "aria-label": "\u6A21\u578B\u63A8\u7406\u7B49\u7EA7", disabled: disabled || !model, value: current?.reasoningEffort || "", onChange: (event) => {
-    const next = { provider: current.provider, model: current.model };
-    if (event.target.value) next.reasoningEffort = event.target.value;
-    onChange?.(next);
-  } }, /* @__PURE__ */ import_react49.default.createElement("option", { value: "" }, "\u6A21\u578B\u9ED8\u8BA4"), current?.reasoningEffort && !efforts.some((item) => item.id === current.reasoningEffort) && /* @__PURE__ */ import_react49.default.createElement("option", { value: current.reasoningEffort, disabled: true }, current.reasoningEffort, "\uFF08\u5F53\u524D\u4E0D\u53EF\u7528\uFF09"), efforts.map((item) => /* @__PURE__ */ import_react49.default.createElement("option", { key: item.id, value: item.id }, EFFORT_LABELS[item.id] || item.name))))), /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-model-selection-hint" }, "\u7528\u4E8E\u4E4B\u540E\u53D1\u8D77\u7684\u521B\u4F5C\uFF1B\u5DF2\u6709\u4EFB\u52A1\u7EE7\u7EED\u4F7F\u7528\u521B\u5EFA\u65F6\u7684\u6A21\u578B\u3002"));
-  const modelLabel = loading ? "\u8BFB\u53D6\u6A21\u578B\u2026" : model?.name || current?.model || "\u9009\u62E9\u6A21\u578B";
-  const modelState = failure ? "\u52A0\u8F7D\u5931\u8D25" : !loading && !groups.length ? "\u672A\u914D\u7F6E" : unavailable ? "\u4E0D\u53EF\u7528" : normalized?.failures.length ? "\u90E8\u5206\u4E0D\u53EF\u7528" : "";
-  const diagnostics = /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, failure && /* @__PURE__ */ import_react49.default.createElement(UserError, { className: "wcc-model-selection-error", error: failure }), !loading && !failure && !groups.length && /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u5C1A\u65E0\u53EF\u7528\u6A21\u578B\uFF0C\u8BF7\u6253\u5F00\u6A21\u578B\u8BBE\u7F6E\u6DFB\u52A0\u63D0\u4F9B\u5546\u3002"), unavailable && (groups.length > 0 || !compact) && /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-model-selection-error", role: "status" }, "\u8FD9\u4E2A\u6A21\u578B\u76EE\u524D\u4E0D\u53EF\u7528\u3002\u8BF7\u68C0\u67E5\u8FDE\u63A5\u8BBE\u7F6E\uFF0C\u6216\u4E3A\u65B0\u4EFB\u52A1\u9009\u62E9\u5176\u4ED6\u6A21\u578B\u3002"), normalized?.failures.map((item, index2) => /* @__PURE__ */ import_react49.default.createElement("p", { className: "wcc-model-selection-error", key: `${item.id}-${index2}`, role: "status" }, item.name, "\uFF1A", item.message)));
-  return /* @__PURE__ */ import_react49.default.createElement("section", { className: `wcc-model-selection${compact ? " is-compact" : ""}`, "aria-label": "\u521B\u4F5C\u6A21\u578B", "aria-busy": loading }, compact ? /* @__PURE__ */ import_react49.default.createElement("details", { className: "wcc-model-selection-disclosure", onKeyDown: (event) => {
-    if (event.key === "Escape" && event.currentTarget.open) {
-      event.preventDefault();
-      event.stopPropagation();
-      event.currentTarget.open = false;
-      event.currentTarget.querySelector("summary")?.focus();
-    }
-  } }, /* @__PURE__ */ import_react49.default.createElement("summary", { "aria-label": [`\u521B\u4F5C\u6A21\u578B\uFF1A${modelLabel}`, effortLabel, modelState].filter(Boolean).join(" \xB7 "), title: [provider?.name || current?.provider, modelLabel, `\u63A8\u7406\uFF1A${effortLabel}`, !onChange && "\u539F\u4EFB\u52A1\u6A21\u578B\u5DF2\u9501\u5B9A"].filter(Boolean).join(" \xB7 ") }, /* @__PURE__ */ import_react49.default.createElement("span", { className: "wcc-model-selection-current" }, modelLabel), /* @__PURE__ */ import_react49.default.createElement("span", { className: "wcc-model-selection-effort" }, "\xB7 ", effortLabel), modelState && /* @__PURE__ */ import_react49.default.createElement("span", { className: "wcc-model-selection-state" }, modelState), !onChange && current && /* @__PURE__ */ import_react49.default.createElement("span", { className: "wcc-model-selection-state" }, "\u5DF2\u9501\u5B9A"), /* @__PURE__ */ import_react49.default.createElement("span", { className: "wcc-model-selection-chevron", "aria-hidden": "true" }, "\u2304")), /* @__PURE__ */ import_react49.default.createElement("div", { className: "wcc-model-selection-expanded" }, fields, diagnostics)) : /* @__PURE__ */ import_react49.default.createElement(import_react49.default.Fragment, null, fields, diagnostics));
+    )), /* @__PURE__ */ import_react49.default.createElement("details", null, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u67E5\u770B\u540D\u79F0\u4E0E\u6765\u6E90"), /* @__PURE__ */ import_react49.default.createElement("code", null, "/", skill.name), skill.path && /* @__PURE__ */ import_react49.default.createElement("code", null, skill.path), /* @__PURE__ */ import_react49.default.createElement("small", null, skill.origin || "\u672C\u673A\u6682\u672A\u627E\u5230"))))), !entries.length && /* @__PURE__ */ import_react49.default.createElement("p", null, loading ? "\u6B63\u5728\u8BFB\u53D6\u672C\u673A\u6280\u80FD\u2026" : search ? "\u6CA1\u627E\u5230\u76F8\u5173\u6280\u80FD\uFF0C\u6362\u4E2A\u5173\u952E\u8BCD\u8BD5\u8BD5\u3002" : "\u8FD8\u6CA1\u6709\u53EF\u7528\u6280\u80FD\u3002\u6DFB\u52A0\u5B58\u653E\u6280\u80FD\u7684\u6587\u4EF6\u5939\u540E\u518D\u8BD5\u3002")), /* @__PURE__ */ import_react49.default.createElement("details", { className: "wcc-skill-folders" }, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u6280\u80FD\u6587\u4EF6\u5939 \xB7 \u81EA\u52A8\u53D1\u73B0\u4E0E\u81EA\u5B9A\u4E49"), /* @__PURE__ */ import_react49.default.createElement("p", null, "\u81EA\u52A8\u8BFB\u53D6\u5DF2\u5B58\u5728\u7684\u5E38\u89C1\u76EE\u5F55\uFF0C\u5E76\u4FDD\u7559 DSH \u7684\u9879\u76EE\u6280\u80FD\u6765\u6E90\u3002"), (catalog?.automaticDirectories || []).map((directory) => /* @__PURE__ */ import_react49.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react49.default.createElement("code", null, directory), /* @__PURE__ */ import_react49.default.createElement("small", null, "\u81EA\u52A8\u53D1\u73B0"))), settings.directories.map((directory) => /* @__PURE__ */ import_react49.default.createElement("div", { key: directory }, /* @__PURE__ */ import_react49.default.createElement("code", null, directory), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, "aria-label": `\u79FB\u9664\u6280\u80FD\u76EE\u5F55 ${directory}`, onClick: () => void change(() => onSave({ ...settings, directories: settings.directories.filter((item) => item !== directory) }), "\u5DF2\u79FB\u9664\u5173\u8054\uFF0C\u539F\u6587\u4EF6\u4FDD\u7559\u3002").catch(() => {
+    }) }, "\u79FB\u9664\u5173\u8054"))), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: busy, onClick: () => setFolderOpen(true) }, "\u6DFB\u52A0\u6280\u80FD\u6587\u4EF6\u5939")), !!catalog?.warnings?.length && /* @__PURE__ */ import_react49.default.createElement("details", { className: "wcc-skill-settings-warnings" }, /* @__PURE__ */ import_react49.default.createElement("summary", null, "\u6765\u6E90\u63D0\u793A \xB7 ", catalog.warnings.length, " \u9879"), /* @__PURE__ */ import_react49.default.createElement("ul", null, catalog.warnings.map((warning, index2) => /* @__PURE__ */ import_react49.default.createElement("li", { key: index2 }, warning)))), (localError || error) && /* @__PURE__ */ import_react49.default.createElement(UserError, { className: "wcc-skill-settings-error", error: localError || error })),
+    /* @__PURE__ */ import_react49.default.createElement(DialogFooter, null, /* @__PURE__ */ import_react49.default.createElement("span", { role: "status" }, notice || "\u66F4\u6539\u81EA\u52A8\u4FDD\u5B58"), /* @__PURE__ */ import_react49.default.createElement(UiButton, { variant: "quiet", type: "button", disabled: saving, onClick: onClose }, "\u5B8C\u6210"))
+  ), open && folderOpen && /* @__PURE__ */ import_react49.default.createElement(ProjectPicker, { purpose: "skill", currentProject: { path: settings.directories[0] || catalog?.automaticDirectories?.[0] }, browseDirectory, onOpenProject: addDirectory, onClose: () => setFolderOpen(false), busy: saving }));
 }
 
 // src/task-input-summary.jsx
@@ -55174,6 +55209,12 @@ function CanvasContent({
           requirement,
           selected: agentSelection.current,
           cardId: assistantCardId,
+          nativeModelSeat,
+          modelCatalog,
+          modelLoading,
+          modelError,
+          onRefreshModels,
+          onOpenModelSettings,
           request,
           renderConversation: renderEditorConversation,
           canvasActions: agentActions,
@@ -57365,7 +57406,7 @@ function ProjectWeChatDialog({ projectId, canvasId, request, onClose }) {
   } }, /* @__PURE__ */ import_react66.default.createElement("form", { onSubmit: (event) => {
     event.preventDefault();
     if (phase === "pin" && pin) void change("pin", { pairingId: state.pairingId, pin });
-  } }, /* @__PURE__ */ import_react66.default.createElement(DialogHeader, { title: "\u5FAE\u4FE1\u9879\u76EE\u52A9\u624B", titleId, onClose }), /* @__PURE__ */ import_react66.default.createElement(DialogBody, null, /* @__PURE__ */ import_react66.default.createElement("p", { className: phase === "scan" ? "wtt-wechat-scan" : void 0, role: "status" }, labels2[phase] || (error ? "\u65E0\u6CD5\u83B7\u53D6\u4E8C\u7EF4\u7801" : "\u6B63\u5728\u83B7\u53D6\u4E8C\u7EF4\u7801\u2026")), qr.image && /* @__PURE__ */ import_react66.default.createElement("img", { className: "wtt-wechat-qr", src: qr.image, alt: "\u5FAE\u4FE1\u626B\u7801\u7ED1\u5B9A\u4E8C\u7EF4\u7801" }), phase === "pin" && /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u624B\u673A\u5FAE\u4FE1\u6821\u9A8C\u7801"), /* @__PURE__ */ import_react66.default.createElement(
+  } }, /* @__PURE__ */ import_react66.default.createElement(DialogHeader, { title: projectAgentWeChatTitle, titleId, onClose }), /* @__PURE__ */ import_react66.default.createElement(DialogBody, null, /* @__PURE__ */ import_react66.default.createElement("p", { className: phase === "scan" ? "wtt-wechat-scan" : void 0, role: "status" }, labels2[phase] || (error ? "\u65E0\u6CD5\u83B7\u53D6\u4E8C\u7EF4\u7801" : "\u6B63\u5728\u83B7\u53D6\u4E8C\u7EF4\u7801\u2026")), qr.image && /* @__PURE__ */ import_react66.default.createElement("img", { className: "wtt-wechat-qr", src: qr.image, alt: "\u5FAE\u4FE1\u626B\u7801\u7ED1\u5B9A\u4E8C\u7EF4\u7801" }), phase === "pin" && /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u624B\u673A\u5FAE\u4FE1\u6821\u9A8C\u7801"), /* @__PURE__ */ import_react66.default.createElement(
     "input",
     {
       autoFocus: true,
@@ -57377,7 +57418,7 @@ function ProjectWeChatDialog({ projectId, canvasId, request, onClose }) {
       onChange: (event) => setPin(event.target.value.replace(/[^0-9]/g, "")),
       disabled: busy
     }
-  )), (phase === "connecting" || phase === "online") && /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-muted" }, "\u5728\u5FAE\u4FE1\u91CC\u6253\u5F00 ClawBot\uFF0C\u8BF4\u4E00\u53E5\u300C\u4F60\u597D\u300D\u3002"), visibleError && /* @__PURE__ */ import_react66.default.createElement(UserError, { error: visibleError }), state?.bound && !pairing && /* @__PURE__ */ import_react66.default.createElement("details", { className: "wtt-wechat-settings" }, /* @__PURE__ */ import_react66.default.createElement("summary", null, "\u8FDE\u63A5\u8BBE\u7F6E"), /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u5FAE\u4FE1\u65B0\u5EFA\u9879\u76EE\u7684\u5B58\u653E\u76EE\u5F55"), /* @__PURE__ */ import_react66.default.createElement("select", { className: "wtt-select", value: parent, disabled: busy, onChange: (event) => setParent(event.target.value) }, state.projects.map((project) => /* @__PURE__ */ import_react66.default.createElement("option", { key: project.id, value: project.id }, project.name))), selected2 && /* @__PURE__ */ import_react66.default.createElement("small", { className: "wtt-muted wtt-wechat-path", title: selected2.path }, selected2.path)), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-wechat-actions" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { disabled: busy, onClick: () => void change("disconnect", {}) }, "\u65AD\u5F00\u5FAE\u4FE1"), canSave && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", disabled: busy, onClick: () => void change("parent", { parentProjectId: parent }) }, "\u4FDD\u5B58\u76EE\u5F55")))), (canPair || phase === "pin") && /* @__PURE__ */ import_react66.default.createElement(DialogFooter, null, canPair && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", disabled: busy, onClick: () => void change("pair", { canvasId: openingCanvas.current, refresh: Boolean(qr.error) }) }, busy ? "\u6B63\u5728\u83B7\u53D6\u2026" : "\u83B7\u53D6\u4E8C\u7EF4\u7801"), phase === "pin" && /* @__PURE__ */ import_react66.default.createElement(UiButton, { type: "submit", variant: "primary", disabled: busy || !pin }, "\u63D0\u4EA4\u6821\u9A8C\u7801"))));
+  )), (phase === "connecting" || phase === "online") && /* @__PURE__ */ import_react66.default.createElement("p", { className: "wtt-muted" }, "\u5728\u5FAE\u4FE1\u91CC\u6253\u5F00 ClawBot\uFF0C\u8BF4\u4E00\u53E5\u300C", projectAgentName, "\uFF0C\u4F60\u597D\u300D\u3002"), visibleError && /* @__PURE__ */ import_react66.default.createElement(UserError, { error: visibleError }), state?.bound && !pairing && /* @__PURE__ */ import_react66.default.createElement("details", { className: "wtt-wechat-settings" }, /* @__PURE__ */ import_react66.default.createElement("summary", null, "\u8FDE\u63A5\u8BBE\u7F6E"), /* @__PURE__ */ import_react66.default.createElement("label", { className: "wtt-field" }, /* @__PURE__ */ import_react66.default.createElement("span", null, "\u5FAE\u4FE1\u65B0\u5EFA\u9879\u76EE\u7684\u5B58\u653E\u76EE\u5F55"), /* @__PURE__ */ import_react66.default.createElement("select", { className: "wtt-select", value: parent, disabled: busy, onChange: (event) => setParent(event.target.value) }, state.projects.map((project) => /* @__PURE__ */ import_react66.default.createElement("option", { key: project.id, value: project.id }, project.name))), selected2 && /* @__PURE__ */ import_react66.default.createElement("small", { className: "wtt-muted wtt-wechat-path", title: selected2.path }, selected2.path)), /* @__PURE__ */ import_react66.default.createElement("div", { className: "wtt-wechat-actions" }, /* @__PURE__ */ import_react66.default.createElement(UiButton, { disabled: busy, onClick: () => void change("disconnect", {}) }, "\u65AD\u5F00\u5FAE\u4FE1"), canSave && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", disabled: busy, onClick: () => void change("parent", { parentProjectId: parent }) }, "\u4FDD\u5B58\u76EE\u5F55")))), (canPair || phase === "pin") && /* @__PURE__ */ import_react66.default.createElement(DialogFooter, null, canPair && /* @__PURE__ */ import_react66.default.createElement(UiButton, { variant: "primary", disabled: busy, onClick: () => void change("pair", { canvasId: openingCanvas.current, refresh: Boolean(qr.error) }) }, busy ? "\u6B63\u5728\u83B7\u53D6\u2026" : "\u83B7\u53D6\u4E8C\u7EF4\u7801"), phase === "pin" && /* @__PURE__ */ import_react66.default.createElement(UiButton, { type: "submit", variant: "primary", disabled: busy || !pin }, "\u63D0\u4EA4\u6821\u9A8C\u7801"))));
 }
 
 // src/client.jsx
@@ -57484,7 +57525,7 @@ function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, select
     /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       onWeChat();
-    } }, "\u5FAE\u4FE1\u9879\u76EE\u52A9\u624B"),
+    } }, projectAgentWeChatTitle),
     notificationChannel?.permission === "default" && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "custom", type: "button", role: "menuitem", onClick: () => {
       setMenuOpen(false);
       void notificationChannel.requestPermission().catch((error) => console.warn("DSH \u684C\u9762\u901A\u77E5\u6388\u6743\u5931\u8D25", error));
@@ -58044,7 +58085,7 @@ function WorkbenchPage({
     setFormError("");
     setShowNew(true);
   }, onList: showList, onRefresh: () => load(), onRename: showRename, onBackground: showBackground, onSyncDeliverables: syncDeliverables, onModelSettings: onOpenModelSettings, onWeChat: () => setShowWeChat(true), notificationChannel: desktopTaskNotices?.channel });
-  return /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-layout" }, filesOpen && /* @__PURE__ */ import_react67.default.createElement(ProjectExplorer, { onChanged: fileTreeChanged, clipboard: fileClipboard, setClipboard: setFileClipboard, onOrganized: fileOrganizationChanged, refreshSignal: fileRefresh, onRecycle: () => setRecycleRequest(crypto.randomUUID()), project, request, active, onClose: () => setFilesOpen(false), onChooseProject, onOpenProject, onPreview: previewProjectFile, previewPath: projectFileSelection?.path, revealRequest: fileRevealRequest, onAdd: addProjectFile, canAdd: view === "canvas" && Boolean(selected2) }), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-main" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: `wtt-course-workbench ${view === "canvas" ? "wtt-canvas-mode" : ""}` }, view === "canvas" && !selected2 && projectBar, view !== "canvas" && /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, /* @__PURE__ */ import_react67.default.createElement("header", { className: "wtt-page-heading" }, /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement("h1", null, "WTT \u521B\u4F5C\u5DE5\u4F5C\u53F0"), !filesOpen && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", onClick: () => setFilesOpen(true), "aria-label": "\u6253\u5F00\u6587\u4EF6\u680F" }, "\u6253\u5F00\u6587\u4EF6\u680F")), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-heading-actions" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", onClick: () => setShowWeChat(true) }, "\u5FAE\u4FE1\u9879\u76EE\u52A9\u624B"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", onClick: () => load(), disabled: loading || Boolean(busy) }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: !workspace || Boolean(busy), onClick: () => {
+  return /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-layout" }, filesOpen && /* @__PURE__ */ import_react67.default.createElement(ProjectExplorer, { onChanged: fileTreeChanged, clipboard: fileClipboard, setClipboard: setFileClipboard, onOrganized: fileOrganizationChanged, refreshSignal: fileRefresh, onRecycle: () => setRecycleRequest(crypto.randomUUID()), project, request, active, onClose: () => setFilesOpen(false), onChooseProject, onOpenProject, onPreview: previewProjectFile, previewPath: projectFileSelection?.path, revealRequest: fileRevealRequest, onAdd: addProjectFile, canAdd: view === "canvas" && Boolean(selected2) }), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-project-main" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: `wtt-course-workbench ${view === "canvas" ? "wtt-canvas-mode" : ""}` }, view === "canvas" && !selected2 && projectBar, view !== "canvas" && /* @__PURE__ */ import_react67.default.createElement(import_react67.default.Fragment, null, /* @__PURE__ */ import_react67.default.createElement("header", { className: "wtt-page-heading" }, /* @__PURE__ */ import_react67.default.createElement("div", null, /* @__PURE__ */ import_react67.default.createElement("h1", null, "WTT \u521B\u4F5C\u5DE5\u4F5C\u53F0"), !filesOpen && /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", onClick: () => setFilesOpen(true), "aria-label": "\u6253\u5F00\u6587\u4EF6\u680F" }, "\u6253\u5F00\u6587\u4EF6\u680F")), /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-heading-actions" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", onClick: () => setShowWeChat(true) }, projectAgentWeChatTitle), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button wtt-button-text", onClick: () => load(), disabled: loading || Boolean(busy) }, loading ? "\u8BFB\u53D6\u4E2D\u2026" : "\u5237\u65B0"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "primary", className: "wtt-button wtt-button-primary", disabled: !workspace || Boolean(busy), onClick: () => {
     setFormError("");
     setShowNew(true);
   } }, "\u65B0\u5EFA\u753B\u5E03"))), workspace && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-view-toolbar" }, /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-view-toggle", "aria-label": "\u5DE5\u4F5C\u53F0\u89C6\u56FE" }, /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", "aria-pressed": view === "canvas", onClick: () => setView("canvas") }, "\u81EA\u7531\u753B\u5E03"), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", "aria-pressed": view === "list", onClick: showList }, "\u5217\u8868\u7F16\u8F91")))), view === "canvas" && deliverableFeedback && /* @__PURE__ */ import_react67.default.createElement("div", { className: `wtt-deliverable-feedback is-${deliverableFeedback.status}`, role: deliverableFeedback.status === "failed" ? "alert" : "status" }, /* @__PURE__ */ import_react67.default.createElement("span", null, deliverableFeedback.text), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "ghost", size: "compact", type: "button", "aria-label": "\u5173\u95ED\u6587\u4EF6\u6574\u7406\u63D0\u793A", onClick: () => setDeliverableFeedback(null) }, "\xD7")), loadError && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-feedback wtt-feedback-error", role: "alert" }, /* @__PURE__ */ import_react67.default.createElement(UserError, { error: loadError, announce: false }), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", onClick: () => load(!workspace), disabled: loading }, "\u91CD\u65B0\u8BFB\u53D6")), modelError && /* @__PURE__ */ import_react67.default.createElement("div", { className: "wtt-feedback wtt-feedback-error wtt-model-feedback", role: "alert" }, /* @__PURE__ */ import_react67.default.createElement(UserError, { error: modelError, announce: false }), /* @__PURE__ */ import_react67.default.createElement(UiButton, { variant: "quiet", className: "wtt-button", onClick: onRefreshModels, disabled: modelLoading }, "\u5237\u65B0\u6A21\u578B")), view === "canvas" && selected2 && /* @__PURE__ */ import_react67.default.createElement(

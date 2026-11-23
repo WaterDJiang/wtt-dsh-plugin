@@ -2,6 +2,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { DialogBody, DialogFooter, DialogHeader, UiButton } from './ui/controls.jsx';
 import { UserError } from './user-feedback.jsx';
+import { projectAgentName, projectAgentWeChatTitle } from './project-agent-name.mjs';
 
 const labels={unbound:'微信未连接',preparing:'正在获取二维码…',scan:'用微信扫一扫',scanned:'请在手机微信上确认',
   pin:'微信需要验证',connecting:'微信已绑定',online:'微信已连接',expired:'微信授权已过期',
@@ -68,7 +69,7 @@ export function ProjectWeChatDialog({ projectId, canvasId, request, onClose }) {
     event.preventDefault();onClose();
   }}>
     <form onSubmit={event=>{event.preventDefault();if(phase==='pin'&&pin)void change('pin',{pairingId:state.pairingId,pin});}}>
-      <DialogHeader title="微信项目助手" titleId={titleId} onClose={onClose}/>
+      <DialogHeader title={projectAgentWeChatTitle} titleId={titleId} onClose={onClose}/>
       <DialogBody>
         <p className={phase==='scan'?'wtt-wechat-scan':undefined} role="status">
           {labels[phase]||(error?'无法获取二维码':'正在获取二维码…')}
@@ -78,7 +79,7 @@ export function ProjectWeChatDialog({ projectId, canvasId, request, onClose }) {
           <input autoFocus type="password" inputMode="numeric" autoComplete="one-time-code" maxLength={10} value={pin}
             onChange={event=>setPin(event.target.value.replace(/[^0-9]/g,''))} disabled={busy}/>
         </label>}
-        {(phase==='connecting'||phase==='online')&&<p className="wtt-muted">在微信里打开 ClawBot，说一句「你好」。</p>}
+        {(phase==='connecting'||phase==='online')&&<p className="wtt-muted">在微信里打开 ClawBot，说一句「{projectAgentName}，你好」。</p>}
         {visibleError&&<UserError error={visibleError}/>}
         {state?.bound&&!pairing&&<details className="wtt-wechat-settings">
           <summary>连接设置</summary>

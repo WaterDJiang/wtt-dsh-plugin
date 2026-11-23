@@ -2,6 +2,7 @@ import { realpath } from 'node:fs/promises';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { projectAgents } from './project-agent-host.mjs';
+import { projectAgentName } from './project-agent-name.mjs';
 import { resultReviewSource } from './project-result-review.mjs';
 import { ProjectRegistry } from './project-registry.mjs';
 import { ProjectWeChat } from './project-wechat.mjs';
@@ -91,7 +92,7 @@ export function apply(ctx, config = {}) {
   }
   coordinators = projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskControl});
   function requireNativeTask(service,taskId){
-    if(service.tasks.get(taskId).input.projectExecutor==='codex')throw Error('请在项目助手控制此 Codex 步骤');
+    if(service.tasks.get(taskId).input.projectExecutor==='codex')throw Error('请在'+projectAgentName+'处理此 Codex 步骤');
   }
   ctx.effect(() => () => coordinators.close());
   const wechat = new ProjectWeChat(ctx,projects,coordinators);

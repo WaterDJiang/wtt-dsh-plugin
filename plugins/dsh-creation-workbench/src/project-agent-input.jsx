@@ -3,6 +3,7 @@ import {CanvasConversationReferenceContext,ProjectInputContext} from './conversa
 import {UiButton, UiIcon} from './ui/controls.jsx';
 import {CanvasPopover} from './ui/canvas-popover.jsx';
 import {skillSearchText} from './skill-presentation.mjs';
+import {projectAgentName} from './project-agent-name.mjs';
 
 const TOKEN='/项目';
 const noop=()=>{};
@@ -75,7 +76,7 @@ export function projectInputBridge(ctx){
   const claim=(id,frozen)=>({name:'项目',token:TOKEN+' ',hint:'交代任务或询问项目进展',attachments:true,
     async submit(text,_actx,attachments){
       const owner=owners.get(id);
-      if(!owner&&!frozen)throw Error('请重新打开项目助手后发送');
+      if(!owner&&!frozen)throw Error('请重新打开'+projectAgentName+'后发送');
       const done=owner?.current.submitting?.();
       try {
         const turn=frozen||await owner.current.freeze(id,text);
@@ -104,7 +105,7 @@ export function projectInputBridge(ctx){
     if(!result.ok)throw Error(result.error?.message||'技能目录暂时无法读取');
     return result.value.skills;
   },source:{trigger:'/',name:'wtt-project-agent',order:3,showGroupTitle:false,
-    async candidates({sessionId},{query,position}){return owners.has(sessionId)&&position==='leading'&&'项目'.includes(query)?[{name:'项目',label:'WTT 项目助手'}]:[];},
+    async candidates({sessionId},{query,position}){return owners.has(sessionId)&&position==='leading'&&'项目'.includes(query)?[{name:'项目',label:projectAgentName}]:[];},
     onPick(){return {text:TOKEN+' ',continue:true};},lexicon:()=>['项目'],
     matchSpace({sessionId},token){if(owners.has(sessionId)&&token===TOKEN)return {claim:claim(sessionId)};},
     async matchClaim({sessionId},token){if(owners.has(sessionId)&&token===TOKEN)return claim(sessionId);},
@@ -244,7 +245,7 @@ export function ProjectInputDock({sessionId,useInput,inputActions,bridge}){
     }catch(error){owner.showError(error.message);}
   }
   const expanded=Boolean(visibleSkillMenu||nativeSkillsOpen(controller));
-  return <div ref={tools} className="wtt-agent-input-tools" aria-label="WTT 项目助手输入工具">
+  return <div ref={tools} className="wtt-agent-input-tools" aria-label={projectAgentName+'输入工具'}>
     <div className="wtt-agent-input-actions">
       <UiButton ref={skillButton} size="compact" variant="ghost" disabled={locked} aria-label="技能" aria-expanded={expanded}
         onMouseDown={event=>event.preventDefault()} onClick={openSkillMenu}>

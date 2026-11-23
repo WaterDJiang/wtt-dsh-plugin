@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { ProjectMemory } from './project-memory.mjs';
+import { projectAgentName } from './project-agent-name.mjs';
 import { ProjectResultReview, readReceipts } from './project-result-review.mjs';
 import { normalizeModelSelection } from './model-selection.mjs';
 import { extractSkillNames } from './skill-commands.mjs';
@@ -22,6 +23,10 @@ function limitSourceContent(sources) {
     remaining-=size;
     return size===text.length?source:{...source,content:text.slice(0,size),noteTruncated:'正文超过本次上下文上限，以下仅为节选；未包含的内容需按路径进一步读取'};
   });
+}
+
+function hashScope(value) {
+  return createHash('sha256').update(json(value)).digest('hex');
 }
 
 export class ProjectAgent {
@@ -55,7 +60,7 @@ export class ProjectAgent {
     if(replace!==undefined && replace!==current)throw Error('项目会话已更新，请重新打开助手');
     if(this.opening)return this.opening;
     if(replace===undefined && current)return {sessionId:current};
-    if(current && this.host.sessionRunning?.(current))throw Error('项目助手正在回复，请等本轮结束后再新建对话');
+    if(current && this.host.sessionRunning?.(current))throw Error(projectAgentName+'正在回复，请等本轮结束后再新建对话');
     this.opening=(async()=>{
       const id=await this.host.createSession(this.service);
       this.db.prepare('INSERT OR IGNORE INTO pa_owned_sessions VALUES(?)').run(id);
@@ -123,7 +128,7 @@ export class ProjectAgent {
     if(prior){
       const saved=parse(prior.data);
       if(saved.sessionId!==sessionId||saved.requirementId!==requirementId||saved.mode!==mode||saved.text!==text||saved.origin!==origin||refs.length)
-        throw Error('项目助手请求标识已使用');
+        throw Error(projectAgentName+'的请求标识已使用');
       return {id};
     }
     const sources=limitSourceContent(this.freezeByCanvas(refs,requirementId));
@@ -138,7 +143,7 @@ export class ProjectAgent {
     const context={turnId:requestId,mode:turn.mode,canvas:{id:turn.requirementId,title:this.canvas(turn.requirementId).title},sources:turn.sources.map(summary)};
     if(turn.skills?.length)context.skills=turn.skills;
     if(turn.origin==='wechat')context.origin='微信';
-    return '[工作台发送现场] '+json(context)+'\n你是这个项目的画布助手。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。需要验收的步骤用 acceptance 声明可核对的条件、最少成果数。选择特定模型或外部执行者前用 context 查询可用路线。发送现场的 skills 是用户为本轮调用的技能。委托步骤需要其中的技能时，在该步骤 instruction 中用独立的 /技能名 标明，使原任务也加载该技能。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
+    return '[工作台发送现场] '+json(context)+'\n你叫'+projectAgentName+'，是 WTT 项目助手。使用 workbench_project，通过 context 查委托、有效设定及相关日志，必要时用 cards 找其他画布的卡、read-card 查指定版本节选，search 可按画布／版本筛选，evidence 用 eventId 读日志原文。生成成果用 plan 提交步骤，追加交付或更改尚未派发的范围用 amend。需要验收的步骤用 acceptance 声明可核对的条件、最少成果数。选择特定模型或外部执行者前用 context 查询可用路线。发送现场的 skills 是用户为本轮调用的技能。委托步骤需要其中的技能时，在该步骤 instruction 中用独立的 /技能名 标明，使原任务也加载该技能。按真实回执报告结果。多份匹配先请用户选择。用 suggest 提请用户保存长期设定，log 记录事实和原因。暂停和停止可调用对应工具。等待任务时说明进度，无须循环查询。';
   }
   steps(id){return this.db.prepare('SELECT * FROM pa_steps WHERE plan_id=? ORDER BY seq').all(id).map(r=>({...r,data:parse(r.data),receipt:r.receipt?parse(r.receipt):null}));}
   waitingConsumers(step){
@@ -239,9 +244,14 @@ export class ProjectAgent {
     this.memory.event(randomUUID(),'任务交接',current.title,`已采用 V${number}`,{planId:current.planId,taskId,cardId,versionId});
     return read();
   }
-  approvalToken(id){
+  planStepsToken(id){
     const ids=this.db.prepare('SELECT id FROM pa_steps WHERE plan_id=? ORDER BY seq').all(id);
-    return createHash('sha256').update(json(ids)).digest('hex');
+    return hashScope(ids);
+  }
+  approvalToken(id,steps=this.steps(id),change=this.change(id)){
+    const scope=steps.map(({id,data})=>data.modelSelection ? {id,modelSelection:data.modelSelection} : {id});
+    const proposedModels=change?.data.map(step=>step.modelSelection??null);
+    return hashScope(proposedModels?.some(Boolean) ? [scope,change.id,proposedModels] : scope);
   }
   pendingEvents(){
     const rows=this.db.prepare(`SELECT p.id AS planId,p.state AS planState,s.id,s.state,s.authorized,s.interaction,s.task_id AS taskId,s.error,s.handoff
@@ -304,17 +314,19 @@ export class ProjectAgent {
   planView(plan){
     const describe=d=>({title:d.title,instruction:d.instruction,target:this.db.prepare('SELECT title FROM requirements WHERE id=?').get(d.requirementId)?.title||'已移除的画布',requirementId:d.requirementId,type:d.type,refs:d.sources.map(summary),deps:d.deps,
       executor:d.executor||'dsh',modelSelection:d.modelSelection,acceptance:d.acceptance});
-    const change=this.change(plan.id);
-    return {...plan,scopeToken:this.approvalToken(plan.id),change:change&&{id:change.id,start:change.start,steps:change.data.map(describe)},
-      steps:this.steps(plan.id).map(s=>{
+    const change=this.change(plan.id),steps=this.steps(plan.id);
+    const active=!['done','stopped','stopping'].includes(plan.state);
+    return {...plan,scopeToken:this.approvalToken(plan.id,steps,change),change:change&&{id:change.id,start:change.start,
+      steps:change.data.map(step=>({...describe(step),modelEditable:active&&step.executor!=='codex'}))},
+      steps:steps.map(s=>{
         const binding=s.task_id?this.service.cards.binding(s.task_id):null;
         const receipts=readReceipts(s);
         const cardId=binding?.outputCardId||s.receipt?.cardId;
-        const active=!['done','stopped','stopping'].includes(plan.state);
         const consumers=cardId&&active&&(s.handoff||s.receipt)?this.waitingConsumers(s):[];
         const choice=cardId&&active&&(s.handoff||consumers.length||s.state==='review-waiting')
           ? [cardId,...receipts.filter(card=>card.cardId!==cardId).map(card=>card.cardId)].map(card=>this.versionChoice({...s,card_id:card})).find(Boolean):null;
         return {id:s.id,...describe(s.data),state:s.state,authorized:!!s.authorized,error:s.error,interaction:s.interaction,
+          modelEditable:active&&this.canSelectModel(s,change),
           taskId:s.task_id,outputCardId:cardId,receipt:s.receipt,receipts,handoff:active&&Boolean(s.handoff),choice,consumers,
           resultReviewId:s.result_review_id,resultReview:this.results.view(s.result_review_id),revisionCount:s.revision_count,revising:Boolean(s.revision_task),
           canRecheck:s.state==='blocked'&&(!s.task_id||Boolean(this.db.prepare("SELECT 1 FROM course_tasks WHERE id=? AND status='draft'").get(s.task_id)))};
@@ -356,6 +368,31 @@ export class ProjectAgent {
   }
   started(step){
     return step.task_id||this.db.prepare("SELECT 1 FROM operations WHERE id=? AND kind='create-task'").get(step.operation_id||step.id);
+  }
+  canSelectModel(step,change){
+    return step.data.executor!=='codex'&&step.state==='ready'&&!step.authorized&&!step.handoff&&!step.revision_task
+      &&(!change||step.seq<change.start)&&!this.started(step);
+  }
+  async selectStepModel({id,stepId,changeId,changeIndex,scopeToken,modelSelection:value}){
+    if(value===undefined)throw Error('请选择要保存的模型');
+    const modelSelection=normalizeModelSelection(value);
+    if(modelSelection)await this.host.validateModel(modelSelection);
+    if(this.service.store.closed)throw Error('项目已关闭，请重新打开计划');
+    const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(id);
+    if(!plan||!['approval','running','paused'].includes(plan.state))throw Error('此委托已无法更换模型');
+    const steps=this.steps(id),change=this.change(id);
+    if(this.approvalToken(id,steps,change)!==scopeToken)throw Error('计划已更新，请刷新后重新选择模型');
+    if(changeId){
+      const proposed=Number.isInteger(changeIndex)&&change?.id===changeId&&change.data[changeIndex];
+      if(!proposed||proposed.executor==='codex')throw Error('此变更步骤已无法更换模型');
+      change.data[changeIndex]={...proposed,modelSelection};
+      this.db.prepare('UPDATE pa_changes SET data=? WHERE id=?').run(json(change.data),change.id);
+    }else{
+      const step=steps.find(item=>item.id===stepId);
+      if(!step||!this.canSelectModel(step,change))throw Error('此步骤已授权或派发，无法更换模型');
+      this.db.prepare('UPDATE pa_steps SET data=? WHERE id=?').run(json({...step.data,modelSelection}),step.id);
+    }
+    return {saved:true};
   }
   amend(turnId,data,turn){
     const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(data.planId||'');
@@ -478,15 +515,17 @@ export class ProjectAgent {
       return current;
     }
     if(['use-version','keep-version'].includes(command))return this.chooseVersion(input);
+    if(command==='select-step-model')return this.selectStepModel(input);
     const plan=this.db.prepare('SELECT * FROM pa_plans WHERE id=?').get(id);
     if(!plan||['done','stopped'].includes(plan.state))throw Error('委托已结束或不存在');
     if(plan.state==='stopping'&&command!=='stop')throw Error('正在核对原任务停止状态');
     const setState=s=>this.db.prepare('UPDATE pa_plans SET state=? WHERE id=?').run(s,id);
     const steps=this.steps(id);
-    if(command==='approve-plan' && this.approvalToken(id)!==scopeToken)throw Error('批准范围已变化，请刷新后核对计划');
+    if(['approve-plan','approve-step','accept-change'].includes(command) && this.approvalToken(id,steps)!==scopeToken)
+      throw Error('批准范围已变化，请刷新后核对计划');
     if(['review-again','accept-result'].includes(command)){
       const next=steps.find(s=>s.state!=='done'||s.handoff);
-      if(next?.id!==stepId||next.result_review_id!==input.resultReviewId||this.approvalToken(id)!==scopeToken)
+      if(next?.id!==stepId||next.result_review_id!==input.resultReviewId||this.approvalToken(id,steps)!==scopeToken)
         throw Error('本次验收已变化，请刷新后重新核对');
       if(command==='accept-result')this.results.acceptManually(next,plan);
       else this.results.retry(next,plan);

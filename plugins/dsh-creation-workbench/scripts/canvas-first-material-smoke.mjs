@@ -15,10 +15,10 @@ export async function checkFirstMaterial(page, workspace, api) {
     await page.screenshot({path:path.join(directory, name+'.png')});
   };
   await canvas.locator('.wcc-first-material').getByRole('button',{name:'添加素材',exact:true}).waitFor();
-  const assistant = action('打开WTT 项目助手');
+  const assistant = action('打开小瓦');
   const emptyPosition = await assistant.boundingBox();
   await assistant.click();
-  await action('收起WTT 项目助手').click();
+  await action('收起小瓦').click();
   assert.equal(await assistant.evaluate(el => el === document.activeElement), true);
   const picker = page.getByLabel('选择素材文件');
   await picker.setInputFiles({ name:'采访笔记.exe', mimeType:'application/octet-stream', buffer:Buffer.from('sample') });

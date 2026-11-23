@@ -63,7 +63,7 @@ export class ProjectResultReview {
     const sessionId = data.sessionId || this.db.prepare('SELECT session_id FROM pa_turns WHERE id=?').get(step.plan_id)?.session_id;
     if (!sessionId) throw Error('无法找到委托的原助手会话');
     this.db.prepare("INSERT INTO pa_result_reviews(id,step_id,task_id,session_id,scope_token,state) VALUES(?,?,?,?,?,'pending')")
-      .run(id,step.id,step.task_id,sessionId,this.runner.approvalToken(step.plan_id));
+      .run(id,step.id,step.task_id,sessionId,this.runner.planStepsToken(step.plan_id));
     return id;
   }
 
@@ -79,7 +79,7 @@ export class ProjectResultReview {
     const row = this.row(id);
     return row && row.session_id === sessionId && row.plan_state === 'running' && row.step_state === 'checking' &&
       !row.handoff && row.authorized && row.task_id === row.current_task &&
-      ['pending','running'].includes(row.state) && this.runner.approvalToken(row.plan_id) === row.scope_token ? row : null;
+      ['pending','running'].includes(row.state) && this.runner.planStepsToken(row.plan_id) === row.scope_token ? row : null;
   }
 
   evidence(row,{allowKept=false}={}) {
