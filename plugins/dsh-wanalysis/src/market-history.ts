@@ -58,12 +58,18 @@ async function eastmoneyWindow(symbol:string,prior:Prior,signal?:AbortSignal){
 }
 
 async function tencentWindow(symbol:string, adjust:string, prior:ReturnType<typeof parseMarketSnapshotV1>|undefined, signal?:AbortSignal) {
-  const url = new URL('https://web.ifzq.gtimg.cn/appstock/app/fqkline/get');
-  url.searchParams.set('param',[symbol,'day','','','640',adjust].join(','));
-  const stock = (await json(url,signal)).data?.[symbol];
-  const quote = stock?.qt?.[symbol];
-  const rows = stock?.[adjust+'day'];
-  if (!Array.isArray(rows) || !rows.length || quote?.[2]!==symbol.slice(2)) throw Error('历史源未返回该股票日线');
+  async function history(endpoint:string){
+    const url=new URL('https://web.ifzq.gtimg.cn/appstock/app/'+endpoint+'/get');
+    url.searchParams.set('param',[symbol,'day','','','640',adjust].join(','));
+    const stock=(await json(url,signal)).data?.[symbol];
+    const quote=stock?.qt?.[symbol],rows=stock?.[adjust+'day'];
+    if(!Array.isArray(rows)||!rows.length||quote?.[2]!==symbol.slice(2))throw Error('历史源未返回该股票日线');
+    return {quote,rows};
+  }
+  const {quote,rows}=await history('newfqkline').catch(error=>{
+    if(signal?.aborted||error.status===429)throw error;
+    return history('fqkline');
+  });
   const aux = new URL('https://q.stock.sohu.com/hisHq');
   aux.search = new URLSearchParams({code:'cn_'+symbol.slice(2),start:String(rows[0][0]).replaceAll('-',''),end:String(rows.at(-1)[0]).replaceAll('-',''),stat:'0',order:'A',period:'d',rt:'json'}).toString();
   const supplemental = await json(aux,signal).catch(error=>{

@@ -166,6 +166,32 @@ export class MarketDatabase {
     return typeof row?.json === 'string' ? parseStockContext(JSON.parse(row.json), symbol) : undefined;
   }
 
+  freshForViewing(symbol:string,adjust:Adjustment,now=new Date()){
+    const snapshot=this.read(symbol,adjust,1);
+    if(!snapshot)return false;
+    const fetched=Date.parse(snapshot.fetchedAt), time=now.getTime();
+    if(!Number.isFinite(fetched) || fetched>time)return false;
+    const day=new Date(time+8*3600000).toISOString().slice(0,10);
+    const close=Date.parse(day+'T07:05:00Z');
+    if(time>=close){
+      if(fetched<close)return false;
+      if(snapshot.asOf===day && snapshot.quality.missingFields.length===0)return true;
+    }
+    return time-fetched<5*60000;
+  }
+
+  watchQuotes(symbols:string[]){
+    return symbols.flatMap(symbol=>{
+      const snapshot=this.read(symbol,'qfq',2);
+      if(!snapshot)return [];
+      const last=snapshot.bars.at(-1)!,previous=snapshot.bars.at(-2)?.close;
+      const change=last.close!=null && previous!=null ? last.close-previous : null;
+      return [{symbol,code:snapshot.code,name:snapshot.name,price:last.close,change,
+        changePercent:change!=null && previous ? change/previous*100 : null,
+        amount:last.amount,volume:last.volume}];
+    });
+  }
+
   reusableForBatch(now = new Date()) {
     // Shanghai has a fixed UTC+8 offset. Never skip intraday bars or infer a holiday.
     const day = new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 10);
