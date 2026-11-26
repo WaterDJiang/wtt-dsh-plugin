@@ -3,7 +3,7 @@ import {stockDirectory} from './market-history';
 
 type Stock = {symbol:string;name:string};
 
-export function bulkSync(sync:(symbol:string,signal:AbortSignal)=>Promise<unknown>, reusable:()=>Set<string>) {
+export function bulkSync(sync:(symbol:string,signal:AbortSignal)=>Promise<unknown>, reusable:()=>Promise<Set<string>>, favorites:()=>string[]) {
   let task:AbortController|undefined;
   let queue:Stock[]=[];
   let failed:Stock[]=[];
@@ -17,11 +17,14 @@ export function bulkSync(sync:(symbol:string,signal:AbortSignal)=>Promise<unknow
       if(!resume){
         const directory=await stockDirectory(signal);
         signal.throwIfAborted();
-        const current=reusable();
+        const current=await reusable();
+        signal.throwIfAborted();
         queue=directory.filter(stock=>!current.has(stock.symbol));
         state.skipped=directory.length-queue.length;
         state.done=state.skipped;
       }
+      const rank=new Map(favorites().map((symbol,index)=>[symbol,index]));
+      queue.sort((a,b)=>(rank.get(a.symbol)??rank.size)-(rank.get(b.symbol)??rank.size));
       state.total=state.done+queue.length;
       let consecutive=0, nextStart=0;
       const active=new Set<string>();

@@ -1,6 +1,6 @@
 {
   "name": "@wtt/dsh-wanalysis",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "在 DeepSeek Harness 查看 A 股日周线、指标和归档财务，将单股或全市场行情同步到本机 SQLite。",
   "type": "module",
   "engines": {

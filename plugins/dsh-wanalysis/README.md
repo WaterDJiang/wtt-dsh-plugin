@@ -67,7 +67,7 @@ npm pack --ignore-scripts
 将生成的 `.tgz` 复制到目标电脑。在安装包所在目录执行下方命令（文件名以实际生成的为准）。Web 版将 `desktop` 换为 `web`。
 
 ```sh
-dsh plugin --profile desktop add "$PWD/wtt-dsh-wanalysis-0.5.3.tgz"
+dsh plugin --profile desktop add "$PWD/wtt-dsh-wanalysis-0.5.4.tgz"
 ```
 
 ### 安装后第一次打开
