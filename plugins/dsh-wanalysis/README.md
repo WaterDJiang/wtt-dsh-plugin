@@ -8,25 +8,71 @@
 
 ## 安装到 DSH
 
-| 安装入口 | 操作 |
-| --- | --- |
-| 社区插件市场 | 收录后，在 DSH 的插件市场搜索 **WTT 股票分析** 并安装。 |
-| 自定义市场 | 在「插件 → 发现」添加下方索引地址，刷新后安装。 |
-| GitHub | 在「插件 → 添加插件 → 安装第三方插件」粘贴下方安装串。 |
+第一次安装，直接使用 **方式一**。已经在 DSH 添加过 WTT 创作工作台索引的用户，可以直接用 **方式二** 搜索股票分析。两者安装同一个公开插件，任选一种即可。
 
-**自定义市场索引**
+### 方式一 · DSH 官方桌面入口
 
-```text
-https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json
-```
-
-**GitHub 安装串**
+打开 **插件 → 添加插件 → 安装第三方插件**，粘贴整行并确认安装：
 
 ```text
 github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-wanalysis
 ```
 
-安装后按宿主提示重启，点左侧小瓦图标 **WTT 股票分析**。插件自带预构建组件。首次打开会在当前 DSH 配置下创建行情库；已有 Wanalysis v3 库的用户可点页面顶部的路径切换。
+末尾的 `plugins/dsh-wanalysis` 指定股票分析子包。同一个 GitHub 仓库也提供创作工作台。
+
+### 方式二 · DSH 官方「发现」
+
+在 **插件 → 实验性插件** 中启用 **自定义插件索引**（部分版本称「自定义插件市场」）。进入 **发现 → 添加索引源**，粘贴：
+
+```text
+https://raw.githubusercontent.com/WaterDJiang/wtt-dsh-plugin/main/market/index.json
+```
+
+刷新后搜索 **WTT 股票分析**，点开详情，选择兼容版本并安装。已经添加过 WTT 索引时只需刷新。同一个索引内的两个插件可以分别安装、更新。[DSH 官方插件索引指南](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/plugin-market.zh.md)
+
+### 方式三 · 社区插件市场 dshmarket
+
+在已安装 dshmarket 的 DSH 中打开 **插件 → 插件市场**。社区收录并同步到所用目录后，搜索 **WTT 股票分析** 即可安装。暂时搜不到时，可以直接使用方式一或二。[查看社区收录进度](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/19113)
+
+### 方式四 · DSH 官方命令行
+
+桌面版先打开一次 DeepSeek Harness 以初始化配置，再完全退出应用。执行以下命令后重新打开桌面版：
+
+```sh
+dsh plugin --profile desktop add 'github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-wanalysis'
+```
+
+使用 DSH Web 版时，安装到 Web 配置：
+
+```sh
+dsh plugin --profile web add 'github:WaterDJiang/wtt-dsh-plugin#path:/plugins/dsh-wanalysis'
+```
+
+要精确复现某个版本，可从市场索引的股票分析条目取该版本的 `source.commit`。例如公开版 0.5.2 对应以下安装串，在方式一或 CLI 均可使用：
+
+```text
+github:WaterDJiang/wtt-dsh-plugin#93ab8b850e3f870984578c29a377c5c06ebc739d&path:/plugins/dsh-wanalysis
+```
+
+### 方式五 · 从本地安装包安装
+
+公开仓已经包含构建产物。有 Git 和 npm 的机器可以从股票子目录打包：
+
+```sh
+git clone --depth 1 https://github.com/WaterDJiang/wtt-dsh-plugin.git
+cd wtt-dsh-plugin/plugins/dsh-wanalysis
+npm pack --ignore-scripts
+```
+
+将生成的 `.tgz` 复制到目标电脑。在安装包所在目录执行下方命令（文件名以实际生成的为准）。Web 版将 `desktop` 换为 `web`。
+
+```sh
+dsh plugin --profile desktop add "$PWD/wtt-dsh-wanalysis-0.5.2.tgz"
+```
+
+### 安装后第一次打开
+
+按宿主提示完成加载或重启，从左侧栏进入 **WTT 股票分析**。首次打开会在当前 DSH 配置下创建本机行情库。已有 Wanalysis v3 行情库的用户可点击顶部路径选回原文件。搜索 **000001 平安银行**，点 **更新数据库 → 同步这只股票**，即可查看本机日线。
 
 ## 用平安银行试一次
 

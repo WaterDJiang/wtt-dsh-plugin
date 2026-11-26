@@ -5,7 +5,7 @@
 | [WTT 创作工作台](plugins/dsh-creation-workbench/) | 用 AI 画布组织项目、资料和创作成果 |
 | [WTT 股票分析](plugins/dsh-wanalysis/) | 在本机 SQLite 看 A 股行情、试算指标、查看归档财务 |
 
-两个插件可以分别安装。[WTT 插件市场索引](market/index.json)
+两个插件可以分别安装。[WTT 插件市场索引](market/index.json) · [股票分析安装指南（DSH 桌面入口、发现、社区市场、CLI、本地包）](https://github.com/WaterDJiang/wtt-dsh-plugin/tree/main/plugins/dsh-wanalysis#安装到-dsh)
 
 ## WTT 创作工作台
 
