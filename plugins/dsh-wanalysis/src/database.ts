@@ -166,6 +166,39 @@ export class MarketDatabase {
     return typeof row?.json === 'string' ? parseStockContext(JSON.parse(row.json), symbol) : undefined;
   }
 
+  reusableForBatch(now = new Date()) {
+    // Shanghai has a fixed UTC+8 offset. Never skip intraday bars or infer a holiday.
+    const day = new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 10);
+    const cutoff = day + 'T07:05:00.000Z';
+    const prices = new Set<string>();
+    const complete = new Set<string>();
+    if (now.toISOString() < cutoff) return {day, prices, complete};
+    const midnight = new Date(day + 'T00:00:00+08:00').toISOString();
+    const rows = this.db.prepare(`
+      SELECT s.symbol, s.members,
+        (c.fetched>=? AND CASE WHEN json_valid(c.json) THEN json_extract(c.json,'$.finance.status') END IN ('valid','partial')) AS has_finance
+      FROM snapshots s LEFT JOIN contexts c ON c.symbol=s.symbol
+      WHERE s.adj='qfq' AND s.last_date=? AND s.fetched>=?
+      ORDER BY s.symbol, s.fetched DESC
+    `).all(midnight, day, cutoff);
+    const completeBar = this.db.prepare(`
+      SELECT 1 FROM bars WHERE id=? AND symbol=? AND adj='qfq' AND date=?
+        AND volume IS NOT NULL AND amount IS NOT NULL AND turnoverRate IS NOT NULL
+    `);
+    let previousSymbol = '';
+    for (const row of rows) {
+      const symbol = String(row.symbol);
+      if (symbol === previousSymbol) continue;
+      previousSymbol = symbol;
+      const lastId = snapshotIds(row.members as Uint8Array).at(-1);
+      if (lastId && completeBar.get(lastId, symbol, day)) {
+        prices.add(symbol);
+        if (row.has_finance) complete.add(symbol);
+      }
+    }
+    return {day, prices, complete};
+  }
+
   coverage() {
     return this.db.prepare("SELECT max(last_date) AS asOf,count(DISTINCT symbol) AS symbols FROM snapshots WHERE adj='qfq'").get();
   }

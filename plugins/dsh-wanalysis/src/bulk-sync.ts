@@ -1,41 +1,78 @@
 import {setTimeout as delay} from 'node:timers/promises';
 import {stockDirectory} from './market-history';
 
-export function bulkSync(sync:(symbol:string,signal:AbortSignal)=>Promise<unknown>) {
+type Stock = {symbol:string;name:string};
+
+export function bulkSync(sync:(symbol:string,signal:AbortSignal)=>Promise<unknown>, reusable:()=>Set<string>) {
   let task:AbortController|undefined;
-  let queue:{symbol:string;name:string}[]=[];
-  let failed:{symbol:string;name:string}[]=[];
-  let state={phase:'idle',total:0,done:0,failed:0,current:'',error:''};
+  let queue:Stock[]=[];
+  let failed:Stock[]=[];
+  const initial=()=>({phase:'idle',total:0,done:0,failed:0,skipped:0,current:'',error:''});
+  let state=initial();
   const status=()=>({...state});
+
   async function run(controller:AbortController,resume:boolean) {
+    const {signal}=controller;
     try {
-      if(!resume) queue=await stockDirectory(controller.signal);
-      if(controller.signal.aborted)return;
-      state.total=state.done+queue.length;
-      let consecutive=0;
-      while(queue.length && !controller.signal.aborted){
-        const stock=queue[0]!;
-        state.current=stock.name+' '+stock.symbol;
-        try {await sync(stock.symbol,controller.signal);consecutive=0}
-        catch(e){
-          if(controller.signal.aborted)break;
-          state.error=state.current+'：'+e.message;
-          if(e.status===429 || ++consecutive>=3){state.phase='paused';return}
-          failed.push(stock);state.failed++;
-        }
-        queue.shift();state.done++;
-        await delay(300,undefined,{signal:controller.signal});
+      if(!resume){
+        const directory=await stockDirectory(signal);
+        signal.throwIfAborted();
+        const current=reusable();
+        queue=directory.filter(stock=>!current.has(stock.symbol));
+        state.skipped=directory.length-queue.length;
+        state.done=state.skipped;
       }
-      if(!controller.signal.aborted)state.phase=failed.length?'partial':'complete';
-    } catch(e){if(!controller.signal.aborted){state.error=e.message;state.phase='error'}}
-    finally{if(controller.signal.aborted)state.phase='paused';task=undefined}
+      state.total=state.done+queue.length;
+      let consecutive=0, nextStart=0;
+      const active=new Set<string>();
+      async function worker(){
+        while(queue.length && !signal.aborted){
+          // Share a launch cadence across all workers; fast replies cannot flood the provider.
+          const start=Math.max(performance.now(),nextStart);
+          nextStart=start+150;
+          await delay(Math.max(0,start-performance.now()),undefined,{signal}).catch(()=>{});
+          if(signal.aborted)return;
+          const stock=queue.shift();
+          if(!stock)return;
+          const label=stock.name+' '+stock.symbol;
+          active.add(label);
+          state.current=[...active].join('、');
+          try {
+            await sync(stock.symbol,signal);
+            consecutive=0;
+          } catch(e){
+            if(signal.aborted){queue.push(stock);return}
+            state.error=label+'：'+e.message;
+            if(e.status===429 || ++consecutive>=3){
+              queue.unshift(stock);
+              controller.abort();
+              return;
+            }
+            failed.push(stock);
+            state.failed++;
+          } finally {
+            active.delete(label);
+            state.current=[...active].join('、');
+          }
+          state.done++;
+        }
+      }
+      await Promise.all(Array.from({length:Math.min(3,queue.length)},worker));
+      state.phase=failed.length?'partial':'complete';
+    } catch(e){
+      if(!signal.aborted){state.error=e.message;state.phase=e.status===429?'paused':'error'}
+    } finally {
+      if(signal.aborted)state.phase='paused';
+      task=undefined;
+    }
   }
   return {status,stop(){task?.abort();return status()},start(){
     if(task)return status();
     let resume=state.phase==='paused' && queue.length>0;
     if(state.phase==='partial'){queue=failed;failed=[];state.done-=state.failed;state.failed=0;resume=true}
-    if(!resume){queue=[];failed=[];state={phase:'idle',total:0,done:0,failed:0,current:'',error:''}}
-    task=new AbortController();state.phase='running';state.error='';
+    if(!resume){queue=[];failed=[];state=initial()}
+    state.error='';
+    task=new AbortController();state.phase='running';
     void run(task,resume);return status();
   }};
 }
