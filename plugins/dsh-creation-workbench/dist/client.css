@@ -425,6 +425,11 @@
 .wtt-course-workbench .wtt-page-heading {
   margin-bottom: 25px;
 }
+.wtt-course-workbench .wtt-page-heading h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .wtt-course-workbench .wtt-page-heading > div:first-child {
   min-width: 0;
 }
@@ -1049,10 +1054,9 @@
   gap: 12px;
   color: var(--wtt-muted);
 }
-.wtt-course-workbench .wtt-page-empty > svg {
+.wtt-course-workbench .wtt-page-empty > img {
   width: 31px;
   height: 31px;
-  color: var(--wtt-ui-muted, #8a94a8);
   margin-bottom: 4px;
 }
 .wtt-course-workbench .wtt-page-empty h2 {

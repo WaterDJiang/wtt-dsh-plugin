@@ -27,7 +27,7 @@ export function readProjectPrompt(events, requestId) {
 
 export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskControl}) {
   const runners=new Map(),owners=new Map();
-  const codex=new ProjectCodexExecutor();
+  const codex=new ProjectCodexExecutor(()=>getService('subprocess'));
   let closed=false;
   const getService=name=>ctx.get?.(name)||ctx[name];
   const controller=name=>{const v=getService(name);if(!v)throw Error('当前 DSH 尚未加载 '+name);return v;};
@@ -90,7 +90,7 @@ export function projectAgents(ctx,projects,{catalogReady,verifyTaskSkills,taskCo
     },
     async routes(query) {
       const filter=typeof query==='string'?query.slice(0,120).toLowerCase():'';
-      const executors=[{id:'dsh',available:true},{id:'codex',available:Boolean(await findCodex()),type:'text',authorization:'确认后执行'}];
+      const executors=[{id:'dsh',available:true},{id:'codex',available:Boolean(getService('subprocess')?.spawn && await findCodex()),type:'text',authorization:'确认后执行'}];
       try{
         const catalog=normalizeModelCatalog(await controller('sessionController').modelCatalog());
         const models=catalog.groups.flatMap(group=>group.models.map(model=>({provider:group.id,model:model.id,name:model.name,

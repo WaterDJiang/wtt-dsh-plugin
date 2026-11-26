@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

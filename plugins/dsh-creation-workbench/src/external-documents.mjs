@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from './local-process.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import { deliverableName } from './deliverable-files.mjs';

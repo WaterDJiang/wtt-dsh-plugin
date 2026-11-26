@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from './local-process.mjs';
 import { resolvePreviewFontDirectories, windowsOfficeExecutable } from './preview-environment.mjs';
 export function environmentCheck(service) {
   const checks = [];

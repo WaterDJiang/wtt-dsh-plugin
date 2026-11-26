@@ -10,7 +10,7 @@ import {creationSource, usableCreationSource} from './creation-context.mjs';
 import {EFFORT_LABELS} from './model-selection.mjs';
 import {ModelSelection} from './model-selection.jsx';
 import {projectAgentName as assistantName} from './project-agent-name.mjs';
-import wattterAgentLogo from './assets/wattter-agent.png';
+import { XiaowaLogo } from './ui/xiaowa-logo.jsx';
 import './project-agent.css';
 
 const labels={auto:'全自动',plan:'先规划后执行',step:'逐项确认'};
@@ -311,7 +311,7 @@ export const ProjectAgentFloat=React.memo(function ProjectAgentFloat({notices,pr
     <ToolButton label={'打开'+assistantName} buttonRef={launcher} className={`wtt-agent-launch${open?' is-active':''}`}
       expanded={open} controlsId={open?panelId:undefined} description={[!open&&returnPlan?'返回刚才的委托':'',waiting>0?waiting+' 项待确认':''].filter(Boolean).join('。')||undefined}
       hint={!open&&returnPlan?'返回委托':undefined} onClick={openAssistant}>
-      <img src={wattterAgentLogo} alt="" draggable={false}/>
+      <XiaowaLogo />
       {!open&&returnPlan&&<span className="wtt-agent-return" aria-hidden="true">↩</span>}
       {waiting>0&&<span className="wtt-agent-badge" aria-hidden="true">{waiting}</span>}
     </ToolButton>

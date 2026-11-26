@@ -1,7 +1,7 @@
 import { projectTaskFingerprint } from './task-store.mjs';
 import { projectAgentName } from './project-agent-name.mjs';
 import { createHash } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from './local-process.mjs';
 import { existsSync, lstatSync, mkdirSync, realpathSync, readFileSync } from 'node:fs';
 import { access, link, mkdtemp, readFile, realpath, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -128,7 +128,7 @@ export class WorkbenchService {
   #pythonAvailable(key, args) {
     if (!this.productionChecks.has(key)) {
       const result = spawnSync(this.python, args, { encoding: 'utf8', timeout: 20_000,
-        env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } });
+        env: { PYTHONDONTWRITEBYTECODE: '1' } });
       this.productionChecks.set(key, result.status === 0 ? null
         : String(result.error?.message || result.stderr || result.stdout || `退出码 ${result.status}`).trim().slice(0, 1800));
     }

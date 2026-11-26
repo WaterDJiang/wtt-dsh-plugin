@@ -1,3 +1,4 @@
+import { XiaowaLogo } from './ui/xiaowa-logo.jsx'
 import {projectInputBridge, ProjectInputDock} from './project-agent-input.jsx'
 import { projectAgentWeChatTitle } from './project-agent-name.mjs'
 import { createDesktopTaskNotices, desktopTaskNotificationChannel } from './desktop-task-notices.mjs'
@@ -78,13 +79,6 @@ function formatTime(value) {
   return Number.isNaN(date.getTime()) ? '时间未记录' : new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date)
-}
-
-function BookIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 5.5C9 3.7 5.5 3.7 3 4.5v15c2.5-.8 6-.8 9 1 3-1.8 6.5-1.8 9-1v-15c-2.5-.8-6-.8-9 1Z" />
-    <path d="M12 5.5v15M6 8h3M15 8h3" />
-  </svg>
 }
 
 function CanvasProjectBar({ workspace, project, onToggleFiles, filesOpen, selectedId, busy, loading, onSelect, onNew, onAssets, onList, onRefresh, onRename, onModelSettings, onWeChat, onSyncDeliverables, onBackground, notificationChannel }) {
@@ -667,7 +661,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
     {view !== 'canvas' && <>
       <header className="wtt-page-heading">
       <div>
-        <h1>WTT 创作工作台</h1>
+        <h1><XiaowaLogo />WTT 创作工作台</h1>
         {!filesOpen&&<UiButton variant="ghost" onClick={()=>setFilesOpen(true)} aria-label="打开文件栏">打开文件栏</UiButton>}
       </div>
       <div className="wtt-heading-actions">
@@ -716,7 +710,7 @@ function WorkbenchPage({ project, active, onChooseProject, onOpenProject, onStar
       </aside>
 
       <main className="wtt-detail">
-        {!selected ? <div className="wtt-page-empty"><BookIcon /><h2>创建一张画布</h2><p>使用已有资料继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div> : <>
+        {!selected ? <div className="wtt-page-empty"><XiaowaLogo /><h2>创建一张画布</h2><p>使用已有资料继续创作。</p><UiButton variant="primary" className="wtt-button wtt-button-primary" onClick={() => setShowNew(true)}>新建画布</UiButton></div> : <>
           <div className="wtt-detail-heading">
             <div><h2>{selected.title}</h2><UiButton variant="quiet" className="wtt-button wtt-button-text" disabled={Boolean(busy)} onClick={showRename}>重命名画布</UiButton></div>
             <UiButton variant="primary" className="wtt-button wtt-button-primary" disabled={Boolean(busy)} onClick={startCourse}>{busy === 'prepare-course' ? '正在准备会话…' : '生成课程大纲'}</UiButton>
@@ -840,7 +834,7 @@ function ProjectWorkbench(props) {
   const project = registry?.projects.find(item => item.id === registry.activeProjectId)
   return <div className="wtt-project-workbench">
     {!registry && <div className="wtt-project-boot">
-      <BookIcon /><h1>WTT 创作工作台</h1>
+      <XiaowaLogo /><h1>WTT 创作工作台</h1>
       <p role={error ? 'alert' : 'status'}>{error || (loading ? '正在打开项目目录…' : '选择项目文件夹，开始创作。')}</p>
       {!loading && <div><UiButton variant="quiet" onClick={() => void loadProjects()}>重新读取</UiButton><UiButton variant="quiet" onClick={() => setPickerOpen(true)}>选择项目目录</UiButton></div>}
     </div>}
@@ -948,5 +942,5 @@ export function apply(ctx) {
     id: PANEL_ID,
     order: 10,
     label: 'WTT 创作工作台',
-  }, BookIcon))
+  }, XiaowaLogo))
 }

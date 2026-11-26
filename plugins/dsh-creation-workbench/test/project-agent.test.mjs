@@ -8,6 +8,19 @@ import {WorkbenchService} from '../src/service.mjs';
 import {ProjectAgent} from '../src/project-agent.mjs';
 import {ProjectCodexExecutor} from '../src/project-codex-executor.mjs';
 
+const localHost = await Promise.all([
+  import('../.runtime/host/node_modules/@deepseek-ai/cordis/lib/index.js'),
+  import('../.runtime/host/node_modules/@deepseek-ai/dsh-subprocess-local/lib/index.js'),
+]).catch(()=>null);
+async function codexExecutor(t) {
+  const [{Context},{LocalSubprocessRuntime}] = localHost;
+  const ctx = new Context();
+  const registration = ctx.plugin(LocalSubprocessRuntime);
+  await registration;
+  t.after(()=>registration.dispose());
+  return new ProjectCodexExecutor(()=>ctx.subprocess);
+}
+
 async function fixture(t,mode='plan'){
   const root=mkdtempSync(path.join(tmpdir(),'wtt-project-agent-'));
   let service=new WorkbenchService({workspaceRoot:root}),agent;
@@ -218,8 +231,8 @@ test('验收调整未派发步骤走原范围审批，Codex 在自动档仍需�
   assert.equal(f.agent.reviews(f.session).item.kind,'step');
 });
 
-test('Codex 缺失、首次启动围栏、失败与受理不明保留单次派发',async t=>{
-  const f=await fixture(t,'auto'), executor=new ProjectCodexExecutor();
+test('Codex 缺失、首次启动围栏、失败与受理不明保留单次派发',{skip:!localHost},async t=>{
+  const f=await fixture(t,'auto'), executor=await codexExecutor(t);
   const binary=path.join(f.root,'fake-codex');
   writeFileSync(binary,'#!/bin/sh\ncat >/dev/null\nexit 17\n',{mode:0o700});
   f.plan.steps[0].executor='codex';
@@ -254,12 +267,15 @@ test('Codex 缺失、首次启动围栏、失败与受理不明保留单次派�
   assert.equal(f.agent.plans()[0].state,'stopping');
 });
 
-test('只停止宿主拥有的 Codex 进程并保留任务记录',async t=>{
-  const f=await fixture(t,'auto'), executor=new ProjectCodexExecutor();
+test('只停止宿主拥有的 Codex 进程并保留任务记录',{skip:!localHost},async t=>{
+  const f=await fixture(t,'auto'), executor=await codexExecutor(t);
+  const previous = process.env.WTT_TEST_SECRET;
+  process.env.WTT_TEST_SECRET = 'synthetic-only';
+  t.after(()=>{ if(previous===undefined) delete process.env.WTT_TEST_SECRET; else process.env.WTT_TEST_SECRET=previous; });
   const marker=path.join(f.root,'started');
   const binary=path.join(f.root,'fake-codex');
   writeFileSync(binary,`#!/usr/bin/env node
-require('node:fs').writeFileSync(${JSON.stringify(marker)},'active');
+require('node:fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify({filtered:process.env.WTT_TEST_SECRET===undefined && process.env.OPENAI_API_KEY===undefined,args:process.argv.slice(2),cwd:process.cwd()}));
 process.stdin.resume();
 setInterval(()=>{},1000);
 `,{mode:0o700});
@@ -275,6 +291,9 @@ setInterval(()=>{},1000);
   const deadline=Date.now()+3000;
   while(!existsSync(marker)&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));
   assert(existsSync(marker));
+  const observed = JSON.parse(readFileSync(marker));
+  assert.equal(observed.filtered,true); assert.notEqual(observed.cwd,f.root);
+  assert(observed.args.includes('read-only') && observed.args.includes('shell_tool'));
   assert.equal(executor.state(f.service.tasks.get(taskId)).phase,'generating');
   await f.agent.control({id:f.turn.id,command:'stop'});
   assert.equal(executor.running(taskId),false);

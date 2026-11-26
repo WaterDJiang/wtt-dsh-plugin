@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from './local-process.mjs';
 import { existsSync, realpathSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -82,7 +82,7 @@ export class BaoyuRuntime {
     const runtime = this.resolve();
     return new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [runtime.script, ...args], { stdio: ['ignore', 'pipe', 'pipe'], signal,
-        env: { ...process.env, NODE_NO_WARNINGS: '1' } });
+        env: { NODE_NO_WARNINGS: '1' } });
       let stdout = '', stderr = '', limit = false;
       const collect = (kind, chunk) => {
         if (kind === 'out') stdout += chunk; else stderr += chunk;

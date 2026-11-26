@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,

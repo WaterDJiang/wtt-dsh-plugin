@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const excluded = new Set(['node_modules','.git','.wtt-workbench','.Trash','回收站','backup','exports']);
@@ -120,7 +120,7 @@ export class SvgDeckSources {
   run(args,input,timeout=60000) {
     if(this.closed)throw new Error('SVG编辑服务已关闭');
     return new Promise((resolve,reject)=>{
-      const child=spawn(this.service.python,[this.helper,...args],{cwd:this.root,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'},stdio:['pipe','pipe','pipe']});
+      const child=spawn(this.service.python,[this.helper,...args],{cwd:this.root,env:{PYTHONDONTWRITEBYTECODE:'1'},stdio:['pipe','pipe','pipe']});
       this.children.add(child);let stdout='',stderr='',error;
       const timer=setTimeout(()=>{error=new Error('SVG操作超过60秒');child.kill('SIGTERM');},timeout);
       child.stdout.on('data',c=>{stdout+=c;if(stdout.length>(args[0]==='preview'?64_000_000:10_000_000)){error=new Error('SVG输出过大');child.kill('SIGTERM');}});

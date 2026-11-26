@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { normalizeModelSelection } from './model-selection.mjs';
 import { constants, lstatSync, mkdirSync, openSync, closeSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -85,7 +85,7 @@ export class DeckEditor {
     this.#check();
     return new Promise((resolve, reject) => {
       const child = spawn(this.service.python, [this.helper, ...args], {
-        cwd: this.root, env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: this.root, env: { PYTHONDONTWRITEBYTECODE: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
       });
       this.children.add(child);
       let stdout = '', stderr = '', failure;

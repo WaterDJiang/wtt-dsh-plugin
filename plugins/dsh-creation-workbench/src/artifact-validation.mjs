@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

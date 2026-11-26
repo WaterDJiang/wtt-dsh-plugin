@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, lstat, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
@@ -10,9 +9,10 @@ const codexArgs = ['--disable','shell_tool','-a','never','-c','web_search="disab
   'exec','--ignore-user-config','--ephemeral','--skip-git-repo-check','--sandbox','read-only','--json','-'];
 const maxOutputBytes = 1024 * 1024;
 const maxRunMs = 240_000;
-const codexEnvironment = ['PATH','HOME','USER','LOGNAME','TMPDIR','LANG','LC_ALL','CODEX_HOME',
-  'XDG_CONFIG_HOME','XDG_CACHE_HOME','OPENAI_API_KEY','OPENAI_BASE_URL','HTTP_PROXY','HTTPS_PROXY','NO_PROXY',
-  'http_proxy','https_proxy','no_proxy','SSL_CERT_FILE','SSL_CERT_DIR'];
+// DSH scrubs credentials. Also suppress unrelated host variables without reading their values.
+const codexEnvironment = new Set(['PATH','HOME','USER','LOGNAME','TMPDIR','TMP','TEMP','LANG','LC_ALL','CODEX_HOME',
+  'XDG_CONFIG_HOME','XDG_CACHE_HOME','HTTP_PROXY','HTTPS_PROXY','NO_PROXY','SSL_CERT_FILE','SSL_CERT_DIR',
+  'SYSTEMROOT','WINDIR','USERPROFILE','LOCALAPPDATA','APPDATA','PATHEXT']);
 
 export async function findCodex() {
   const directories = [...new Set([...(process.env.PATH || '').split(path.delimiter),'/opt/homebrew/bin','/usr/local/bin'])];
@@ -28,49 +28,46 @@ export async function findCodex() {
   return null;
 }
 
-function runCodex(binary,cwd,prompt,signal) {
-  return new Promise((resolve,reject) => {
-    signal.throwIfAborted();
-    const env = Object.fromEntries(codexEnvironment.filter(key=>process.env[key]!==undefined).map(key=>[key,process.env[key]]));
-    const child = spawn(binary,codexArgs,{cwd,env,shell:false,stdio:['pipe','pipe','ignore']});
+async function runCodex(runtime,binary,cwd,prompt,signal) {
+  signal.throwIfAborted();
+  const controller = new AbortController();
+  const cancellation = AbortSignal.any([signal,controller.signal]);
+  const timeout = setTimeout(()=>controller.abort(Error('Codex 执行超过 4 分钟，已终止')),maxRunMs);
+  timeout.unref?.();
+  let child;
+  try {
+    const env = Object.fromEntries(Object.keys(process.env)
+      .filter(name=>!codexEnvironment.has(name.toUpperCase())).map(name=>[name,undefined]));
+    child = runtime.spawn({argv:[binary,...codexArgs],cwd,env,signal:cancellation,graceMs:3000,
+      stdio:{stdin:{data:prompt},stdout:'pipe',stderr:{maxBytes:1024}}});
     const chunks = [];
-    let bytes = 0, failure, hardStop;
-    const stop = error => {
-      if (failure) return;
-      failure = error;
-      child.kill('SIGTERM');
-      hardStop = setTimeout(()=>child.kill('SIGKILL'),3000);
-      hardStop.unref?.();
-    };
-    const abort = ()=>stop(signal.reason);
-    signal.addEventListener('abort',abort,{once:true});
-    const timeout = setTimeout(()=>stop(Error('Codex 执行超过 4 分钟，已终止')),maxRunMs);
-    timeout.unref?.();
-    child.once('error',error=>stop(Error('Codex 无法启动（'+(error.code||'进程错误')+'）')));
-    child.stdin.on('error',error=>stop(Error('Codex 未能读取任务（'+(error.code||'输入错误')+'）')));
-    child.stdout.on('data',chunk=>{
-      bytes += chunk.length;
-      if (bytes > maxOutputBytes) stop(Error('Codex 输出超过 1 MiB，已终止'));
-      else chunks.push(chunk);
-    });
-    child.once('close',(code,stoppedBy)=>{
-      clearTimeout(timeout);
-      clearTimeout(hardStop);
-      signal.removeEventListener('abort',abort);
-      if (failure || code!==0) return reject(failure || Error('Codex 执行失败（'+(stoppedBy||'退出码 '+code)+'）'));
-      try {
-        const events = Buffer.concat(chunks).toString('utf8').split('\n').filter(line=>line.trim()).map(line=>JSON.parse(line));
-        const text = events.findLast(event=>event.type==='item.completed' && event.item?.type==='agent_message')?.item?.text;
-        if (!events.some(event=>event.type==='turn.completed') || events.some(event=>event.type==='turn.failed') ||
-            typeof text!=='string' || !text.trim() || text.includes('\0') || Buffer.byteLength(text)>120_000)
-          throw Error('Codex 没有返回符合要求的 Markdown 报告');
-        resolve(text.trim()+'\n');
-      } catch (error) {
-        reject(error instanceof SyntaxError ? Error('Codex 返回了无法识别的 JSONL 执行回执') : error);
+    let bytes = 0;
+    const read = async () => {
+      for await (const chunk of child.stdout) {
+        bytes += chunk.length;
+        if (bytes > maxOutputBytes) throw Error('Codex 输出超过 1 MiB，已终止');
+        chunks.push(chunk);
       }
-    });
-    child.stdin.end(prompt);
-  });
+    };
+    const [outcome] = await Promise.all([child.done,read()]);
+    cancellation.throwIfAborted();
+    if (outcome.exitCode!==0) throw Error('Codex 执行失败（'+(outcome.signal||'退出码 '+outcome.exitCode)+'）');
+    let events;
+    try { events = Buffer.concat(chunks).toString('utf8').split('\n').filter(line=>line.trim()).map(line=>JSON.parse(line)); }
+    catch { throw Error('Codex 返回了无法识别的 JSONL 执行回执'); }
+    const text = events.findLast(event=>event.type==='item.completed' && event.item?.type==='agent_message')?.item?.text;
+    if (!events.some(event=>event.type==='turn.completed') || events.some(event=>event.type==='turn.failed') ||
+        typeof text!=='string' || !text.trim() || text.includes('\0') || Buffer.byteLength(text)>120_000)
+      throw Error('Codex 没有返回符合要求的 Markdown 报告');
+    return text.trim()+'\n';
+  } finally {
+    clearTimeout(timeout);
+    if (child) {
+      child.terminate();
+      await child.waitForExit();
+    }
+    cancellation.throwIfAborted();
+  }
 }
 
 function taskPrompt(input,step,revision) {
@@ -96,9 +93,10 @@ function taskPrompt(input,step,revision) {
 }
 
 export class ProjectCodexExecutor {
-  constructor() { this.runs = new Map(); }
+  constructor(getRuntime) { this.getRuntime = getRuntime; this.runs = new Map(); }
 
   async preflight() {
+    if (!this.getRuntime()?.spawn) throw Error('DSH 进程服务未启用，无法启动只读 Codex 步骤');
     const binary = await findCodex();
     if (!binary) throw Error('找不到 Codex CLI，安装后可重新核对此步骤');
     return binary;
@@ -129,7 +127,7 @@ export class ProjectCodexExecutor {
   async execute(service,task,prepared,step,binary,revision,signal) {
     const cwd = await mkdtemp(path.join(tmpdir(),'wtt-codex-'));
     try {
-      const result = await runCodex(binary,cwd,taskPrompt(task.input,step,revision),signal);
+      const result = await runCodex(this.getRuntime(),binary,cwd,taskPrompt(task.input,step,revision),signal);
       signal.throwIfAborted();
       if (service.store.closed) return;
       const relative = prepared.deliveryDirectory + '/codex-report.md';

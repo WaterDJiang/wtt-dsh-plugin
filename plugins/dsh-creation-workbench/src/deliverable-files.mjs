@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, linkSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const short = value => hash(String(value)).slice(0, 8);

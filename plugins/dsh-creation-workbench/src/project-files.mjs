@@ -1,6 +1,6 @@
 import { constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, closeSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { opendir, readdir } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { spawn } from './local-process.mjs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DocumentPreview} from './document-preview.mjs';

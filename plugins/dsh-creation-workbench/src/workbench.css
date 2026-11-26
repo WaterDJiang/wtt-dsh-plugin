@@ -45,6 +45,7 @@
 .wtt-course-workbench .wtt-list-heading,
 .wtt-course-workbench .wtt-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .wtt-course-workbench .wtt-page-heading { margin-bottom: 25px; }
+.wtt-course-workbench .wtt-page-heading h1 { display: flex; align-items: center; gap: 8px; }
 .wtt-course-workbench .wtt-page-heading > div:first-child { min-width: 0; }
 .wtt-course-workbench h1:where(:not(.wtt-native-conversation *):not(.wtt-native-editor-conversation *)) { font-size: 23px; line-height: 1.4; font-weight: 650; letter-spacing: -.4px; }
 .wtt-course-workbench .wtt-workspace-path { margin-top: 5px; color: var(--wtt-muted); font-size:var(--wtt-text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -143,7 +144,7 @@
 .wtt-course-workbench .wtt-feedback-error { color: var(--wtt-ui-danger, #a33436); background: var(--wtt-ui-danger-paper, #fff5f4); border-color: var(--wtt-ui-line, #f5dedb); }
 .wtt-course-workbench .wtt-feedback-success { color: var(--wtt-ui-success, #356552); background: var(--wtt-ui-canvas, #f2f8f5); border-color: var(--wtt-ui-line, #dcebe3); }
 .wtt-course-workbench .wtt-page-empty { display: flex; min-height: 420px; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 30px; gap: 12px; color: var(--wtt-muted); }
-.wtt-course-workbench .wtt-page-empty > svg { width: 31px; height: 31px; color: var(--wtt-ui-muted, #8a94a8); margin-bottom: 4px; }
+.wtt-course-workbench .wtt-page-empty > img { width: 31px; height: 31px; margin-bottom: 4px; }
 .wtt-course-workbench .wtt-page-empty h2 { font-size:var(--wtt-text-xl); font-weight: 550; color: var(--wtt-ui-text, #444c59); }
 .wtt-course-workbench .wtt-page-empty p { font-size:var(--wtt-text-md); margin-bottom: 5px; }
 .wtt-course-workbench .wtt-dialog { width: min(620px, calc(100vw - 40px)); max-height: calc(100vh - 48px); overflow: auto; padding: 25px 27px; border: 1px solid var(--wtt-line); border-radius: 10px; color: var(--wtt-ink); background: var(--wtt-ui-surface, #fff); box-shadow: 0 18px 75px var(--wtt-ui-shadow, #11182724); }
