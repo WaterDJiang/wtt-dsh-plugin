@@ -1,4 +1,13 @@
-# WTT 创作工作台
+# WTT DSH 插件
+
+| 插件 | 用途 |
+| --- | --- |
+| [WTT 创作工作台](plugins/dsh-creation-workbench/) | 用 AI 画布组织项目、资料和创作成果 |
+| [WTT 股票分析](plugins/dsh-wanalysis/) | 在本机 SQLite 看 A 股行情、试算指标、查看归档财务 |
+
+两个插件可以分别安装。[WTT 插件市场索引](market/index.json)
+
+## WTT 创作工作台
 
 ## 0.59.4-rc.1 候选版本
 

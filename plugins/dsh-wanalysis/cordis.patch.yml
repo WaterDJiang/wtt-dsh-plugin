@@ -1,0 +1,3 @@
+- insert:
+    - id: wtt-wanalysis
+      name: '@wtt/dsh-wanalysis'

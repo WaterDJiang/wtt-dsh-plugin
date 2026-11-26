@@ -1,0 +1,9 @@
+[
+  {
+    "id": "chip-concentration",
+    "name": "筹码集中度",
+    "placement": "pane",
+    "version": 2,
+    "source": "{筹码集中度副图（对齐 MOCKUP：白=C90 / 紫=C70 / 虚线=阈值 / 青柱=吸筹 / 箭头=买卖）}\nC90:(COST(95)-COST(5))/(COST(95)+COST(5))*100,COLORWHITE,LINETHICK2;\nC70:(COST(85)-COST(15))/(COST(85)+COST(15))*100,COLORMAGENTA,LINETHICK1;\n极品线:12,DOTLINE,COLORBLUE;\n风险线:20,DOTLINE,COLORGREEN;\n零轴:0,COLORGRAY,LINETHICK1;\n顶轴:40,COLORGRAY,LINETHICK1;\n低位:=CLOSE<HHV(H,250)*0.72;\n高位:=CLOSE>HHV(H,120)*0.85;\n上移:=COST(50)>REF(COST(50),20)*1.05;\n吸筹区:=低位 AND C90<=25;\nSTICKLINE(吸筹区,0,8,2,0),COLORCYAN;\n吸筹起:=吸筹区 AND REF(吸筹区,1)=0;\n吸筹续标:=吸筹区 AND MOD(BARSLAST(吸筹起),15)=0 AND BARSLAST(吸筹起)>0;\nDRAWTEXT(吸筹起 OR 吸筹续标,11,'吸筹'),COLORCYAN;\n买:=CROSS(CLOSE,COST(95)) AND VOL>MA(VOL,5)*1.2;\n买首触:=买 AND REF(买,1)=0;\n卖:=CROSS(REF(COST(5),1),CLOSE) AND VOL>MA(VOL,5)*1.2;\n卖首触:=卖 AND REF(卖,1)=0;\nDRAWICON(买首触,C90,1);\nDRAWTEXT(买首触,C90*1.15,'买'),COLORRED;\nDRAWICON(卖首触,C90,2);\nDRAWTEXT(卖首触,C90*0.85,'卖'),COLORGREEN;\n状态:=IF(低位 AND C90<=15,'状态:低位吸筹',IF(高位 AND WINNER(CLOSE)>0.9 AND 上移,'状态:高位派筹',IF(高位 AND C90>20,'状态:高位风险','状态:观望蓄势')));\nDRAWTEXT(CURRBARSCOUNT=1,38,状态),COLORWHITE;"
+  }
+]

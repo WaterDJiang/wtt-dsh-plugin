@@ -1,0 +1,7 @@
+node_modules/
+.runtime/
+evidence/
+*.sqlite*
+*.db
+*.tgz
+.DS_Store

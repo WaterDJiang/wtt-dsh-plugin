@@ -1,0 +1,60 @@
+{
+  "name": "@wtt/dsh-wanalysis",
+  "version": "0.5.2",
+  "description": "在 DeepSeek Harness 查看 A 股日周线、指标和归档财务，将单股或全市场行情同步到本机 SQLite。",
+  "type": "module",
+  "engines": {
+    "node": ">=24",
+    "dsh": ">=0.2.1-rc.5 || >=0.2.2-rc.0"
+  },
+  "exports": {
+    ".": "./dist/host.mjs",
+    "./client": "./dist/client.js"
+  },
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "THIRD_PARTY_NOTICES.md",
+    "README.md",
+    "CHANGELOG.md",
+    "docs/first-chart.md",
+    "docs/data-and-support.md",
+    "assets/readme/daily-chart.png",
+    "assets/readme/weekly-chart.png",
+    "assets/readme/indicator-library.png",
+    "assets/readme/database-sync.png",
+    "assets/readme/financial-summary.png",
+    "src/assets/wattter-agent.png",
+    "screenshots.json"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WaterDJiang/wtt-dsh-plugin.git",
+    "directory": "plugins/dsh-wanalysis"
+  },
+  "homepage": "https://github.com/WaterDJiang/wtt-dsh-plugin/tree/main/plugins/dsh-wanalysis",
+  "bugs": {
+    "url": "https://github.com/WaterDJiang/wtt-dsh-plugin/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "wanalysis",
+    "股票分析",
+    "A股",
+    "SQLite",
+    "筹码集中度"
+  ]
+}
